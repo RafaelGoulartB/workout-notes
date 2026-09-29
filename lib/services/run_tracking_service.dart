@@ -55,7 +55,8 @@ class RunTrackingService extends ChangeNotifier {
     supported: defaultTargetPlatform == TargetPlatform.android,
   );
   StreamSubscription<dynamic>? _eventSubscription;
-  bool _initialized = false;
+  Future<void>? _initFuture;
+  bool _routeMaintenanceStarted = false;
   bool _recovering = false;
   int _recoveredCount = 0;
   final List<RunLatLng> _trail = [];
@@ -85,37 +86,74 @@ class RunTrackingService extends ChangeNotifier {
 
   bool get _isAndroid => defaultTargetPlatform == TargetPlatform.android;
 
-  Future<void> initialize() async {
+  /// Subscribes to the native events, reads capabilities/state and recovers
+  /// what a killed process left behind. Concurrent and later callers share the
+  /// same run (home, run screens and startup all call this); a failed run can
+  /// be retried by calling it again. Use [refresh] for a light re-read.
+  Future<void> initialize() {
+    final running = _initFuture;
+    if (running != null) return running;
+    final future = _initialize();
+    _initFuture = future;
+    future.catchError((Object _) {
+      if (identical(_initFuture, future)) _initFuture = null;
+    });
+    return future;
+  }
+
+  Future<void> _initialize() async {
     if (!_isAndroid) {
       if (kDebugMode) {
         _state = _state.copyWith(supported: true, locationGranted: true);
       }
       _notificationsGranted = true;
-      _initialized = true;
       notifyListeners();
-      await _maintainRouteStorage();
+      _scheduleRouteMaintenance();
       return;
     }
-    if (!_initialized) {
-      _initialized = true;
-      _eventSubscription = events.receiveBroadcastStream().listen(
-        _onEvent,
-        onError: (Object error, StackTrace stack) {
-          if (_debugSim != null) return;
-          _state = _state.copyWith(
-            errorCode: 'event_channel',
-            errorMessage: error.toString(),
-          );
-          notifyListeners();
-        },
-      );
-    }
-    await getCapabilities();
-    await getState();
+    _subscribeToEvents();
+    await refresh();
     await _recoverActiveNativeSession();
     _sessionContext = _state.sessionContext;
     await recoverPendingSessions();
-    await _maintainRouteStorage();
+    _scheduleRouteMaintenance();
+  }
+
+  /// Forgets the shared initialisation so the next [initialize] runs again
+  /// (tests share the singleton across cases).
+  @visibleForTesting
+  void resetInitializationForTest() {
+    _initFuture = null;
+    _routeMaintenanceStarted = false;
+  }
+
+  /// Light re-read of the native capabilities and state (no recovery).
+  Future<void> refresh() async {
+    await getCapabilities();
+    await getState();
+  }
+
+  void _subscribeToEvents() {
+    if (_eventSubscription != null) return;
+    _eventSubscription = events.receiveBroadcastStream().listen(
+      _onEvent,
+      onError: (Object error, StackTrace stack) {
+        if (_debugSim != null) return;
+        _state = _state.copyWith(
+          errorCode: 'event_channel',
+          errorMessage: error.toString(),
+        );
+        notifyListeners();
+      },
+    );
+  }
+
+  /// Route storage maintenance runs at most once per process, in the
+  /// background, and never while a run is being recorded.
+  void _scheduleRouteMaintenance() {
+    if (_routeMaintenanceStarted || _state.isActive) return;
+    _routeMaintenanceStarted = true;
+    unawaited(_maintainRouteStorage());
   }
 
   Future<void> _maintainRouteStorage() async {

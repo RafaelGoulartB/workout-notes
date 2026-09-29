@@ -190,6 +190,12 @@
   "sleepMonitorPlacementBody": "Deixe o celular carregando entre 50 e 100 cm da cabeça, com o microfone apontado para você, e nunca sob o travesseiro. Outras pessoas, pets, TV ou música podem reduzir a confiança.",
 
   "commonCancel": "Cancelar",
+  "commonRetry": "Tentar novamente",
+  "commonOk": "OK",
+  "commonLoadError": "Não foi possível carregar seus dados.",
+  "commonRefreshFailed": "Não foi possível atualizar. Mostrando os dados anteriores.",
+  "sleepAlarmShiftEarlier": "− 15 min",
+  "sleepAlarmShiftLater": "+ 15 min",
   "commonDelete": "Excluir",
   "commonSave": "Salvar",
   "commonDiscard": "Descartar",

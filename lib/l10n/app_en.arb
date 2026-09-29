@@ -190,6 +190,12 @@
   "sleepMonitorPlacementBody": "Keep the phone charging 50–100 cm from your head, point the microphone toward you and never place it under the pillow. Other people, pets, TV or music can reduce confidence.",
 
   "commonCancel": "Cancel",
+  "commonRetry": "Try again",
+  "commonOk": "OK",
+  "commonLoadError": "Could not load your data.",
+  "commonRefreshFailed": "Could not refresh. Showing the earlier data.",
+  "sleepAlarmShiftEarlier": "− 15 min",
+  "sleepAlarmShiftLater": "+ 15 min",
   "commonDelete": "Delete",
   "commonSave": "Save",
   "commonDiscard": "Discard",

@@ -98,7 +98,7 @@ void main() {
     }) => _app(
       ActiveWorkoutHeader(
         phase: phase,
-        elapsed: '12:34',
+        elapsed: ValueNotifier('12:34'),
         startedAt: DateTime(2026, 9, 1, 18, 5),
         endedAt: null,
         onStart: () {},

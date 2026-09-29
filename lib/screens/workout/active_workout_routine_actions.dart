@@ -409,7 +409,7 @@ mixin _ActiveWorkoutRoutineActions
   void _updateRestTimeAndClose(ExerciseWithSets exercise, int seconds) async {
     await _workoutRepo.updateExerciseEntryRestTime(exercise.entryId, seconds);
     await _loadExercises();
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   Future<void> _pickExercise() async {

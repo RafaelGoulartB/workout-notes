@@ -174,7 +174,7 @@ class _PeriodizationPlanEditorScreenState
       selectableDayPredicate: (day) =>
           day.weekday == DateTime.monday || DateUtils.isSameDay(day, initial),
     );
-    if (picked != null) setState(() => _start = picked);
+    if (picked != null && mounted) setState(() => _start = picked);
   }
 
   Future<void> _addPhase() async {
@@ -214,7 +214,7 @@ class _PeriodizationPlanEditorScreenState
       ),
     );
     controller.dispose();
-    if (name == null || name.trim().isEmpty) return;
+    if (name == null || name.trim().isEmpty || !mounted) return;
     setState(() => phase.entry = phase.entry.copyWith(name: name.trim()));
   }
 
@@ -253,7 +253,7 @@ class _PeriodizationPlanEditorScreenState
           ],
         ),
       );
-      if (confirmed != true) return;
+      if (confirmed != true || !mounted) return;
     }
     setState(() => _saving = true);
     try {

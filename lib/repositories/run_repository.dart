@@ -1044,6 +1044,54 @@ class RunRepository extends BaseRepository {
     }, conflictAlgorithm: ConflictAlgorithm.replace);
     return updated;
   }
+
+  /// Every completed cardio session since [startedFrom], newest first, with
+  /// only the columns weekly totals and calendars need.
+  Future<List<CardioStamp>> listCardioStamps({DateTime? startedFrom}) async {
+    final database = await db;
+    final rows = await database.query(
+      'run_activities',
+      columns: const [
+        'started_at',
+        'activity_type',
+        'duration_seconds',
+        'moving_time_seconds',
+        'distance_meters',
+      ],
+      where: startedFrom == null
+          ? 'status = ?'
+          : 'status = ? AND started_at >= ?',
+      whereArgs: [
+        'completed',
+        if (startedFrom != null) startedFrom.toIso8601String(),
+      ],
+      orderBy: 'started_at DESC',
+    );
+    return rows.map(CardioStamp.fromMap).toList();
+  }
+
+  /// The newest completed cardio sessions that are more than an aborted
+  /// start (a minute or 100 m), for "recent" lists.
+  Future<List<RunActivity>> listRecentCardio({
+    int limit = 3,
+    DateTime? startedFrom,
+  }) async {
+    final database = await db;
+    final rows = await database.query(
+      'run_activities',
+      where: startedFrom == null
+          ? 'status = ? AND (duration_seconds >= 60 OR distance_meters >= 100)'
+          : 'status = ? AND (duration_seconds >= 60 OR distance_meters >= 100) '
+                'AND started_at >= ?',
+      whereArgs: [
+        'completed',
+        if (startedFrom != null) startedFrom.toIso8601String(),
+      ],
+      orderBy: 'started_at DESC',
+      limit: limit,
+    );
+    return rows.map(RunActivity.fromMap).toList();
+  }
 }
 
 class _RouteSummary {

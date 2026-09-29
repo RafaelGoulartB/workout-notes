@@ -157,7 +157,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
       firstDate: DateTime(2018),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
     setState(() => _selectedDate = _dateOnly(picked));
     await _load();
   }

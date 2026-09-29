@@ -251,3 +251,37 @@ class RunActivity {
     );
   }
 }
+
+/// The few columns of a completed cardio session that calendars and weekly
+/// totals need — no route, notes or best efforts.
+class CardioStamp {
+  final DateTime startedAt;
+  final CardioActivityType activityType;
+  final int durationSeconds;
+  final int movingTimeSeconds;
+  final double distanceMeters;
+
+  const CardioStamp({
+    required this.startedAt,
+    required this.activityType,
+    required this.durationSeconds,
+    required this.movingTimeSeconds,
+    required this.distanceMeters,
+  });
+
+  /// Outdoor or treadmill run.
+  bool get isRunning => activityType.isRunning;
+
+  /// Sub-minute sessions are aborted starts, not sessions.
+  bool get countsAsSession => durationSeconds >= 60 || distanceMeters >= 100;
+
+  factory CardioStamp.fromMap(Map<String, dynamic> map) {
+    return CardioStamp(
+      startedAt: DateTime.parse(map['started_at'] as String),
+      activityType: CardioActivityType.fromDatabase(map['activity_type']),
+      durationSeconds: (map['duration_seconds'] as num?)?.toInt() ?? 0,
+      movingTimeSeconds: (map['moving_time_seconds'] as num?)?.toInt() ?? 0,
+      distanceMeters: (map['distance_meters'] as num?)?.toDouble() ?? 0,
+    );
+  }
+}

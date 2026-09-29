@@ -131,7 +131,6 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     _service.addListener(_onChanged);
     _indoorService.addListener(_onIndoorChanged);
     _coach.addListener(_onCoachChanged);
-    _service.initialize();
     _prepareCoach();
     _loadPreferences();
     _loadTodayWorkout();

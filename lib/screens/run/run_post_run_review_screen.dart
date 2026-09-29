@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_gear.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_review_draft.dart';
@@ -138,50 +139,25 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
 
   Future<void> _loadContext() async {
     final activity = _draft.activity;
-    ScheduledRun? scheduled;
-    RunPlanWorkout? workout;
     final scheduledId = _draft.scheduledRunId;
-    if (scheduledId != null) {
-      scheduled = await _planRepository.getScheduledRun(scheduledId);
-      workout = scheduled?.workout;
-    }
     final workoutId = _draft.planWorkoutId;
-    if (workout == null && workoutId != null) {
-      workout = await _planRepository.getWorkout(workoutId);
-    }
 
-    var insights = RunReviewInsights.empty;
-    ScheduledRun? next;
-    RunGearUsage? gear;
-    if (!_isStationaryBike) {
-      final ranking = activity.isRun
-          ? await _runRepository.listActivitiesForRanking()
-          : const <dynamic>[];
-      // The week and the month of the run, with a day of slack; the pure
-      // function does the exact filtering.
-      final since = RunReviewInsights.weekStart(
-        activity.startedAt,
-      ).subtract(const Duration(days: 40));
-      final recent = await _runRepository.listActivities(
-        limit: null,
-        activityType: null,
-        activityTypes: RunRepository.runningTypes,
-        startedFrom: since,
-      );
-      insights = RunReviewInsights.compute(
-        draft: activity,
-        ranking: ranking.cast(),
-        recent: recent,
-      );
-      next = await _nextPlannedSession(exclude: scheduledId);
-      final defaultGear = await DatabaseHelper.instance.runGearRepo
-          .getDefaultGear();
-      if (defaultGear != null) {
-        gear = await DatabaseHelper.instance.runGearRepo.getUsage(
-          defaultGear.id,
-        );
-      }
-    }
+    // The plan context and the run history are independent reads, so they
+    // run together (SQLite still serialises the statements).
+    final scheduledFuture = scheduledId == null
+        ? Future<ScheduledRun?>.value(null)
+        : _planRepository.getScheduledRun(scheduledId);
+    final workoutFuture = scheduledFuture.then((scheduled) async {
+      final fromSchedule = scheduled?.workout;
+      if (fromSchedule != null || workoutId == null) return fromSchedule;
+      return _planRepository.getWorkout(workoutId);
+    });
+    final historyFuture = _isStationaryBike
+        ? Future.value((RunReviewInsights.empty, null, null))
+        : _loadHistory(activity, scheduledId);
+
+    final RunPlanWorkout? workout = await workoutFuture;
+    final (insights, next, gear) = await historyFuture;
     if (!mounted) return;
     setState(() {
       _planWorkout = workout;
@@ -193,6 +169,42 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
       }
       _loading = false;
     });
+  }
+
+  Future<(RunReviewInsights, ScheduledRun?, RunGearUsage?)> _loadHistory(
+    RunActivity activity,
+    String? scheduledId,
+  ) async {
+    // The week and the month of the run, with a day of slack; the pure
+    // function does the exact filtering.
+    final since = RunReviewInsights.weekStart(
+      activity.startedAt,
+    ).subtract(const Duration(days: 40));
+    final (ranking, recent, next, gear) = await (
+      activity.isRun
+          ? _runRepository.listActivitiesForRanking()
+          : Future.value(const <RunActivity>[]),
+      _runRepository.listActivities(
+        limit: null,
+        activityType: null,
+        activityTypes: RunRepository.runningTypes,
+        startedFrom: since,
+      ),
+      _nextPlannedSession(exclude: scheduledId),
+      _defaultGearUsage(),
+    ).wait;
+    final insights = RunReviewInsights.compute(
+      draft: activity,
+      ranking: ranking,
+      recent: recent,
+    );
+    return (insights, next, gear);
+  }
+
+  Future<RunGearUsage?> _defaultGearUsage() async {
+    final gearRepo = DatabaseHelper.instance.runGearRepo;
+    final defaultGear = await gearRepo.getDefaultGear();
+    return defaultGear == null ? null : gearRepo.getUsage(defaultGear.id);
   }
 
   /// The next session of the followed plan, if any (light: one date range).

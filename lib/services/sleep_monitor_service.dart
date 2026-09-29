@@ -29,7 +29,7 @@ class SleepMonitorService extends ChangeNotifier {
     supported: defaultTargetPlatform == TargetPlatform.android,
   );
   StreamSubscription<dynamic>? _eventSubscription;
-  bool _initialized = false;
+  Future<void>? _initFuture;
   bool _recovering = false;
   int _recoveredCount = 0;
   SleepWakeCursor? _liveCursor;
@@ -43,26 +43,53 @@ class SleepMonitorService extends ChangeNotifier {
   bool get isMonitoring => _state.isActive;
   int get recoveredCount => _recoveredCount;
 
-  Future<void> initialize() async {
-    if (!_isAndroid) {
-      _initialized = true;
-      return;
-    }
-    if (!_initialized) {
-      _initialized = true;
-      _eventSubscription = events.receiveBroadcastStream().listen(
-        _onEvent,
-        onError: (Object error, StackTrace stack) {
-          _state = _state.copyWith(
-            errorCode: 'event_channel',
-            errorMessage: error.toString(),
-          );
-          notifyListeners();
-        },
-      );
-    }
+  /// Subscribes to the native events, reads capabilities/state and imports
+  /// pending spools. Concurrent and later callers share the same run; a failed
+  /// run can be retried by calling it again. Use [refresh] for a light re-read.
+  Future<void> initialize() {
+    final running = _initFuture;
+    if (running != null) return running;
+    final future = _initialize();
+    _initFuture = future;
+    future.catchError((Object _) {
+      if (identical(_initFuture, future)) _initFuture = null;
+    });
+    return future;
+  }
+
+  Future<void> _initialize() async {
+    if (!_isAndroid) return;
+    _eventSubscription ??= events.receiveBroadcastStream().listen(
+      _onEvent,
+      onError: (Object error, StackTrace stack) {
+        _state = _state.copyWith(
+          errorCode: 'event_channel',
+          errorMessage: error.toString(),
+        );
+        notifyListeners();
+      },
+    );
+    await refresh();
+    await recoverPendingSessions();
+  }
+
+  /// Forgets the shared initialisation so the next [initialize] runs again
+  /// (tests share the singleton across cases).
+  @visibleForTesting
+  void resetInitializationForTest() => _initFuture = null;
+
+  /// Light re-read of the native capabilities and state (no spool import).
+  Future<void> refresh() async {
     await getCapabilities();
     await getState();
+  }
+
+  /// The app came back to the foreground (or the user pulled to refresh):
+  /// re-read the native state and import what finished meanwhile.
+  Future<void> resync() async {
+    if (!_isAndroid) return;
+    await initialize();
+    await refresh();
     await recoverPendingSessions();
   }
 

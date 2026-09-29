@@ -19,6 +19,7 @@ import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 import 'package:workout_notes/services/open_food_facts_gateway.dart';
 
+import 'package:workout_notes/widgets/load_error_view.dart';
 import 'food_quantity_sheet.dart';
 import 'food_library_screen.dart';
 import 'food_search_screen.dart';
@@ -56,6 +57,12 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   late DateTime _selectedDate;
   bool _isLoading = true;
   bool _hasLoaded = false;
+
+  // A failed read keeps the last data on screen (with a retry) instead of
+  // passing for an empty diary; data of another day is never shown as this
+  // day's, so then the whole body is the error.
+  bool _loadFailed = false;
+  DateTime? _dataDate;
   int _loadGeneration = 0;
 
   @override
@@ -105,6 +112,8 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
         _meals = results[3] as List<MealLogWithItems>;
         _isLoading = false;
         _hasLoaded = true;
+        _loadFailed = false;
+        _dataDate = selectedDate;
       });
       // The plan target is an enhancement to the existing diary summary.
       // Loading it independently keeps diary navigation responsive even when
@@ -114,11 +123,14 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
       if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _isLoading = false;
-        _hasLoaded = true;
-        _weeklyCalories = const {};
+        _loadFailed = true;
       });
     }
   }
+
+  bool get _showLoadError =>
+      _loadFailed &&
+      (_dataDate == null || !_isSameDay(_dataDate!, _selectedDate));
 
   Future<void> _loadEffectiveGoal(DateTime selectedDate, int generation) async {
     try {
@@ -534,7 +546,20 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
           ),
         ],
       ),
-      body: _isLoading && !_hasLoaded
+      body: _showLoadError
+          ? Column(
+              children: [
+                _NutritionWeekSelector(
+                  selectedDate: _selectedDate,
+                  onSelected: _selectDate,
+                  collapseProgress: 0,
+                  weeklyCalories: _weeklyCalories,
+                  calorieGoal: _effective.goal?.calories,
+                ),
+                Expanded(child: LoadErrorView(onRetry: _load)),
+              ],
+            )
+          : _isLoading && !_hasLoaded
           ? Column(
               children: [
                 _NutritionWeekSelector(
@@ -564,6 +589,10 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                           calorieGoal: _effective.goal?.calories,
                         ),
                       ),
+                      if (_loadFailed)
+                        SliverToBoxAdapter(
+                          child: LoadErrorBanner(onRetry: _load),
+                        ),
                       SliverToBoxAdapter(
                         child:
                             NutritionSummaryCard(

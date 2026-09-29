@@ -13,6 +13,7 @@ import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'package:workout_notes/services/traditional_alarm_service.dart';
 import 'package:workout_notes/utils/sleep_alarm_time.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/second_ticker.dart';
 
 import 'sleep_monitor_result_screen.dart';
 import 'sleep_settings_screen.dart';
@@ -34,7 +35,6 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
 
   final _service = SleepMonitorService.instance;
   final _missions = SleepMissionService();
-  Timer? _ticker;
   TimeOfDay _selectedTime = const TimeOfDay(hour: 7, minute: 0);
   SleepMonitoringMode _selectedMode = SleepMonitoringMode.alarmWithoutMission;
   int _globalMaxSnoozes = TraditionalAlarmService.defaultMaxSnoozes;
@@ -51,35 +51,20 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     WidgetsBinding.instance.addObserver(this);
     _service.addListener(_onChanged);
     _initialize();
-    _startTicker();
-  }
-
-  void _startTicker() {
-    _ticker?.cancel();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted && _service.state.isActive) setState(() {});
-    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _service.removeListener(_onChanged);
-    _ticker?.cancel();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _startTicker();
-    } else {
-      _ticker?.cancel();
-      _ticker = null;
-    }
     if (state == AppLifecycleState.resumed && _service.isSupported) {
       _reloadMission();
-      _service.initialize().then((_) => _service.getAlarmCapabilities());
+      _service.resync().then((_) => _service.getAlarmCapabilities());
       _openPendingAlarmResult();
     }
   }
@@ -100,6 +85,8 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
 
   Future<void> _initialize() async {
     await _service.initialize();
+    // Opening the screen re-reads the native state (initialize() runs once).
+    await _service.refresh();
     if (!_service.isSupported) {
       if (mounted) setState(() => _loading = false);
       return;
@@ -443,11 +430,14 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
                 style: Theme.of(context).textTheme.labelLarge,
               ),
               const SizedBox(height: 4),
-              Text(
-                _formatDuration(state.elapsed),
-                style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+              // Only the clock rebuilds every second, not the whole screen.
+              SecondTicker(
+                builder: (context) => Text(
+                  _formatDuration(state.elapsed),
+                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
               ),
               const SizedBox(height: 18),
@@ -476,10 +466,17 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
                                     context,
                                   ).textTheme.labelMedium,
                                 ),
-                                Text(
-                                  _formatRemaining(alarmAt, withSeconds: true),
-                                  style: Theme.of(context).textTheme.titleLarge
-                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                SecondTicker(
+                                  builder: (context) => Text(
+                                    _formatRemaining(
+                                      alarmAt,
+                                      withSeconds: true,
+                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
                                 ),
                               ],
                             ),
@@ -1470,7 +1467,9 @@ class _AlarmClockCard extends StatelessWidget {
                                 visualDensity: VisualDensity.compact,
                               )
                             : null,
-                        child: const Text('− 15 min'),
+                        child: Text(
+                          AppLocalizations.of(context)!.sleepAlarmShiftEarlier,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -1486,7 +1485,9 @@ class _AlarmClockCard extends StatelessWidget {
                                 visualDensity: VisualDensity.compact,
                               )
                             : null,
-                        child: const Text('+ 15 min'),
+                        child: Text(
+                          AppLocalizations.of(context)!.sleepAlarmShiftLater,
+                        ),
                       ),
                     ),
                   ],
@@ -1703,7 +1704,9 @@ class _PermissionRow extends StatelessWidget {
       children: [
         Icon(granted ? Icons.check_circle : Icons.warning_amber, color: color),
         const SizedBox(width: 8),
-        Text('$label: ${granted ? 'OK' : '—'}'),
+        Text(
+          '$label: ${granted ? AppLocalizations.of(context)!.commonOk : '—'}',
+        ),
       ],
     );
   }

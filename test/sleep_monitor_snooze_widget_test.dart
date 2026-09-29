@@ -57,6 +57,8 @@ void main() {
       'full_screen_intent_granted': true,
     };
     calls.clear();
+    // initialize() is shared per process; every case starts from scratch.
+    SleepMonitorService.instance.resetInitializationForTest();
     messenger.setMockMethodCallHandler(SleepMonitorService.methods, (
       call,
     ) async {
