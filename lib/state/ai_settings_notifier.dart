@@ -18,6 +18,10 @@ const _kPrefsAutoExpandToolDetails = 'ai_auto_expand_tool_details_v1';
 const _kTokenPrefix = 'ai_token:';
 const _kLegacyTokenKey = 'ai_token';
 
+/// Set once the pre-multi-provider token key has been looked at, so later
+/// launches skip the (slow) secure-storage read.
+const _kPrefsLegacyTokenMigrated = 'ai_legacy_token_migrated_v1';
+
 const String kDefaultAiCoachSystemPrompt = r'''# Identidade e missão
 
 Você é o **Treinador do Workout Notes**, um assistente de treinamento físico altamente capacitado. Sua função é transformar os dados registrados pelo usuário em análises claras, decisões práticas e orientações individualizadas. Combine o raciocínio de um excelente personal trainer com comunicação responsável: seja preciso, direto, encorajador e nunca finja saber o que os dados não mostram.
@@ -204,8 +208,10 @@ class AiSettingsNotifier extends ChangeNotifier {
       autoExpandToolDetails: autoExpandToolDetails,
     );
 
-    // Migrate legacy single token.
-    if (providers.isNotEmpty) {
+    // Migrate the legacy single token once. The flag keeps every later launch
+    // from touching secure storage just to find nothing.
+    if (providers.isNotEmpty &&
+        !(prefs.getBool(_kPrefsLegacyTokenMigrated) ?? false)) {
       try {
         final legacyToken = await secure.read(key: _kLegacyTokenKey);
         if (legacyToken != null && legacyToken.isNotEmpty) {
@@ -218,6 +224,7 @@ class AiSettingsNotifier extends ChangeNotifier {
           }
           await secure.delete(key: _kLegacyTokenKey);
         }
+        await prefs.setBool(_kPrefsLegacyTokenMigrated, true);
       } catch (_) {}
     }
 
