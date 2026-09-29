@@ -3,6 +3,9 @@ import 'dart:math' as math;
 
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
+import 'package:workout_notes/repositories/phase_target_training.dart';
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/sql_helpers.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_ledger.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
@@ -90,14 +93,14 @@ class RunPlanRepository extends BaseRepository {
   /// back-filled).
   Future<int> activatePlan(String id, {DateTime? from}) async {
     final database = await db;
-    final today = _day(from ?? DateTime.now());
+    final today = dayOf(from ?? DateTime.now());
     var start = today;
     if (from == null) {
       final existing = await getPlan(id);
       final race = existing?.raceDate;
       if (existing != null && race != null && existing.weeks > 0) {
-        final raceWeek = _weekStart(race);
-        if (!raceWeek.isBefore(_weekStart(today))) {
+        final raceWeek = mondayOf(race);
+        if (!raceWeek.isBefore(mondayOf(today))) {
           start = raceWeek.subtract(Duration(days: 7 * (existing.weeks - 1)));
         }
       }
@@ -112,7 +115,7 @@ class RunPlanRepository extends BaseRepository {
       );
       await txn.update(
         'run_plans',
-        {'activated_at': _date(start), 'updated_at': now},
+        {'activated_at': dateKey(start), 'updated_at': now},
         where: 'id = ?',
         whereArgs: [id],
       );
@@ -120,7 +123,7 @@ class RunPlanRepository extends BaseRepository {
     final plan = await getPlan(id);
     if (plan == null) return 0;
     var created = 0;
-    final anchorWeek = _weekStart(start);
+    final anchorWeek = mondayOf(start);
     // Only the weeks from here on: back-filling earlier weeks would invent
     // planned sessions the user never had a chance to run.
     final firstWeek = start.isBefore(today)
@@ -250,7 +253,7 @@ class RunPlanRepository extends BaseRepository {
     final planId = await _planIdForWorkout(database, planWorkoutId);
     if (planId == null) return null;
     final wasComplete = (await getPlanProgress(planId)).isComplete;
-    final day = _day(date);
+    final day = dayOf(date);
     // A plan session is one logical unit, so running Wednesday's workout on
     // Saturday must tick off that same row rather than spawn a twin and leave
     // the original planned forever. Exact date first, then the session's own
@@ -259,7 +262,7 @@ class RunPlanRepository extends BaseRepository {
       'scheduled_runs',
       columns: ['id'],
       where: 'run_plan_workout_id = ? AND date = ?',
-      whereArgs: [planWorkoutId, _date(day)],
+      whereArgs: [planWorkoutId, dateKey(day)],
       limit: 1,
     );
     var moved = false;
@@ -277,8 +280,8 @@ class RunPlanRepository extends BaseRepository {
         whereArgs: [
           planWorkoutId,
           ScheduledRunStatus.planned.value,
-          _date(from),
-          _date(to),
+          dateKey(from),
+          dateKey(to),
         ],
         orderBy: 'date ASC',
         limit: 1,
@@ -291,7 +294,7 @@ class RunPlanRepository extends BaseRepository {
       id = _uuid.v4();
       await database.insert('scheduled_runs', {
         'id': id,
-        'date': _date(day),
+        'date': dateKey(day),
         'run_plan_id': planId,
         'run_plan_workout_id': planWorkoutId,
         'status': ScheduledRunStatus.completed.value,
@@ -307,7 +310,7 @@ class RunPlanRepository extends BaseRepository {
         {
           'status': ScheduledRunStatus.completed.value,
           'run_activity_id': runActivityId,
-          if (moved) 'date': _date(day),
+          if (moved) 'date': dateKey(day),
           'updated_at': now,
         },
         where: 'id = ?',
@@ -372,7 +375,7 @@ class RunPlanRepository extends BaseRepository {
     final plan = RunPlan(
       id: _uuid.v4(),
       name: name.trim(),
-      notes: _optional(notes),
+      notes: optionalText(notes),
       goalKind: goalKind,
       raceDate: raceDate,
       weeks: weeks < 1 ? 1 : weeks,
@@ -401,12 +404,12 @@ class RunPlanRepository extends BaseRepository {
     };
     if (name != null) updates['name'] = name.trim();
     if (!identical(notes, _sentinel)) {
-      updates['notes'] = _optional(notes as String?);
+      updates['notes'] = optionalText(notes as String?);
     }
     if (goalKind != null) updates['goal_kind'] = goalKind.value;
     if (!identical(raceDate, _sentinel)) {
       final value = raceDate as DateTime?;
-      updates['race_date'] = value == null ? null : _date(value);
+      updates['race_date'] = value == null ? null : dateKey(value);
     }
     if (weeks != null) updates['weeks'] = weeks < 1 ? 1 : weeks;
     if (status != null) updates['status'] = status.value;
@@ -582,11 +585,11 @@ class RunPlanRepository extends BaseRepository {
       orderIndex: count,
       kind: kind,
       name: name.trim(),
-      notes: _optional(notes),
+      notes: optionalText(notes),
       targetDistanceMeters: targetDistanceMeters,
       targetDurationSeconds: targetDurationSeconds,
       targetPaceSecPerKm: targetPaceSecPerKm,
-      effortZone: _optional(effortZone),
+      effortZone: optionalText(effortZone),
       createdAt: DateTime.now(),
     );
     await database.insert('run_plan_workouts', workout.toMap());
@@ -614,7 +617,7 @@ class RunPlanRepository extends BaseRepository {
       updates['day_of_week'] = dayOfWeek as int?;
     }
     if (!identical(notes, _sentinel)) {
-      updates['notes'] = _optional(notes as String?);
+      updates['notes'] = optionalText(notes as String?);
     }
     if (!identical(targetDistanceMeters, _sentinel)) {
       updates['target_distance_meters'] = targetDistanceMeters as double?;
@@ -626,7 +629,7 @@ class RunPlanRepository extends BaseRepository {
       updates['target_pace_sec_per_km'] = targetPaceSecPerKm as double?;
     }
     if (!identical(effortZone, _sentinel)) {
-      updates['effort_zone'] = _optional(effortZone as String?);
+      updates['effort_zone'] = optionalText(effortZone as String?);
     }
     if (weekIndex != null) updates['week_index'] = weekIndex;
     if (updates.isEmpty) return;
@@ -695,7 +698,7 @@ class RunPlanRepository extends BaseRepository {
       repeatCount: repeatCount < 1 ? 1 : repeatCount,
       targetPaceMinSecPerKm: targetPaceMinSecPerKm,
       targetPaceMaxSecPerKm: targetPaceMaxSecPerKm,
-      notes: _optional(notes),
+      notes: optionalText(notes),
     );
     await database.insert('run_workout_steps', step.toMap());
     await _touchPlanForWorkout(database, workoutId);
@@ -759,7 +762,7 @@ class RunPlanRepository extends BaseRepository {
     final rows = await database.query(
       'scheduled_runs',
       where: 'date >= ? AND date <= ?',
-      whereArgs: [_date(from), _date(to)],
+      whereArgs: [dateKey(from), dateKey(to)],
       orderBy: 'date ASC',
     );
     return _hydrateScheduled(database, rows, hydrate: hydrate);
@@ -770,7 +773,7 @@ class RunPlanRepository extends BaseRepository {
     final rows = await database.query(
       'scheduled_runs',
       where: 'date = ?',
-      whereArgs: [_date(date)],
+      whereArgs: [dateKey(date)],
       orderBy: 'created_at ASC',
     );
     return _hydrateScheduled(database, rows);
@@ -803,7 +806,7 @@ class RunPlanRepository extends BaseRepository {
     if (plan == null) return const [];
     final sessions = plan.workoutsForWeek(weekIndex);
     if (sessions.isEmpty) return const [];
-    final monday = _weekStart(weekStart);
+    final monday = mondayOf(weekStart);
     final database = await db;
     final created = <String>[];
     await database.transaction((txn) async {
@@ -818,7 +821,7 @@ class RunPlanRepository extends BaseRepository {
               '(date = ? OR status IN (?, ?))',
           whereArgs: [
             session.id,
-            _date(date),
+            dateKey(date),
             ScheduledRunStatus.completed.value,
             ScheduledRunStatus.skipped.value,
           ],
@@ -829,7 +832,7 @@ class RunPlanRepository extends BaseRepository {
         final id = _uuid.v4();
         await txn.insert('scheduled_runs', {
           'id': id,
-          'date': _date(date),
+          'date': dateKey(date),
           'run_plan_id': planId,
           'run_plan_workout_id': session.id,
           'status': ScheduledRunStatus.planned.value,
@@ -855,10 +858,10 @@ class RunPlanRepository extends BaseRepository {
     final updates = <String, dynamic>{
       'updated_at': DateTime.now().toIso8601String(),
     };
-    if (date != null) updates['date'] = _date(date);
+    if (date != null) updates['date'] = dateKey(date);
     if (status != null) updates['status'] = status.value;
     if (!identical(notes, _sentinel)) {
-      updates['notes'] = _optional(notes as String?);
+      updates['notes'] = optionalText(notes as String?);
     }
     if (!identical(runActivityId, _sentinel)) {
       updates['run_activity_id'] = runActivityId as String?;
@@ -1022,9 +1025,9 @@ class RunPlanRepository extends BaseRepository {
     final plan = await getPlan(planId);
     final anchor = plan?.activatedAt;
     if (plan == null || !plan.isActivated || anchor == null) return;
-    final today = _weekStart(DateTime.now());
+    final today = mondayOf(DateTime.now());
     for (var week = fromWeek; week < plan.weeks; week++) {
-      final start = _weekStart(anchor).add(Duration(days: 7 * week));
+      final start = mondayOf(anchor).add(Duration(days: 7 * week));
       if (start.isBefore(today)) continue;
       await materializeWeek(planId: planId, weekIndex: week, weekStart: start);
     }
@@ -1125,10 +1128,13 @@ class RunPlanRepository extends BaseRepository {
     );
     for (final row in rows) {
       final date = DateTime.parse(row['date'] as String);
-      final moved = _weekStart(date).add(Duration(days: dayOfWeek - 1));
+      final moved = mondayOf(date).add(Duration(days: dayOfWeek - 1));
       await database.update(
         'scheduled_runs',
-        {'date': _date(moved), 'updated_at': DateTime.now().toIso8601String()},
+        {
+          'date': dateKey(moved),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
         where: 'id = ?',
         whereArgs: [row['id']],
       );
@@ -1384,40 +1390,8 @@ class RunPlanRepository extends BaseRepository {
   }
 
   /// Weekly periodization targets keep `run_plan_ids` inside `training_json`.
-  Future<void> _clearPlanFromTargets(
-    DatabaseExecutor txn,
-    String planId,
-  ) async {
-    final targets = await txn.query(
-      'phase_targets',
-      columns: ['id', 'training_json'],
-    );
-    for (final target in targets) {
-      final raw = target['training_json'] as String?;
-      if (raw == null || raw.isEmpty || !raw.contains(planId)) continue;
-      final training = _decodeJson(raw);
-      final run = training['run'];
-      if (run is! Map) continue;
-      final ids = (run['run_plan_ids'] as List?)
-          ?.whereType<String>()
-          .where((id) => id != planId)
-          .toList();
-      if (ids == null) continue;
-      final updatedRun = Map<String, dynamic>.from(run);
-      if (ids.isEmpty) {
-        updatedRun.remove('run_plan_ids');
-      } else {
-        updatedRun['run_plan_ids'] = ids;
-      }
-      training['run'] = updatedRun;
-      await txn.update(
-        'phase_targets',
-        {'training_json': _encodeJson(training)},
-        where: 'id = ?',
-        whereArgs: [target['id']],
-      );
-    }
-  }
+  Future<void> _clearPlanFromTargets(DatabaseExecutor txn, String planId) =>
+      PhaseTargetTraining.removeRunPlan(txn, planId);
 
   Future<String?> _planIdForWorkout(
     DatabaseExecutor database,
@@ -1448,33 +1422,12 @@ class RunPlanRepository extends BaseRepository {
         where: 'id = ?',
         whereArgs: [planId],
       );
-
-  static String? _optional(String? value) {
-    final trimmed = value?.trim();
-    return trimmed == null || trimmed.isEmpty ? null : trimmed;
-  }
-
-  static String _date(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
-
-  static DateTime _day(DateTime value) =>
-      DateTime(value.year, value.month, value.day);
-
-  static DateTime _weekStart(DateTime date) {
-    final day = DateTime(date.year, date.month, date.day);
-    return day.subtract(Duration(days: day.weekday - 1));
-  }
 }
 
 Map<String, dynamic> _decodeJson(String raw) {
   final decoded = jsonDecode(raw);
   return decoded is Map ? Map<String, dynamic>.from(decoded) : {};
 }
-
-String _encodeJson(Map<String, dynamic> value) => jsonEncode(value);
 
 const Object _sentinel = Object();
 

@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/sql_helpers.dart';
 import 'package:workout_notes/models/periodization_checkin.dart';
 import 'package:workout_notes/models/periodization_metrics.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
@@ -87,7 +89,7 @@ class PeriodizationRepository extends BaseRepository {
     );
     if (rows.isNotEmpty) {
       final endDate = DateTime.parse(rows.first['end_date'] as String);
-      if (_day(endDate).isBefore(_day(DateTime.now()))) {
+      if (dayOf(endDate).isBefore(dayOf(DateTime.now()))) {
         await database.update(
           'periodization_plans',
           {
@@ -115,12 +117,12 @@ class PeriodizationRepository extends BaseRepository {
     final plan = PeriodizationPlan(
       id: _uuid.v4(),
       name: name.trim(),
-      startDate: _day(startDate),
-      endDate: _day(endDate),
+      startDate: dayOf(startDate),
+      endDate: dayOf(endDate),
       status: activate
           ? PeriodizationPlanStatus.active
           : PeriodizationPlanStatus.draft,
-      notes: _optional(notes),
+      notes: optionalText(notes),
       createdAt: now,
       updatedAt: now,
     );
@@ -152,9 +154,9 @@ class PeriodizationRepository extends BaseRepository {
       }
       if (phase.weeklyTargets != null) {
         _validateWeeklyWindow(
-          _day(phase.startDate),
-          _day(phase.startDate),
-          _day(phase.endDate),
+          dayOf(phase.startDate),
+          dayOf(phase.startDate),
+          dayOf(phase.endDate),
           phase.weeklyTargets!,
         );
       }
@@ -162,7 +164,7 @@ class PeriodizationRepository extends BaseRepository {
         throw const PeriodizationValidationException('phase_overlap');
       }
     }
-    if (_day(sorted.first.startDate).isBefore(_day(startDate))) {
+    if (dayOf(sorted.first.startDate).isBefore(dayOf(startDate))) {
       throw const PeriodizationValidationException('phase_outside_plan');
     }
     final planEnd = sorted
@@ -173,12 +175,12 @@ class PeriodizationRepository extends BaseRepository {
     final plan = PeriodizationPlan(
       id: _uuid.v4(),
       name: name.trim(),
-      startDate: _day(startDate),
-      endDate: _day(planEnd),
+      startDate: dayOf(startDate),
+      endDate: dayOf(planEnd),
       status: activate
           ? PeriodizationPlanStatus.active
           : PeriodizationPlanStatus.draft,
-      notes: _optional(notes),
+      notes: optionalText(notes),
       createdAt: now,
       updatedAt: now,
     );
@@ -195,9 +197,9 @@ class PeriodizationRepository extends BaseRepository {
           name: draft.name.trim(),
           templateKey: draft.templateKey,
           color: draft.color,
-          startDate: _day(draft.startDate),
-          endDate: _day(draft.endDate),
-          intent: _optional(draft.intent),
+          startDate: dayOf(draft.startDate),
+          endDate: dayOf(draft.endDate),
+          intent: optionalText(draft.intent),
           orderIndex: index,
           createdAt: now,
           updatedAt: now,
@@ -304,9 +306,9 @@ class PeriodizationRepository extends BaseRepository {
         'periodization_plans',
         {
           'name': name.trim(),
-          'notes': _optional(notes),
-          'start_date': _date(ranges.first.start),
-          'end_date': _date(ranges.last.end),
+          'notes': optionalText(notes),
+          'start_date': dateKey(ranges.first.start),
+          'end_date': dateKey(ranges.last.end),
           'updated_at': now,
         },
         where: 'id = ?',
@@ -335,7 +337,7 @@ class PeriodizationRepository extends BaseRepository {
               color: entry.color,
               startDate: range.start,
               endDate: range.end,
-              intent: _optional(entry.intent),
+              intent: optionalText(entry.intent),
               orderIndex: index,
               createdAt: DateTime.now(),
               updatedAt: DateTime.now(),
@@ -361,9 +363,9 @@ class PeriodizationRepository extends BaseRepository {
             'name': entry.name.trim(),
             'template_key': entry.templateKey,
             'color': entry.color,
-            'intent': _optional(entry.intent),
-            'start_date': _date(range.start),
-            'end_date': _date(range.end),
+            'intent': optionalText(entry.intent),
+            'start_date': dateKey(range.start),
+            'end_date': dateKey(range.end),
             'order_index': index,
             'updated_at': now,
           },
@@ -388,7 +390,7 @@ class PeriodizationRepository extends BaseRepository {
               SELECT MIN(version) FROM phase_targets WHERE phase_id = ?
             )
           ''',
-          [original.id, _date(range.end), original.id],
+          [original.id, dateKey(range.end), original.id],
         );
       }
     });
@@ -430,7 +432,7 @@ class PeriodizationRepository extends BaseRepository {
     DateTime start,
     Iterable<int> weeks,
   ) {
-    var cursor = _day(start);
+    var cursor = dayOf(start);
     final ranges = <({DateTime start, DateTime end})>[];
     for (final count in weeks) {
       final end = cursor.add(Duration(days: 7 * count - 1));
@@ -469,7 +471,7 @@ class PeriodizationRepository extends BaseRepository {
           'name': name.trim(),
           'template_key': templateKey,
           'color': color,
-          'intent': _optional(intent),
+          'intent': optionalText(intent),
           'updated_at': DateTime.now().toIso8601String(),
         },
         where: 'id = ?',
@@ -506,7 +508,7 @@ class PeriodizationRepository extends BaseRepository {
 
   /// What the active plan expects on [date], or null outside any phase.
   Future<PeriodizationDayPlan?> getDayPlan(DateTime date) async {
-    final day = _day(date);
+    final day = dayOf(date);
     final phase = await getEffectivePhase(day);
     if (phase == null) return null;
     final target = await getEffectiveTarget(phase.id, date: day);
@@ -520,7 +522,7 @@ class PeriodizationRepository extends BaseRepository {
     DateTime date, {
     Map<String, RunPlan?>? runPlanCache,
   }) async {
-    final day = _day(date);
+    final day = dayOf(date);
     RunPlan? runPlan;
     int? runPlanWeek;
     final planId = target?.runPlanIds.firstOrNull;
@@ -572,7 +574,7 @@ class PeriodizationRepository extends BaseRepository {
       SELECT DISTINCT date FROM workouts
       WHERE end_time IS NOT NULL AND date BETWEEN ? AND ?
       ''',
-      [_date(start), _date(end)],
+      [dateKey(start), dateKey(end)],
     );
     // `started_at >= day AND started_at < nextDay` matches the same rows as
     // comparing `date(started_at)` but can use the started_at indexes.
@@ -582,7 +584,7 @@ class PeriodizationRepository extends BaseRepository {
       WHERE status = 'completed' AND activity_type = 'running'
         AND started_at >= ? AND started_at < ?
       ''',
-      [_date(start), _dayAfter(end)],
+      [dateKey(start), _dayAfter(end)],
     );
     final runs = runRows.map((row) => row['day']).whereType<String>().toSet();
     return (
@@ -605,7 +607,7 @@ class PeriodizationRepository extends BaseRepository {
     if (plan == null) {
       throw const PeriodizationValidationException('plan_not_found');
     }
-    final weeks = phase.weekAt(_day(today ?? DateTime.now())).clamp(1, 104);
+    final weeks = phase.weekAt(dayOf(today ?? DateTime.now())).clamp(1, 104);
     final phases = await getPhases(plan.id);
     await replanPlan(
       planId: plan.id,
@@ -641,9 +643,9 @@ class PeriodizationRepository extends BaseRepository {
       'periodization_plans',
       {
         'name': plan.name.trim(),
-        'start_date': _date(plan.startDate),
-        'end_date': _date(plan.endDate),
-        'notes': _optional(plan.notes),
+        'start_date': dateKey(plan.startDate),
+        'end_date': dateKey(plan.endDate),
+        'notes': optionalText(plan.notes),
         'updated_at': DateTime.now().toIso8601String(),
       },
       where: 'id = ?',
@@ -713,7 +715,7 @@ class PeriodizationRepository extends BaseRepository {
 
   Future<PeriodizationPhase?> getEffectivePhase(DateTime date) async {
     final database = await db;
-    final day = _date(date);
+    final day = dateKey(date);
     try {
       final rows = await database.rawQuery(
         '''
@@ -750,7 +752,7 @@ class PeriodizationRepository extends BaseRepository {
     DateTime? date,
   }) async {
     final database = await db;
-    final effectiveDate = _date(date ?? DateTime.now());
+    final effectiveDate = dateKey(date ?? DateTime.now());
     final rows = await database.query(
       'phase_targets',
       where: 'phase_id = ? AND valid_from <= ?',
@@ -769,7 +771,7 @@ class PeriodizationRepository extends BaseRepository {
   Future<PeriodizationRoutineSuggestion?> getRoutineSuggestion(
     DateTime date,
   ) async {
-    final day = _day(date);
+    final day = dayOf(date);
     final phase = await getEffectivePhase(day);
     if (phase == null) return null;
     final database = await db;
@@ -832,12 +834,12 @@ class PeriodizationRepository extends BaseRepository {
               ''',
               [
                 ...routineIds,
-                _date(
-                  _weekStart(day).isBefore(phase.startDate)
+                dateKey(
+                  mondayOf(day).isBefore(phase.startDate)
                       ? phase.startDate
-                      : _weekStart(day),
+                      : mondayOf(day),
                 ),
-                _date(day),
+                dateKey(day),
               ],
             ),
           ) ??
@@ -865,7 +867,7 @@ class PeriodizationRepository extends BaseRepository {
   /// phase) and picks the session whose `day_of_week` matches. Prefers an
   /// already-scheduled row so a rescheduled or skipped run is respected.
   Future<PeriodizationRunSuggestion?> getRunSuggestion(DateTime date) async {
-    final day = _day(date);
+    final day = dayOf(date);
     final phase = await getEffectivePhase(day);
     if (phase == null) return null;
     final target = await getEffectiveTarget(phase.id, date: day);
@@ -873,7 +875,7 @@ class PeriodizationRepository extends BaseRepository {
     if (planIds.isEmpty) return null;
 
     final runPlanRepo = DatabaseHelper.instance.runPlanRepo;
-    final weekStart = _weekStart(day);
+    final weekStart = mondayOf(day);
     const resolver = RunPlanWeekResolver();
     final phaseWeekIndex = resolver.phaseWeekOf(
       phaseStart: phase.startDate,
@@ -950,8 +952,8 @@ class PeriodizationRepository extends BaseRepository {
   }) async {
     const resolver = RunPlanWeekResolver();
     final runPlanRepo = DatabaseHelper.instance.runPlanRepo;
-    final phaseStartWeek = _weekStart(phase.startDate);
-    final fromWeek = _weekStart(_day(from ?? DateTime.now()));
+    final phaseStartWeek = mondayOf(phase.startDate);
+    final fromWeek = mondayOf(dayOf(from ?? DateTime.now()));
     final firstWeek = fromWeek.isAfter(phaseStartWeek)
         ? resolver.phaseWeekOf(phaseStart: phase.startDate, date: fromWeek)
         : 0;
@@ -1004,7 +1006,7 @@ class PeriodizationRepository extends BaseRepository {
             WHERE status = 'completed' AND activity_type = 'running'
               AND started_at >= ? AND started_at < ?
             ''',
-            [_date(start), _dayAfter(end)],
+            [dateKey(start), _dayAfter(end)],
           ),
         ) ??
         0;
@@ -1029,7 +1031,7 @@ class PeriodizationRepository extends BaseRepository {
     final rows = await database.query(
       'periodization_checkins',
       where: 'phase_id = ? AND week_start = ?',
-      whereArgs: [phaseId, _date(_weekStart(weekStart))],
+      whereArgs: [phaseId, dateKey(mondayOf(weekStart))],
       limit: 1,
     );
     return rows.isEmpty ? null : PeriodizationCheckin.fromMap(rows.first);
@@ -1048,7 +1050,7 @@ class PeriodizationRepository extends BaseRepository {
     if (phase == null) {
       throw const PeriodizationValidationException('phase_not_found');
     }
-    final normalizedWeek = _weekStart(checkin.weekStart);
+    final normalizedWeek = mondayOf(checkin.weekStart);
     final weekEnd = normalizedWeek.add(const Duration(days: 6));
     if (weekEnd.isBefore(phase.startDate) ||
         normalizedWeek.isAfter(phase.endDate)) {
@@ -1073,7 +1075,7 @@ class PeriodizationRepository extends BaseRepository {
       await txn.delete(
         'periodization_checkins',
         where: 'phase_id = ? AND week_start = ?',
-        whereArgs: [checkin.phaseId, _date(normalizedWeek)],
+        whereArgs: [checkin.phaseId, dateKey(normalizedWeek)],
       );
       await txn.insert('periodization_checkins', normalized.toMap());
     });
@@ -1084,9 +1086,9 @@ class PeriodizationRepository extends BaseRepository {
     DateTime? rangeStart,
     DateTime? rangeEnd,
   }) async {
-    final now = _day(DateTime.now());
-    final start = _day(rangeStart ?? phase.startDate);
-    var end = _day(rangeEnd ?? phase.endDate);
+    final now = dayOf(DateTime.now());
+    final start = dayOf(rangeStart ?? phase.startDate);
+    var end = dayOf(rangeEnd ?? phase.endDate);
     if (end.isAfter(now)) end = now;
     if (end.isBefore(start)) {
       return PeriodizationMetrics(
@@ -1101,8 +1103,8 @@ class PeriodizationRepository extends BaseRepository {
       );
     }
     final database = await db;
-    final startText = _date(start);
-    final endText = _date(end);
+    final startText = dateKey(start);
+    final endText = dateKey(end);
     final endAfterText = _dayAfter(end);
     final targetHistory = await getTargetHistory(phase.id);
     final routineIds = <String>{};
@@ -1128,7 +1130,7 @@ class PeriodizationRepository extends BaseRepository {
     double? plannedLongRun;
     var hasRunTarget = false;
     for (
-      var weekCursor = _weekStart(start);
+      var weekCursor = mondayOf(start);
       !weekCursor.isAfter(end);
       weekCursor = weekCursor.add(const Duration(days: 7))
     ) {
@@ -1289,7 +1291,7 @@ class PeriodizationRepository extends BaseRepository {
       ];
       if (targetValues.any((value) => value != null)) {
         nutritionTargetDays++;
-        final actual = nutritionByDate[_date(date)];
+        final actual = nutritionByDate[dateKey(date)];
         if (actual != null) nutritionTargetDaysLogged++;
         final actualValues = [
           (actual?['calories'] as num?)?.toDouble(),
@@ -1350,7 +1352,7 @@ class PeriodizationRepository extends BaseRepository {
     ) {
       final expected = _targetForDate(targetHistory, date)?.sleepHours;
       if (expected == null) continue;
-      final actual = sleepByDate[_date(date)];
+      final actual = sleepByDate[dateKey(date)];
       if (actual != null) sleepTargetDaysLogged++;
       sleepAdherenceSum += _adherenceScore(actual, expected);
     }
@@ -1526,15 +1528,13 @@ class PeriodizationRepository extends BaseRepository {
     DateTime weekStart,
   ) => getPhaseMetrics(
     phase,
-    rangeStart: _weekStart(weekStart).isBefore(phase.startDate)
+    rangeStart: mondayOf(weekStart).isBefore(phase.startDate)
         ? phase.startDate
-        : _weekStart(weekStart),
+        : mondayOf(weekStart),
     rangeEnd:
-        _weekStart(
-          weekStart,
-        ).add(const Duration(days: 6)).isAfter(phase.endDate)
+        mondayOf(weekStart).add(const Duration(days: 6)).isAfter(phase.endDate)
         ? phase.endDate
-        : _weekStart(weekStart).add(const Duration(days: 6)),
+        : mondayOf(weekStart).add(const Duration(days: 6)),
   );
 
   static Future<void> _deactivateCurrent(
@@ -1558,7 +1558,7 @@ class PeriodizationRepository extends BaseRepository {
     if (name.trim().isEmpty) {
       throw const PeriodizationValidationException('name_required');
     }
-    if (_day(end).isBefore(_day(start))) {
+    if (dayOf(end).isBefore(dayOf(start))) {
       throw const PeriodizationValidationException('invalid_date_range');
     }
   }
@@ -1713,7 +1713,7 @@ class PeriodizationRepository extends BaseRepository {
     await txn.delete(
       'phase_targets',
       where: 'phase_id = ? AND valid_from >= ?',
-      whereArgs: [phaseId, _date(boundary)],
+      whereArgs: [phaseId, dateKey(boundary)],
     );
     await _insertWeeklyTargets(
       txn,
@@ -1810,22 +1810,10 @@ class PeriodizationRepository extends BaseRepository {
     return unit == 'lb' || unit == 'lbs' ? value * 0.45359237 : value;
   }
 
-  static DateTime _day(DateTime date) =>
-      DateTime(date.year, date.month, date.day);
-  static DateTime _weekStart(DateTime date) {
-    final day = _day(date);
-    return day.subtract(Duration(days: day.weekday - DateTime.monday));
-  }
-
-  static String _date(DateTime date) =>
-      _day(date).toIso8601String().substring(0, 10);
-
   /// Exclusive upper bound for "started on or before [date]" on a
   /// `started_at` text column: the day after, as `yyyy-MM-dd`.
   static String _dayAfter(DateTime date) =>
-      _date(DateTime(date.year, date.month, date.day + 1));
-  static String? _optional(String? value) =>
-      value == null || value.trim().isEmpty ? null : value.trim();
+      dateKey(DateTime(date.year, date.month, date.day + 1));
 }
 
 class PeriodizationValidationException implements Exception {

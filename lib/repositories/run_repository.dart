@@ -10,7 +10,6 @@ import 'package:workout_notes/models/run_lap.dart';
 import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/repositories/base_repository.dart';
-import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/services/run_route_codec.dart';
 import 'package:workout_notes/utils/run_effort_analytics.dart';
 import 'package:workout_notes/utils/run_elevation_analytics.dart';
@@ -770,7 +769,7 @@ class RunRepository extends BaseRepository {
 
   Future<double> _latestBodyWeightKg() async {
     try {
-      final latest = await BodyMeasurementRepository().getLatestWeightKg();
+      final latest = await DatabaseHelper.instance.bodyMeasurementRepo.getLatestWeightKg();
       return latest ?? 70;
     } catch (_) {
       // Lightweight repository tests and partially recovered databases may not

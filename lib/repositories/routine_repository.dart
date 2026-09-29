@@ -1,8 +1,7 @@
-import 'dart:convert';
-
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'package:workout_notes/utils/strength_routine_summary.dart';
+import 'package:workout_notes/repositories/phase_target_training.dart';
 import 'base_repository.dart';
 
 double _normalizeRoutineDecimal(double value, int decimals) =>
@@ -193,23 +192,7 @@ class RoutineRepository extends BaseRepository {
     await db.transaction((txn) async {
       // Weekly targets store the routine id in JSON, so clear references
       // before the routine's FK-backed rows are cascaded.
-      final targets = await txn.query(
-        'phase_targets',
-        columns: ['id', 'training_json'],
-      );
-      for (final target in targets) {
-        final raw = target['training_json'] as String?;
-        if (raw == null) continue;
-        final training = Map<String, dynamic>.from(jsonDecode(raw) as Map);
-        if (training['routine_id'] != id) continue;
-        training.remove('routine_id');
-        await txn.update(
-          'phase_targets',
-          {'training_json': jsonEncode(training)},
-          where: 'id = ?',
-          whereArgs: [target['id']],
-        );
-      }
+      await PhaseTargetTraining.removeRoutine(txn, id);
       await txn.delete('routines', where: 'id = ?', whereArgs: [id]);
     });
   }

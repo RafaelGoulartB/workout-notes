@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import 'package:workout_notes/repositories/analytics_repository.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/repositories/exercise_repository.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/screens/workout/exercise_form_screen.dart';
@@ -35,7 +35,7 @@ class ExerciseDetailTabsScreen extends StatefulWidget {
 
 class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen> {
   final _exerciseRepo = ExerciseRepository();
-  final _analyticsRepo = AnalyticsRepository();
+  final _analyticsRepo = DatabaseHelper.instance.analyticsRepo;
   final _recordsRepo = StrengthRecordsRepository();
 
   bool _loading = true;

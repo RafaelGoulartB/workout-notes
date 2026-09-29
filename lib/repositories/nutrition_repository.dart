@@ -17,6 +17,8 @@ import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/models/nutrition/saved_meal.dart';
 import 'package:workout_notes/utils/nutrition_conversion.dart';
 
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/sql_helpers.dart';
 import 'base_repository.dart';
 
 part 'nutrition_repository_calorie_analytics.dart';
@@ -52,7 +54,7 @@ class NutritionRepository extends BaseRepository {
     final normalized = Food.normalizeForSearch(query);
     if (normalized.isEmpty) return const [];
     final db = await this.db;
-    final like = '%${_escapeLike(normalized)}%';
+    final like = '%${escapeLike(normalized)}%';
     final brand = _extractBrand(query);
     // `_extractBrand` always yields a real token (for single-word
     // queries the word itself), so the brand predicate below can
@@ -73,9 +75,9 @@ class NutritionRepository extends BaseRepository {
       <Object?>[
         normalized,
         '$normalized%',
-        '%${_escapeLike(brand.toLowerCase())}%',
+        '%${escapeLike(brand.toLowerCase())}%',
         like,
-        '%${_escapeLike(brand.toLowerCase())}%',
+        '%${escapeLike(brand.toLowerCase())}%',
         limit,
       ],
     );
@@ -1102,8 +1104,8 @@ class NutritionRepository extends BaseRepository {
     required DateTime endDate,
   }) async {
     final db = await this.db;
-    final start = _dateString(startDate);
-    final end = _dateString(endDate);
+    final start = dateKey(startDate);
+    final end = dateKey(endDate);
     final rows = await db.rawQuery(
       '''
       SELECT ml.date as date,
@@ -1493,8 +1495,8 @@ class NutritionRepository extends BaseRepository {
     required DateTime endDate,
   }) async {
     final db = await this.db;
-    final start = _dateString(startDate);
-    final end = _dateString(endDate);
+    final start = dateKey(startDate);
+    final end = dateKey(endDate);
     final rows = await db.rawQuery(
       '''
       SELECT ml.date as date,
@@ -1521,7 +1523,7 @@ class NutritionRepository extends BaseRepository {
     final days = lastDay.difference(firstDay).inDays + 1;
     for (var i = 0; i < days; i++) {
       final d = DateTime(firstDay.year, firstDay.month, firstDay.day + i);
-      final key = _dateString(d);
+      final key = dateKey(d);
       result.add(DailyCalorieTotal(date: d, calories: totalsByDate[key]));
     }
     return result;
@@ -1533,8 +1535,8 @@ class NutritionRepository extends BaseRepository {
     int limit = 10,
   }) async {
     final db = await this.db;
-    final start = _dateString(startDate);
-    final end = _dateString(endDate);
+    final start = dateKey(startDate);
+    final end = dateKey(endDate);
     final rows = await db.rawQuery(
       '''
       SELECT mli.food_name_snapshot as food_name,
@@ -1569,8 +1571,8 @@ class NutritionRepository extends BaseRepository {
     required DateTime endDate,
   }) async {
     final db = await this.db;
-    final start = _dateString(startDate);
-    final end = _dateString(endDate);
+    final start = dateKey(startDate);
+    final end = dateKey(endDate);
     final rows = await db.rawQuery(
       '''
       SELECT ml.meal_type as meal_type,
@@ -1614,11 +1616,11 @@ class NutritionRepository extends BaseRepository {
     final args = <Object?>[];
     if (startDate != null) {
       where.add('ml.date >= ?');
-      args.add(_dateString(startDate));
+      args.add(dateKey(startDate));
     }
     if (endDate != null) {
       where.add('ml.date <= ?');
-      args.add(_dateString(endDate));
+      args.add(dateKey(endDate));
     }
     final rows = await db.rawQuery('''
       SELECT
@@ -2136,9 +2138,6 @@ class NutritionRepository extends BaseRepository {
     return cleaned.split(' ').first;
   }
 
-  static String _escapeLike(String value) =>
-      value.replaceAll('%', r'\%').replaceAll('_', r'\_');
-
   static double? _sum(dynamic value) {
     if (value == null) return null;
     if (value is num) return value.toDouble();
@@ -2158,12 +2157,6 @@ class NutritionRepository extends BaseRepository {
       throw const NutritionValidationException('invalid_date_format');
     }
   }
-
-  static String _dateString(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
 }
 
 /// Lightweight food + variant bundle returned by local search.

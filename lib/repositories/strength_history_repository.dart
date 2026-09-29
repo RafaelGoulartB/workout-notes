@@ -1,12 +1,14 @@
 import 'dart:ui';
 
 import 'package:sqflite/sqflite.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/exercise_with_sets.dart';
 import 'package:workout_notes/models/workout_stats.dart';
 import 'package:workout_notes/repositories/base_repository.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/repositories/workout_repository.dart';
 import 'package:workout_notes/repositories/workout_sql.dart';
+import 'package:workout_notes/utils/sql_helpers.dart';
 import 'package:workout_notes/utils/strength_workout_records.dart';
 
 /// How the exercise-name part of a search matches an `exercises` row
@@ -260,17 +262,12 @@ class StrengthHistoryRepository extends BaseRepository {
     this.exerciseMatcher,
     WorkoutRepository? workouts,
     StrengthRecordsRepository? records,
-  }) : _workouts = workouts ?? WorkoutRepository(),
+  }) : _workouts = workouts ?? DatabaseHelper.instance.workoutRepo,
        _records = records ?? StrengthRecordsRepository();
 
   static const _anaerobic =
       "IFNULL(c.energy_system, 'anaerobic') = 'anaerobic'";
   static const _workingSet = WorkoutSql.workSet;
-
-  static String _escapeLike(String value) => value
-      .replaceAll(r'\', r'\\')
-      .replaceAll('%', r'\%')
-      .replaceAll('_', r'\_');
 
   Future<_Where> _where(
     DatabaseExecutor db,
@@ -309,7 +306,7 @@ class StrengthHistoryRepository extends BaseRepository {
 
     final query = filter.query.trim();
     if (query.isNotEmpty) {
-      final like = '%${_escapeLike(query)}%';
+      final like = '%${escapeLike(query)}%';
       final matchedIds = <String>[];
       final matcher = exerciseMatcher;
       if (matcher != null) {

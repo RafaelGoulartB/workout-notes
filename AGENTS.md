@@ -55,7 +55,7 @@ lib/
 
 android/app/src/main/kotlin/.../run, sleep   Native foreground services and bridges
 android/app/src/test/                         Kotlin unit tests (./gradlew test)
-test/support/                                 Shared test DB setup (ai_test_db.dart)
+test/support/                                 Shared test DB setup (test_db.dart, real schema)
 tool/                                         Standalone Dart scripts (sleep validation, run plan catalog)
 ```
 
@@ -105,23 +105,26 @@ When changing the schema:
 2. Add an incremental migration for existing databases.
 3. Increase `_dbVersion` in `database_helper.dart`.
 4. Keep foreign keys and indexes consistent.
-5. Add a `test/database_migration_vNN_test.dart` covering both a fresh
-   database and the upgrade path.
-6. Mirror the table in `test/support/ai_test_db.dart` if AI tools read it.
+5. Extend `test/database_migrations_test.dart` (it upgrades the captured v37
+   schema in `test/support/schema_v37_fixture.dart` and compares the result
+   with a fresh install).
 
-Migrations are additive `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE` blocks
-wrapped in try/catch so they are idempotent. For a destructive change, create a
-replacement table, copy the data, validate the result, and only then replace
-the old table. Code that reads newer tables should guard with an existence
-check (see `_tableExists` in `export_import_repository.dart`) because older
-devices may still be on an older schema.
+Version 37 is the migration floor: databases older than that are rebuilt from
+scratch and no code for earlier versions is kept. Migrations are additive
+`CREATE TABLE IF NOT EXISTS` / `ALTER TABLE` blocks run through
+`DatabaseMigrations.tryExecute`, which only ignores "duplicate column" /
+"already exists" errors so upgrades stay idempotent. For a destructive change,
+create a replacement table, copy the data, validate the result, and only then
+replace the old table. Repositories may assume every table and column of the
+current schema exists; do not add `sqlite_master` / `PRAGMA table_info` guards.
 
 Tables use client-generated UUID v4 primary keys and `ON DELETE CASCADE`
 foreign keys.
 
-Tests that need SQLite should use `sqflite_common_ffi` with an in-memory
-database installed via `DatabaseHelper.overrideDatabase` (set in `setUp`,
-cleared in `tearDown`); do not open the application database from tests.
+Tests that need SQLite should use `test/support/test_db.dart`
+(`installTestDb()` / `uninstallTestDb`), which installs an in-memory database
+with the real schema through `DatabaseHelper.overrideDatabase`; do not open the
+application database from tests or hand-write `CREATE TABLE` statements.
 
 ## Navigation, theme, and settings
 
