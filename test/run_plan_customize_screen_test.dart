@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:workout_notes/database/database_helper.dart';
-import 'package:workout_notes/database/database_periodization_schema.dart';
-import 'package:workout_notes/database/database_run_plan_schema.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_template.dart';
@@ -13,6 +9,7 @@ import 'package:workout_notes/screens/run/run_plan_customize_screen.dart';
 import 'package:workout_notes/services/run_plan_history.dart';
 import 'package:workout_notes/services/run_plan_templates.dart';
 import 'package:workout_notes/widgets/run/run_plan_volume_sparkline.dart';
+import 'support/test_db.dart';
 
 Widget _app({RunPlanTemplate? template, RunPlanHistoryInsights? history}) =>
     MaterialApp(
@@ -317,39 +314,16 @@ void main() {
   });
 
   group('creating a plan', () {
-    late Database database;
     late RunPlanRepository repo;
 
-    setUpAll(() {
-      sqfliteFfiInit();
-      databaseFactory = databaseFactoryFfi;
-    });
+    setUpAll(initSqfliteFfiForTests);
 
     setUp(() async {
-      database = await databaseFactory.openDatabase(
-        inMemoryDatabasePath,
-        options: OpenDatabaseOptions(
-          version: 45,
-          onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-          onCreate: (db, version) async {
-            await db.execute(
-              'CREATE TABLE run_activities (id TEXT PRIMARY KEY, started_at TEXT NOT NULL, '
-              'status TEXT NOT NULL DEFAULT \'completed\', created_at TEXT NOT NULL, '
-              'updated_at TEXT NOT NULL, plan_workout_id TEXT)',
-            );
-            await DatabasePeriodizationSchema.create(db);
-            await DatabaseRunPlanSchema.create(db);
-          },
-        ),
-      );
-      DatabaseHelper.overrideDatabase = database;
+      await installTestDb();
       repo = RunPlanRepository();
     });
 
-    tearDown(() async {
-      DatabaseHelper.overrideDatabase = null;
-      await database.close();
-    });
+    tearDown(uninstallTestDb);
 
     /// Runs real-async work from inside a `testWidgets` body (see
     /// run_plans_widget_test.dart for why).

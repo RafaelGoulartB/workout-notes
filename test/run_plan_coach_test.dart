@@ -17,6 +17,7 @@ import 'package:workout_notes/services/run_plan_coach.dart';
 import 'package:workout_notes/services/run_plan_composer.dart';
 import 'package:workout_notes/services/run_plan_templates.dart';
 import 'package:workout_notes/services/runner_strength_routine.dart';
+import 'support/test_db.dart';
 
 /// A runner following a "Faster 5K" plan, as the app stores it: created by
 /// the wizard, activated, sessions on the calendar, runs recorded.
@@ -24,10 +25,7 @@ void main() {
   late Database database;
   late RunPlanRepository plans;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(

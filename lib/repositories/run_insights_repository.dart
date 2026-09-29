@@ -8,11 +8,6 @@ class RunInsightsRepository extends BaseRepository {
   /// older imports) are simply absent; callers fall back to average pace.
   Future<Map<String, List<RunSplitSample>>> splitsSince(DateTime from) async {
     final database = await db;
-    final table = await database.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type = 'table' "
-      "AND name = 'run_splits'",
-    );
-    if (table.isEmpty) return const {};
     final rows = await database.rawQuery(
       '''
       SELECT s.activity_id, s.duration_seconds, s.pace_sec_per_km

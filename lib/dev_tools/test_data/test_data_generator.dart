@@ -105,7 +105,8 @@ class TestDataGenerator {
       'run_workout_steps',
       'run_plan_workouts',
       'run_plans',
-      'run_track_points',
+      'run_route_data',
+      'run_splits',
       'run_activities',
       // Sleep monitor tree (sessions cascade from sleep_entries, but delete
       // explicitly for FK-off safety)

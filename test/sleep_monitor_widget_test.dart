@@ -9,6 +9,7 @@ import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/models/sleep_monitor_state.dart';
 import 'package:workout_notes/screens/workout/sleep_monitor_result_screen.dart';
 import 'package:workout_notes/screens/workout/sleep_monitor_screen.dart';
+import 'support/test_db.dart';
 
 Widget _localized(Widget child) => MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -17,10 +18,7 @@ Widget _localized(Widget child) => MaterialApp(
 );
 
 void main() {
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   test('active elapsed time keeps advancing after the last native event', () {
     final now = DateTime.now();
@@ -64,7 +62,6 @@ void main() {
       final database = (await tester.runAsync(
         () => _resultDatabase(session),
       ))!;
-      DatabaseHelper.overrideDatabase = database;
       addTearDown(() async {
         DatabaseHelper.overrideDatabase = null;
         await database.close();
@@ -98,48 +95,7 @@ Future<void> _pumpUntilLoaded(WidgetTester tester) async {
 }
 
 Future<Database> _resultDatabase(SleepMonitorSession session) async {
-  final database = await databaseFactory.openDatabase(
-    inMemoryDatabasePath,
-    options: OpenDatabaseOptions(
-      version: 1,
-      onCreate: (db, version) async {
-        await db.execute('''
-          CREATE TABLE sleep_monitor_sessions (
-            id TEXT PRIMARY KEY,
-            sleep_entry_id TEXT,
-            status TEXT NOT NULL,
-            started_at TEXT NOT NULL,
-            ended_at TEXT,
-            alarm_at TEXT,
-            utc_offset_start_minutes INTEGER NOT NULL,
-            utc_offset_end_minutes INTEGER,
-            sensor_mode TEXT NOT NULL,
-            algorithm_version TEXT NOT NULL,
-            time_in_bed_minutes INTEGER,
-            quiet_minutes INTEGER,
-            noisy_minutes INTEGER,
-            estimated_sleep_minutes INTEGER,
-            noise_event_count INTEGER NOT NULL,
-            signal_quality_score REAL,
-            analysis_status TEXT,
-            sleep_onset_at TEXT,
-            final_wake_at TEXT,
-            sleep_latency_minutes INTEGER,
-            awake_minutes INTEGER,
-            sleeping_minutes INTEGER,
-            deep_sleep_minutes INTEGER,
-            unknown_minutes INTEGER,
-            awakening_count INTEGER,
-            sleep_efficiency REAL,
-            stage_confidence REAL,
-            stage_algorithm_version TEXT,
-            end_reason TEXT,
-            created_at TEXT NOT NULL
-          )
-        ''');
-      },
-    ),
-  );
+  final database = await installTestDb();
   await database.insert('sleep_monitor_sessions', session.toMap());
   return database;
 }

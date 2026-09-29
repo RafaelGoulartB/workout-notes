@@ -1,14 +1,16 @@
 import 'package:workout_notes/repositories/base_repository.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
+import 'package:workout_notes/repositories/workout_sql.dart';
 
 /// Repository for exercise history, body-weight vs volume and the workout
 /// overview totals.
 class AnalyticsRepository extends BaseRepository {
   /// A working set that really happened: completed, not a warm-up. Every
   /// statistic below joins `workouts w` and also requires [_finished], so
-  /// planned or abandoned sessions never leak into the numbers.
-  static const _workSet = 's.is_complete = 1 AND IFNULL(s.is_warmup, 0) = 0';
-  static const _finished = 'w.end_time IS NOT NULL';
+  /// planned or abandoned sessions never leak into the numbers. Goals use the
+  /// same rule through [WorkoutSql].
+  static const _workSet = WorkoutSql.workSet;
+  static const _finished = WorkoutSql.finished;
 
   // ===================================================================
   // EXERCISE HISTORY

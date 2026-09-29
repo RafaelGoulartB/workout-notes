@@ -17,6 +17,7 @@ Future<void> _workout(
   'start_time': '${date}T10:00:00.000',
   'end_time': finished ? '${date}T11:00:00.000' : null,
   'duration_seconds': duration,
+  'created_at': '${date}T09:00:00.000',
 });
 
 var _seq = 0;
@@ -71,6 +72,7 @@ void main() {
       'id': 'bench',
       'name': 'Bench',
       'category_id': 'chest',
+      'created_at': '2026-01-01T00:00:00.000',
     });
     await _workout(db, 'w1', '2026-09-01', duration: 3600);
     await _workout(db, 'w2', '2026-09-08', finished: false);
@@ -112,19 +114,13 @@ void main() {
     expect(data['history'] as List, hasLength(2));
   });
 
-  test(
-    'overview counts finished workouts and completed sets only',
-    () async {
-      await _sets(db, 'w1', 'bench', [
-        _set(100, 10),
-        _set(50, 10, done: false),
-      ]);
-      await _sets(db, 'w2', 'bench', [_set(100, 10)]);
+  test('overview counts finished workouts and completed sets only', () async {
+    await _sets(db, 'w1', 'bench', [_set(100, 10), _set(50, 10, done: false)]);
+    await _sets(db, 'w2', 'bench', [_set(100, 10)]);
 
-      final overview = await DatabaseHelper.instance.analyticsRepo
-          .getWorkoutOverviewStats();
-      expect(overview['total_workouts'], 1);
-      expect(overview['total_sets'], 1);
-    },
-  );
+    final overview = await DatabaseHelper.instance.analyticsRepo
+        .getWorkoutOverviewStats();
+    expect(overview['total_workouts'], 1);
+    expect(overview['total_sets'], 1);
+  });
 }

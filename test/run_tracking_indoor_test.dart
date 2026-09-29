@@ -8,6 +8,7 @@ import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
 import 'package:workout_notes/services/stationary_bike_tracking_service.dart';
+import 'support/test_db.dart';
 
 Map<String, dynamic> _treadmillSpool({
   String id = 'treadmill-1',
@@ -30,10 +31,7 @@ Map<String, dynamic> _treadmillSpool({
 void main() {
   late Database database;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(

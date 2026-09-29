@@ -46,6 +46,7 @@ Future<void> _workout(
         : null,
     'duration_seconds': 3600,
     'feeling_rating': feeling,
+    'created_at': DateTime(day.year, day.month, day.day, 7).toIso8601String(),
   });
   var order = 0;
   for (final entry in exercises.entries) {
@@ -90,11 +91,13 @@ Future<void> _seed(Database db) async {
     'name': 'Supino teste',
     'category_id': 'chest',
     'equipment': 'Barbell',
+    'created_at': '2026-01-01T00:00:00.000',
   });
   await db.insert('exercises', {
     'id': 'row',
     'name': 'Remada teste',
     'category_id': 'back',
+    'created_at': '2026-01-01T00:00:00.000',
   });
   final today = DateTime.now();
   DateTime ago(int d) => DateTime(today.year, today.month, today.day - d);

@@ -4,6 +4,7 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/database/database_schema.dart';
 import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
+import 'support/test_db.dart';
 
 Map<String, dynamic> _spool({
   String id = 'run-with-laps',
@@ -35,10 +36,7 @@ void main() {
   late Database database;
   final repository = RunRepository();
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(

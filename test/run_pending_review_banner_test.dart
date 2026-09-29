@@ -7,6 +7,7 @@ import 'package:workout_notes/database/database_schema.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
 import 'package:workout_notes/widgets/run/run_pending_review_banner.dart';
+import 'support/test_db.dart';
 
 Widget _app(Widget child) => MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -57,10 +58,7 @@ void main() {
     'points': <Map<String, dynamic>>[],
   };
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     pending = [

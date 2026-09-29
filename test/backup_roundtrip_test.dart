@@ -9,6 +9,7 @@ import 'package:workout_notes/repositories/export_import_repository.dart';
 import 'package:workout_notes/services/backup_exception.dart';
 import 'package:workout_notes/services/backup_media_service.dart';
 import 'package:workout_notes/services/export_service.dart';
+import 'support/test_db.dart';
 
 void main() {
   late Database database;
@@ -17,56 +18,14 @@ void main() {
   late Directory mediaRoot;
   late ExportService service;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({'accent_color': 42});
     sandbox = await Directory.systemTemp.createTemp('backup_roundtrip_');
     backupsDirectory = await Directory('${sandbox.path}/backups').create();
     mediaRoot = Directory('${sandbox.path}/media');
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 1,
-        onCreate: (db, version) async {
-          for (final table in [
-            'exercise_categories',
-            'exercises',
-            'workouts',
-            'exercise_entries',
-            'sets',
-            'routines',
-            'routine_days',
-            'routine_exercises',
-            'predefined_sets',
-            'sleep_entries',
-            'sleep_monitor_segments',
-            'foods',
-            'food_variants',
-            'food_servings',
-            'meal_logs',
-            'meal_log_items',
-            'nutrition_goals',
-          ]) {
-            await db.execute('CREATE TABLE $table (id TEXT PRIMARY KEY)');
-          }
-          await db.execute(
-            'CREATE TABLE body_measurements '
-            '(id TEXT PRIMARY KEY, weight REAL, photos_paths TEXT)',
-          );
-          await db.execute(
-            'CREATE TABLE sleep_monitor_sessions '
-            '(id TEXT PRIMARY KEY, alarm_at TEXT)',
-          );
-          await db.execute(
-            'CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT)',
-          );
-        },
-      ),
-    );
+    database = await openTestDb();
     service = ExportService(
       exportRepo: ExportImportRepository(
         databaseProvider: () async => database,
@@ -101,16 +60,22 @@ void main() {
       await file.writeAsBytes(entry.value);
       paths[entry.key] = file.path;
     }
-    await database.insert('workouts', {'id': 'w1'});
-    await database.insert('workouts', {'id': 'w2'});
+    await database.insert('workouts', _workout('w1'));
+    await database.insert('workouts', _workout('w2'));
     await database.insert('body_measurements', {
       'id': 'm1',
-      'weight': 80.5,
+      'type': 'weight',
+      'value': 80.5,
+      'date': '2026-01-01',
+      'created_at': '2026-01-01T08:00:00.000',
       'photos_paths': jsonEncode([paths['a.jpg'], paths['b.png']]),
     });
     await database.insert('body_measurements', {
       'id': 'm2',
-      'weight': 79.0,
+      'type': 'weight',
+      'value': 79.0,
+      'date': '2026-01-02',
+      'created_at': '2026-01-02T08:00:00.000',
       'photos_paths': jsonEncode([paths['c.jpg']]),
     });
     await database.insert('app_settings', {'key': 'k', 'value': 'v'});
@@ -129,7 +94,7 @@ void main() {
   Future<void> expectRestoredMedia() async {
     expect((await database.query('workouts')).length, 2);
     final rows = await database.query('body_measurements', orderBy: 'id');
-    expect(rows.map((r) => r['weight']), [80.5, 79.0]);
+    expect(rows.map((r) => r['value']), [80.5, 79.0]);
     final m1 = (jsonDecode(rows[0]['photos_paths'] as String) as List)
         .cast<String>();
     final m2 = (jsonDecode(rows[1]['photos_paths'] as String) as List)
@@ -178,9 +143,12 @@ void main() {
 
     expect(count, greaterThan(0));
     await expectRestoredMedia();
-    expect(await database.query('app_settings'), [
-      {'key': 'k', 'value': 'v'},
-    ]);
+    expect(
+      await database.query('app_settings', where: 'key = ?', whereArgs: ['k']),
+      [
+        {'key': 'k', 'value': 'v'},
+      ],
+    );
   });
 
   test('round-trips through bytes and a legacy indented backup', () async {
@@ -266,3 +234,9 @@ void main() {
     );
   });
 }
+
+Map<String, Object?> _workout(String id) => {
+  'id': id,
+  'date': '2026-01-01',
+  'created_at': '2026-01-01T08:00:00.000',
+};

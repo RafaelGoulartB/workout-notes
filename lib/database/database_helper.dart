@@ -22,7 +22,7 @@ import '../repositories/ai_routine_mutation_repository.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 55;
+  static const _dbVersion = 56;
 
   static DatabaseHelper? _instance;
   static Database? _database;

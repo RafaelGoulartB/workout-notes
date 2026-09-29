@@ -6,33 +6,11 @@ import 'package:workout_notes/models/run_lap.dart';
 import 'package:workout_notes/repositories/base_repository.dart';
 
 /// Shoes / gear mileage and manual laps (schema v53).
-///
-/// Every query guards on the tables existing so older test schemas and
-/// partially migrated databases degrade to "no gear" instead of throwing.
 class RunGearRepository extends BaseRepository {
   static const _uuid = Uuid();
 
-  Future<bool> _hasGear(DatabaseExecutor database) async {
-    final rows = await database.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'run_gear'",
-    );
-    if (rows.isEmpty) return false;
-    final columns = await database.rawQuery(
-      'PRAGMA table_info(run_activities)',
-    );
-    return columns.any((c) => c['name'] == 'gear_id');
-  }
-
-  Future<bool> _hasLaps(DatabaseExecutor database) async {
-    final rows = await database.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'run_laps'",
-    );
-    return rows.isNotEmpty;
-  }
-
   Future<List<RunGearUsage>> listGearUsage({bool includeRetired = true}) async {
     final database = await db;
-    if (!await _hasGear(database)) return const [];
     final rows = await database.rawQuery(
       '''
       SELECT g.*,
@@ -76,7 +54,6 @@ class RunGearRepository extends BaseRepository {
   /// The gear pre-selected for new runs, if any active one is marked default.
   Future<RunGear?> getDefaultGear() async {
     final database = await db;
-    if (!await _hasGear(database)) return null;
     final rows = await database.query(
       'run_gear',
       where: 'is_default = 1 AND retired_at IS NULL',
@@ -161,7 +138,6 @@ class RunGearRepository extends BaseRepository {
 
   Future<void> setActivityGear(String activityId, String? gearId) async {
     final database = await db;
-    if (!await _hasGear(database)) return;
     await database.update(
       'run_activities',
       {'gear_id': gearId},
@@ -172,7 +148,6 @@ class RunGearRepository extends BaseRepository {
 
   Future<List<RunLap>> getLaps(String activityId) async {
     final database = await db;
-    if (!await _hasLaps(database)) return const [];
     final rows = await database.query(
       'run_laps',
       where: 'activity_id = ?',
@@ -190,7 +165,6 @@ class RunGearRepository extends BaseRepository {
     DatabaseExecutor? executor,
   }) async {
     final database = executor ?? await db;
-    if (!await _hasLaps(database)) return;
     await database.delete(
       'run_laps',
       where: 'activity_id = ?',

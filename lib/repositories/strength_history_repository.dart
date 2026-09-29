@@ -1,11 +1,14 @@
 import 'dart:ui';
 
 import 'package:sqflite/sqflite.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/exercise_with_sets.dart';
 import 'package:workout_notes/models/workout_stats.dart';
 import 'package:workout_notes/repositories/base_repository.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/repositories/workout_repository.dart';
+import 'package:workout_notes/repositories/workout_sql.dart';
+import 'package:workout_notes/utils/sql_helpers.dart';
 import 'package:workout_notes/utils/strength_workout_records.dart';
 
 /// How the exercise-name part of a search matches an `exercises` row
@@ -259,43 +262,20 @@ class StrengthHistoryRepository extends BaseRepository {
     this.exerciseMatcher,
     WorkoutRepository? workouts,
     StrengthRecordsRepository? records,
-  }) : _workouts = workouts ?? WorkoutRepository(),
+  }) : _workouts = workouts ?? DatabaseHelper.instance.workoutRepo,
        _records = records ?? StrengthRecordsRepository();
 
   static const _anaerobic =
       "IFNULL(c.energy_system, 'anaerobic') = 'anaerobic'";
-  static const _workingSet = 's.is_complete = 1 AND IFNULL(s.is_warmup, 0) = 0';
-
-  Future<bool> _hasRoutineDayColumn(DatabaseExecutor db) async {
-    final columns = await db.rawQuery('PRAGMA table_info(workouts)');
-    return columns.any((c) => c['name'] == 'routine_day_id');
-  }
-
-  Future<bool> _tableExists(DatabaseExecutor db, String table) async {
-    final rows = await db.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
-      [table],
-    );
-    return rows.isNotEmpty;
-  }
-
-  static String _escapeLike(String value) => value
-      .replaceAll(r'\', r'\\')
-      .replaceAll('%', r'\%')
-      .replaceAll('_', r'\_');
+  static const _workingSet = WorkoutSql.workSet;
 
   Future<_Where> _where(
     DatabaseExecutor db,
     StrengthHistoryFilter filter,
     DateTime now,
   ) async {
-    final hasDay = await _hasRoutineDayColumn(db);
     final joins = StringBuffer()
-      ..write(
-        hasDay
-            ? 'LEFT JOIN routine_days rd ON rd.id = w.routine_day_id '
-            : 'LEFT JOIN routine_days rd ON 1 = 0 ',
-      )
+      ..write('LEFT JOIN routine_days rd ON rd.id = w.routine_day_id ')
       ..write(
         'LEFT JOIN routines r ON r.id = COALESCE(w.routine_id, rd.routine_id)',
       );
@@ -326,7 +306,7 @@ class StrengthHistoryRepository extends BaseRepository {
 
     final query = filter.query.trim();
     if (query.isNotEmpty) {
-      final like = '%${_escapeLike(query)}%';
+      final like = '%${escapeLike(query)}%';
       final matchedIds = <String>[];
       final matcher = exerciseMatcher;
       if (matcher != null) {
@@ -357,7 +337,6 @@ class StrengthHistoryRepository extends BaseRepository {
       joins: joins.toString(),
       condition: conditions.join(' AND '),
       args: args,
-      hasRoutineDay: hasDay,
     );
   }
 
@@ -375,7 +354,7 @@ class StrengthHistoryRepository extends BaseRepository {
       SELECT w.id AS id, w.date AS date, w.start_time AS start_time,
         w.duration_seconds AS duration_seconds,
         w.feeling_rating AS feeling_rating, w.comment AS comment,
-        r.id AS routine_id, ${where.hasRoutineDay ? 'w.routine_day_id' : 'NULL'} AS routine_day_id,
+        r.id AS routine_id, w.routine_day_id AS routine_day_id,
         r.name AS routine_name, rd.name AS day_name
       FROM workouts w
       ${where.joins}
@@ -548,11 +527,10 @@ class StrengthHistoryRepository extends BaseRepository {
   /// Routines that have at least one listed workout.
   Future<List<StrengthRoutineOption>> routineOptions() async {
     final database = await db;
-    final hasDay = await _hasRoutineDayColumn(database);
     final rows = await database.rawQuery('''
       SELECT DISTINCT r.id AS id, r.name AS name
       FROM workouts w
-      ${hasDay ? 'LEFT JOIN routine_days rd ON rd.id = w.routine_day_id' : 'LEFT JOIN routine_days rd ON 1 = 0'}
+      LEFT JOIN routine_days rd ON rd.id = w.routine_day_id
       JOIN routines r ON r.id = COALESCE(w.routine_id, rd.routine_id)
       WHERE w.end_time IS NOT NULL
       ORDER BY r.name COLLATE NOCASE
@@ -669,7 +647,7 @@ class StrengthHistoryRepository extends BaseRepository {
     String? routineName;
     String? routineId = workout['routine_id'] as String?;
     final dayId = workout['routine_day_id'] as String?;
-    if (dayId != null && await _tableExists(database, 'routine_days')) {
+    if (dayId != null) {
       final rows = await database.query(
         'routine_days',
         columns: ['name', 'routine_id'],
@@ -682,7 +660,7 @@ class StrengthHistoryRepository extends BaseRepository {
         routineId ??= rows.first['routine_id'] as String?;
       }
     }
-    if (routineId != null && await _tableExists(database, 'routines')) {
+    if (routineId != null) {
       final rows = await database.query(
         'routines',
         columns: ['name'],
@@ -700,13 +678,11 @@ class _Where {
   final String joins;
   final String condition;
   final List<Object?> args;
-  final bool hasRoutineDay;
 
   const _Where({
     required this.joins,
     required this.condition,
     required this.args,
-    required this.hasRoutineDay,
   });
 }
 

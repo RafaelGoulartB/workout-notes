@@ -1,95 +1,22 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:workout_notes/database/database_helper.dart';
-import 'package:workout_notes/database/database_run_route_schema.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
+import 'support/test_db.dart';
 
 void main() {
   late Database database;
   late RunRepository repository;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 1,
-        onConfigure: (db) async {
-          await db.execute('PRAGMA foreign_keys = ON');
-        },
-        onCreate: (db, version) async {
-          await db.execute('''
-            CREATE TABLE run_activities (
-              id TEXT PRIMARY KEY,
-              activity_type TEXT NOT NULL DEFAULT 'running',
-              started_at TEXT NOT NULL,
-              ended_at TEXT,
-              duration_seconds INTEGER NOT NULL DEFAULT 0,
-              moving_time_seconds INTEGER NOT NULL DEFAULT 0,
-              distance_meters REAL NOT NULL DEFAULT 0,
-              avg_pace_sec_per_km REAL,
-              max_pace_sec_per_km REAL,
-              calories INTEGER,
-              title TEXT,
-              notes TEXT,
-              rpe REAL,
-              feeling_rating INTEGER,
-              status TEXT NOT NULL DEFAULT 'completed',
-              polyline_summary TEXT,
-              created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL,
-              best_split_pace_sec_per_km REAL,
-              best_effort_1k_sec INTEGER,
-              best_effort_3k_sec INTEGER,
-              best_effort_5k_sec INTEGER,
-              best_effort_10k_sec INTEGER,
-              best_effort_half_sec INTEGER,
-              best_effort_marathon_sec INTEGER,
-              efforts_computed INTEGER NOT NULL DEFAULT 0,
-              elevation_gain_meters REAL,
-              elevation_loss_meters REAL,
-              minimum_altitude_meters REAL,
-              maximum_altitude_meters REAL,
-              gps_accuracy_mean_meters REAL,
-              gps_accuracy_good_fraction REAL,
-              raw_point_count INTEGER,
-              stored_point_count INTEGER,
-              route_quality TEXT,
-              route_codec_version INTEGER
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE run_track_points (
-              id TEXT PRIMARY KEY,
-              activity_id TEXT NOT NULL,
-              seq INTEGER NOT NULL,
-              lat REAL NOT NULL,
-              lng REAL NOT NULL,
-              altitude REAL,
-              accuracy REAL,
-              speed REAL,
-              recorded_at TEXT NOT NULL,
-              FOREIGN KEY (activity_id) REFERENCES run_activities(id) ON DELETE CASCADE
-            )
-          ''');
-          await DatabaseRunRouteSchema.create(db);
-        },
-      ),
-    );
-    DatabaseHelper.overrideDatabase = database;
+    database = await installTestDb();
     repository = RunRepository();
   });
 
-  tearDown(() async {
-    DatabaseHelper.overrideDatabase = null;
-    await database.close();
-  });
+  tearDown(uninstallTestDb);
 
   test('imports native spool idempotently and lists completed runs', () async {
     final spool = {
@@ -133,9 +60,6 @@ void main() {
     final points = await repository.getTrackPoints('run-1');
     expect(points, hasLength(2));
     expect(points.first.lat, -23.55);
-    expect(await database.rawQuery('SELECT COUNT(*) c FROM run_track_points'), [
-      containsPair('c', 0),
-    ]);
     expect(await database.query('run_route_data'), hasLength(1));
 
     await repository.updateActivityMeta(
@@ -178,41 +102,21 @@ void main() {
     expect(await repository.listActivities(activityType: null), hasLength(1));
   });
 
-  test('migrates legacy point rows transactionally', () async {
-    const startedAt = '2025-01-01T10:00:00.000Z';
-    await database.insert('run_activities', {
-      'id': 'legacy-run',
-      'activity_type': 'running',
-      'started_at': startedAt,
-      'ended_at': '2025-01-01T10:10:00.000Z',
-      'duration_seconds': 600,
-      'moving_time_seconds': 600,
-      'distance_meters': 1000.0,
-      'status': 'completed',
-      'created_at': startedAt,
-      'updated_at': startedAt,
-    });
-    for (var index = 0; index < 121; index++) {
-      await database.insert('run_track_points', {
-        'id': 'legacy-$index',
-        'activity_id': 'legacy-run',
-        'seq': index,
-        'lat': -23.5,
-        'lng': -46.6 + index * 0.00003,
-        'altitude': 700 + index / 20,
-        'accuracy': 6.0,
-        'speed': 3.0,
-        'recorded_at': DateTime.parse(
-          startedAt,
-        ).add(Duration(seconds: index * 5)).toIso8601String(),
-      });
-    }
-
-    expect(await repository.migrateLegacyRoutes(limit: 1), 1);
-    expect(await database.query('run_track_points'), isEmpty);
-    expect(await database.query('run_route_data'), hasLength(1));
-    expect(await repository.getTrackPoints('legacy-run'), isNotEmpty);
-    expect(await repository.migrateLegacyRoutes(limit: 1), 0);
+  test('route maintenance runs at most once per week', () async {
+    final now = DateTime.utc(2026, 9, 1, 12);
+    expect(await repository.runRouteMaintenance(now: now), isTrue);
+    expect(
+      await repository.runRouteMaintenance(
+        now: now.add(const Duration(days: 3)),
+      ),
+      isFalse,
+    );
+    expect(
+      await repository.runRouteMaintenance(
+        now: now.add(const Duration(days: 8)),
+      ),
+      isTrue,
+    );
   });
 
   test('archives old compact routes only when explicitly forced', () async {

@@ -8,6 +8,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/screens/workout/workout_home_screen.dart';
 
 import 'support/strength_home_fixtures.dart';
+import 'support/test_db.dart';
 
 Future<void> _pumpHome(WidgetTester tester) async {
   await tester.runAsync(() async {
@@ -38,10 +39,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Database database;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(

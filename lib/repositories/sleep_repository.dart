@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import '../models/sleep_entry.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'base_repository.dart';
 
 /// Persistence and dashboard queries for nightly sleep records.
@@ -109,11 +110,11 @@ class SleepRepository extends BaseRepository {
     final args = <dynamic>[];
     if (from != null) {
       where.add('date >= ?');
-      args.add(_dateString(from));
+      args.add(dateKey(from));
     }
     if (to != null) {
       where.add('date <= ?');
-      args.add(_dateString(to));
+      args.add(dateKey(to));
     }
     return database.query(
       'sleep_entries',
@@ -184,7 +185,4 @@ class SleepRepository extends BaseRepository {
 
   static DateTime _dateOnly(DateTime value) =>
       DateTime(value.year, value.month, value.day);
-
-  static String _dateString(DateTime value) =>
-      _dateOnly(value).toIso8601String().substring(0, 10);
 }

@@ -18,15 +18,13 @@ abstract final class DatabaseSeed {
     ];
     for (var i = 0; i < rows.length; i++) {
       final row = rows[i];
-      try {
-        await db.insert('meal_types', {
-          'id': row['key'],
-          'key': row['key'],
-          'name': null,
-          'order_index': row['order_index'],
-          'created_at': now,
-        }, conflictAlgorithm: ConflictAlgorithm.ignore);
-      } catch (_) {}
+      await db.insert('meal_types', {
+        'id': row['key'],
+        'key': row['key'],
+        'name': null,
+        'order_index': row['order_index'],
+        'created_at': now,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
   }
 

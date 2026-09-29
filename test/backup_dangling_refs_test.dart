@@ -2,16 +2,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:workout_notes/database/database_schema.dart';
 import 'package:workout_notes/repositories/export_import_repository.dart';
+import 'support/test_db.dart';
 
 /// Restores against the production schema with foreign keys enforced, the
 /// way the app opens its database.
 void main() {
   late Database database;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(

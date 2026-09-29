@@ -2,27 +2,17 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:workout_notes/database/database_schema.dart';
 import 'package:workout_notes/repositories/export_import_repository.dart';
 import 'package:workout_notes/services/run_route_codec.dart';
+import 'support/test_db.dart';
 
 void main() {
   late Database database;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 51,
-        onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-        onCreate: DatabaseSchema.onCreate,
-      ),
-    );
+    database = await openTestDb(seed: true);
   });
 
   tearDown(() => database.close());
@@ -57,25 +47,6 @@ void main() {
         'deep_sleep_minutes': 120,
         'stage_confidence': 0.9,
         'created_at': now,
-      });
-      await database.insert('sleep_stage_epochs', {
-        'id': 'stage-1',
-        'session_id': 'session-1',
-        'started_at': now,
-        'duration_seconds': 30,
-        'stage': 'deep',
-        'confidence': 0.9,
-        'algorithm_version': '1',
-        'source': 'acoustic_model',
-      });
-      await database.insert('sleep_monitor_segments', {
-        'id': 'segment-cache',
-        'session_id': 'session-1',
-        'started_at': now,
-        'duration_seconds': 30,
-        'classification': 'quiet',
-        'valid_fraction': 1,
-        'noise_burst_count': 0,
       });
       await database.insert('ai_chat_threads', {
         'id': 'thread-1',
@@ -189,7 +160,6 @@ void main() {
         ),
         hasLength(1),
       );
-      expect(await database.query('sleep_stage_epochs'), isEmpty);
       final restoredSession = (await database.query(
         'sleep_monitor_sessions',
         where: 'id = ?',
@@ -200,7 +170,6 @@ void main() {
       expect(await database.query('ai_chat_threads'), isEmpty);
       expect(await database.query('ai_chat_messages'), isEmpty);
       expect(await database.query('ai_routine_proposals'), isEmpty);
-      expect(await database.query('sleep_monitor_segments'), isEmpty);
       expect(await database.query('ai_chat_thread_summaries'), isEmpty);
       expect(
         await database.query(

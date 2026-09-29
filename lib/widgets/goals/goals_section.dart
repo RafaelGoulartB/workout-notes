@@ -90,18 +90,17 @@ class _GoalsSectionState extends State<GoalsSection> {
       final goals = (await _goalRepo.getAll())
           .where((g) => widget.allowedScopes.contains(g.scope))
           .toList();
-      final progressEntries = await Future.wait(
-        goals.map((g) async {
-          try {
-            return MapEntry<String, GoalProgress?>(
-              g.id,
-              await _goalRepo.getProgress(g),
-            );
-          } catch (_) {
-            return MapEntry<String, GoalProgress?>(g.id, null);
-          }
-        }),
-      );
+      // A goal whose progress can't be read shows as unavailable, not 0%.
+      Map<String, GoalProgress> progressByGoal;
+      try {
+        progressByGoal = await _goalRepo.getProgressForGoals(goals);
+      } catch (_) {
+        progressByGoal = const {};
+      }
+      final progressEntries = [
+        for (final g in goals)
+          MapEntry<String, GoalProgress?>(g.id, progressByGoal[g.id]),
+      ];
       if (!mounted || !_generation.isCurrent(token)) return;
       setState(() {
         _isKm = isKm;

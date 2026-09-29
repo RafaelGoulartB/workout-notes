@@ -1,70 +1,28 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:workout_notes/database/database_helper.dart';
-import 'package:workout_notes/database/database_periodization_schema.dart';
 import 'package:workout_notes/models/periodization_checkin.dart';
 import 'package:workout_notes/models/periodization_phase_draft.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'support/periodization_fixtures.dart';
+import 'support/sql_capture.dart';
+import 'support/test_db.dart';
 
 void main() {
   late Database database;
+  late SqlLog sqlLog;
   late PeriodizationRepository repository;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 37,
-        onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-        onCreate: (db, version) async {
-          await db.execute(
-            'CREATE TABLE routines (id TEXT PRIMARY KEY, name TEXT NOT NULL, notes TEXT, created_at TEXT NOT NULL)',
-          );
-          await db.execute(
-            'CREATE TABLE routine_days (id TEXT PRIMARY KEY, routine_id TEXT NOT NULL, name TEXT NOT NULL, order_index INTEGER NOT NULL DEFAULT 0, FOREIGN KEY (routine_id) REFERENCES routines(id) ON DELETE CASCADE)',
-          );
-          await db.execute(
-            'CREATE TABLE workouts (id TEXT PRIMARY KEY, date TEXT NOT NULL, start_time TEXT, end_time TEXT, duration_seconds INTEGER, estimated_calories REAL, comment TEXT, feeling_rating INTEGER, is_from_routine INTEGER DEFAULT 0, routine_id TEXT, pause_start_time TEXT, created_at TEXT NOT NULL)',
-          );
-          await db.execute(
-            'CREATE TABLE exercise_entries (id TEXT PRIMARY KEY, workout_id TEXT NOT NULL, exercise_id TEXT NOT NULL, order_index INTEGER, FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE)',
-          );
-          await db.execute(
-            'CREATE TABLE sets (id TEXT PRIMARY KEY, exercise_entry_id TEXT NOT NULL, weight REAL, reps INTEGER, rpe REAL, is_complete INTEGER DEFAULT 0, is_warmup INTEGER DEFAULT 0, order_index INTEGER, FOREIGN KEY (exercise_entry_id) REFERENCES exercise_entries(id) ON DELETE CASCADE)',
-          );
-          await db.execute(
-            'CREATE TABLE body_measurements (id TEXT PRIMARY KEY, type TEXT, value REAL, unit TEXT, date TEXT, created_at TEXT)',
-          );
-          await db.execute(
-            'CREATE TABLE sleep_entries (id TEXT PRIMARY KEY, date TEXT, sleep_minutes INTEGER, actual_sleep_minutes INTEGER, estimated_sleep_minutes INTEGER)',
-          );
-          await db.execute(
-            'CREATE TABLE meal_logs (id TEXT PRIMARY KEY, date TEXT, meal_type TEXT)',
-          );
-          await db.execute(
-            'CREATE TABLE meal_log_items (id TEXT PRIMARY KEY, meal_log_id TEXT, calories REAL, protein_g REAL, carbs_g REAL, fat_g REAL, FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE)',
-          );
-          await DatabasePeriodizationSchema.create(db);
-        },
-      ),
-    );
-    DatabaseHelper.overrideDatabase = database;
+    (database, sqlLog) = await installCountingTestDb();
     repository = PeriodizationRepository();
   });
 
-  tearDown(() async {
-    DatabaseHelper.overrideDatabase = null;
-    await database.close();
-  });
+  tearDown(uninstallTestDb);
 
   PeriodizationTarget target({
     double calories = 2200,
@@ -88,6 +46,47 @@ void main() {
     sleepHours: 8,
     createdAt: DateTime(2026, 1, 1),
   );
+
+  test('run days and phase run volume use calendar-day ranges', () async {
+    final plan = await repository.createPlan(
+      name: 'Runs',
+      startDate: DateTime(2026, 1, 1),
+      endDate: DateTime(2026, 1, 31),
+    );
+    final phase = await addPhaseFixture(
+      repository,
+      planId: plan.id,
+      name: 'Base',
+      startDate: DateTime(2026, 1, 5),
+      endDate: DateTime(2026, 1, 5),
+      color: 1,
+      target: target(),
+    );
+    Future<void> run(String id, String startedAt) =>
+        database.insert('run_activities', {
+          'id': id,
+          'started_at': startedAt,
+          'distance_meters': 5000.0,
+          'moving_time_seconds': 1500,
+          'status': 'completed',
+          'created_at': startedAt,
+          'updated_at': startedAt,
+        });
+    await run('before-midnight', '2026-01-04T23:59:00.000');
+    await run('first-minute', '2026-01-05T00:01:00.000');
+    await run('last-minute', '2026-01-05T23:59:00.000');
+    await run('after-midnight', '2026-01-06T00:01:00.000');
+
+    final dates = await repository.getActivityDates(
+      DateTime(2026, 1, 5),
+      DateTime(2026, 1, 5),
+    );
+    final metrics = await repository.getPhaseMetrics(phase);
+
+    expect(dates.runs, {'2026-01-05'});
+    expect(metrics.runCount, 2);
+    expect(metrics.runDistanceMeters, 10000.0);
+  });
 
   test('creates an integrated active plan', () async {
     await database.insert('routines', {
@@ -155,6 +154,17 @@ void main() {
         'end_time': '2026-01-02T11:00:00',
         'created_at': '2026-01-02T10:00:00',
       });
+      await database.insert('exercise_categories', {
+        'id': 'category',
+        'name': 'Category',
+        'color': 1,
+      });
+      await database.insert('exercises', {
+        'id': 'exercise',
+        'name': 'Exercise',
+        'category_id': 'category',
+        'created_at': '2026-01-01T08:00:00',
+      });
       await database.insert('exercise_entries', {
         'id': 'e1',
         'workout_id': 'w1',
@@ -173,10 +183,16 @@ void main() {
         'id': 'm1',
         'date': '2026-01-02',
         'meal_type': 'lunch',
+        'created_at': '2026-01-01T08:00:00',
       });
       await database.insert('meal_log_items', {
         'id': 'mi1',
         'meal_log_id': 'm1',
+        'food_name_snapshot': 'Food',
+        'quantity': 1,
+        'unit': 'serving',
+        'nutrition_snapshot_json': '{}',
+        'created_at': '2026-01-01T08:00:00',
         'calories': 2100,
         'protein_g': 170,
       });
@@ -200,6 +216,7 @@ void main() {
         'id': 'sl1',
         'date': '2026-01-02',
         'sleep_minutes': 480,
+        'created_at': '2026-01-02T08:00:00',
       });
 
       final metrics = await repository.getPhaseMetrics(
@@ -295,10 +312,16 @@ void main() {
         'id': 'meal-only',
         'date': '2026-01-01',
         'meal_type': 'lunch',
+        'created_at': '2026-01-01T08:00:00',
       });
       await database.insert('meal_log_items', {
         'id': 'item-only',
         'meal_log_id': 'meal-only',
+        'food_name_snapshot': 'Food',
+        'quantity': 1,
+        'unit': 'serving',
+        'nutrition_snapshot_json': '{}',
+        'created_at': '2026-01-01T08:00:00',
         'calories': 2200,
         'protein_g': 180,
       });
@@ -445,6 +468,70 @@ void main() {
     expect(suggestion?.routineDayId, 'routine-b-day');
     expect(suggestion?.routineDayCount, 2);
     expect(suggestion?.completedWorkouts, 1);
+  });
+
+  test('routine suggestion reads routines in bulk, not one by one', () async {
+    final today = DateTime.now();
+    final start = DateTime(today.year, today.month, today.day - 2);
+    final end = DateTime(today.year, today.month, today.day + 2);
+    final routineIds = [for (var i = 0; i < 4; i++) 'routine-$i'];
+    for (final id in routineIds) {
+      await database.insert('routines', {
+        'id': id,
+        'name': 'Routine $id',
+        'created_at': today.toIso8601String(),
+      });
+      for (var d = 0; d < 2; d++) {
+        await database.insert('routine_days', {
+          'id': '$id-day$d',
+          'routine_id': id,
+          'name': 'Day $d',
+          'order_index': d,
+        });
+      }
+    }
+    await repository.createPlanWithPhases(
+      name: 'Many routines',
+      startDate: start,
+      phases: [
+        PeriodizationPhaseDraft(
+          name: 'Current phase',
+          color: 1,
+          startDate: start,
+          endDate: end,
+          target: PeriodizationTarget(
+            id: '',
+            phaseId: '',
+            version: 0,
+            validFrom: start,
+            routineIds: routineIds,
+            createdAt: today,
+          ),
+        ),
+      ],
+    );
+    // Three finished sessions: the fourth day of the sequence is next.
+    for (var i = 0; i < 3; i++) {
+      await database.insert('workouts', {
+        'id': 'done-$i',
+        'date': _testDate(today),
+        'end_time': today.toIso8601String(),
+        'routine_id': routineIds[i],
+        'created_at': today.toIso8601String(),
+      });
+    }
+
+    sqlLog.clear();
+    final suggestion = await repository.getRoutineSuggestion(today);
+    final reads = sqlLog.reads;
+
+    expect(suggestion?.routineId, 'routine-1');
+    expect(suggestion?.routineDayId, 'routine-1-day1');
+    expect(suggestion?.routineDayCount, 8);
+    expect(suggestion?.completedWorkouts, 3);
+    // Same query count as with a single routine (phase, target, routines,
+    // days, completed count): nothing scales with the routine count.
+    expect(reads, lessThanOrEqualTo(6));
   });
 
   test(
