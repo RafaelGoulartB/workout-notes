@@ -22,13 +22,6 @@ class RoutineCardActions {
 /// Why a routine is highlighted as "in use".
 enum RoutineInUseReason { planned, recent }
 
-String _sessionText(AppLocalizations loc, RoutineSummary routine) {
-  final duration = WorkoutEstimateCalculator.formatDuration(
-    routine.averageSessionSeconds,
-  );
-  return duration == null ? '' : loc.routinesSessionValue(duration);
-}
-
 String _lastTrainedText(AppLocalizations loc, DateTime? date) => date == null
     ? loc.routinesNeverTrained
     : loc.routinesLastTrained(StrengthRoutineFormat.shortDate(date));
@@ -64,13 +57,46 @@ class RoutineCardMenu extends StatelessWidget {
   }
 }
 
-/// A routine of the library: name, description, key numbers, muscle split and
-/// when it was last trained.
-class RoutineLibraryCard extends StatelessWidget {
+/// "3 dias · 17 exercícios · 26 séries/semana · 28 min".
+String _metaLine(AppLocalizations loc, RoutineSummary routine) => [
+  loc.routinesDaysValue(routine.dayCount),
+  loc.routinesExercisesValue(routine.exerciseCount),
+  loc.routinesSetsPerWeekValue(routine.weeklySets),
+  ?WorkoutEstimateCalculator.formatDuration(routine.averageSessionSeconds),
+].join(' · ');
+
+/// Other routines of the library, listed in one card.
+class RoutineLibraryList extends StatelessWidget {
+  final List<RoutineSummary> routines;
+  final RoutineCardActions Function(RoutineSummary routine) actionsFor;
+
+  const RoutineLibraryList({
+    super.key,
+    required this.routines,
+    required this.actionsFor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return RunSectionCard(
+      padding: const EdgeInsets.fromLTRB(12, 2, 0, 2),
+      child: RunDividedList(
+        children: [
+          for (final routine in routines)
+            RoutineLibraryRow(routine: routine, actions: actionsFor(routine)),
+        ],
+      ),
+    );
+  }
+}
+
+/// A routine of the library: name, one line of notes, key numbers, muscle
+/// split and when it was last trained.
+class RoutineLibraryRow extends StatelessWidget {
   final RoutineSummary routine;
   final RoutineCardActions actions;
 
-  const RoutineLibraryCard({
+  const RoutineLibraryRow({
     super.key,
     required this.routine,
     required this.actions,
@@ -82,91 +108,73 @@ class RoutineLibraryCard extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
     final muted = theme.colorScheme.onSurfaceVariant;
     final notes = routine.notes?.trim() ?? '';
-    final session = _sessionText(loc, routine);
 
-    return RunSectionCard(
+    return InkWell(
       onTap: actions.onOpen,
-      padding: const EdgeInsets.fromLTRB(16, 12, 4, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  routine.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              RoutineCardMenu(actions: actions),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (notes.isNotEmpty) ...[
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(4, 12, 0, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    notes,
+                    routine.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (notes.isNotEmpty)
+                    Text(
+                      notes,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                    ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _metaLine(loc, routine),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(color: muted),
                   ),
-                  const SizedBox(height: 8),
-                ],
-                Wrap(
-                  spacing: 14,
-                  runSpacing: 4,
-                  children: [
-                    RoutineInfoItem(
-                      icon: Icons.calendar_view_week_rounded,
-                      text: loc.routinesDaysValue(routine.dayCount),
-                    ),
-                    RoutineInfoItem(
-                      icon: Icons.fitness_center_rounded,
-                      text: loc.routinesExercisesValue(routine.exerciseCount),
-                    ),
-                    RoutineInfoItem(
-                      icon: Icons.stacked_bar_chart_rounded,
-                      text: loc.routinesSetsPerWeekValue(routine.weeklySets),
-                    ),
-                    if (session.isNotEmpty)
-                      RoutineInfoItem(
-                        icon: Icons.timer_outlined,
-                        text: session,
-                      ),
-                  ],
-                ),
-                if (routine.muscles.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  RoutineMuscleBar(muscles: routine.muscles),
                   const SizedBox(height: 6),
-                  RoutineMuscleChips(muscles: routine.muscles, max: 4),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      if (routine.muscles.isNotEmpty)
+                        RoutineMuscleChips(muscles: routine.muscles, max: 3),
+                      Text(
+                        _lastTrainedText(loc, routine.lastTrainedAt),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: muted,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
-                const SizedBox(height: 8),
-                Text(
-                  _lastTrainedText(loc, routine.lastTrainedAt),
-                  style: theme.textTheme.labelSmall?.copyWith(color: muted),
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
+            RoutineCardMenu(actions: actions),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// The routine being followed, pinned on top: key numbers plus every day as a
-/// row with its own start button.
+/// The routine being followed, pinned on top: one summary line, the muscle
+/// split and every day as a compact row with its own start button (the next
+/// day stands out).
 class RoutineInUseCard extends StatelessWidget {
   final RoutineSummary routine;
-  final RoutineInUseReason reason;
   final RoutineCardActions actions;
 
   /// Day the periodization plan expects next, when it links this routine.
@@ -177,7 +185,6 @@ class RoutineInUseCard extends StatelessWidget {
   const RoutineInUseCard({
     super.key,
     required this.routine,
-    required this.reason,
     required this.actions,
     required this.onStartDay,
     required this.onOpenDay,
@@ -189,108 +196,36 @@ class RoutineInUseCard extends StatelessWidget {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
     final scheme = theme.colorScheme;
-    final notes = routine.notes?.trim() ?? '';
-    final duration = WorkoutEstimateCalculator.formatDuration(
-      routine.averageSessionSeconds,
-    );
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(RunUi.heroRadius),
-        onTap: actions.onOpen,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(16, 12, 4, 8),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                scheme.primary.withAlpha(46),
-                scheme.surfaceContainerLow,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(RunUi.heroRadius),
-            border: Border.all(color: scheme.primary.withAlpha(90)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return RunSectionCard(
+      onTap: actions.onOpen,
+      padding: const EdgeInsets.fromLTRB(16, 10, 0, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  RunPill(
-                    icon: Icons.bolt_rounded,
-                    label: loc.routinesInUseBadge,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      reason == RoutineInUseReason.planned
-                          ? loc.routinesInUsePlanned
-                          : loc.routinesInUseRecent,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  RoutineCardMenu(actions: actions),
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       routine.name,
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleLarge?.copyWith(
+                      style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    if (notes.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        notes,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _metaLine(loc, routine),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
                       ),
-                    ],
-                    const SizedBox(height: 14),
-                    RunStatRow(
-                      children: [
-                        RunStatTile(
-                          label: loc.routineStatDays,
-                          value: '${routine.dayCount}',
-                        ),
-                        RunStatTile(
-                          label: loc.routineStatExercises,
-                          value: '${routine.exerciseCount}',
-                        ),
-                        RunStatTile(
-                          label: loc.routineStatWeeklySets,
-                          value: '${routine.weeklySets}',
-                        ),
-                        RunStatTile(
-                          label: loc.routineStatSession,
-                          value: duration ?? '--',
-                        ),
-                      ],
                     ),
-                    if (routine.muscles.isNotEmpty) ...[
-                      const SizedBox(height: 14),
-                      RoutineMuscleBar(muscles: routine.muscles),
-                      const SizedBox(height: 6),
-                      RoutineMuscleChips(muscles: routine.muscles, max: 5),
-                    ],
-                    const SizedBox(height: 6),
                     Text(
                       _lastTrainedText(loc, routine.lastTrainedAt),
                       style: theme.textTheme.labelSmall?.copyWith(
@@ -300,23 +235,31 @@ class RoutineInUseCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (routine.days.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: Divider(height: 1, color: RunUi.divider(scheme)),
-                ),
-                for (final day in routine.days)
-                  _InUseDayRow(
-                    day: day,
-                    isNext: day.id == nextDayId,
-                    onStart: () => onStartDay(day),
-                    onOpen: () => onOpenDay(day),
-                  ),
-              ],
+              RoutineCardMenu(actions: actions),
             ],
           ),
-        ),
+          if (routine.muscles.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: RoutineMuscleChips(muscles: routine.muscles, max: 5),
+            ),
+          ],
+          if (routine.days.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Divider(height: 1, color: RunUi.divider(scheme)),
+            ),
+            for (final day in routine.days)
+              _InUseDayRow(
+                day: day,
+                isNext: day.id == nextDayId,
+                onStart: () => onStartDay(day),
+                onOpen: () => onOpenDay(day),
+              ),
+          ],
+        ],
       ),
     );
   }
@@ -355,7 +298,7 @@ class _InUseDayRow extends StatelessWidget {
       borderRadius: BorderRadius.circular(10),
       onTap: onOpen,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(0, 8, 4, 8),
+        padding: const EdgeInsets.fromLTRB(0, 6, 12, 6),
         child: Row(
           children: [
             _DayDots(muscles: day.muscles),
@@ -393,11 +336,20 @@ class _InUseDayRow extends StatelessWidget {
                 ],
               ),
             ),
-            IconButton.filledTonal(
-              tooltip: loc.routinesStartDay,
-              onPressed: day.exerciseCount == 0 ? null : onStart,
-              icon: const Icon(Icons.play_arrow_rounded),
-            ),
+            if (isNext)
+              IconButton.filled(
+                tooltip: loc.routinesStartDay,
+                visualDensity: VisualDensity.compact,
+                onPressed: day.exerciseCount == 0 ? null : onStart,
+                icon: const Icon(Icons.play_arrow_rounded),
+              )
+            else
+              IconButton.filledTonal(
+                tooltip: loc.routinesStartDay,
+                visualDensity: VisualDensity.compact,
+                onPressed: day.exerciseCount == 0 ? null : onStart,
+                icon: const Icon(Icons.play_arrow_rounded),
+              ),
           ],
         ),
       ),
@@ -416,8 +368,8 @@ class _DayDots extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final colors = [for (final m in muscles.take(3)) Color(m.color)];
     return Container(
-      width: 6,
-      height: 36,
+      width: 4,
+      height: 30,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(3),
         color: colors.length == 1

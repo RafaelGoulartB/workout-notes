@@ -64,7 +64,8 @@ void main() {
     await _settle(tester);
 
     expect(find.text('EM USO'), findsOneWidget); // section header
-    expect(find.text('Em uso'), findsOneWidget); // badge on the card
+    // Why it is in use, next to the section header.
+    expect(find.text('Treinada mais recentemente'), findsOneWidget);
     expect(find.text('PPL'), findsOneWidget);
     expect(find.text('SUAS ROTINAS'), findsOneWidget);
     expect(find.text('Full body'), findsOneWidget);

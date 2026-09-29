@@ -189,20 +189,21 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
               child: ListView(
                 padding: RunUi.screenPadding.copyWith(top: 8),
                 children: [
-                  Text(
-                    loc.routinesSubtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
                   if (active != null) ...[
                     RunSectionHeader(
                       loc.routinesInUseSection,
-                      padding: const EdgeInsets.fromLTRB(4, 16, 0, 8),
+                      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+                      trailing: Text(
+                        _reason == RoutineInUseReason.planned
+                            ? loc.routinesInUsePlanned
+                            : loc.routinesInUseRecent,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     ),
                     RoutineInUseCard(
                       routine: active,
-                      reason: _reason,
                       actions: _actionsFor(active),
                       nextDayId: _nextDayId,
                       onStartDay: (day) => _startDay(active, day),
@@ -210,21 +211,19 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
                     ),
                   ],
                   if (others.isNotEmpty) ...[
-                    if (active != null)
-                      RunSectionHeader(
-                        loc.routinesOthersSection,
-                        padding: const EdgeInsets.fromLTRB(4, 20, 0, 8),
-                      )
-                    else
-                      const SizedBox(height: 12),
-                    for (final routine in others)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: RoutineLibraryCard(
-                          routine: routine,
-                          actions: _actionsFor(routine),
-                        ),
+                    RunSectionHeader(
+                      loc.routinesOthersSection,
+                      padding: EdgeInsets.fromLTRB(
+                        4,
+                        active == null ? 8 : 22,
+                        0,
+                        8,
                       ),
+                    ),
+                    RoutineLibraryList(
+                      routines: others,
+                      actionsFor: _actionsFor,
+                    ),
                   ],
                 ],
               ),
