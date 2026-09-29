@@ -234,6 +234,60 @@ void main() {
       },
     );
 
+    test(
+      'logs a legacy serving item without label or equivalence when the '
+      'variant has a single portion',
+      () async {
+        // Mirrors items saved from old meal logs: unit `serving`, no
+        // serving label and no grams snapshot, while the food's only
+        // serving uses a different unit token ("unidade").
+        final egg = await repository.createManualFood(
+          name: 'Ovo médio',
+          referenceAmount: 100,
+          referenceUnit: 'g',
+          referenceValues: const NutritionValues(
+            calories: 124,
+            proteinG: 10.4,
+            carbsG: 1.38,
+            fatG: 8.7,
+          ),
+          servings: const [
+            ManualServingInput(
+              label: '1 ovo médio',
+              quantity: 1,
+              unit: 'unidade',
+              gramsEquivalent: 50,
+            ),
+          ],
+        );
+        final saved = await repository.saveSavedMeal(
+          name: 'Café da Manhã',
+          items: [
+            SavedMealItemDraft(
+              foodId: egg.id,
+              foodVariantId: (await variantOf(egg)).id,
+              foodNameSnapshot: egg.name,
+              quantity: 5,
+              unit: 'serving',
+            ),
+          ],
+        );
+        final loaded = await repository.getSavedMeal(saved.id);
+        // 5 × 50 g = 250 g → 2.5 × the 100 g values.
+        expect(loaded!.totals!.calories, closeTo(310, 0.001));
+
+        final result = await repository.addSavedMealToDate(
+          date: '2026-08-10',
+          mealType: 'breakfast',
+          savedMealId: saved.id,
+        );
+        expect(result.added, 1);
+        expect(result.skipped, 0);
+        final summary = await repository.getDailySummary('2026-08-10');
+        expect(summary.consumed.calories, closeTo(310, 0.001));
+      },
+    );
+
     test('totals recalculate when a cached food value changes', () async {
       final banana = await createFood('Banana', calories: 90, carbs: 22);
       final variant = await variantOf(banana);

@@ -2002,7 +2002,11 @@ class NutritionRepository extends BaseRepository {
     final legacyMatches = servings
         .where((s) => s.label == unit || s.unit == unit)
         .toList();
-    return legacyMatches.length == 1 ? legacyMatches.first : null;
+    if (legacyMatches.length == 1) return legacyMatches.first;
+    // Items saved from older meal logs carry only the generic `serving`
+    // unit (no label, no equivalence). When the variant defines exactly
+    // one portion there is nothing ambiguous to pick.
+    return servings.length == 1 ? servings.first : null;
   }
 
   static bool _sameNullableDouble(double? a, double? b) {
