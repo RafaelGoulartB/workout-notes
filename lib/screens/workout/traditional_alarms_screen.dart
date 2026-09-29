@@ -4,10 +4,15 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 
 import '../../models/traditional_alarm.dart';
 import '../../models/traditional_alarm_runtime_state.dart';
+import '../../services/medication_reminder_service.dart';
 import '../../services/traditional_alarm_service.dart';
+import 'medication_reminders_tab.dart';
 
 class TraditionalAlarmsScreen extends StatefulWidget {
-  const TraditionalAlarmsScreen({super.key});
+  const TraditionalAlarmsScreen({super.key, this.initialTab = 0});
+
+  /// 0 opens the wake alarms, 1 the medication reminders.
+  final int initialTab;
 
   @override
   State<TraditionalAlarmsScreen> createState() =>
@@ -15,14 +20,20 @@ class TraditionalAlarmsScreen extends StatefulWidget {
 }
 
 class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   final _service = TraditionalAlarmService.instance;
+  late final TabController _tabs;
   bool _loading = true;
   bool _busy = false;
 
   @override
   void initState() {
     super.initState();
+    _tabs = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTab.clamp(0, 1),
+    )..addListener(_changed);
     WidgetsBinding.instance.addObserver(this);
     _service.addListener(_changed);
     _load();
@@ -32,13 +43,23 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _service.removeListener(_changed);
+    _tabs.dispose();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _service.reconcile();
+    if (state == AppLifecycleState.resumed) {
+      _service.reconcile();
+      // Doses confirmed from the notification while the app was paused.
+      MedicationReminderService.instance.reconcile();
+    }
   }
+
+  Future<void> _newMedication() => Navigator.push<bool>(
+    context,
+    MaterialPageRoute(builder: (_) => const MedicationEditorScreen()),
+  );
 
   Future<void> _load() async {
     await _service.initialize();
@@ -130,38 +151,68 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
+    final onMedications = _tabs.index == 1;
     return Scaffold(
-      appBar: AppBar(title: Text(loc.alarmTitle)),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _busy ? null : () => _edit(),
-        icon: const Icon(Icons.add_alarm_rounded),
-        label: Text(loc.alarmNew),
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _service.alarms.isEmpty
-          ? const _EmptyAlarms()
-          : ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-              itemCount: _service.alarms.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 10),
-              itemBuilder: (_, index) {
-                final alarm = _service.alarms[index];
-                final runtimeState = _service.runtimeStateFor(alarm.id);
-                return _AlarmCard(
-                  alarm: alarm,
-                  runtimeState: runtimeState,
-                  disabled: _busy,
-                  onTap: () => _edit(alarm),
-                  onToggle: (enabled) => _toggle(alarm, enabled),
-                  onDelete: () => _delete(alarm),
-                  onSnoozeAction: runtimeState?.isSnoozing == true
-                      ? () => _handleSnooze(alarm, runtimeState!)
-                      : null,
-                );
-              },
+      appBar: AppBar(
+        title: Text(loc.alarmTitle),
+        bottom: TabBar(
+          controller: _tabs,
+          tabs: [
+            Tab(
+              icon: const Icon(Icons.alarm_rounded),
+              text: loc.alarmTabAlarms,
             ),
+            Tab(
+              icon: const Icon(Icons.medication_rounded),
+              text: loc.alarmTabMedications,
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: onMedications
+          ? FloatingActionButton.extended(
+              key: const Key('medication-new'),
+              onPressed: _newMedication,
+              icon: const Icon(Icons.add_rounded),
+              label: Text(loc.medicationNew),
+            )
+          : FloatingActionButton.extended(
+              onPressed: _busy ? null : () => _edit(),
+              icon: const Icon(Icons.add_alarm_rounded),
+              label: Text(loc.alarmNew),
+            ),
+      body: TabBarView(
+        controller: _tabs,
+        children: [_buildAlarms(), const MedicationRemindersTab()],
+      ),
     );
+  }
+
+  Widget _buildAlarms() {
+    return _loading
+        ? const Center(child: CircularProgressIndicator())
+        : _service.alarms.isEmpty
+        ? const _EmptyAlarms()
+        : ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+            itemCount: _service.alarms.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 10),
+            itemBuilder: (_, index) {
+              final alarm = _service.alarms[index];
+              final runtimeState = _service.runtimeStateFor(alarm.id);
+              return _AlarmCard(
+                alarm: alarm,
+                runtimeState: runtimeState,
+                disabled: _busy,
+                onTap: () => _edit(alarm),
+                onToggle: (enabled) => _toggle(alarm, enabled),
+                onDelete: () => _delete(alarm),
+                onSnoozeAction: runtimeState?.isSnoozing == true
+                    ? () => _handleSnooze(alarm, runtimeState!)
+                    : null,
+              );
+            },
+          );
   }
 }
 
