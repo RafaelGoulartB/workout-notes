@@ -34,6 +34,7 @@ import 'periodization_plan_editor_screen.dart';
 import 'periodization_plan_screen.dart';
 import 'periodization_plans_screen.dart';
 import 'settings_screen.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Progress tab: body weight, then the active plan — what today asks for,
 /// how this week is going, and the plan's phases on a roadmap.
@@ -71,7 +72,7 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
 
   DateTime get _day {
     final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day);
+    return dayOf(now);
   }
 
   @override
@@ -156,7 +157,7 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
         _safe(EffectiveNutritionGoalService.resolve(date: day)),
         _safe(
           NutritionRepository().getDailySummary(
-            day.toIso8601String().substring(0, 10),
+            dateKey(day),
           ),
         ),
         _safe(_repository.getRoutineSuggestion(day)),

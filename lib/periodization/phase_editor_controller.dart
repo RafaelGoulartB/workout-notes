@@ -14,6 +14,7 @@ import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Per-week deviation from the phase targets: a label ("Deload", "Refeed")
 /// and/or different calories for training and rest days.
@@ -148,7 +149,7 @@ class PhaseEditorController extends ChangeNotifier {
     storedWeeks = results[5] as List<PeriodizationTarget?>;
     planPhases = results[6] as List<PeriodizationPhase>;
 
-    final today = DateTime(_today.year, _today.month, _today.day);
+    final today = dayOf(_today);
     editableFrom = _phase.contains(today) ? _phase.weekAt(today) - 1 : 0;
     final base = editableFrom < storedWeeks.length
         ? storedWeeks[editableFrom]
@@ -366,7 +367,7 @@ class PhaseEditorController extends ChangeNotifier {
 
   /// The week containing today, or null when today is outside the phase.
   int? get currentWeek {
-    final today = DateTime(_today.year, _today.month, _today.day);
+    final today = dayOf(_today);
     return _phase.contains(today) ? _phase.weekAt(today) - 1 : null;
   }
 

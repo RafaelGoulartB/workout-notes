@@ -14,6 +14,7 @@ import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 
 import 'periodization_checkin_flow.dart';
 import 'periodization_phase_editor_screen.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// A phase at a glance: what it plans (targets and template week) and how
 /// each of its weeks went (planned vs done, weekly review).
@@ -48,7 +49,7 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
 
   DateTime get _today {
     final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day);
+    return dayOf(now);
   }
 
   @override
@@ -213,9 +214,7 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
   }
 
   static String _key(DateTime date) {
-    final day = DateTime(date.year, date.month, date.day);
-    final monday = day.subtract(Duration(days: day.weekday - 1));
-    return monday.toIso8601String().substring(0, 10);
+    return dateKey(mondayOf(date));
   }
 
   @override

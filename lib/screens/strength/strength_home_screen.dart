@@ -32,6 +32,7 @@ import 'package:workout_notes/widgets/strength/home/strength_home_records_sectio
 import 'package:workout_notes/widgets/strength/home/strength_home_today_card.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_trends_card.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_week_card.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 enum _HomeMenu { routines, exercises, history, records, calendar }
 
@@ -71,8 +72,8 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
     setState(() => _loading = _analytics == null);
     try {
       final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final monday = StrengthWeekAnalytics.mondayOf(today);
+      final today = dayOf(now);
+      final monday = mondayOf(today);
       // Name older workouts after the routine day they trained (one-off).
       await StrengthRoutineDayInference.runOnce();
       final finished = await _repo.loadFinishedWorkouts();

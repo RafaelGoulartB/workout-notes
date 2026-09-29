@@ -14,6 +14,7 @@ import 'package:workout_notes/services/run_route_codec.dart';
 import 'package:workout_notes/utils/run_effort_analytics.dart';
 import 'package:workout_notes/utils/run_elevation_analytics.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 class RunRepository extends BaseRepository {
   static const _uuid = Uuid();
@@ -189,7 +190,7 @@ class RunRepository extends BaseRepository {
     final grouped = <String, List<RunActivity>>{};
     for (final row in rows) {
       final activity = RunActivity.fromMap(row);
-      final key = activity.startedAt.toIso8601String().substring(0, 10);
+      final key = dateKey(activity.startedAt);
       grouped.putIfAbsent(key, () => []).add(activity);
     }
     return grouped;

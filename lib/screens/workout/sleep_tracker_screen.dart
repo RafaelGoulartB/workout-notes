@@ -29,6 +29,7 @@ import 'sleep_monitor_result_screen.dart';
 import 'sleep_monitor_screen.dart';
 import 'traditional_alarms_screen.dart';
 import 'settings_screen.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 class SleepTrackerScreen extends StatefulWidget {
   const SleepTrackerScreen({super.key});
@@ -68,7 +69,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   @override
   void initState() {
     super.initState();
-    _weekEnd = _dateOnly(DateTime.now());
+    _weekEnd = dayOf(DateTime.now());
     _monitorService.addListener(_onMonitorChanged);
     _lastRecoveryCount = _monitorService.recoveredCount;
     _bootstrap();
@@ -123,7 +124,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     final token = _generation.begin();
     if (mounted && !_hasLoaded) setState(() => _isLoading = true);
     try {
-      final today = _dateOnly(DateTime.now());
+      final today = dayOf(DateTime.now());
       final results = await Future.wait<Object>([
         _repository.getEntries(limit: _historyPageSize + 1),
         _repository.getDashboardStats(referenceDate: _weekEnd),
@@ -436,12 +437,12 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   }
 
   bool get _canGoToNextWeek {
-    return _weekEnd.isBefore(_dateOnly(DateTime.now()));
+    return _weekEnd.isBefore(dayOf(DateTime.now()));
   }
 
   Future<void> _changeWeek(int direction) async {
     if (_isChangingWeek) return;
-    final today = _dateOnly(DateTime.now());
+    final today = dayOf(DateTime.now());
     var candidate = _weekEnd.add(Duration(days: direction * 7));
     if (candidate.isAfter(today)) candidate = today;
     if (candidate == _weekEnd) return;
@@ -667,6 +668,4 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     );
   }
 
-  static DateTime _dateOnly(DateTime value) =>
-      DateTime(value.year, value.month, value.day);
 }

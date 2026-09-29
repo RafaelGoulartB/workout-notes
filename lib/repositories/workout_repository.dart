@@ -5,6 +5,7 @@ import 'package:workout_notes/utils/workout_estimator.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'base_repository.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 double _normalizeWorkoutDecimal(double value, int decimals) =>
     double.tryParse(value.toStringAsFixed(decimals)) ?? 0;
@@ -60,7 +61,7 @@ class WorkoutRepository extends BaseRepository {
       final batch = txn.batch();
       batch.insert('workouts', {
         'id': id,
-        'date': (date ?? now).toIso8601String().substring(0, 10),
+        'date': dateKey(date ?? now),
         'is_from_routine': routineId != null ? 1 : 0,
         'routine_id': routineId,
         'routine_day_id': ?routineDayId,
@@ -235,7 +236,7 @@ class WorkoutRepository extends BaseRepository {
       final batch = txn.batch();
       batch.insert('workouts', {
         'id': newId,
-        'date': newDate.toIso8601String().substring(0, 10),
+        'date': dateKey(newDate),
         'start_time': null,
         'end_time': null,
         'duration_seconds': null,
@@ -293,7 +294,7 @@ class WorkoutRepository extends BaseRepository {
   /// and with at least one exercise entry).
   Future<List<Map<String, dynamic>>> getActiveWorkouts() async {
     final db = await this.db;
-    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final today = dateKey(DateTime.now());
     return db.rawQuery(
       '''
       SELECT DISTINCT w.* FROM workouts w
@@ -720,7 +721,7 @@ class WorkoutRepository extends BaseRepository {
     final db = await this.db;
     await db.update(
       'workouts',
-      {'date': newDate.toIso8601String().substring(0, 10)},
+      {'date': dateKey(newDate)},
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -838,7 +839,7 @@ class WorkoutRepository extends BaseRepository {
   /// empty workouts dated today or earlier, never planned future ones.
   Future<int> deleteAbandonedBlankWorkouts({String? exceptId}) async {
     final db = await this.db;
-    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final today = dateKey(DateTime.now());
     return db.delete(
       'workouts',
       where:

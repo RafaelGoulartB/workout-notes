@@ -33,6 +33,7 @@ import 'package:workout_notes/widgets/run/plan_detail/run_plan_week_header.dart'
 import 'package:workout_notes/widgets/run/plan_detail/run_plan_week_strip.dart';
 import 'package:workout_notes/widgets/run/run_balance_dialog.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Plan detail: identity header, status, week picker and the training week
 /// laid out by weekday. A running week is read by day ("longão no domingo"),
@@ -69,7 +70,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
   Set<DateTime> _strengthDone = const {};
   bool _applying = false;
 
-  DateTime get _today => RunPlanWeekView.day(widget.today ?? DateTime.now());
+  DateTime get _today => dayOf(widget.today ?? DateTime.now());
 
   @override
   void initState() {
@@ -109,7 +110,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     final anchor = plan.activatedAt;
     final strengthFuture = anchor != null && _includesStrength(plan)
         ? () {
-            final start = RunPlanWeekView.monday(anchor);
+            final start = mondayOf(anchor);
             return RunnerStrengthRoutine()
                 .completedDays(
                   start,

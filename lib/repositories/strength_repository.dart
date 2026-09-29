@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:workout_notes/repositories/base_repository.dart';
 import 'package:workout_notes/utils/workout_estimator.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// The routine (and day) a workout was last trained from.
 class StrengthLastRoutineUse {
@@ -20,8 +21,6 @@ class StrengthLastRoutineUse {
 /// (`end_time` set) and completed, non-warm-up sets of anaerobic exercises
 /// are counted, so planned or abandoned sessions never inflate the numbers.
 class StrengthRepository extends BaseRepository {
-  static String _day(DateTime d) => d.toIso8601String().substring(0, 10);
-
   static const String _anaerobic =
       "IFNULL(c.energy_system, 'anaerobic') = 'anaerobic'";
 
@@ -36,7 +35,7 @@ class StrengthRepository extends BaseRepository {
     final dateFilter =
         '${from == null ? '' : 'AND w.date >= ?'} '
         '${to == null ? '' : 'AND w.date <= ?'}';
-    final dateArgs = [if (from != null) _day(from), if (to != null) _day(to)];
+    final dateArgs = [if (from != null) dateKey(from), if (to != null) dateKey(to)];
 
     final rows = await database.rawQuery(
       '''
@@ -110,7 +109,7 @@ class StrengthRepository extends BaseRepository {
     }
     return StrengthWorkoutSummary(
       id: row['id'] as String,
-      date: DateTime(date.year, date.month, date.day),
+      date: dayOf(date),
       startTime: start,
       endTime: end,
       durationSeconds: duration,
@@ -148,7 +147,7 @@ class StrengthRepository extends BaseRepository {
         )
       ORDER BY w.date ASC
       ''',
-      [if (from != null) _day(from)],
+      [if (from != null) dateKey(from)],
     );
     return [
       for (final row in rows)
@@ -161,7 +160,7 @@ class StrengthRepository extends BaseRepository {
             duration = end.difference(start).inSeconds.clamp(0, 86400);
           }
           return StrengthWorkoutStamp(
-            date: DateTime(date.year, date.month, date.day),
+            date: dayOf(date),
             durationSeconds: duration,
           );
         }(),
@@ -193,7 +192,7 @@ class StrengthRepository extends BaseRepository {
       GROUP BY e.category_id
       ORDER BY sets DESC, volume DESC
       ''',
-      [if (from != null) _day(from), if (to != null) _day(to)],
+      [if (from != null) dateKey(from), if (to != null) dateKey(to)],
     );
     return [
       for (final row in rows)
@@ -245,7 +244,7 @@ class StrengthRepository extends BaseRepository {
       ORDER BY w.date ASC, w.created_at ASC
       LIMIT ?
       ''',
-      [_day(after), limit],
+      [dateKey(after), limit],
     );
     return [
       for (final row in rows)
@@ -283,7 +282,7 @@ class StrengthRepository extends BaseRepository {
       ORDER BY w.date DESC, w.start_time DESC
       LIMIT 1
       ''',
-      [if (upTo != null) _day(upTo)],
+      [if (upTo != null) dateKey(upTo)],
     );
     if (rows.isEmpty) return null;
     final row = rows.first;

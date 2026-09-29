@@ -11,6 +11,7 @@ import 'package:workout_notes/services/run_pace_calculator.dart';
 import 'package:workout_notes/services/run_plan_adaptation.dart';
 import 'package:workout_notes/services/run_plan_composer.dart';
 import 'package:workout_notes/services/run_plan_templates.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Weekly review of the plan being followed: turns what was actually run
 /// into a [RunPlanAdaptationProposal], and applies it by re-planning the rest
@@ -95,7 +96,7 @@ class RunPlanCoach {
         plan: plan,
         config: config,
         proposal: proposal,
-        startWeek: _weekStart(
+        startWeek: mondayOf(
           anchor,
         ).add(Duration(days: 7 * proposal.fromWeek)),
         includeTest: config.includeTest && !testDone,
@@ -175,7 +176,7 @@ class RunPlanCoach {
   }
 
   Future<_ReviewData> _load(RunPlan plan, DateTime today) async {
-    final anchor = _weekStart(plan.activatedAt!);
+    final anchor = mondayOf(plan.activatedAt!);
     final scheduled = await _plans.getScheduledRunsForPlan(plan.id);
     final activities = (await _runs.listActivities(
       limit: 400,
@@ -375,11 +376,6 @@ class RunPlanCoach {
       'plannedKm': p.lastWeek!.plannedKm,
     },
   };
-
-  static DateTime _weekStart(DateTime date) {
-    final day = DateTime(date.year, date.month, date.day);
-    return day.subtract(Duration(days: day.weekday - 1));
-  }
 }
 
 class _ReviewData {

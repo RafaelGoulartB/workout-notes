@@ -10,6 +10,7 @@ import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
 
 import 'saved_meal_editor_screen.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Lists the user's saved meal templates and lets them log a template
 /// into today with a single tap.
@@ -182,11 +183,7 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
 
   static String _todayString() {
     final now = DateTime.now();
-    return DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).toIso8601String().substring(0, 10);
+    return dateKey(DateTime(now.year,now.month,now.day,));
   }
 
   @override

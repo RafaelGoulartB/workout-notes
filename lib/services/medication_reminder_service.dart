@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../models/medication.dart';
 import '../repositories/medication_repository.dart';
 import 'traditional_alarm_service.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Where one of today's doses stands.
 enum MedicationDoseState {
@@ -313,7 +314,7 @@ class MedicationReminderService extends ChangeNotifier {
 
   DateTime _today() {
     final now = _clock();
-    return DateTime(now.year, now.month, now.day);
+    return dayOf(now);
   }
 
   bool get _isAndroid => defaultTargetPlatform == TargetPlatform.android;

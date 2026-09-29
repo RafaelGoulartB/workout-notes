@@ -23,6 +23,7 @@ import 'nutrition_replicate_day_dialog.dart';
 import 'nutrition_settings_screen.dart';
 import 'saved_meal_editor_screen.dart';
 import 'saved_meals_screen.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 part 'nutrition_day_detail_widgets.dart';
 
@@ -72,7 +73,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _selectedDate = _dateOnly(widget.initialDate ?? DateTime.now());
+    _selectedDate = dayOf(widget.initialDate ?? DateTime.now());
     _load();
   }
 
@@ -86,7 +87,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final date = _dateString(_selectedDate);
+      final date = dateKey(_selectedDate);
       final results = await Future.wait([
         _repository.getMealTypes(),
         _repository.getDayMeals(date),
@@ -140,13 +141,13 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
 
   Future<void> _changeDay(int delta) async {
     setState(() {
-      _selectedDate = _dateOnly(_selectedDate.add(Duration(days: delta)));
+      _selectedDate = dayOf(_selectedDate.add(Duration(days: delta)));
     });
     await _load();
   }
 
   Future<void> _jumpToToday() async {
-    setState(() => _selectedDate = _dateOnly(DateTime.now()));
+    setState(() => _selectedDate = dayOf(DateTime.now()));
     await _load();
   }
 
@@ -158,7 +159,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
     if (picked == null || !mounted) return;
-    setState(() => _selectedDate = _dateOnly(picked));
+    setState(() => _selectedDate = dayOf(picked));
     await _load();
   }
 
@@ -170,7 +171,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
           repository: _repository,
           mealType: mealType,
           mealName: mealLabel,
-          date: _dateString(_selectedDate),
+          date: dateKey(_selectedDate),
         ),
       ),
     );
@@ -213,7 +214,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
         servings: {selection.variant.id: selection.availableServings},
       );
       await _repository.addMealLogItem(
-        date: _dateString(_selectedDate),
+        date: dateKey(_selectedDate),
         mealType: mealType,
         name: mealLabel,
         food: upserted,
@@ -374,8 +375,8 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
   /// user picks which meal types to carry over via a checkbox dialog.
   Future<void> _copyPreviousDay() async {
     final loc = AppLocalizations.of(context)!;
-    final yesterday = _dateString(
-      _dateOnly(_selectedDate.subtract(const Duration(days: 1))),
+    final yesterday = dateKey(
+      dayOf(_selectedDate.subtract(const Duration(days: 1))),
     );
     final source = (await _repository.getDayMeals(
       yesterday,
@@ -431,7 +432,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
     for (final m in source) {
       if (!selected.contains(m.log.mealType)) continue;
       count += await _repository.copyItemsToMeal(
-        date: _dateString(_selectedDate),
+        date: dateKey(_selectedDate),
         mealType: m.log.mealType,
         name: m.log.name,
         items: m.items,
@@ -448,7 +449,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
   /// dates chosen in the calendar. Existing target items are preserved.
   Future<void> _replicateDay() async {
     final loc = AppLocalizations.of(context)!;
-    final sourceDate = _dateString(_selectedDate);
+    final sourceDate = dateKey(_selectedDate);
     final source = (await _repository.getDayMeals(
       sourceDate,
     )).where((meal) => meal.items.isNotEmpty).toList();
@@ -470,7 +471,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
     try {
       final count = await _repository.replicateDayToDates(
         sourceDate: sourceDate,
-        targetDates: selectedDates.map(_dateString),
+        targetDates: selectedDates.map(dateKey),
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -491,7 +492,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
   /// selected day) into the selected day, keeping the section name.
   Future<void> _repeatMeal(MealLogWithItems meal) async {
     final loc = AppLocalizations.of(context)!;
-    final before = _dateString(_selectedDate);
+    final before = dateKey(_selectedDate);
     final items = await _repository.getLatestMealItems(
       meal.log.mealType,
       beforeDate: before,
@@ -548,7 +549,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final isToday = _selectedDate == _dateOnly(DateTime.now());
+    final isToday = _selectedDate == dayOf(DateTime.now());
     return Scaffold(
       appBar: AppBar(
         backgroundColor: theme.colorScheme.surface,
@@ -792,7 +793,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
     return MealLogWithItems(
       log: MealLog(
         id: '',
-        date: _dateString(_selectedDate),
+        date: dateKey(_selectedDate),
         mealType: mealType,
         createdAt: DateTime.now(),
       ),
@@ -800,9 +801,4 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
     );
   }
 
-  static DateTime _dateOnly(DateTime value) =>
-      DateTime(value.year, value.month, value.day);
-
-  static String _dateString(DateTime value) =>
-      _dateOnly(value).toIso8601String().substring(0, 10);
 }

@@ -8,6 +8,7 @@ import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 
 import 'periodization_phase_screen.dart';
 import 'periodization_plan_editor_screen.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// A plan that is not necessarily the active one: its roadmap and phases,
 /// plus activating, editing, finishing, archiving and deleting it.
@@ -27,7 +28,7 @@ class _PeriodizationPlanScreenState extends State<PeriodizationPlanScreen> {
 
   DateTime get _today {
     final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day);
+    return dayOf(now);
   }
 
   @override

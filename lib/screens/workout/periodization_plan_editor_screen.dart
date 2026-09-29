@@ -14,6 +14,7 @@ import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/widgets/periodization/plan_overview.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Creates or re-plans a plan: its name, the Monday it starts and the
 /// ordered list of phases, each lasting a number of weeks. Phases are laid
@@ -81,7 +82,7 @@ class _PeriodizationPlanEditorScreenState
   }
 
   static DateTime _nextMonday(DateTime date) {
-    final day = DateTime(date.year, date.month, date.day);
+    final day = dayOf(date);
     if (day.weekday == DateTime.monday) return day;
     return day.add(Duration(days: 8 - day.weekday));
   }

@@ -6,6 +6,7 @@ import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/services/run_pace_calculator.dart';
 import 'package:workout_notes/services/run_plan_composer.dart';
 import 'package:workout_notes/services/run_plan_templates.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Real-athlete scenarios from the persona review
 /// (docs/run-plan-persona-review.md). Each test is a plan a real person would
@@ -303,7 +304,7 @@ void main() {
       expect(outline.schedule, hasLength(RunPlanTemplates.fiveK.weeks));
       expect(
         outline.startWeek,
-        RunPlanComposer.weekStartOf(
+        mondayOf(
           race,
         ).subtract(Duration(days: 7 * (RunPlanTemplates.fiveK.weeks - 1))),
       );

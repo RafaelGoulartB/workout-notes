@@ -1,4 +1,5 @@
 import 'package:workout_notes/models/strength_workout_summary.dart';
+import 'package:workout_notes/utils/date_utils.dart' as dates;
 import 'package:workout_notes/utils/run_progress_analytics.dart';
 
 /// One bar of the gym trend charts: a calendar week, or a calendar month when
@@ -211,7 +212,7 @@ class StrengthWeekAnalytics {
     DateTime? now,
   }) {
     final clock = now ?? DateTime.now();
-    final today = _dateOnly(clock);
+    final today = dates.dayOf(clock);
     final thisWeekStart = mondayOf(today);
     final nextWeekStart = thisWeekStart.add(const Duration(days: 7));
     final lastWeekStart = thisWeekStart.subtract(const Duration(days: 7));
@@ -325,13 +326,11 @@ class StrengthWeekAnalytics {
     );
   }
 
-  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
-
   /// Monday (00:00) of the calendar week of [d].
-  static DateTime mondayOf(DateTime d) {
-    final day = _dateOnly(d);
-    return day.subtract(Duration(days: day.weekday - DateTime.monday));
-  }
+  ///
+  /// Kept as a delegate for `workout_home_screen.dart`; new code uses the
+  /// shared `mondayOf` from `date_utils.dart`.
+  static DateTime mondayOf(DateTime d) => dates.mondayOf(d);
 
   static StrengthPeriodTotals _totals(
     List<StrengthWorkoutSummary> workouts, {
@@ -501,7 +500,7 @@ class WorkoutWeekOverview {
     DateTime? now,
   }) {
     final clock = now ?? DateTime.now();
-    final today = DateTime(clock.year, clock.month, clock.day);
+    final today = dates.dayOf(clock);
     final monday = StrengthWeekAnalytics.mondayOf(today);
     final nextMonday = monday.add(const Duration(days: 7));
     bool thisWeek(DateTime d) => !d.isBefore(monday) && d.isBefore(nextMonday);

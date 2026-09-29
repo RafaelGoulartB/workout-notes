@@ -23,6 +23,7 @@ import 'package:workout_notes/widgets/run/run_route_map.dart';
 import 'package:workout_notes/widgets/run/run_route_sketch.dart';
 import 'package:workout_notes/widgets/run/run_splits_list.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// What to do when the runner leaves the review with back / gesture.
 enum _LeaveChoice { save, discard, keepEditing }
@@ -217,7 +218,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
     final plan = await _planRepository.getActivatedPlan(hydrate: false);
     if (plan == null) return null;
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = dayOf(now);
     final upcoming = await _planRepository.getScheduledRuns(
       today,
       today.add(const Duration(days: 28)),

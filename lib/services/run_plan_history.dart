@@ -1,6 +1,7 @@
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/services/run_plan_composer.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// A completed GPS run the wizard can use as "recent race" calibration.
 class RunPlanSuggestedRace {
@@ -71,15 +72,9 @@ class RunPlanHistoryInsights {
         _effortSeconds(activity),
       );
 
-  /// Monday of the calendar week containing [date], local date only.
-  static DateTime weekStart(DateTime date) {
-    final day = DateTime(date.year, date.month, date.day);
-    return day.subtract(Duration(days: day.weekday - 1));
-  }
-
   /// Last [completeWeeks] finished weeks (excludes the current partial week).
   static List<double> _weeksWithRuns(List<RunActivity> runs, DateTime now) {
-    final currentWeek = weekStart(now);
+    final currentWeek = mondayOf(now);
     final km = <double>[];
     for (var i = 1; i <= completeWeeks; i++) {
       final start = currentWeek.subtract(Duration(days: 7 * i));

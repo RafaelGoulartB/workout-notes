@@ -1,6 +1,7 @@
 import 'package:workout_notes/models/run_plan_template.dart';
 import 'package:workout_notes/services/run_pace_calculator.dart';
 import 'package:workout_notes/services/run_plan_text.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// How hard the athlete wants to push weekly volume and quality load.
 enum RunPlanIntensity { conservative, standard, aggressive }
@@ -216,7 +217,7 @@ class RunPlanBuildConfig {
     'paceSource': paceSource.name,
     'fitnessCalibration': fitnessCalibration?.toJson(),
     'goalCalibration': goalCalibration?.toJson(),
-    'raceDate': raceDate?.toIso8601String().substring(0, 10),
+    'raceDate': raceDate == null ? null : dateKey(raceDate!),
     'currentWeeklyKm': currentWeeklyKm,
     'includeHills': includeHills,
     'hillSurface': hillSurface.name,

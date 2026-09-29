@@ -8,6 +8,7 @@ import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 class PeriodizationCheckinScreen extends StatefulWidget {
   final PeriodizationPhase phase;
@@ -44,8 +45,7 @@ class _PeriodizationCheckinScreenState
   void initState() {
     super.initState();
     final date = widget.weekStart ?? DateTime.now();
-    final day = DateTime(date.year, date.month, date.day);
-    _weekStart = day.subtract(Duration(days: day.weekday - DateTime.monday));
+    _weekStart = mondayOf(date);
     _load();
   }
 

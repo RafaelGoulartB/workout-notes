@@ -1,4 +1,5 @@
 import 'package:workout_notes/models/run_plan_workout.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 enum ScheduledRunStatus {
   planned('planned'),
@@ -74,7 +75,7 @@ class ScheduledRun {
 
   Map<String, dynamic> toMap() => {
     'id': id,
-    'date': _date(date),
+    'date': dateKey(date),
     'run_plan_id': runPlanId,
     'run_plan_workout_id': runPlanWorkoutId,
     'status': status.value,
@@ -102,11 +103,6 @@ class ScheduledRun {
     workout: workout,
   );
 
-  static String _date(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
 }
 
 /// Planned-vs-actual result of one executed step.

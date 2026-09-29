@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Calendar dialog used to choose multiple target dates for a diary day.
 class NutritionReplicateDayDialog extends StatefulWidget {
@@ -18,8 +19,8 @@ class _NutritionReplicateDayDialogState
     extends State<NutritionReplicateDayDialog> {
   static final DateTime _firstDate = DateTime(2018, 1, 1);
 
-  late final DateTime _sourceDate = _dateOnly(widget.sourceDate);
-  late final DateTime _lastDate = _dateOnly(
+  late final DateTime _sourceDate = dayOf(widget.sourceDate);
+  late final DateTime _lastDate = dayOf(
     DateTime.now().add(const Duration(days: 365)),
   );
   late DateTime _focusedMonth = DateTime(_sourceDate.year, _sourceDate.month);
@@ -31,9 +32,7 @@ class _NutritionReplicateDayDialogState
     final theme = Theme.of(context);
     final locale = Localizations.localeOf(context).toLanguageTag();
     final monthStart = DateTime(_focusedMonth.year, _focusedMonth.month, 1);
-    final gridStart = monthStart.subtract(
-      Duration(days: monthStart.weekday % DateTime.daysPerWeek),
-    );
+    final gridStart = sundayOf(monthStart);
     final canGoPrevious = _canFocusMonth(-1);
     final canGoNext = _canFocusMonth(1);
 
@@ -105,7 +104,7 @@ class _NutritionReplicateDayDialogState
                   ),
                   itemCount: 42,
                   itemBuilder: (context, index) {
-                    final date = _dateOnly(
+                    final date = dayOf(
                       gridStart.add(Duration(days: index)),
                     );
                     return _buildDay(
@@ -250,9 +249,6 @@ class _NutritionReplicateDayDialogState
       _focusedMonth = DateTime(_focusedMonth.year, _focusedMonth.month + delta);
     });
   }
-
-  static DateTime _dateOnly(DateTime date) =>
-      DateTime(date.year, date.month, date.day);
 
   static bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;

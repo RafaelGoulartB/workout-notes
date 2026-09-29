@@ -1,6 +1,7 @@
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/services/run_pace_calculator.dart';
 import 'package:workout_notes/utils/run_analytics_dates.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Fitness from running efforts: the VDOT estimate, race predictions and the
 /// monthly fitness curve.
@@ -75,7 +76,7 @@ abstract final class RunFitnessAnalytics {
     DateTime? now,
     int windowDays = 90,
   }) {
-    final today = RunAnalyticsDates.day(now ?? DateTime.now());
+    final today = dayOf(now ?? DateTime.now());
     final runs = activities.where(RunAnalyticsDates.completedRun).toList();
 
     RunEffortSample? best(Iterable<RunEffortSample> samples, int days) {
@@ -83,8 +84,8 @@ abstract final class RunFitnessAnalytics {
       RunEffortSample? top;
       var topVdot = 0.0;
       for (final s in samples) {
-        if (RunAnalyticsDates.day(s.date).isBefore(from) ||
-            RunAnalyticsDates.day(s.date).isAfter(today)) {
+        if (dayOf(s.date).isBefore(from) ||
+            dayOf(s.date).isAfter(today)) {
           continue;
         }
         final v = vdotOf(s);
@@ -144,12 +145,12 @@ abstract final class RunFitnessAnalytics {
     int months = 12,
     DateTime? now,
   }) {
-    final today = RunAnalyticsDates.day(now ?? DateTime.now());
+    final today = dayOf(now ?? DateTime.now());
     final firstMonth = DateTime(today.year, today.month - (months - 1));
     final runs = activities.where(RunAnalyticsDates.completedRun).where((a) {
       final d = a.startedAt.toLocal();
       return !d.isBefore(firstMonth) &&
-          !RunAnalyticsDates.day(d).isAfter(today);
+          !dayOf(d).isAfter(today);
     }).toList();
 
     var samples = [for (final a in runs) ...effortsOf(a)];

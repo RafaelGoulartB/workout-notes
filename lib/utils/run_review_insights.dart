@@ -1,6 +1,7 @@
 import 'package:workout_notes/models/run_achievement.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/utils/run_achievement_engine.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// What a just-finished run means against the history: record placements,
 /// month bests and the running volume of its week. Pure, so the post-run
@@ -43,9 +44,7 @@ class RunReviewInsights {
 
   /// Monday 00:00 of the week containing [date] (local).
   static DateTime weekStart(DateTime date) {
-    final local = date.toLocal();
-    final day = DateTime(local.year, local.month, local.day);
-    return day.subtract(Duration(days: day.weekday - DateTime.monday));
+    return mondayOf(date.toLocal());
   }
 
   /// [ranking]: every completed outdoor run (see

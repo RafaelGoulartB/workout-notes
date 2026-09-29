@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import '../database/database_helper.dart';
 import 'effective_nutrition_goal_service.dart';
 import 'package:workout_notes/services/ai_tool_math.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Read-only, compact wellness analytics used by the AI Coach tools.
 ///
@@ -79,7 +80,7 @@ class AiWellnessAnalyticsService {
   Future<Map<String, dynamic>> nutritionSummary({int days = 14}) async {
     days = days.clamp(3, 90);
     final database = await db.database;
-    final start = AiToolMath.isoDay(
+    final start = dateKey(
       _today().subtract(Duration(days: days - 1)),
     );
     final rows = await database.rawQuery(
@@ -240,7 +241,7 @@ class AiWellnessAnalyticsService {
   Future<Map<String, dynamic>> nutritionBodyTrend({int days = 84}) async {
     days = days.clamp(14, 180);
     final database = await db.database;
-    final start = AiToolMath.isoDay(
+    final start = dateKey(
       _today().subtract(Duration(days: days - 1)),
     );
     final nutrition = await database.rawQuery(
@@ -344,7 +345,7 @@ class AiWellnessAnalyticsService {
 
   Future<List<Map<String, dynamic>>> _sleepRows(int days) async {
     final database = await db.database;
-    final start = AiToolMath.isoDay(
+    final start = dateKey(
       _today().subtract(Duration(days: days - 1)),
     );
     return database.query(
@@ -358,7 +359,7 @@ class AiWellnessAnalyticsService {
 
   Future<List<Map<String, dynamic>>> _dailyWorkoutRows(int days) async {
     final database = await db.database;
-    final start = AiToolMath.isoDay(
+    final start = dateKey(
       _today().subtract(Duration(days: days - 1)),
     );
     return database.rawQuery(
@@ -406,7 +407,7 @@ class AiWellnessAnalyticsService {
 
   DateTime _today() {
     final value = _now();
-    return DateTime(value.year, value.month, value.day);
+    return dayOf(value);
   }
 
   static Map<String, dynamic> _compactSleepRow(Map<String, dynamic> row) => {
@@ -566,10 +567,7 @@ class AiWellnessAnalyticsService {
   }
 
   static String _weekStart(String date) {
-    final parsed = DateTime.parse(date);
-    return AiToolMath.isoDay(
-      parsed.subtract(Duration(days: parsed.weekday - 1)),
-    );
+    return dateKey(mondayOf(DateTime.parse(date)));
   }
 }
 

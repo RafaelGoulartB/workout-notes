@@ -2,6 +2,7 @@ import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_ledger.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Where a plan session stands today.
 enum RunSessionState {
@@ -42,14 +43,6 @@ class RunPlanSessionView {
 /// screen shows: real dates per weekday, one state per session and planned
 /// versus done kilometres per week.
 abstract final class RunPlanWeekView {
-  static DateTime day(DateTime value) =>
-      DateTime(value.year, value.month, value.day);
-
-  static DateTime monday(DateTime value) {
-    final d = day(value);
-    return DateTime(d.year, d.month, d.day - (d.weekday - 1));
-  }
-
   /// Monday of plan week [week], or null when the plan is not followed.
   ///
   /// Repeating plans wrap: the week shown is the one in the cycle running on
@@ -62,10 +55,10 @@ abstract final class RunPlanWeekView {
   }) {
     final anchor = plan.activatedAt;
     if (anchor == null || plan.weeks < 1) return null;
-    final anchorMonday = monday(anchor);
+    final anchorMonday = mondayOf(anchor);
     var offset = week;
     if (plan.repeats) {
-      final elapsed = monday(today).difference(anchorMonday).inDays ~/ 7;
+      final elapsed = mondayOf(today).difference(anchorMonday).inDays ~/ 7;
       final cycle = elapsed < 0 ? 0 : elapsed ~/ plan.weeks;
       offset = (cycle + cycleShift) * plan.weeks + week;
     }
@@ -102,7 +95,7 @@ abstract final class RunPlanWeekView {
         return RunSessionState.skipped;
       case ScheduledRunStatus.planned:
       case null:
-        return date != null && day(date).isBefore(day(today))
+        return date != null && dayOf(date).isBefore(dayOf(today))
             ? RunSessionState.missed
             : RunSessionState.planned;
     }
@@ -145,13 +138,13 @@ abstract final class RunPlanWeekView {
     if (entry != null && plan.repeats && start != null) {
       final at = entry.date;
       final end = DateTime(start.year, start.month, start.day + 6);
-      if (at == null || day(at).isBefore(start) || day(at).isAfter(end)) {
+      if (at == null || dayOf(at).isBefore(start) || dayOf(at).isAfter(end)) {
         entry = null;
       }
     }
     // Rescheduled sessions keep their own calendar date.
     final date = entry != null && !entry.isCompleted && entry.date != null
-        ? day(entry.date!)
+        ? dayOf(entry.date!)
         : planned;
     return RunPlanSessionView(
       workout: workout,
@@ -197,7 +190,7 @@ abstract final class RunPlanWeekView {
         )) {
           final date = view.date;
           if (date == null || view.state != RunSessionState.planned) continue;
-          if (day(date).isBefore(day(today))) continue;
+          if (dayOf(date).isBefore(dayOf(today))) continue;
           if (best == null || date.isBefore(best.date!)) best = view;
         }
       }

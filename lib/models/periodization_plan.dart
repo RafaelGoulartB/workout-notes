@@ -1,3 +1,5 @@
+import 'package:workout_notes/utils/date_utils.dart';
+
 enum PeriodizationPlanStatus {
   draft('draft'),
   active('active'),
@@ -37,7 +39,7 @@ class PeriodizationPlan {
   int get totalDays => endDate.difference(startDate).inDays + 1;
 
   bool contains(DateTime date) {
-    final day = DateTime(date.year, date.month, date.day);
+    final day = dayOf(date);
     return !day.isBefore(startDate) && !day.isAfter(endDate);
   }
 
@@ -68,8 +70,8 @@ class PeriodizationPlan {
   Map<String, dynamic> toMap() => {
     'id': id,
     'name': name,
-    'start_date': _date(startDate),
-    'end_date': _date(endDate),
+    'start_date': dateKey(startDate),
+    'end_date': dateKey(endDate),
     'status': status.value,
     'notes': notes,
     'created_at': createdAt.toIso8601String(),
@@ -88,11 +90,6 @@ class PeriodizationPlan {
         updatedAt: DateTime.parse(map['updated_at'] as String),
       );
 
-  static String _date(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
 }
 
 const Object _sentinel = Object();
