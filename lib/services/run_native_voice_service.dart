@@ -1,6 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import 'package:workout_notes/models/run_step_snapshot.dart';
+import 'package:workout_notes/models/run_voice_settings.dart';
 
+/// Facade over the Android voice controller (`RunVoiceController.kt`), the
+/// only engine that speaks run cues. It lives in the tracking foreground
+/// service, so cues keep coming while the screen is off; Dart only pushes
+/// settings, goal and plan, and asks for one-shot announcements.
 class RunNativeVoiceService {
   RunNativeVoiceService._();
   static final RunNativeVoiceService instance = RunNativeVoiceService._();
@@ -11,20 +18,27 @@ class RunNativeVoiceService {
 
   bool get isSupported => _isAndroid;
 
+  /// Settings as the native controller reads them: the stored JSON plus the
+  /// language already resolved against the app locale.
+  static Map<String, dynamic> settingsPayload(RunVoiceSettings settings) => {
+    ...settings.toJson(),
+    'resolvedLanguage': settings.language
+        .resolve(Intl.defaultLocale)
+        .storageValue,
+  };
+
   Future<void> syncSettings({
-    required Map<String, dynamic> settings,
+    required RunVoiceSettings settings,
     required Map<String, dynamic> goal,
     required bool intervalsOn,
-    bool bypassHeadphonesGate = false,
     List<Map<String, dynamic>>? plan,
   }) async {
     if (!_isAndroid) return;
     try {
       await _methods.invokeMethod('syncSettings', {
-        'settings': settings,
+        'settings': settingsPayload(settings),
         'goal': goal,
         'intervalsOn': intervalsOn,
-        'bypassHeadphonesGate': bypassHeadphonesGate,
         'plan': plan ?? const <Map<String, dynamic>>[],
       });
     } on MissingPluginException {
@@ -35,19 +49,17 @@ class RunNativeVoiceService {
   }
 
   Future<void> beginSession({
-    required Map<String, dynamic> settings,
+    required RunVoiceSettings settings,
     required Map<String, dynamic> goal,
     required bool intervalsOn,
-    bool bypassHeadphonesGate = false,
     List<Map<String, dynamic>>? plan,
   }) async {
     if (!_isAndroid) return;
     try {
       await _methods.invokeMethod('beginSession', {
-        'settings': settings,
+        'settings': settingsPayload(settings),
         'goal': goal,
         'intervalsOn': intervalsOn,
-        'bypassHeadphonesGate': bypassHeadphonesGate,
         'plan': plan ?? const <Map<String, dynamic>>[],
       });
     } on MissingPluginException {
@@ -70,15 +82,15 @@ class RunNativeVoiceService {
 
   /// Per-step results measured by the native controller during a structured
   /// session. Empty on other platforms or when no plan was running.
-  Future<List<Map<String, dynamic>>> stepResults() async {
+  Future<List<RunStepResult>> stepResults() async {
     if (!_isAndroid) return const [];
     try {
       final raw = await _methods.invokeMethod<List<Object?>>('stepResults');
       if (raw == null) return const [];
-      return raw
-          .whereType<Map>()
-          .map((row) => Map<String, dynamic>.from(row))
-          .toList();
+      return [
+        for (final row in raw.whereType<Map>())
+          RunStepResult.fromMap(Map<String, dynamic>.from(row)),
+      ];
     } on MissingPluginException {
       return const [];
     } catch (_) {
@@ -99,10 +111,21 @@ class RunNativeVoiceService {
     }
   }
 
-  Future<bool> speakTest() async {
+  /// Speaks the settings-screen sample phrase with [settings] and their
+  /// resolved language, without needing a run in progress.
+  Future<bool> speakTest(RunVoiceSettings settings) =>
+      _oneShot('speakTest', settings);
+
+  /// The short "workout complete" acknowledgement after a free run stopped.
+  Future<bool> speakWorkoutComplete(RunVoiceSettings settings) =>
+      _oneShot('speakWorkoutComplete', settings);
+
+  Future<bool> _oneShot(String method, RunVoiceSettings settings) async {
     if (!_isAndroid) return false;
     try {
-      final result = await _methods.invokeMethod<bool>('speakTest');
+      final result = await _methods.invokeMethod<bool>(method, {
+        'settings': settingsPayload(settings),
+      });
       return result ?? false;
     } on MissingPluginException {
       return false;

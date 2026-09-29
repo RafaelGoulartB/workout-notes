@@ -12,12 +12,21 @@ import java.util.Locale
 import java.util.concurrent.LinkedBlockingQueue
 import android.util.Log
 
+/** Speech sink used by [RunVoiceController]; faked in unit tests. */
+interface RunSpeechOutput {
+    fun ensureReady(language: RunVoiceLanguage)
+    fun setLanguage(language: RunVoiceLanguage)
+    fun speak(text: String)
+    fun stop()
+    fun shutdown()
+}
+
 /**
  * Native TTS bound to the run foreground service lifecycle.
  * Survives screen-off because it lives inside RunTrackingService.
  * Uses STREAM_MUSIC with USAGE_ASSISTANCE_NAVIGATION_GUIDANCE equivalent.
  */
-class RunTtsService(private val context: Context) : TextToSpeech.OnInitListener {
+class RunTtsService(private val context: Context) : RunSpeechOutput, TextToSpeech.OnInitListener {
 
     private var tts: TextToSpeech? = null
     @Volatile private var ready = false
@@ -27,7 +36,7 @@ class RunTtsService(private val context: Context) : TextToSpeech.OnInitListener 
     private var audioManager: AudioManager? = null
     private var focusRequest: AudioFocusRequest? = null
 
-    fun ensureReady(language: RunVoiceLanguage = desiredLanguage) {
+    override fun ensureReady(language: RunVoiceLanguage) {
         desiredLanguage = language
         if (ready) {
             applyLanguage(tts ?: return)
@@ -53,10 +62,7 @@ class RunTtsService(private val context: Context) : TextToSpeech.OnInitListener 
         val engine = tts ?: return
         try {
             applyLanguage(engine)
-            // flutter_tts normalizes its 0.48 setting to 0.96 on Android
-            // (the plugin multiplies the Dart value by 2). This native path
-            // must use the Android TextToSpeech scale directly, where 1.0 is
-            // the normal rate, so both execution paths sound the same.
+            // Android TextToSpeech scale: 1.0 is the normal rate.
             engine.setSpeechRate(0.96f)
             engine.setPitch(1.0f)
             // Ensure we play on music stream and duck other audio briefly.
@@ -89,7 +95,7 @@ class RunTtsService(private val context: Context) : TextToSpeech.OnInitListener 
         }
     }
 
-    fun setLanguage(language: RunVoiceLanguage) {
+    override fun setLanguage(language: RunVoiceLanguage) {
         desiredLanguage = language
         val engine = tts
         if (ready && engine != null) applyLanguage(engine)
@@ -113,12 +119,12 @@ class RunTtsService(private val context: Context) : TextToSpeech.OnInitListener 
         }
     }
 
-    fun speak(text: String) {
+    override fun speak(text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
         if (!ready) {
             pendingQueue.offer(trimmed)
-            ensureReady()
+            ensureReady(desiredLanguage)
             return
         }
         speakInternal(trimmed)
@@ -139,7 +145,7 @@ class RunTtsService(private val context: Context) : TextToSpeech.OnInitListener 
         }
     }
 
-    fun stop() {
+    override fun stop() {
         try {
             tts?.stop()
         } catch (_: Throwable) {}
@@ -147,7 +153,7 @@ class RunTtsService(private val context: Context) : TextToSpeech.OnInitListener 
         abandonFocus()
     }
 
-    fun shutdown() {
+    override fun shutdown() {
         stop()
         try {
             tts?.shutdown()

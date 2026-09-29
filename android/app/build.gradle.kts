@@ -42,6 +42,11 @@ android {
         }
     }
 
+    testOptions {
+        // android.util.Log and friends return defaults in JVM unit tests.
+        unitTests.isReturnDefaultValues = true
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true

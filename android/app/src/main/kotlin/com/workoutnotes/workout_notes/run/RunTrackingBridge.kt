@@ -88,7 +88,6 @@ class RunTrackingBridge(private val context: Context) :
             "setSessionContext" -> setSessionContext(call, result)
             "recoverActive" -> recoverActive(result)
             "start" -> start(result)
-            "startDebugSimulation" -> startDebugSimulation(call, result)
             "pause" -> result.success(RunTrackingService.pauseCurrent())
             "resume" -> result.success(RunTrackingService.resumeCurrent())
             "lap" -> result.success(RunTrackingService.lapCurrent())
@@ -276,38 +275,6 @@ class RunTrackingBridge(private val context: Context) :
             if (delivered.compareAndSet(false, true)) {
                 result.error("location_denied", error.message, null)
             }
-        }
-    }
-
-    private fun startDebugSimulation(call: MethodCall, result: MethodChannel.Result) {
-        @Suppress("UNCHECKED_CAST")
-        val args = call.arguments as? Map<String, Any?> ?: emptyMap()
-        val startLat = (args["startLat"] as? Number)?.toDouble() ?: -23.5505
-        val startLng = (args["startLng"] as? Number)?.toDouble() ?: -46.6333
-        onSpool({ listPending().any { isActiveStatus(it["status"] as? String) } }) { outcome ->
-            if (outcome.getOrDefault(false) || isAnotherRunActive()) {
-                result.error("already_active", "A run is already active", null)
-                return@onSpool
-            }
-            // Debug sim bypasses location permission — uses synthetic GPS.
-            val service = RunTrackingService.activeInstanceForVoice()
-            if (service != null) {
-                val ok = service.startNativeDebugSimulation(startLat, startLng)
-                result.success(ok)
-                return@onSpool
-            }
-            // No active service — start via intent with debug extras.
-            val intent = Intent(context, RunTrackingService::class.java).apply {
-                action = "com.workoutnotes.workout_notes.run.START_DEBUG"
-                putExtra("debug_start_lat", startLat)
-                putExtra("debug_start_lng", startLng)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
-            result.success(true)
         }
     }
 

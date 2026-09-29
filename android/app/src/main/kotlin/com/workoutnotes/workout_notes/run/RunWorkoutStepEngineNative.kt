@@ -201,9 +201,10 @@ data class RunStepResultNative(
 
 /**
  * Pure FSM that walks a structured running session (warmup → N×(work/recovery)
- * → cooldown). Kotlin port of lib/services/run_workout_step_engine.dart —
- * keep both sides in sync; test/run_workout_step_engine_test.dart and
- * RunWorkoutStepEngineNativeTest cover the same scenarios.
+ * → cooldown). It is the only step engine: Dart reads its `snapshotMap()` from
+ * the tracking state. [expand] mirrors `RunPlanWorkout.expand` in Dart, which
+ * the plan screens use for the same repeat blocks — keep both in sync
+ * (test/run_workout_steps_test.dart and RunWorkoutStepEngineNativeTest).
  */
 class RunWorkoutStepEngineNative {
     private var steps: List<RunExpandedStepNative> = emptyList()
