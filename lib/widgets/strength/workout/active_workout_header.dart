@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
@@ -15,7 +16,9 @@ enum ActiveWorkoutTimerPhase { idle, running, paused, finished }
 /// Tapping the card expands the per-muscle comparison with the last session.
 class ActiveWorkoutHeader extends StatelessWidget {
   final ActiveWorkoutTimerPhase phase;
-  final String elapsed;
+
+  /// The workout clock; only the time text listens to it.
+  final ValueListenable<String> elapsed;
   final DateTime? startedAt;
   final DateTime? endedAt;
   final VoidCallback onStart;
@@ -112,17 +115,20 @@ class ActiveWorkoutHeader extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            phase == ActiveWorkoutTimerPhase.idle
-                                ? '00:00'
-                                : elapsed,
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              height: 1.1,
-                              fontFeatures: RunUi.tabular,
-                              color: phase == ActiveWorkoutTimerPhase.idle
-                                  ? colors.onSurfaceVariant
-                                  : null,
+                          ValueListenableBuilder<String>(
+                            valueListenable: elapsed,
+                            builder: (context, value, _) => Text(
+                              phase == ActiveWorkoutTimerPhase.idle
+                                  ? '00:00'
+                                  : value,
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                height: 1.1,
+                                fontFeatures: RunUi.tabular,
+                                color: phase == ActiveWorkoutTimerPhase.idle
+                                    ? colors.onSurfaceVariant
+                                    : null,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 2),

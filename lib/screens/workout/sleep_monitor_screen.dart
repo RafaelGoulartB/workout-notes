@@ -85,6 +85,8 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
 
   Future<void> _initialize() async {
     await _service.initialize();
+    // Opening the screen re-reads the native state (initialize() runs once).
+    await _service.refresh();
     if (!_service.isSupported) {
       if (mounted) setState(() => _loading = false);
       return;

@@ -119,6 +119,14 @@ class RunTrackingService extends ChangeNotifier {
     _scheduleRouteMaintenance();
   }
 
+  /// Forgets the shared initialisation so the next [initialize] runs again
+  /// (tests share the singleton across cases).
+  @visibleForTesting
+  void resetInitializationForTest() {
+    _initFuture = null;
+    _routeMaintenanceStarted = false;
+  }
+
   /// Light re-read of the native capabilities and state (no recovery).
   Future<void> refresh() async {
     await getCapabilities();

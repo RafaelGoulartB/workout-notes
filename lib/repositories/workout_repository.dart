@@ -1,6 +1,5 @@
 import 'dart:ui';
 
-import 'package:workout_notes/models/exercise_with_sets.dart';
 import 'package:workout_notes/models/workout_stats.dart';
 import 'package:workout_notes/utils/workout_estimator.dart';
 import 'package:sqflite/sqflite.dart';
@@ -613,163 +612,6 @@ class WorkoutRepository extends BaseRepository {
     );
   }
 
-  Future<List<ExerciseVolumeComparison>> getExerciseVolumeComparisons(
-    String workoutId,
-  ) async {
-    final db = await this.db;
-    final exerciseRows = await db.rawQuery(
-      '''
-      SELECT DISTINCT e.id as exercise_id
-      FROM exercise_entries ee
-      JOIN exercises e ON ee.exercise_id = e.id
-      WHERE ee.workout_id = ? AND e.type = 'weightReps'
-      ORDER BY ee.order_index ASC
-    ''',
-      [workoutId],
-    );
-
-    final comparisons = <ExerciseVolumeComparison>[];
-    for (final row in exerciseRows) {
-      final exerciseId = row['exercise_id'] as String;
-      final currentVolume = await _getWorkoutExerciseVolume(
-        db,
-        workoutId,
-        exerciseId,
-        completedOnly: false,
-      );
-      final lastVolume = await _getLastCompletedExerciseVolume(
-        db,
-        exerciseId,
-        workoutId,
-      );
-      comparisons.add(
-        ExerciseVolumeComparison(
-          exerciseId: exerciseId,
-          currentVolume: currentVolume,
-          lastVolume: lastVolume,
-        ),
-      );
-    }
-    return comparisons;
-  }
-
-  Future<List<CategoryVolumeComparison>> getCategoryVolumeComparisons(
-    String workoutId,
-  ) async {
-    final db = await this.db;
-    final exerciseRows = await db.rawQuery(
-      '''
-      SELECT DISTINCT e.id as exercise_id, ec.id as category_id,
-        ec.name as category_name, ec.color as category_color
-      FROM exercise_entries ee
-      JOIN exercises e ON ee.exercise_id = e.id
-      LEFT JOIN exercise_categories ec ON e.category_id = ec.id
-      WHERE ee.workout_id = ? AND e.type = 'weightReps'
-      ORDER BY ec.name ASC
-    ''',
-      [workoutId],
-    );
-
-    final grouped = <String, _CategoryVolumeAccumulator>{};
-    for (final row in exerciseRows) {
-      final exerciseId = row['exercise_id'] as String;
-      final categoryId = row['category_id'] as String? ?? '';
-      final acc = grouped.putIfAbsent(
-        categoryId,
-        () => _CategoryVolumeAccumulator(
-          categoryId: categoryId,
-          categoryName: row['category_name'] as String? ?? '',
-          categoryColor: Color(row['category_color'] as int? ?? 0xFF757575),
-        ),
-      );
-      acc.currentVolume += await _getWorkoutExerciseVolume(
-        db,
-        workoutId,
-        exerciseId,
-        completedOnly: false,
-      );
-      acc.lastVolume += await _getLastCompletedExerciseVolume(
-        db,
-        exerciseId,
-        workoutId,
-      );
-    }
-
-    final comparisons = grouped.values
-        .where((acc) => acc.currentVolume > 0 || acc.lastVolume > 0)
-        .map(
-          (acc) => CategoryVolumeComparison(
-            categoryId: acc.categoryId,
-            categoryName: acc.categoryName,
-            categoryColor: acc.categoryColor,
-            currentVolume: acc.currentVolume,
-            lastVolume: acc.lastVolume,
-          ),
-        )
-        .toList();
-    comparisons.sort((a, b) {
-      final byCurrent = b.currentVolume.compareTo(a.currentVolume);
-      if (byCurrent != 0) return byCurrent;
-      return b.lastVolume.compareTo(a.lastVolume);
-    });
-    return comparisons;
-  }
-
-  Future<double> _getWorkoutExerciseVolume(
-    Database db,
-    String workoutId,
-    String exerciseId, {
-    required bool completedOnly,
-  }) async {
-    final completeFilter = completedOnly ? 'AND s.is_complete = 1' : '';
-    final rows = await db.rawQuery(
-      '''
-      SELECT COALESCE(SUM(s.weight * s.reps), 0) as volume
-      FROM sets s
-      JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
-      JOIN exercises e ON ee.exercise_id = e.id
-      WHERE ee.workout_id = ? AND ee.exercise_id = ?
-        AND e.type = 'weightReps'
-        $completeFilter
-        AND s.is_warmup = 0
-        AND s.weight IS NOT NULL
-        AND s.reps IS NOT NULL
-    ''',
-      [workoutId, exerciseId],
-    );
-    return (rows.first['volume'] as num?)?.toDouble() ?? 0;
-  }
-
-  Future<double> _getLastCompletedExerciseVolume(
-    Database db,
-    String exerciseId,
-    String excludeWorkoutId,
-  ) async {
-    final lastWorkout = await db.rawQuery(
-      '''
-      SELECT w.id
-      FROM workouts w
-      JOIN exercise_entries ee ON ee.workout_id = w.id
-      JOIN exercises e ON ee.exercise_id = e.id
-      WHERE ee.exercise_id = ?
-        AND w.id != ?
-        AND w.end_time IS NOT NULL
-        AND e.type = 'weightReps'
-      ORDER BY w.date DESC, w.end_time DESC, w.start_time DESC
-      LIMIT 1
-    ''',
-      [exerciseId, excludeWorkoutId],
-    );
-    if (lastWorkout.isEmpty) return 0;
-
-    return _getWorkoutExerciseVolume(
-      db,
-      lastWorkout.first['id'] as String,
-      exerciseId,
-      completedOnly: true,
-    );
-  }
-
   Future<void> finishWorkout(
     String id, {
     String? comment,
@@ -1284,6 +1126,111 @@ class WorkoutRepository extends BaseRepository {
   }
 
   // ===================================================================
+  // ACTIVE WORKOUT READS
+  // ===================================================================
+
+  /// Every set of the workout, grouped by the exercise entry it belongs to
+  /// (in set order): one query instead of one per exercise.
+  Future<Map<String, List<Map<String, dynamic>>>> getWorkoutSetsByEntry(
+    String workoutId,
+  ) async {
+    final db = await this.db;
+    final rows = await db.rawQuery(
+      '''
+      SELECT s.* FROM sets s
+      JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+      WHERE ee.workout_id = ?
+      ORDER BY s.order_index ASC
+    ''',
+      [workoutId],
+    );
+    final byEntry = <String, List<Map<String, dynamic>>>{};
+    for (final row in rows) {
+      byEntry
+          .putIfAbsent(row['exercise_entry_id'] as String, () => [])
+          .add(row);
+    }
+    return byEntry;
+  }
+
+  /// For each weight-and-reps exercise of the workout, the completed working
+  /// volume (kg) of its previous finished session — the baseline the active
+  /// workout compares against. One grouped query for all exercises; an
+  /// exercise never done before maps to 0.
+  Future<Map<String, double>> getLastCompletedVolumes(String workoutId) async {
+    final db = await this.db;
+    final rows = await db.rawQuery(
+      '''
+      SELECT cur.exercise_id AS exercise_id,
+        COALESCE(SUM(s.weight * s.reps), 0) AS volume
+      FROM (
+        SELECT DISTINCT ee.exercise_id AS exercise_id
+        FROM exercise_entries ee
+        JOIN exercises e ON e.id = ee.exercise_id
+        WHERE ee.workout_id = ? AND e.type = 'weightReps'
+      ) cur
+      LEFT JOIN exercise_entries lee
+        ON lee.exercise_id = cur.exercise_id
+        AND lee.workout_id = (
+          SELECT w.id
+          FROM workouts w
+          JOIN exercise_entries ee2 ON ee2.workout_id = w.id
+          WHERE ee2.exercise_id = cur.exercise_id
+            AND w.id != ?
+            AND w.end_time IS NOT NULL
+          ORDER BY w.date DESC, w.end_time DESC, w.start_time DESC
+          LIMIT 1
+        )
+      LEFT JOIN sets s
+        ON s.exercise_entry_id = lee.id
+        AND s.is_complete = 1
+        AND s.is_warmup = 0
+        AND s.weight IS NOT NULL
+        AND s.reps IS NOT NULL
+      GROUP BY cur.exercise_id
+    ''',
+      [workoutId, workoutId],
+    );
+    return {
+      for (final row in rows)
+        row['exercise_id'] as String: (row['volume'] as num?)?.toDouble() ?? 0,
+    };
+  }
+
+  Future<Map<String, dynamic>?> getSet(String setId) async {
+    final db = await this.db;
+    final rows = await db.query(
+      'sets',
+      where: 'id = ?',
+      whereArgs: [setId],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  /// The longest distance completed for [exerciseId] in any workout other
+  /// than [excludeWorkoutId]; 0 when there is none.
+  Future<double> getBestPreviousDistance(
+    String exerciseId, {
+    required String excludeWorkoutId,
+  }) async {
+    final db = await this.db;
+    final rows = await db.rawQuery(
+      '''
+      SELECT COALESCE(MAX(s.distance), 0) AS best_distance
+      FROM sets s
+      JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+      WHERE ee.exercise_id = ? AND ee.workout_id != ?
+        AND s.is_warmup = 0 AND s.is_complete = 1
+        AND s.distance IS NOT NULL AND s.distance > 0
+    ''',
+      [exerciseId, excludeWorkoutId],
+    );
+    if (rows.isEmpty) return 0;
+    return (rows.first['best_distance'] as num?)?.toDouble() ?? 0;
+  }
+
+  // ===================================================================
   // INTERNAL HELPERS (used by importRoutineDayToWorkout)
 
   /// Older test schemas and partially migrated databases lack the v54
@@ -1360,18 +1307,4 @@ class WorkoutRepository extends BaseRepository {
     );
     return results.isEmpty ? null : results.first;
   }
-}
-
-class _CategoryVolumeAccumulator {
-  final String categoryId;
-  final String categoryName;
-  final Color categoryColor;
-  double currentVolume = 0;
-  double lastVolume = 0;
-
-  _CategoryVolumeAccumulator({
-    required this.categoryId,
-    required this.categoryName,
-    required this.categoryColor,
-  });
 }

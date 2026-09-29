@@ -5,9 +5,8 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
   final _workoutRepo = WorkoutRepository();
   final _routineRepo = RoutineRepository();
   final _settingsRepo = SettingsRepository();
-  final _bodyRepo = BodyMeasurementRepository();
+  final _summaryService = WorkoutSummaryService();
   final _timerService = RestTimerService.instance;
-  final _uuid = const Uuid();
   bool _isLoading = true;
   String? _workoutId;
 
@@ -27,7 +26,10 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
   DateTime? _timerStart;
   DateTime? _timerEnd;
   Timer? _elapsedTimer; // periodic tick for live elapsed time
-  String _elapsedStr = '00:00';
+
+  /// The workout clock. Only the header listens to it, so the once-a-second
+  /// tick never rebuilds the whole screen.
+  final ValueNotifier<String> _elapsed = ValueNotifier<String>('00:00');
   bool _isPaused = false;
   DateTime? _pauseStart;
 
@@ -37,6 +39,11 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
   List<ExerciseWithSets> _exercises = [];
   Map<String, ExerciseVolumeComparison> _exerciseVolumeComparisons = {};
   List<CategoryVolumeComparison> _categoryVolumeComparisons = [];
+
+  /// Completed volume of each exercise's previous session (one grouped
+  /// query per full load). It does not change while this workout is edited,
+  /// so set edits recompute the comparisons from memory.
+  Map<String, double> _lastVolumes = {};
   bool _isVolumeSummaryExpanded = false;
 
   /// Handles drag-to-reorder of exercises during an active workout.
@@ -99,27 +106,28 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
     );
   }
 
-  void _onTimerTick() {
-    if (mounted) setState(() {});
-  }
-
+  /// Starts the once-a-second clock and (re)posts the ongoing notification.
+  /// The notification carries a system chronometer, so it is not refreshed
+  /// every second: it is posted here, on state changes, and never again.
   void _startElapsedTimer() {
     _elapsedTimer?.cancel();
-    _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted && _timerStart != null && _timerEnd == null) {
-        final elapsed = DateTime.now().difference(_timerStart!);
-        final hours = elapsed.inHours;
-        final minutes = elapsed.inMinutes.remainder(60);
-        final seconds = elapsed.inSeconds.remainder(60);
-        setState(() {
-          _elapsedStr = hours > 0
-              ? '${hours}h${minutes.toString().padLeft(2, '0')}min'
-              : '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-        });
-        // Update workout timer notification
-        NotificationService.instance.showWorkoutTimer(_elapsedStr);
-      }
-    });
+    _refreshElapsed();
+    _elapsedTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _refreshElapsed(),
+    );
+    final start = _timerStart;
+    if (start != null) {
+      unawaited(
+        NotificationService.instance.showWorkoutTimer(startedAt: start),
+      );
+    }
+  }
+
+  void _refreshElapsed() {
+    final start = _timerStart;
+    if (!mounted || start == null || _timerEnd != null) return;
+    _elapsed.value = _formatDuration(DateTime.now().difference(start));
   }
 
   Future<void> _initialize() async {
@@ -207,12 +215,11 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
 
   void _updateElapsedStr() {
     if (_timerStart == null) {
-      _elapsedStr = '00:00';
+      _elapsed.value = '00:00';
       return;
     }
     final end = _timerEnd ?? DateTime.now();
-    final elapsed = end.difference(_timerStart!);
-    _elapsedStr = _formatDuration(elapsed);
+    _elapsed.value = _formatDuration(end.difference(_timerStart!));
   }
 
   String _formatDuration(Duration d) {
@@ -260,21 +267,25 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
     await _loadExercises();
   }
 
+  /// Reads the whole workout (three queries, whatever the number of
+  /// exercises). Set edits do not come through here: they update the list in
+  /// memory.
   Future<void> _loadExercises() async {
-    if (_workoutId == null) return;
-    final entries = await _workoutRepo.getWorkoutExercises(_workoutId!);
+    final workoutId = _workoutId;
+    if (workoutId == null) return;
+    final entries = await _workoutRepo.getWorkoutExercises(workoutId);
+    final setsByEntry = await _workoutRepo.getWorkoutSetsByEntry(workoutId);
+    final lastVolumes = await _workoutRepo.getLastCompletedVolumes(workoutId);
     final loadedExercises = <ExerciseWithSets>[];
     final cardioIds = <String>{};
     for (final entry in entries) {
+      final entryId = entry['id'] as String;
       if (entry['category_energy'] == 'aerobic') {
         cardioIds.add(entry['exercise_id'] as String);
       }
-      final sets = List<Map<String, dynamic>>.from(
-        await _workoutRepo.getExerciseSets(entry['id'] as String),
-      );
       loadedExercises.add(
         ExerciseWithSets(
-          entryId: entry['id'] as String,
+          entryId: entryId,
           exerciseId: entry['exercise_id'] as String,
           name: entry['exercise_name'] as String? ?? '',
           localeKey: entry['exercise_locale_key'] as String?,
@@ -283,24 +294,44 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
           weightIncrement: (entry['weight_increment'] as num?)?.toDouble() ?? 1,
           categoryName: entry['category_name'] as String? ?? '',
           categoryColor: Color(entry['category_color'] as int? ?? 0xFF757575),
-          sets: sets,
+          sets: List<Map<String, dynamic>>.from(
+            setsByEntry[entryId] ?? const [],
+          ),
           restTimeSeconds: (entry['rest_time_seconds'] as int?) ?? 90,
         ),
       );
     }
-    final exerciseComparisons = await _workoutRepo.getExerciseVolumeComparisons(
-      _workoutId!,
-    );
-    final categoryComparisons = await _workoutRepo.getCategoryVolumeComparisons(
-      _workoutId!,
-    );
     _exercises = loadedExercises;
     _cardioExerciseIds = cardioIds;
-    _exerciseVolumeComparisons = {
-      for (final comparison in exerciseComparisons)
-        comparison.exerciseId: comparison,
-    };
-    _categoryVolumeComparisons = categoryComparisons;
+    _lastVolumes = lastVolumes;
+    _refreshComparisons();
+  }
+
+  /// Recomputes the volume comparisons from the sets in memory.
+  void _refreshComparisons() {
+    final comparisons = WorkoutVolumeComparisons.compute(
+      _exercises,
+      _lastVolumes,
+    );
+    _exerciseVolumeComparisons = comparisons.exercises;
+    _categoryVolumeComparisons = comparisons.categories;
+  }
+
+  ExerciseWithSets? _exerciseByEntry(String entryId) {
+    for (final exercise in _exercises) {
+      if (exercise.entryId == entryId) return exercise;
+    }
+    return null;
+  }
+
+  /// Replaces the in-memory set with [row] (or appends it when new).
+  void _upsertSet(ExerciseWithSets exercise, Map<String, dynamic> row) {
+    final index = exercise.sets.indexWhere((s) => s['id'] == row['id']);
+    if (index >= 0) {
+      exercise.sets[index] = row;
+    } else {
+      exercise.sets.add(row);
+    }
   }
 
   // ===================== TIMER CARD ACTIONS =====================
@@ -311,9 +342,9 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
     _timerStart = now;
     _timerEnd = null;
     await _workoutRepo.startWorkoutTimer(_workoutId!);
+    _elapsed.value = '00:00';
     _startElapsedTimer();
-    setState(() => _elapsedStr = '00:00');
-    NotificationService.instance.showWorkoutTimer('00:00');
+    if (mounted) setState(() {});
   }
 
   Future<void> _stopTimer() async {
@@ -322,9 +353,9 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
     _timerEnd = now;
     _elapsedTimer?.cancel();
     await _workoutRepo.stopWorkoutTimer(_workoutId!);
+    unawaited(NotificationService.instance.cancelWorkoutTimer());
     _updateElapsedStr();
-    setState(() {});
-    NotificationService.instance.cancelWorkoutTimer();
+    if (mounted) setState(() {});
   }
 
   Future<void> _pauseTimer() async {
@@ -332,10 +363,18 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
     _pauseStart = DateTime.now();
     _isPaused = true;
     _elapsedTimer?.cancel();
+    // The chronometer would keep counting through the pause: freeze the
+    // notification on the time reached.
+    unawaited(
+      NotificationService.instance.showWorkoutTimer(
+        startedAt: _timerStart!,
+        pausedElapsed: _elapsed.value,
+      ),
+    );
     // Persist the pause start so the pause time is not counted even if the
     // app is closed or reloaded before resuming.
     await _workoutRepo.setWorkoutPause(_workoutId!, _pauseStart!);
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   Future<void> _resumeTimer() async {
@@ -349,7 +388,7 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
     // adjustment survives an app reload.
     await _workoutRepo.clearWorkoutPause(_workoutId!, _timerStart!);
     _startElapsedTimer();
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   Future<void> _resetTimer() async {
@@ -381,10 +420,10 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
       _isPaused = false;
       _pauseStart = null;
       _elapsedTimer?.cancel();
-      _elapsedStr = '00:00';
+      _elapsed.value = '00:00';
       await _workoutRepo.resetWorkoutTimer(_workoutId!);
-      setState(() {});
-      NotificationService.instance.cancelWorkoutTimer();
+      unawaited(NotificationService.instance.cancelWorkoutTimer());
+      if (mounted) setState(() {});
     }
   }
 
@@ -397,36 +436,16 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
     Color catColor, {
     int? restTimeSeconds,
   }) async {
-    if (_workoutId == null) return;
-    final entryId = _uuid.v4();
-    final db = await DatabaseHelper.instance.database;
-    final rt = restTimeSeconds ?? 90;
-    await db.insert('exercise_entries', {
-      'id': entryId,
-      'workout_id': _workoutId,
-      'exercise_id': exerciseId,
-      'order_index': _exercises.length,
-      'rest_time_seconds': rt,
-    });
-
-    // Auto-populate sets from last workout (excluding current workout)
-    if (_workoutId != null) {
-      final lastSets = await _workoutRepo.getLastWorkoutSets(
-        exerciseId,
-        excludeWorkoutId: _workoutId,
-      );
-      for (final s in lastSets) {
-        await _workoutRepo.addSet(
-          exerciseEntryId: entryId,
-          weight: (s['weight'] as num?)?.toDouble(),
-          reps: (s['reps'] as int?),
-          isWarmup: (s['is_warmup'] as int?) == 1,
-        );
-      }
-    }
-
+    final workoutId = _workoutId;
+    if (workoutId == null) return;
+    // Inserts the entry and fills its sets from the exercise's last workout.
+    await _workoutRepo.addExerciseToWorkout(
+      workoutId,
+      exerciseId,
+      restTimeSeconds: restTimeSeconds,
+    );
     await _loadExercises();
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   Future<void> _addSet(ExerciseWithSets exercise) async {
@@ -444,7 +463,7 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
       lastWarmup = (last['is_warmup'] as int?) == 1;
     }
 
-    await _workoutRepo.addSet(
+    final setId = await _workoutRepo.addSet(
       exerciseEntryId: exercise.entryId,
       weight: lastWeight,
       reps: lastReps,
@@ -452,8 +471,14 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
       timeSeconds: lastTimeSeconds,
       isWarmup: lastWarmup,
     );
-    await _loadExercises();
-    setState(() {});
+    final row = await _workoutRepo.getSet(setId);
+    if (!mounted) return;
+    final target = _exerciseByEntry(exercise.entryId);
+    if (target == null || row == null) return;
+    setState(() {
+      _upsertSet(target, row);
+      _refreshComparisons();
+    });
   }
 
   Future<void> _toggleSet(String setId) async {
@@ -469,13 +494,20 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
       }
       if (parentExercise != null) break;
     }
+    if (parentExercise == null || theSet == null) return;
 
-    final wasComplete = (theSet?['is_complete'] as int?) == 1;
+    final wasComplete = (theSet['is_complete'] as int?) == 1;
     await _workoutRepo.toggleSetComplete(setId);
-    await _loadExercises();
-    setState(() {});
+    if (!mounted) return;
+    // Completion does not change any volume comparison (it counts every
+    // working set), so only the set itself is updated.
+    final toggled = parentExercise;
+    setState(
+      () =>
+          _upsertSet(toggled, {...theSet!, 'is_complete': wasComplete ? 0 : 1}),
+    );
 
-    if (!wasComplete && parentExercise != null && mounted) {
+    if (!wasComplete) {
       // Check if all sets are now complete (this was the last one)
       bool allComplete = true;
       for (final ex in _exercises) {
@@ -751,8 +783,14 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
         comment: commentCtl.text,
         isWarmup: isWarmup,
       );
-      await _loadExercises();
-      setState(() {});
+      final row = await _workoutRepo.getSet(setId);
+      if (!mounted || row == null) return;
+      final target = _exerciseByEntry(row['exercise_entry_id'] as String);
+      if (target == null) return;
+      setState(() {
+        _upsertSet(target, row);
+        _refreshComparisons();
+      });
     }
   }
 
@@ -784,8 +822,15 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
 
     if (confirm == true && _workoutId != null) {
       await _workoutRepo.deleteExerciseEntry(exercise.entryId);
-      await _loadExercises();
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {
+          _exercises = [
+            for (final e in _exercises)
+              if (e.entryId != exercise.entryId) e,
+          ];
+          _refreshComparisons();
+        });
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -803,30 +848,19 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
 
   Future<void> _deleteSet(String setId) async {
     await _workoutRepo.deleteSet(setId);
-    await _loadExercises();
-    setState(() {});
-  }
-
-  int _estimateCurrentWorkoutDurationSeconds() {
-    final estimateExercises = _exercises.map(
-      (exercise) => WorkoutEstimateExercise(
-        restTimeSeconds: exercise.restTimeSeconds,
-        sets: exercise.sets
-            .map(
-              (set) => WorkoutEstimateSet(
-                reps: (set['reps'] as num?)?.toInt(),
-                timeSeconds: (set['time_seconds'] as num?)?.toInt(),
-              ),
-            )
-            .toList(),
-      ),
-    );
-    return WorkoutEstimateCalculator.estimateDurationSeconds(estimateExercises);
+    if (!mounted) return;
+    setState(() {
+      for (final exercise in _exercises) {
+        exercise.sets.removeWhere((s) => s['id'] == setId);
+      }
+      _refreshComparisons();
+    });
   }
 
   Future<void> _finishWorkout() async {
     if (_workoutId == null) return;
     if (_exercises.isEmpty) return;
+    final loc = AppLocalizations.of(context)!;
 
     // Stop timer if still running or paused
     if (_timerStart != null && _timerEnd == null) {
@@ -837,7 +871,14 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
     }
 
     // Compute workout summary with PR detection
-    final summary = await _computeSummary();
+    final summary = await _summaryService.compute(
+      loc: loc,
+      workoutId: _workoutId,
+      exercises: _exercises,
+      cardioExerciseIds: _cardioExerciseIds,
+      timerStart: _timerStart,
+      timerEnd: _timerEnd,
+    );
 
     if (!mounted) return;
 
@@ -874,209 +915,6 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
       );
       Navigator.pop(context, true);
     }
-  }
-
-  /// Compute workout summary: duration, volume, sets, distance/time, and PRs.
-  Future<WorkoutSummary> _computeSummary() async {
-    final loc = AppLocalizations.of(context)!;
-    int durationSeconds = 0;
-    double totalVolume = 0;
-    int totalSets = 0;
-    int completedSets = 0;
-    double totalDistance = 0;
-    int totalCardioTime = 0;
-    final List<PR> prs = [];
-
-    if (_timerStart != null) {
-      final end = _timerEnd ?? DateTime.now();
-      durationSeconds = end.difference(_timerStart!).inSeconds;
-    }
-    final plannedDurationSeconds = _estimateCurrentWorkoutDurationSeconds();
-    final calorieDurationSeconds = durationSeconds > 0
-        ? durationSeconds
-        : plannedDurationSeconds;
-    final bodyWeightKg = await _bodyRepo.getLatestWeightKg();
-    final estimatedCalories = WorkoutEstimateCalculator.estimateCalories(
-      durationSeconds: calorieDurationSeconds,
-      bodyWeightKg: bodyWeightKg,
-    );
-
-    // Collect cardio stats per exercise (strength records are computed by
-    // [_strengthPrs]).
-    final Map<String, CardioBests> thisWorkoutCardio = {};
-
-    for (final ex in _exercises) {
-      double exerciseDistance = 0;
-      int exerciseTime = 0;
-
-      for (final s in ex.sets) {
-        final isComplete = (s['is_complete'] as int?) == 1;
-        final isWarmup = (s['is_warmup'] as int?) == 1;
-
-        if (!isWarmup) {
-          totalSets++;
-          final dist = (s['distance'] as num?)?.toDouble() ?? 0;
-          final time = (s['time_seconds'] as int?) ?? 0;
-
-          if (dist > 0) {
-            exerciseDistance += dist;
-            totalDistance += dist;
-          }
-          if (time > 0) {
-            exerciseTime += time;
-            totalCardioTime += time;
-          }
-
-          if (isComplete) {
-            completedSets++;
-            final weight = (s['weight'] as num?)?.toDouble() ?? 0;
-            final reps = (s['reps'] as int?) ?? 0;
-            totalVolume += weight * reps;
-          }
-        }
-      }
-
-      // Track cardio bests (longest distance, best pace)
-      if (exerciseDistance > 0 && exerciseTime > 0) {
-        thisWorkoutCardio[ex.exerciseId] = CardioBests(
-          name: ex.localizedName(loc),
-          distance: exerciseDistance,
-          timeSeconds: exerciseTime,
-        );
-      }
-    }
-
-    // Detect PRs
-    if (_workoutId != null) {
-      final db = await DatabaseHelper.instance.database;
-
-      // Strength records: compare this session's sets with every earlier
-      // finished workout (best e1RM, heaviest load, session volume).
-      prs.addAll(await _strengthPrs(loc));
-
-      // Cardio PRs (best distance, best pace)
-      for (final entry in thisWorkoutCardio.entries) {
-        final exId = entry.key;
-        final current = entry.value;
-
-        final rows = await db.rawQuery(
-          '''
-          SELECT
-            COALESCE(MAX(s.distance), 0) as best_distance,
-            COALESCE(MIN(CAST(s.time_seconds AS REAL) / NULLIF(s.distance, 0)), 999999) as best_pace
-          FROM sets s
-          JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
-          WHERE ee.exercise_id = ? AND ee.workout_id != ?
-            AND s.is_warmup = 0 AND s.is_complete = 1
-            AND s.distance IS NOT NULL AND s.distance > 0
-        ''',
-          [exId, _workoutId],
-        );
-
-        if (rows.isNotEmpty) {
-          final bestDist =
-              (rows.first['best_distance'] as num?)?.toDouble() ?? 0;
-          if (bestDist > 0 && current.distance > bestDist) {
-            prs.add(
-              PR(
-                exerciseName: current.name,
-                type: 'distance',
-                value: '${current.distance.toStringAsFixed(1)} km',
-                previous: '${bestDist.toStringAsFixed(1)} km',
-              ),
-            );
-          }
-        }
-      }
-    }
-
-    return WorkoutSummary(
-      durationSeconds: durationSeconds,
-      totalVolume: totalVolume,
-      totalSets: totalSets,
-      completedSets: completedSets,
-      totalDistance: totalDistance,
-      totalCardioTime: totalCardioTime,
-      estimatedCalories: estimatedCalories,
-      prs: prs,
-    );
-  }
-
-  /// Records set by the running workout, computed with the same rules as the
-  /// records screen (completed, non-warm-up, weighted strength sets).
-  Future<List<PR>> _strengthPrs(AppLocalizations loc) async {
-    final workoutId = _workoutId;
-    if (workoutId == null) return const [];
-    final now = DateTime.now();
-    final session = <StrengthSetSample>[];
-    for (final ex in _exercises) {
-      if (_cardioExerciseIds.contains(ex.exerciseId)) continue;
-      for (final s in ex.sets) {
-        if ((s['is_warmup'] as int?) == 1 || (s['is_complete'] as int?) != 1) {
-          continue;
-        }
-        final weight = (s['weight'] as num?)?.toDouble() ?? 0;
-        final reps = (s['reps'] as num?)?.toInt() ?? 0;
-        if (weight <= 0 || reps <= 0) continue;
-        session.add(
-          StrengthSetSample(
-            workoutId: workoutId,
-            date: now,
-            exerciseId: ex.exerciseId,
-            exerciseName: ex.name,
-            exerciseLocaleKey: ex.localeKey,
-            categoryId: ex.categoryId ?? '',
-            weight: weight,
-            reps: reps,
-          ),
-        );
-      }
-    }
-    if (session.isEmpty) return const [];
-
-    final history = await StrengthRecordsRepository().loadSets();
-    final events = StrengthWorkoutRecords.sessionEvents(
-      history: history,
-      session: session,
-      workoutId: workoutId,
-    );
-    final volumes = StrengthWorkoutRecords.volumeRecords(
-      history: history,
-      session: session,
-      workoutId: workoutId,
-    );
-
-    final prs = <PR>[];
-    for (final ex in _exercises) {
-      final name = ex.localizedName(loc);
-      for (final e in events.where((e) => e.exerciseId == ex.exerciseId)) {
-        final set = StrengthWorkoutFormat.setLabel(e.weight, e.reps);
-        prs.add(
-          PR(
-            exerciseName: name,
-            type: e.kind == StrengthRecordKind.e1rm ? 'e1rm' : 'weight',
-            value: e.kind == StrengthRecordKind.e1rm
-                ? '${StrengthWorkoutFormat.weightKg(e.value)} ($set)'
-                : set,
-            previous: e.previous == null
-                ? ''
-                : StrengthWorkoutFormat.weightKg(e.previous!),
-          ),
-        );
-      }
-      final volume = volumes[ex.exerciseId];
-      if (volume != null) {
-        prs.add(
-          PR(
-            exerciseName: name,
-            type: 'volume',
-            value: StrengthWorkoutFormat.volume(volume.volume),
-            previous: StrengthWorkoutFormat.volume(volume.previous),
-          ),
-        );
-      }
-    }
-    return prs;
   }
 
   Future<void> _openRestTimer() async {

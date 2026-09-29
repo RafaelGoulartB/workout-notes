@@ -3,12 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import 'package:uuid/uuid.dart';
-import '../../database/database_helper.dart';
 import '../../repositories/workout_repository.dart';
 import '../../repositories/routine_repository.dart';
 import '../../repositories/settings_repository.dart';
-import '../../repositories/body_measurement_repository.dart';
 import '../../repositories/periodization_repository.dart';
 import '../../services/rest_timer_service.dart';
 import '../../services/notification_service.dart';
@@ -17,14 +14,12 @@ import '../../widgets/workout/set_editor_fields.dart';
 import '../../widgets/workout/exercise_card.dart';
 import '../../widgets/workout/finish_workout_sheet.dart';
 import '../../models/exercise_with_sets.dart';
-import '../../utils/workout_estimator.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_today_card.dart';
-import 'package:workout_notes/repositories/strength_records_repository.dart';
-import 'package:workout_notes/utils/strength_workout_format.dart';
-import 'package:workout_notes/utils/strength_workout_records.dart';
+import 'package:workout_notes/services/workout_summary_service.dart';
+import 'package:workout_notes/utils/workout_volume_comparison.dart';
 import 'package:workout_notes/widgets/strength/workout/active_workout_header.dart';
 import 'rest_timer_screen.dart';
 
@@ -57,14 +52,13 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
   @override
   void initState() {
     super.initState();
-    _timerService.addListener(_onTimerTick);
     _initialize();
   }
 
   @override
   void dispose() {
-    _timerService.removeListener(_onTimerTick);
     _elapsedTimer?.cancel();
+    _elapsed.dispose();
     _discardBlankWorkout();
     super.dispose();
   }
@@ -90,60 +84,11 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
       child: Scaffold(
         appBar: AppBar(
           actions: [
-            if (_timerService.isActive)
-              GestureDetector(
-                onTap: _openRestTimer,
-                child: Container(
-                  margin: const EdgeInsets.only(right: 4),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color:
-                        _timerService.remainingSeconds <= 5 &&
-                            _timerService.isRunning
-                        ? theme.colorScheme.error.withAlpha(40)
-                        : theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _timerService.isPaused ? Icons.pause : Icons.timer,
-                        size: 18,
-                        color:
-                            _timerService.remainingSeconds <= 5 &&
-                                _timerService.isRunning
-                            ? theme.colorScheme.error
-                            : theme.colorScheme.onPrimaryContainer,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _timerService.shortTime,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color:
-                              _timerService.remainingSeconds <= 5 &&
-                                  _timerService.isRunning
-                              ? theme.colorScheme.error
-                              : theme.colorScheme.onPrimaryContainer,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else
-              IconButton(
-                icon: const Icon(Icons.timer_outlined),
-                onPressed: _openRestTimer,
-                tooltip: AppLocalizations.of(
-                  context,
-                )!.activeWorkoutRestTimerTooltip,
-              ),
+            // The rest timer ticks every second: only this action listens.
+            ListenableBuilder(
+              listenable: _timerService,
+              builder: (context, _) => _buildRestTimerAction(theme),
+            ),
             if (_isPaused)
               IconButton(
                 icon: const Icon(Icons.play_arrow),
@@ -249,6 +194,54 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
                   AppLocalizations.of(context)!.activeWorkoutAddExercise,
                 ),
               ),
+      ),
+    );
+  }
+
+  Widget _buildRestTimerAction(ThemeData theme) {
+    final loc = AppLocalizations.of(context)!;
+    if (!_timerService.isActive) {
+      return IconButton(
+        icon: const Icon(Icons.timer_outlined),
+        onPressed: _openRestTimer,
+        tooltip: loc.activeWorkoutRestTimerTooltip,
+      );
+    }
+    final urgent =
+        _timerService.remainingSeconds <= 5 && _timerService.isRunning;
+    final color = urgent
+        ? theme.colorScheme.error
+        : theme.colorScheme.onPrimaryContainer;
+    return GestureDetector(
+      onTap: _openRestTimer,
+      child: Container(
+        margin: const EdgeInsets.only(right: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: urgent
+              ? theme.colorScheme.error.withAlpha(40)
+              : theme.colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _timerService.isPaused ? Icons.pause : Icons.timer,
+              size: 18,
+              color: color,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              _timerService.shortTime,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: color,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -399,7 +392,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
               : _timerStart != null
               ? ActiveWorkoutTimerPhase.running
               : ActiveWorkoutTimerPhase.idle,
-          elapsed: _elapsedStr,
+          elapsed: _elapsed,
           startedAt: _timerStart,
           endedAt: _timerEnd,
           onStart: _startTimer,

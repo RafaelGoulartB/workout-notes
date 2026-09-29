@@ -6,7 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'l10n/app_localizations.dart';
-import 'services/notification_service.dart';
 import 'services/sleep_monitor_service.dart';
 import 'services/traditional_alarm_service.dart';
 import 'services/medication_reminder_service.dart';
@@ -26,9 +25,10 @@ class AccentColors {
     Color(0xFF6A1B9A), // Deep Purple
     Color(0xFF0D47A1), // Dark Blue
     Color(0xFF37474F), // Graphite
-    Color(0xFF4A6741), // Forest Green (default)
+    Color(0xFF4A6741), // Forest Green
   ];
 
+  /// Graphite.
   static const defaultColor = Color(0xFF37474F);
   static const defaultIndex = 6;
 
@@ -124,32 +124,28 @@ void main() async {
 }
 
 Future<void> _initializeDeferredServices() async {
-  final notificationService = NotificationService.instance;
-  try {
-    await notificationService.init();
-    await notificationService.loadSettings();
-  } catch (_) {
-    // Individual features surface their own errors when opened.
-  }
+  // The notification service initialises itself on first use.
+  //
+  // The steps are independent, so they run concurrently: SQLite serialises the
+  // database work and each service reconciles its own state (recovering what
+  // a killed process left behind is durable and does not depend on the
+  // others). A failure only affects its own feature, which surfaces its own
+  // error when opened.
+  await Future.wait([
+    _guarded(() async {
+      await WorkoutNotesApp.aiSettings.load();
+      await AiChatService.bootstrap(settings: WorkoutNotesApp.aiSettings);
+    }),
+    _guarded(SleepMonitorService.instance.initialize),
+    _guarded(TraditionalAlarmService.instance.initialize),
+    _guarded(MedicationReminderService.instance.initialize),
+    _guarded(RunTrackingService.instance.initialize),
+  ]);
+}
 
+Future<void> _guarded(Future<void> Function() step) async {
   try {
-    await WorkoutNotesApp.aiSettings.load();
-    await AiChatService.bootstrap(settings: WorkoutNotesApp.aiSettings);
-  } catch (_) {}
-
-  // Keep recovery ordering deterministic. All three can touch SQLite or
-  // platform channels while reconciling state left by a killed process.
-  try {
-    await SleepMonitorService.instance.initialize();
-  } catch (_) {}
-  try {
-    await TraditionalAlarmService.instance.initialize();
-  } catch (_) {}
-  try {
-    await MedicationReminderService.instance.initialize();
-  } catch (_) {}
-  try {
-    await RunTrackingService.instance.initialize();
+    await step();
   } catch (_) {}
 }
 
@@ -205,10 +201,6 @@ class _WorkoutNotesAppState extends State<WorkoutNotesApp> {
     _locale = widget.initialLocale;
     WorkoutNotesApp.themeNotifier.addListener(_onThemeChanged);
     WorkoutNotesApp.localeNotifier.addListener(_onLocaleChanged);
-    // Sync the notifier's initial values
-    WorkoutNotesApp.themeNotifier.setSeedColor(_seedColor);
-    WorkoutNotesApp.themeNotifier.setThemeMode(_themeMode);
-    WorkoutNotesApp.localeNotifier.setLocale(_locale);
   }
 
   @override

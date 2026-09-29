@@ -73,6 +73,11 @@ class SleepMonitorService extends ChangeNotifier {
     await recoverPendingSessions();
   }
 
+  /// Forgets the shared initialisation so the next [initialize] runs again
+  /// (tests share the singleton across cases).
+  @visibleForTesting
+  void resetInitializationForTest() => _initFuture = null;
+
   /// Light re-read of the native capabilities and state (no spool import).
   Future<void> refresh() async {
     await getCapabilities();
