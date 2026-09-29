@@ -46,10 +46,8 @@ class ExportImportRepository extends BaseRepository {
     'periodization_plans',
     'periodization_phases',
     'phase_targets',
-    'phase_routine_links',
     'periodization_checkins',
     'run_activities',
-    'run_track_points',
     'run_route_data',
     'run_splits',
     'run_plans',
@@ -112,46 +110,41 @@ class ExportImportRepository extends BaseRepository {
       'routine_exercises': await db.query('routine_exercises'),
       'predefined_sets': await db.query('predefined_sets'),
       'body_measurements': await db.query('body_measurements'),
-      'user_goals': await _queryIfExists(db, 'user_goals'),
+      'user_goals': await db.query('user_goals'),
       'sleep_entries': await db.query('sleep_entries'),
       'sleep_monitor_sessions': await _exportSleepSessions(db),
       'foods': nutrition['foods'],
       'food_variants': nutrition['food_variants'],
       'food_servings': nutrition['food_servings'],
-      'meal_types': await _queryIfExists(db, 'meal_types'),
-      'meal_logs': await _queryIfExists(db, 'meal_logs'),
-      'meal_log_items': await _queryIfExists(db, 'meal_log_items'),
-      'nutrition_goals': await _queryIfExists(db, 'nutrition_goals'),
-      'saved_meals': await _queryIfExists(db, 'saved_meals'),
-      'saved_meal_items': await _queryIfExists(db, 'saved_meal_items'),
-      'traditional_alarms': await _queryIfExists(db, 'traditional_alarms'),
-      'periodization_plans': await _queryIfExists(db, 'periodization_plans'),
-      'periodization_phases': await _queryIfExists(db, 'periodization_phases'),
-      'phase_targets': await _queryIfExists(db, 'phase_targets'),
-      'phase_routine_links': await _queryIfExists(db, 'phase_routine_links'),
-      'periodization_checkins': await _queryIfExists(
-        db,
-        'periodization_checkins',
-      ),
+      'meal_types': await db.query('meal_types'),
+      'meal_logs': await db.query('meal_logs'),
+      'meal_log_items': await db.query('meal_log_items'),
+      'nutrition_goals': await db.query('nutrition_goals'),
+      'saved_meals': await db.query('saved_meals'),
+      'saved_meal_items': await db.query('saved_meal_items'),
+      'traditional_alarms': await db.query('traditional_alarms'),
+      'periodization_plans': await db.query('periodization_plans'),
+      'periodization_phases': await db.query('periodization_phases'),
+      'phase_targets': await db.query('phase_targets'),
+      'periodization_checkins': await db.query('periodization_checkins'),
       // Runs and running plans (backup v14). Activities and track points are
       // included because `scheduled_runs` and `run_activity_steps` reference
       // them — restoring the plans without them would break the FKs.
-      'run_activities': await _queryIfExists(db, 'run_activities'),
-      'run_track_points': await _queryIfExists(db, 'run_track_points'),
+      'run_activities': await db.query('run_activities'),
       'run_route_data': await _exportRunRoutes(db),
-      'run_splits': await _queryIfExists(db, 'run_splits'),
-      'run_plans': await _queryIfExists(db, 'run_plans'),
-      'run_plan_workouts': await _queryIfExists(db, 'run_plan_workouts'),
-      'run_workout_steps': await _queryIfExists(db, 'run_workout_steps'),
-      'scheduled_runs': await _queryIfExists(db, 'scheduled_runs'),
-      'run_activity_steps': await _queryIfExists(db, 'run_activity_steps'),
-      'run_plan_adaptations': await _queryIfExists(db, 'run_plan_adaptations'),
+      'run_splits': await db.query('run_splits'),
+      'run_plans': await db.query('run_plans'),
+      'run_plan_workouts': await db.query('run_plan_workouts'),
+      'run_workout_steps': await db.query('run_workout_steps'),
+      'scheduled_runs': await db.query('scheduled_runs'),
+      'run_activity_steps': await db.query('run_activity_steps'),
+      'run_plan_adaptations': await db.query('run_plan_adaptations'),
       // Shoes and manual laps (backup v18).
-      'run_gear': await _queryIfExists(db, 'run_gear'),
-      'run_laps': await _queryIfExists(db, 'run_laps'),
+      'run_gear': await db.query('run_gear'),
+      'run_laps': await db.query('run_laps'),
       // Medication reminders and the dose log (backup v19).
-      'medications': await _queryIfExists(db, 'medications'),
-      'medication_doses': await _queryIfExists(db, 'medication_doses'),
+      'medications': await db.query('medications'),
+      'medication_doses': await db.query('medication_doses'),
       'settings': await db.query('app_settings'),
       // Platform preferences and portable file bytes are filled by
       // ExportService. Empty defaults keep this envelope valid for repository
@@ -205,7 +198,6 @@ class ExportImportRepository extends BaseRepository {
         'ai_chat_messages',
         'ai_chat_threads',
         'periodization_checkins',
-        'phase_routine_links',
         'phase_targets',
         'periodization_phases',
         'periodization_plans',
@@ -220,13 +212,10 @@ class ExportImportRepository extends BaseRepository {
         'run_laps',
         'run_splits',
         'run_route_data',
-        'run_track_points',
         'run_activities',
         'run_gear',
       ]) {
-        if (await _tableExists(txn, table)) {
-          await txn.delete(table);
-        }
+        await txn.delete(table);
       }
       await txn.delete('predefined_sets');
       await txn.delete('routine_exercises');
@@ -236,13 +225,9 @@ class ExportImportRepository extends BaseRepository {
       await txn.delete('exercise_entries');
       await txn.delete('workouts');
       await txn.delete('body_measurements');
-      if (await _tableExists(txn, 'user_goals')) {
-        await txn.delete('user_goals');
-      }
+      await txn.delete('user_goals');
       await txn.delete('sleep_monitor_sessions');
       await txn.delete('sleep_entries');
-      // Nutrition tables exist only on databases migrated past the
-      // nutrition schema version, so clear them defensively.
       for (final table in [
         'meal_log_items',
         'meal_logs',
@@ -254,15 +239,11 @@ class ExportImportRepository extends BaseRepository {
         'saved_meal_items',
         'saved_meals',
       ]) {
-        if (await _tableExists(txn, table)) {
-          await txn.delete(table);
-        }
+        await txn.delete(table);
       }
-      if (await _tableExists(txn, 'traditional_alarms')) {
-        await txn.delete('traditional_alarms');
-      }
+      await txn.delete('traditional_alarms');
       for (final table in ['medication_doses', 'medications']) {
-        if (await _tableExists(txn, table)) await txn.delete(table);
+        await txn.delete(table);
       }
       await txn.delete('exercises');
       await txn.delete('exercise_categories');
@@ -298,26 +279,16 @@ class ExportImportRepository extends BaseRepository {
         'periodization_plans',
         'periodization_phases',
         'phase_targets',
-        'phase_routine_links',
         'periodization_checkins',
         // Parents before children, mirroring the clear order above.
         'run_gear',
         'run_activities',
-        'run_track_points',
       ]) {
-        if (await _tableExists(txn, table)) {
-          totalRows += await _insertAll(txn, table, data[table]);
-        }
+        totalRows += await _insertAll(txn, table, data[table]);
       }
-      if (await _tableExists(txn, 'run_route_data')) {
-        totalRows += await _insertRunRoutes(txn, data['run_route_data']);
-      }
-      if (await _tableExists(txn, 'run_splits')) {
-        totalRows += await _insertAll(txn, 'run_splits', data['run_splits']);
-      }
-      if (await _tableExists(txn, 'run_laps')) {
-        totalRows += await _insertAll(txn, 'run_laps', data['run_laps']);
-      }
+      totalRows += await _insertRunRoutes(txn, data['run_route_data']);
+      totalRows += await _insertAll(txn, 'run_splits', data['run_splits']);
+      totalRows += await _insertAll(txn, 'run_laps', data['run_laps']);
       for (final table in [
         'run_plans',
         'run_plan_workouts',
@@ -326,18 +297,14 @@ class ExportImportRepository extends BaseRepository {
         'run_activity_steps',
         'run_plan_adaptations',
       ]) {
-        if (await _tableExists(txn, table)) {
-          totalRows += await _insertAll(txn, table, data[table]);
-        }
+        totalRows += await _insertAll(txn, table, data[table]);
       }
       totalRows += await _insertAll(
         txn,
         'body_measurements',
         data['body_measurements'],
       );
-      if (await _tableExists(txn, 'user_goals')) {
-        totalRows += await _insertAll(txn, 'user_goals', data['user_goals']);
-      }
+      totalRows += await _insertAll(txn, 'user_goals', data['user_goals']);
       totalRows += await _insertAll(
         txn,
         'sleep_entries',
@@ -358,32 +325,20 @@ class ExportImportRepository extends BaseRepository {
         'saved_meals',
         'saved_meal_items',
       ]) {
-        if (await _tableExists(txn, table)) {
-          totalRows += await _insertAll(txn, table, data[table]);
-        }
+        totalRows += await _insertAll(txn, table, data[table]);
       }
-      if (await _tableExists(txn, 'traditional_alarms')) {
-        totalRows += await _insertAll(
-          txn,
-          'traditional_alarms',
-          data['traditional_alarms'],
-        );
-      }
+      totalRows += await _insertAll(
+        txn,
+        'traditional_alarms',
+        data['traditional_alarms'],
+      );
       for (final table in ['medications', 'medication_doses']) {
-        if (await _tableExists(txn, table)) {
-          totalRows += await _insertAll(txn, table, data[table]);
-        }
+        totalRows += await _insertAll(txn, table, data[table]);
       }
       totalRows += await _insertAll(txn, 'app_settings', data['settings']);
-      // Backups before v6 had no mission settings. Add the safe disabled
-      // defaults only on the production schema; the schema check keeps
-      // compatibility with older lightweight test/import databases.
-      final sessionColumns = (await txn.rawQuery(
-        'PRAGMA table_info(sleep_monitor_sessions)',
-      )).map((row) => row['name'] as String).toSet();
-      if (sessionColumns.contains('monitor_mode')) {
-        totalRows += await _insertMissingSleepSettings(txn);
-      }
+      // Backups before v6 had no mission settings; add the safe disabled
+      // defaults for any that are missing.
+      totalRows += await _insertMissingSleepSettings(txn);
       totalRows -= await _resolveDanglingRefs(txn);
     });
 
@@ -473,15 +428,6 @@ class ExportImportRepository extends BaseRepository {
     }
   }
 
-  static Future<List<Map<String, Object?>>> _queryIfExists(
-    Database database,
-    String table,
-  ) async {
-    return await _tableExists(database, table)
-        ? database.query(table)
-        : const [];
-  }
-
   /// Preserves the monitored-night record and alarm metadata without carrying
   /// the low-priority sleep-stage analysis. The database defaults the restored
   /// session to `legacy_unavailable`, matching the intentionally absent epochs.
@@ -520,9 +466,9 @@ class ExportImportRepository extends BaseRepository {
   static Future<Map<String, List<Map<String, Object?>>>> _exportNutrition(
     Database database,
   ) async {
-    final foods = await _queryIfExists(database, 'foods');
-    final variants = await _queryIfExists(database, 'food_variants');
-    final servings = await _queryIfExists(database, 'food_servings');
+    final foods = await database.query('foods');
+    final variants = await database.query('food_variants');
+    final servings = await database.query('food_servings');
     if (foods.isEmpty) {
       return {
         'foods': const [],
@@ -534,7 +480,7 @@ class ExportImportRepository extends BaseRepository {
     final referencedFoodIds = <String>{};
     final referencedVariantIds = <String>{};
     for (final table in ['meal_log_items', 'saved_meal_items']) {
-      for (final row in await _queryIfExists(database, table)) {
+      for (final row in await database.query(table)) {
         final foodId = row['food_id'];
         final variantId = row['food_variant_id'];
         if (foodId is String) referencedFoodIds.add(foodId);
@@ -579,7 +525,7 @@ class ExportImportRepository extends BaseRepository {
   static Future<List<Map<String, Object?>>> _exportRunRoutes(
     Database database,
   ) async {
-    final rows = await _queryIfExists(database, 'run_route_data');
+    final rows = await database.query('run_route_data');
     return rows
         .map((row) {
           final copy = Map<String, Object?>.from(row);
@@ -592,17 +538,6 @@ class ExportImportRepository extends BaseRepository {
           return copy;
         })
         .toList(growable: false);
-  }
-
-  static Future<bool> _tableExists(
-    DatabaseExecutor database,
-    String table,
-  ) async {
-    final rows = await database.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
-      [table],
-    );
-    return rows.isNotEmpty;
   }
 
   /// Inserts [rows] into [table], returning the count.
@@ -662,11 +597,10 @@ class ExportImportRepository extends BaseRepository {
     var count = 0;
     for (final raw in rows) {
       final row = Map<String, dynamic>.from(raw as Map);
-      if (columns.contains('monitor_mode')) {
-        row['monitor_mode'] ??= row['alarm_at'] == null
-            ? 'monitoring_only'
-            : 'alarm_without_mission';
-      }
+      row['monitor_mode'] ??= row['alarm_at'] == null
+          ? 'monitoring_only'
+          : 'alarm_without_mission';
+      // Older backups may carry columns this schema no longer has.
       row.removeWhere((key, _) => !columns.contains(key));
       await txn.insert(
         'sleep_monitor_sessions',
@@ -716,7 +650,6 @@ class ExportImportRepository extends BaseRepository {
     await db.transaction((txn) async {
       for (final table in [
         'periodization_checkins',
-        'phase_routine_links',
         'phase_targets',
         'periodization_phases',
         'periodization_plans',
@@ -731,13 +664,10 @@ class ExportImportRepository extends BaseRepository {
         'run_laps',
         'run_splits',
         'run_route_data',
-        'run_track_points',
         'run_activities',
         'run_gear',
       ]) {
-        if (await _tableExists(txn, table)) {
-          await txn.delete(table);
-        }
+        await txn.delete(table);
       }
       await txn.delete('predefined_sets');
       await txn.delete('routine_exercises');
@@ -749,11 +679,9 @@ class ExportImportRepository extends BaseRepository {
       await txn.delete('body_measurements');
       await txn.delete('sleep_monitor_sessions');
       await txn.delete('sleep_entries');
-      if (await _tableExists(txn, 'traditional_alarms')) {
-        await txn.delete('traditional_alarms');
-      }
+      await txn.delete('traditional_alarms');
       for (final table in ['medication_doses', 'medications']) {
-        if (await _tableExists(txn, table)) await txn.delete(table);
+        await txn.delete(table);
       }
     });
   }
@@ -767,19 +695,13 @@ class ExportImportRepository extends BaseRepository {
     await db.transaction((txn) async {
       await txn.delete('meal_log_items');
       await txn.delete('meal_logs');
-      if (await _tableExists(txn, 'meal_types')) {
-        await txn.delete('meal_types');
-      }
+      await txn.delete('meal_types');
       await txn.delete('food_servings');
       await txn.delete('food_variants');
       await txn.delete('foods');
       await txn.delete('nutrition_goals');
-      if (await _tableExists(txn, 'saved_meal_items')) {
-        await txn.delete('saved_meal_items');
-      }
-      if (await _tableExists(txn, 'saved_meals')) {
-        await txn.delete('saved_meals');
-      }
+      await txn.delete('saved_meal_items');
+      await txn.delete('saved_meals');
     });
   }
 }

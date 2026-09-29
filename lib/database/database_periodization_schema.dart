@@ -48,19 +48,6 @@ abstract final class DatabasePeriodizationSchema {
       )
     ''');
     await db.execute('''
-      CREATE TABLE IF NOT EXISTS phase_routine_links (
-        id TEXT PRIMARY KEY,
-        phase_id TEXT NOT NULL,
-        routine_id TEXT NOT NULL,
-        starts_on TEXT NOT NULL,
-        ends_on TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        CHECK (ends_on >= starts_on),
-        FOREIGN KEY (phase_id) REFERENCES periodization_phases(id) ON DELETE CASCADE,
-        FOREIGN KEY (routine_id) REFERENCES routines(id) ON DELETE CASCADE
-      )
-    ''');
-    await db.execute('''
       CREATE TABLE IF NOT EXISTS periodization_checkins (
         id TEXT PRIMARY KEY,
         phase_id TEXT NOT NULL,
@@ -89,9 +76,6 @@ abstract final class DatabasePeriodizationSchema {
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_phase_targets_effective ON phase_targets(phase_id, valid_from DESC, version DESC)',
-    );
-    await db.execute(
-      'CREATE INDEX IF NOT EXISTS idx_phase_routine_links_dates ON phase_routine_links(phase_id, starts_on, ends_on)',
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_periodization_checkins_phase_week ON periodization_checkins(phase_id, week_start DESC)',

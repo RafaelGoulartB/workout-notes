@@ -173,8 +173,6 @@ abstract final class DatabaseNutritionSchema {
     ''');
 
     for (final statement in <String>[
-      'CREATE INDEX IF NOT EXISTS idx_foods_search_name ON foods(search_name)',
-      'CREATE INDEX IF NOT EXISTS idx_foods_brand ON foods(brand)',
       'CREATE INDEX IF NOT EXISTS idx_foods_barcode ON foods(barcode)',
       'CREATE INDEX IF NOT EXISTS idx_food_variants_food ON food_variants(food_id)',
       'CREATE INDEX IF NOT EXISTS idx_food_servings_variant ON food_servings(food_variant_id)',

@@ -120,9 +120,7 @@ class RunTrackingService extends ChangeNotifier {
 
   Future<void> _maintainRouteStorage() async {
     try {
-      await _repository.migrateLegacyRoutes(limit: 5);
-      await _repository.optimizeOldRoutes(limit: 5);
-      await _repository.reclaimIncrementalVacuumPages();
+      await _repository.runRouteMaintenance();
     } catch (_) {
       // Storage maintenance is opportunistic and must never block tracking.
     }
