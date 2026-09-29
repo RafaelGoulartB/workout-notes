@@ -1,3 +1,5 @@
+// Read-only queries built for the AI Coach may run SQL directly (a documented
+// exception to the repository-only rule); writes never happen in this file.
 import '../database/database_helper.dart';
 import '../models/ai_provider.dart';
 

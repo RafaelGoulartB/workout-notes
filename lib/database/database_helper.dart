@@ -18,6 +18,7 @@ import '../repositories/run_repository.dart';
 import '../repositories/run_plan_repository.dart';
 import '../repositories/run_gear_repository.dart';
 import '../repositories/ai_chat_repository.dart';
+import '../repositories/ai_routine_mutation_repository.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
@@ -49,6 +50,8 @@ class DatabaseHelper {
   late final RunPlanRepository runPlanRepo = RunPlanRepository();
   late final RunGearRepository runGearRepo = RunGearRepository();
   late final AiChatRepository aiChatRepo = AiChatRepository();
+  late final AiRoutineMutationRepository aiRoutineMutationRepo =
+      AiRoutineMutationRepository();
 
   DatabaseHelper._();
 

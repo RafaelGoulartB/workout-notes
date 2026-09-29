@@ -1,3 +1,5 @@
+// Read-only queries built for the AI Coach may run SQL directly (a documented
+// exception to the repository-only rule); writes never happen in this file.
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_achievement.dart';
