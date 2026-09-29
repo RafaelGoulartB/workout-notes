@@ -7,6 +7,8 @@ import 'package:workout_notes/repositories/settings_repository.dart';
 import 'package:workout_notes/screens/workout/goal_detail_screen.dart';
 import 'package:workout_notes/widgets/goals/goal_card.dart';
 import 'package:workout_notes/widgets/goals/goal_form_sheet.dart';
+import 'package:workout_notes/utils/load_generation.dart';
+import 'package:workout_notes/widgets/load_error_view.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
 
 /// Goals card: one divided row per goal and an add row at the end.
@@ -42,13 +44,25 @@ class _GoalsSectionState extends State<GoalsSection> {
   final GoalRepository _goalRepo = GoalRepository();
   List<Goal> _goals = [];
   final Map<String, GoalProgress> _progressByGoal = {};
+  final _generation = LoadGeneration();
+
+  // A goal whose progress could not be read has no entry here and shows as
+  // unavailable, never as zero progress.
   bool _isLoading = true;
+  bool _hasLoaded = false;
+  bool _loadFailed = false;
   bool _isKm = true;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _generation.invalidate();
+    super.dispose();
   }
 
   @override
@@ -69,36 +83,49 @@ class _GoalsSectionState extends State<GoalsSection> {
   }
 
   Future<void> _load() async {
-    setState(() => _isLoading = true);
+    final token = _generation.begin();
+    if (!_hasLoaded) setState(() => _isLoading = true);
     try {
-      _isKm = await widget.settingsRepo.getIsDistanceKm();
+      final isKm = await widget.settingsRepo.getIsDistanceKm();
       final goals = (await _goalRepo.getAll())
           .where((g) => widget.allowedScopes.contains(g.scope))
           .toList();
       final progressEntries = await Future.wait(
         goals.map((g) async {
           try {
-            final p = await _goalRepo.getProgress(g);
-            return MapEntry(g.id, p);
+            return MapEntry<String, GoalProgress?>(
+              g.id,
+              await _goalRepo.getProgress(g),
+            );
           } catch (_) {
-            return MapEntry(g.id, GoalProgress.empty(DateTime.now()));
+            return MapEntry<String, GoalProgress?>(g.id, null);
           }
         }),
       );
-      if (!mounted) return;
+      if (!mounted || !_generation.isCurrent(token)) return;
       setState(() {
+        _isKm = isKm;
         _goals = goals;
         _progressByGoal
           ..clear()
-          ..addEntries(progressEntries);
+          ..addEntries([
+            for (final e in progressEntries)
+              if (e.value != null) MapEntry(e.key, e.value!),
+          ]);
+        _hasLoaded = true;
+        _loadFailed = false;
         _isLoading = false;
       });
       widget.onSummaryChanged?.call(
-        progressEntries.where((e) => e.value.isComplete).length,
+        progressEntries.where((e) => e.value?.isComplete ?? false).length,
         goals.length,
       );
     } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
+      if (!mounted || !_generation.isCurrent(token)) return;
+      setState(() {
+        _loadFailed = true;
+        _isLoading = false;
+      });
     }
   }
 
@@ -217,6 +244,11 @@ class _GoalsSectionState extends State<GoalsSection> {
       );
     }
 
+    // Nothing was ever read: say so, rather than showing "no goals yet".
+    if (_loadFailed && !_hasLoaded) {
+      return LoadErrorBanner(onRetry: _load, message: loc.commonLoadError);
+    }
+
     final colors = theme.colorScheme;
     final addRow = InkWell(
       onTap: _addGoal,
@@ -247,25 +279,32 @@ class _GoalsSectionState extends State<GoalsSection> {
         : RunDividedList(
             children: [
               for (final goal in _goals)
-                GoalCard(
-                  goal: goal,
-                  progress:
-                      _progressByGoal[goal.id] ??
-                      GoalProgress.empty(DateTime.now()),
-                  isKm: _isKm,
-                  onTap: () => _openDetail(goal),
-                  onEdit: () => _editGoal(goal),
-                  onTogglePause: () => _togglePause(goal),
-                  onDelete: () => _deleteGoal(goal),
-                ),
+                if (_progressByGoal[goal.id] case final progress?)
+                  GoalCard(
+                    goal: goal,
+                    progress: progress,
+                    isKm: _isKm,
+                    onTap: () => _openDetail(goal),
+                    onEdit: () => _editGoal(goal),
+                    onTogglePause: () => _togglePause(goal),
+                    onDelete: () => _deleteGoal(goal),
+                  )
+                else
+                  _GoalUnavailableRow(goal: goal, onRetry: _load),
               addRow,
             ],
           );
 
-    if (!widget.framed) return list;
+    final body = _loadFailed
+        ? Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [LoadErrorBanner(onRetry: _load), list],
+          )
+        : list;
+    if (!widget.framed) return body;
     return RunSectionCard(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-      child: list,
+      child: body,
     );
   }
 
@@ -307,6 +346,53 @@ class _GoalsSectionState extends State<GoalsSection> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A goal whose progress could not be read: its name and a retry, instead of
+/// a ring stuck at 0 %.
+class _GoalUnavailableRow extends StatelessWidget {
+  final Goal goal;
+  final VoidCallback onRetry;
+
+  const _GoalUnavailableRow({required this.goal, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+      child: Row(
+        children: [
+          const RunIconBadge(Icons.error_outline_rounded, size: 44, iconSize: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (goal.title.isNotEmpty)
+                  Text(
+                    goal.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                Text(
+                  loc.commonLoadError,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(onPressed: onRetry, child: Text(loc.commonRetry)),
+        ],
       ),
     );
   }

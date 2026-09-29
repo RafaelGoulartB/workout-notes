@@ -89,26 +89,36 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
       Navigator.pop(context);
       return;
     }
-    final scheduled = await _repo.getScheduledWeeks(plan.id);
-    final progress = await _repo.getPlanProgress(plan.id);
-    final ledger = await _repo.getPlanLedger(plan.id);
-    final linked = await _repo.isLinkedToPeriodization(plan.id);
-    final adaptations = await _repo.listAdaptations(plan.id);
-    RunPlanAdaptationProposal? proposal;
-    Set<DateTime> strengthDone = const {};
-    try {
-      // The weekly review reads the run history; a failure there must not
-      // keep the plan from opening.
-      proposal = linked ? null : await RunPlanCoach().review(plan);
-      final anchor = plan.activatedAt;
-      if (anchor != null && _includesStrength(plan)) {
-        final start = RunPlanWeekView.monday(anchor);
-        strengthDone = await RunnerStrengthRoutine().completedDays(
-          start,
-          start.add(Duration(days: 7 * plan.weeks)),
-        );
-      }
-    } catch (_) {}
+    // Independent reads run together (SQLite still serialises them).
+    final (scheduled, progress, ledger, linked, adaptations) = await (
+      _repo.getScheduledWeeks(plan.id),
+      _repo.getPlanProgress(plan.id),
+      _repo.getPlanLedger(plan.id),
+      _repo.isLinkedToPeriodization(plan.id),
+      _repo.listAdaptations(plan.id),
+    ).wait;
+    // The weekly review reads the run history; a failure there must not keep
+    // the plan from opening.
+    final proposalFuture = linked
+        ? Future<RunPlanAdaptationProposal?>.value(null)
+        : RunPlanCoach()
+              .review(plan)
+              .then<RunPlanAdaptationProposal?>((value) => value)
+              .catchError((Object _) => null);
+    final anchor = plan.activatedAt;
+    final strengthFuture = anchor != null && _includesStrength(plan)
+        ? () {
+            final start = RunPlanWeekView.monday(anchor);
+            return RunnerStrengthRoutine()
+                .completedDays(
+                  start,
+                  start.add(Duration(days: 7 * plan.weeks)),
+                )
+                .catchError((Object _) => <DateTime>{});
+          }()
+        : Future<Set<DateTime>>.value(const {});
+    final proposal = await proposalFuture;
+    final strengthDone = await strengthFuture;
     if (!mounted) return;
     final firstLoad = _loading;
     setState(() {

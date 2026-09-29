@@ -137,4 +137,98 @@ void main() {
     expect(find.text('Nenhum treino ainda'), findsNothing);
     _expectOnlyMissingPlugins(tester);
   });
+  testWidgets('a failed read is an error with retry, not the empty state', (
+    tester,
+  ) async {
+    phone(tester);
+    await tester.runAsync(
+      () => database.execute(
+        'ALTER TABLE run_activities RENAME TO run_activities_hidden',
+      ),
+    );
+    await _pumpHome(tester);
+
+    expect(find.byKey(const Key('load-error-retry')), findsOneWidget);
+    expect(find.text('Nenhum treino ainda'), findsNothing);
+
+    await tester.runAsync(
+      () => database.execute(
+        'ALTER TABLE run_activities_hidden RENAME TO run_activities',
+      ),
+    );
+    await tester.runAsync(() async {
+      await tester.tap(find.byKey(const Key('load-error-retry')));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await tester.pump();
+    });
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.byKey(const Key('load-error-retry')), findsNothing);
+    expect(find.text('Nenhum treino ainda'), findsOneWidget);
+    _expectOnlyMissingPlugins(tester);
+  });
+
+  testWidgets('a failed refresh keeps the data on screen with a retry', (
+    tester,
+  ) async {
+    // Wider than the other cases: the streak chip needs room in test fonts.
+    tester.view.physicalSize = const Size(480 * 2, 800 * 2);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    final now = DateTime.now();
+    final today = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).toIso8601String().substring(0, 10);
+    await tester.runAsync(() async {
+      await seedRoutine(
+        database,
+        id: 'ppl',
+        name: 'PPL',
+        days: [(id: 'push', name: 'Push A')],
+      );
+      await database.insert('exercises', {
+        'id': 'test-bench',
+        'name': 'Bench',
+        'category_id': 'chest',
+        'created_at': '2026-01-01T00:00:00.000',
+      });
+      await seedWorkout(
+        database,
+        id: 'today-done',
+        date: today,
+        routineId: 'ppl',
+        routineDayId: 'push',
+        sets: [seedSet('test-bench', 100, 5)],
+      );
+    });
+    await _pumpHome(tester);
+    expect(find.text('1 treino esta semana'), findsOneWidget);
+
+    await tester.runAsync(
+      () => database.execute(
+        'ALTER TABLE run_activities RENAME TO run_activities_hidden',
+      ),
+    );
+    // Pull to refresh.
+    await tester.runAsync(() async {
+      await tester.fling(
+        find.byType(CustomScrollView),
+        const Offset(0, 400),
+        1000,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await tester.pump();
+    });
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.byKey(const Key('load-error-banner-retry')), findsOneWidget);
+    // The earlier data is still there (today's agenda), not an empty state.
+    expect(find.text('HOJE'), findsOneWidget);
+    expect(find.text('Nenhum treino ainda'), findsNothing);
+    _expectOnlyMissingPlugins(tester);
+  });
 }

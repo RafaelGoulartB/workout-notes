@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -13,7 +14,9 @@ import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'package:workout_notes/services/sleep_goal_service.dart';
 
+import 'package:workout_notes/utils/load_generation.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
+import 'package:workout_notes/widgets/load_error_view.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_history_row.dart';
@@ -27,6 +30,14 @@ import 'sleep_monitor_result_screen.dart';
 import 'sleep_monitor_screen.dart';
 import 'traditional_alarms_screen.dart';
 import 'settings_screen.dart';
+
+/// The legacy-entry repair reads every monitor session and rewrites its
+/// entry, so it runs once per app process, after the screen is showing — not
+/// on every load and refresh.
+bool _repairStarted = false;
+
+@visibleForTesting
+void resetSleepRepairForTest() => _repairStarted = false;
 
 class SleepTrackerScreen extends StatefulWidget {
   const SleepTrackerScreen({super.key});
@@ -50,7 +61,10 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   SleepDashboardStats? _stats;
   SleepNightSummary? _latestNight;
   Map<String, SleepNightSummary> _nightSummaries = const {};
+  final _generation = LoadGeneration();
   bool _isLoading = true;
+  bool _hasLoaded = false;
+  bool _loadFailed = false;
   int _historyDisplayCount = 5;
   int _totalEntries = 0;
   bool _hasMoreHistory = false;
@@ -76,6 +90,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
 
   @override
   void dispose() {
+    _generation.invalidate();
     _monitorService.removeListener(_onMonitorChanged);
     super.dispose();
   }
@@ -110,10 +125,13 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     ).showSnackBar(SnackBar(content: Text(loc.sleepMonitorRecovered(count))));
   }
 
+  /// Reloads the dashboard. Only the newest load applies its result, and a
+  /// failed one keeps what is on screen (with a retry) instead of looking like
+  /// an empty history.
   Future<void> _load() async {
-    if (mounted) setState(() => _isLoading = true);
+    final token = _generation.begin();
+    if (mounted && !_hasLoaded) setState(() => _isLoading = true);
     try {
-      await _monitorRepository.repairSleepEntriesFromSessions();
       final today = _dateOnly(DateTime.now());
       final results = await Future.wait<Object>([
         _repository.getEntries(limit: _historyPageSize + 1),
@@ -138,7 +156,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
       final summariesByEntry = {
         for (final summary in nightSummaries) summary.entry.id: summary,
       };
-      if (!mounted) return;
+      if (!mounted || !_generation.isCurrent(token)) return;
       setState(() {
         _entries = entries;
         _unestimatedSessions = results[5] as List<SleepMonitorSession>;
@@ -153,11 +171,32 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
         _hasMoreHistory = entryPage.length > _historyPageSize;
         _weekEntries = results[6] as List<SleepEntry>;
         _trendEntries = results[7] as List<SleepEntry>;
+        _hasLoaded = true;
+        _loadFailed = false;
         _isLoading = false;
       });
+      _repairLegacyEntriesOnce();
     } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
+      if (!mounted || !_generation.isCurrent(token)) return;
+      setState(() {
+        _loadFailed = true;
+        _isLoading = false;
+      });
     }
+  }
+
+  /// Runs the repair in the background the first time the dashboard is
+  /// shown in this process and reloads once it has finished, since it may have
+  /// filled in older entries.
+  void _repairLegacyEntriesOnce() {
+    if (_repairStarted) return;
+    _repairStarted = true;
+    unawaited(
+      _monitorRepository
+          .repairSleepEntriesFromSessions()
+          .then((_) => mounted ? _load() : null)
+          .catchError((Object _) {}),
+    );
   }
 
   Future<void> _loadMoreHistory() async {
@@ -235,6 +274,8 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
       floatingActionButton: _buildMonitorFab(),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
+          : (_loadFailed && !_hasLoaded)
+          ? LoadErrorView(onRetry: _load)
           : RefreshIndicator(
               onRefresh: _load,
               child: _entries.isEmpty
@@ -253,6 +294,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
       padding: RunUi.screenPadding,
       child: Column(
         children: [
+          if (_loadFailed) LoadErrorBanner(onRetry: _load),
           ..._incompleteSessionCards(loc),
           SizedBox(
             height: MediaQuery.sizeOf(context).height * .5,
@@ -276,6 +318,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: RunUi.screenPadding,
       children: [
+        if (_loadFailed) LoadErrorBanner(onRetry: _load),
         ..._incompleteSessionCards(loc),
         if (latest != null) ...[
           SleepLastNightCard(

@@ -17,6 +17,8 @@ import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
+import 'package:workout_notes/utils/load_generation.dart';
+import 'package:workout_notes/widgets/load_error_view.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/widgets/periodization/body_measurements_teaser_card.dart';
 import 'package:workout_notes/widgets/periodization/plan_overview.dart';
@@ -62,7 +64,10 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
   String? _weightUnit;
   double? _weightDelta;
   String? _weightDate;
+  final _generation = LoadGeneration();
   bool _loading = true;
+  bool _hasLoaded = false;
+  bool _loadFailed = false;
 
   DateTime get _day {
     final now = DateTime.now();
@@ -73,6 +78,12 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _generation.invalidate();
+    super.dispose();
   }
 
   Future<void> _loadWeight() async {
@@ -92,18 +103,37 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
     _weightDelta = value == null || previous == null ? null : value - previous;
   }
 
+  /// Reloads the tab. Only the newest load applies its result, and a failed
+  /// one keeps what is on screen (with a retry) instead of leaving the tab
+  /// loading forever or looking like it has no plan.
   Future<void> _load() async {
+    final token = _generation.begin();
+    if (mounted && !_hasLoaded) setState(() => _loading = true);
+    try {
+      await _loadAll(token);
+    } catch (_) {
+      if (!mounted || !_generation.isCurrent(token)) return;
+      setState(() {
+        _loadFailed = true;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _loadAll(int token) async {
     await _loadWeight();
     final plan = await _repository.getActivePlan();
     if (plan == null) {
       final plans = await _repository.getPlans(includeArchived: false);
-      if (!mounted) return;
+      if (!mounted || !_generation.isCurrent(token)) return;
       setState(() {
         _overview = null;
         _currentPhase = null;
         _today = null;
         _week = null;
         _otherPlans = plans;
+        _hasLoaded = true;
+        _loadFailed = false;
         _loading = false;
       });
       return;
@@ -142,7 +172,7 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
       week = results[5] as WeekProgress?;
       reviewed = results[6] != null;
     }
-    if (!mounted) return;
+    if (!mounted || !_generation.isCurrent(token)) return;
     setState(() {
       _overview = overview;
       _currentPhase = current;
@@ -153,6 +183,8 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
       _runSuggestion = run;
       _week = week;
       _weekReviewed = reviewed;
+      _hasLoaded = true;
+      _loadFailed = false;
       _loading = false;
     });
   }
@@ -169,7 +201,7 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
     );
     if (!mounted) return;
     await _loadWeight();
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   Future<void> _openAppSettings() async {
@@ -377,12 +409,15 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
+          : (_loadFailed && !_hasLoaded)
+          ? LoadErrorView(onRetry: _load)
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
                 children: [
+                  if (_loadFailed) LoadErrorBanner(onRetry: _load),
                   BodyMeasurementsTeaserCard(
                     weightKg: _weightKg,
                     unit: _weightUnit,
