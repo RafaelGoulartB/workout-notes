@@ -10,7 +10,6 @@ class SleepMonitorSession {
   static const analysisInsufficient = 'insufficient_data';
   static const analysisLegacyUnavailable = 'legacy_unavailable';
   static const analysisModelUnavailable = 'model_unavailable';
-  static const analysisFailed = 'failed';
 
   static const starting = 'starting';
   static const running = 'running';
@@ -21,30 +20,7 @@ class SleepMonitorSession {
   static const discarded = 'discarded';
 
   static const endUser = 'user';
-  static const endNotificationAction = 'notification_action';
-  static const endTimeLimit = 'time_limit';
-  static const endServiceDestroyed = 'service_destroyed';
   static const endProcessRecovered = 'process_recovered';
-  static const endPermissionRevoked = 'permission_revoked';
-  static const endAudioError = 'audio_error';
-  static const endAlarm = 'alarm';
-
-  static const dismissButton = 'button';
-  static const dismissBarcode = 'barcode';
-  static const dismissEmergency500Taps = 'emergency_500_taps';
-
-  /// Previous values remain countable after changing the challenge limit.
-  @Deprecated('Use dismissEmergency500Taps')
-  static const dismissEmergency1000Taps = 'emergency_1000_taps';
-
-  @Deprecated('Use dismissEmergency500Taps')
-  static const dismissEmergency100Taps = 'emergency_100_taps';
-
-  static const emergencyDismissMethods = <String>{
-    dismissEmergency500Taps,
-    dismissEmergency1000Taps,
-    dismissEmergency100Taps,
-  };
 
   final String id;
   final String? sleepEntryId;
