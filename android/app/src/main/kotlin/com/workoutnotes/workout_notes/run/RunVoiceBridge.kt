@@ -127,18 +127,13 @@ class RunVoiceBridge(private val context: Context) : MethodChannel.MethodCallHan
                 // Reuse audio gate logic for Flutter UI
                 val am = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
                 val headset = try {
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                        val devices = am.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
-                        devices.any {
-                            it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET ||
-                                it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
-                                it.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-                                it.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
-                                it.type == android.media.AudioDeviceInfo.TYPE_USB_HEADSET
-                        }
-                    } else {
-                        @Suppress("DEPRECATION")
-                        am.isWiredHeadsetOn || am.isBluetoothA2dpOn || am.isBluetoothScoOn
+                    val devices = am.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
+                    devices.any {
+                        it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                            it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                            it.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                            it.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                            it.type == android.media.AudioDeviceInfo.TYPE_USB_HEADSET
                     }
                 } catch (_: Throwable) { false }
                 val inCall = when (am.mode) {

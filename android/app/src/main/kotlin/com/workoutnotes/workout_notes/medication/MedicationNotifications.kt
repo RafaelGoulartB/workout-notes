@@ -1,15 +1,16 @@
 package com.workoutnotes.workout_notes.medication
 
 import android.app.Notification
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.workoutnotes.workout_notes.R
+import com.workoutnotes.workout_notes.common.PendingIntentFlags
+import com.workoutnotes.workout_notes.common.NotificationChannels
+import com.workoutnotes.workout_notes.common.NotificationChannels.silent
 
 /** Channels and the reminder notification for medication doses. */
 object MedicationNotifications {
@@ -18,32 +19,27 @@ object MedicationNotifications {
     val ACCENT: Int = Color.rgb(46, 125, 110)
 
     fun ensureChannels(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val manager = context.getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(
-            NotificationChannel(
-                REMINDER_CHANNEL,
-                context.getString(R.string.medication_reminder_channel_name),
-                NotificationManager.IMPORTANCE_HIGH,
-            ).apply {
-                description = context.getString(R.string.medication_reminder_channel_description)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                enableVibration(true)
-            },
-        )
-        manager.createNotificationChannel(
-            NotificationChannel(
-                ALARM_CHANNEL,
-                context.getString(R.string.medication_alarm_channel_name),
-                NotificationManager.IMPORTANCE_HIGH,
-            ).apply {
-                description = context.getString(R.string.medication_alarm_channel_description)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                // The ringing service plays the alarm sound itself.
-                setSound(null, null)
-                enableVibration(false)
-            },
-        )
+        NotificationChannels.ensure(
+            context,
+            REMINDER_CHANNEL,
+            context.getString(R.string.medication_reminder_channel_name),
+            NotificationManager.IMPORTANCE_HIGH,
+        ) {
+            description = context.getString(R.string.medication_reminder_channel_description)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            enableVibration(true)
+        }
+        NotificationChannels.ensure(
+            context,
+            ALARM_CHANNEL,
+            context.getString(R.string.medication_alarm_channel_name),
+            NotificationManager.IMPORTANCE_HIGH,
+        ) {
+            description = context.getString(R.string.medication_alarm_channel_description)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            // The ringing service plays the alarm sound itself.
+            silent()
+        }
     }
 
     /** Tapping the reminder opens the confirmation screen for that dose. */
@@ -85,7 +81,7 @@ object MedicationNotifications {
             putExtra(MedicationReminderScheduler.EXTRA_SLOT_ID, slot.id)
             putExtra(MedicationReminderScheduler.EXTRA_DOSE_KEY, doseKey)
         },
-        PendingIntent.FLAG_UPDATE_CURRENT or MedicationReminderScheduler.immutableFlag(),
+        PendingIntentFlags.UPDATE_IMMUTABLE,
     )
 
     fun doseLabel(slot: MedicationReminderScheduler.Slot): String =

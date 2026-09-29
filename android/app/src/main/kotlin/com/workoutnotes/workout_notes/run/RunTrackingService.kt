@@ -113,14 +113,17 @@ class RunTrackingService : Service(), LocationListener {
             finalStatus: String,
         ): Map<String, Any?> {
             val spool = RunActivitySpool(context.applicationContext)
-            val pending = spool.listPending()
+            // Rare recovery path (stop/discard racing ahead of start, or no
+            // location permission on restore): waits on the sequential spool
+            // worker so it stays ordered after any queued writes.
+            val pending = spool.blocking { listPending() }
             val orphan = pending.firstOrNull { isActiveSpoolStatus(it["status"] as? String) }
             val id = orphan?.get("id")?.toString()
             if (id == null) {
                 return lastState ?: idleState(context)
             }
             return try {
-                val data = spool.read(id)
+                val data = spool.blocking { read(id) }
                 @Suppress("UNCHECKED_CAST")
                 val session = (data["activity"] as Map<String, Any?>).toMutableMap()
                 val endedAt = System.currentTimeMillis()
@@ -141,9 +144,9 @@ class RunTrackingService : Service(), LocationListener {
                 session["calories"] = RunGeoMath.estimateCalories(distanceMeters)
 
                 if (finalStatus == "discarded") {
-                    spool.delete(id)
+                    spool.blocking { delete(id) }
                 } else {
-                    spool.updateActivity(session)
+                    spool.blocking { updateActivity(session) }
                 }
 
                 val state = mapOf(
@@ -247,7 +250,7 @@ class RunTrackingService : Service(), LocationListener {
         if (plan.isNotEmpty()) {
             session["voice_plan_json"] = RunWorkoutStepNative.listToJsonString(plan)
         }
-        spool.updateActivity(session)
+        spool.updateActivityAsync(session)
         publishState()
     }
 
@@ -409,13 +412,13 @@ class RunTrackingService : Service(), LocationListener {
         )
         applyPendingSessionContext(session)
         activity = session
-        spool.create(session)
+        spool.createAsync(session)
 
         promoteToForeground("recording")
         acquireWakeLock()
         status = "recording"
         session["status"] = "recording"
-        spool.updateActivity(session)
+        spool.updateActivityAsync(session)
         // Native TTS: consume pending settings from bridge or DB
         try {
             val pendingS = RunVoiceBridge.pendingSettings
@@ -480,13 +483,13 @@ class RunTrackingService : Service(), LocationListener {
         )
         applyPendingSessionContext(session)
         activity = session
-        spool.create(session)
+        spool.createAsync(session)
 
         promoteToForeground("recording")
         acquireWakeLock()
         status = "recording"
         session["status"] = "recording"
-        spool.updateActivity(session)
+        spool.updateActivityAsync(session)
         try {
             val pendingS = RunVoiceBridge.pendingSettings
             val pendingG = RunVoiceBridge.pendingGoal
@@ -511,7 +514,8 @@ class RunTrackingService : Service(), LocationListener {
      * the kill gap does not inflate distance.
      */
     private fun restoreActiveSessionIfNeeded() {
-        val pending = spool.listPending()
+        // Process-death recovery: one blocking read on the sequential worker.
+        val pending = spool.blocking { listPending() }
         val orphan = pending.firstOrNull {
             isActiveSpoolStatus(it["status"] as? String)
         }
@@ -527,7 +531,7 @@ class RunTrackingService : Service(), LocationListener {
         }
 
         val data = try {
-            spool.read(id)
+            spool.blocking { read(id) }
         } catch (_: Throwable) {
             stopSelf()
             return
@@ -582,7 +586,7 @@ class RunTrackingService : Service(), LocationListener {
         restoreLaps(session)
         status = restoredStatus
         session["status"] = restoredStatus
-        spool.updateActivity(session)
+        spool.updateActivityAsync(session)
 
         promoteToForeground(restoredStatus)
         acquireWakeLock()
@@ -630,9 +634,12 @@ class RunTrackingService : Service(), LocationListener {
         lastLocation = null
         activity?.let {
             it["status"] = "paused"
-            spool.updateActivity(it)
+            spool.updateActivityAsync(it)
         }
         persistLiveTotals()
+        // Make the paused state durable before it is reported (waits for the
+        // queued writes only; the queue is normally empty or a single write).
+        spool.flush()
         stopLocationUpdates()
         updateNotification()
         publishState()
@@ -702,16 +709,19 @@ class RunTrackingService : Service(), LocationListener {
         // Manual laps: the remainder after the last lap closes the set.
         lapTracker.closeFinal(distanceMeters, movingTimeSeconds)
         persistRuntimeSnapshot(session)
-        spool.updateActivity(session)
+        spool.updateActivityAsync(session)
+        if (finalStatus == "discarded") {
+            spool.deleteAsync(session["id"].toString())
+        }
+        // Durable stop: everything queued (points, checkpoints, the final
+        // activity) must be on disk before the stop is reported, so the Dart
+        // side never imports a spool that is still being written.
+        spool.flush()
 
         status = finalStatus
         val state = stateMap()
         lastState = state
         eventSink?.invoke(state)
-
-        if (finalStatus == "discarded") {
-            spool.delete(session["id"].toString())
-        }
 
         cleanupAndStop()
     }
@@ -914,7 +924,7 @@ class RunTrackingService : Service(), LocationListener {
             "distance_delta_meters" to distanceDelta,
         )
         pointSeq += 1
-        spool.appendPoint(point)
+        spool.appendPointAsync(point)
 
         if (distanceDelta > 0) {
             recordCompletedSplits()
@@ -937,7 +947,7 @@ class RunTrackingService : Service(), LocationListener {
             session["voice_intervals_on"] = voiceController.intervalsEnabled
             session["voice_engine_snapshot_json"] = voiceController.engineSnapshotJson()
             session["voice_step_results"] = voiceController.stepResults()
-            spool.updateActivity(session)
+            spool.updateActivityAsync(session)
         } catch (_: Throwable) {
             // Best-effort: a spool write failure must never abort the run.
         }
@@ -1051,7 +1061,7 @@ class RunTrackingService : Service(), LocationListener {
         session["calories"] = RunGeoMath.estimateCalories(distanceMeters)
         session["splits"] = completedSplits.toList()
         persistRuntimeSnapshot(session)
-        spool.updateActivity(session)
+        spool.updateActivityAsync(session)
     }
 
     private fun persistRuntimeSnapshot(session: MutableMap<String, Any?>) {

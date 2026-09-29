@@ -604,31 +604,26 @@ class RunVoiceController(private val context: Context) {
     private fun isHeadsetConnected(): Boolean {
         return try {
             val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val devices = am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-                for (device in devices) {
-                    when (device.type) {
-                        AudioDeviceInfo.TYPE_WIRED_HEADSET,
-                        AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
-                        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-                        AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
-                        AudioDeviceInfo.TYPE_USB_HEADSET,
-                        AudioDeviceInfo.TYPE_HEARING_AID,
-                        -> return true
-                        else -> {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                if (device.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
-                                    device.type == AudioDeviceInfo.TYPE_BLE_SPEAKER
-                                ) return true
-                            }
+            val devices = am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            for (device in devices) {
+                when (device.type) {
+                    AudioDeviceInfo.TYPE_WIRED_HEADSET,
+                    AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+                    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+                    AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+                    AudioDeviceInfo.TYPE_USB_HEADSET,
+                    AudioDeviceInfo.TYPE_HEARING_AID,
+                    -> return true
+                    else -> {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            if (device.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+                                device.type == AudioDeviceInfo.TYPE_BLE_SPEAKER
+                            ) return true
                         }
                     }
                 }
-                false
-            } else {
-                @Suppress("DEPRECATION")
-                am.isWiredHeadsetOn || am.isBluetoothA2dpOn || am.isBluetoothScoOn
             }
+            false
         } catch (_: Throwable) { false }
     }
 }

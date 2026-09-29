@@ -1,14 +1,15 @@
 package com.workoutnotes.workout_notes.run
 
 import android.app.Notification
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.workoutnotes.workout_notes.MainActivity
+import com.workoutnotes.workout_notes.common.PendingIntentFlags
+import com.workoutnotes.workout_notes.common.NotificationChannels
+import com.workoutnotes.workout_notes.common.NotificationChannels.silent
 
 object RunTrackingNotification {
     const val CHANNEL_ID = "run_tracking"
@@ -19,25 +20,21 @@ object RunTrackingNotification {
     private const val REQUEST_LAP = 1204
 
     fun ensureChannel(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val manager = context.getSystemService(NotificationManager::class.java)
         val pt = isPortuguese(context)
-        manager.createNotificationChannel(
-            NotificationChannel(
-                CHANNEL_ID,
-                if (pt) "Corrida" else "Running",
-                NotificationManager.IMPORTANCE_LOW,
-            ).apply {
-                description = if (pt) {
-                    "Gravação de corrida com GPS"
-                } else {
-                    "GPS run recording"
-                }
-                setSound(null, null)
-                enableVibration(false)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-            },
-        )
+        NotificationChannels.ensure(
+            context,
+            CHANNEL_ID,
+            if (pt) "Corrida" else "Running",
+            NotificationManager.IMPORTANCE_LOW,
+        ) {
+            description = if (pt) {
+                "Gravação de corrida com GPS"
+            } else {
+                "GPS run recording"
+            }
+            silent()
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+        }
     }
 
     /**
@@ -62,7 +59,7 @@ object RunTrackingNotification {
             Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             },
-            PendingIntent.FLAG_UPDATE_CURRENT or pendingIntentImmutable(),
+            PendingIntentFlags.UPDATE_IMMUTABLE,
         )
         val paused = status == "paused"
         val title = when {
@@ -145,13 +142,10 @@ object RunTrackingNotification {
             context,
             requestCode,
             intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or pendingIntentImmutable(),
+            PendingIntentFlags.UPDATE_IMMUTABLE,
         )
     }
 
     private fun isPortuguese(context: Context): Boolean =
         context.resources.configuration.locales[0].language == "pt"
-
-    private fun pendingIntentImmutable(): Int =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
 }

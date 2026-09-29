@@ -16,7 +16,6 @@ import kotlin.math.ln
  */
 class BreathingAnalyzer(private val sampleRate: Int = 16_000) {
     companion object {
-        const val HOP_SAMPLES = 8_000 // 0.5 s at 16 kHz
         const val MIN_LAG = 2 // 1.0 s -> 1.0 Hz ceiling
         const val MAX_LAG = 13 // 6.5 s -> 0.154 Hz floor
         private const val LOG_FLOOR = 1e-6
