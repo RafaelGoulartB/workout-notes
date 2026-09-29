@@ -101,9 +101,8 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
       unit: unit,
       initial: currentValue,
     );
-    if (result == _kUnchanged) return;
-    // result is double? here (null = clear, value = set)
-    onSubmit(result as double?);
+    if (result == null) return;
+    onSubmit(result.$1);
   }
 
   Future<void> _clearGoal() async {
@@ -177,8 +176,8 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
       unit: 'kcal',
       initial: currentTdee,
     );
-    if (result == _kUnchanged) return;
-    final newTdee = result as double?;
+    if (result == null) return;
+    final newTdee = result.$1;
     final current = _current;
     if (current != null) {
       await _saveTdeeGoal(
@@ -353,17 +352,14 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
   // Helpers
   // ===================================================================
 
-  /// Sentinel returned by the number-editor bottom sheet when the user
-  /// dismissed it without saving. Lets `_editNumericValue` tell the
-  /// difference between "no change" and "user typed and saved".
-  static const Object _kUnchanged = Object();
-
-  Future<Object?> _openNumberEditor({
+  /// Resolves to null when the sheet is dismissed without saving, otherwise
+  /// to `(value,)` where a null value clears the target.
+  Future<(double?,)?> _openNumberEditor({
     required String title,
     required String unit,
     required double? initial,
   }) {
-    return showModalBottomSheet<Object?>(
+    return showModalBottomSheet<(double?,)>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,

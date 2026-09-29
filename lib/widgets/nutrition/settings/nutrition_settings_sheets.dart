@@ -4,8 +4,8 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/nutrition_goal_suggest.dart';
 
 /// Bottom sheet used to edit one numeric goal value (calories, protein,
-/// carbs or fat). Submitting an empty field is treated as "clear this
-/// target" and resolves to null.
+/// carbs or fat). Pops `(value,)` on save — an empty field saves `(null,)`,
+/// meaning "clear this target" — and nothing when dismissed.
 class NumberEditorSheet extends StatefulWidget {
   final String title;
   final String unit;
@@ -48,7 +48,7 @@ class _NumberEditorSheetState extends State<NumberEditorSheet> {
     final loc = AppLocalizations.of(context)!;
     final text = _controller.text.trim();
     if (text.isEmpty) {
-      Navigator.of(context).pop(null);
+      Navigator.of(context).pop<(double?,)>((null,));
       return;
     }
     final cleaned = text.replaceAll(',', '.');
@@ -59,7 +59,7 @@ class _NumberEditorSheetState extends State<NumberEditorSheet> {
       ).showSnackBar(SnackBar(content: Text(loc.nutritionInvalidNumber)));
       return;
     }
-    Navigator.of(context).pop(parsed);
+    Navigator.of(context).pop<(double?,)>((parsed,));
   }
 
   @override
