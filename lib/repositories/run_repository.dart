@@ -668,9 +668,16 @@ class RunRepository extends BaseRepository {
         .toList();
 
     final now = DateTime.now();
+    // Native spools carry UTC instants (`...Z`); everything stored or
+    // displayed by the app is local wall-clock time.
     final startedAt =
-        DateTime.tryParse(rawActivity['started_at'] as String? ?? '') ?? now;
-    final endedAt = DateTime.tryParse(rawActivity['ended_at'] as String? ?? '');
+        DateTime.tryParse(
+          rawActivity['started_at'] as String? ?? '',
+        )?.toLocal() ??
+        now;
+    final endedAt = DateTime.tryParse(
+      rawActivity['ended_at'] as String? ?? '',
+    )?.toLocal();
     final status = rawActivity['status'] as String? ?? 'completed';
     final activityType = CardioActivityType.fromDatabase(
       rawActivity['activity_type'],
@@ -721,7 +728,9 @@ class RunRepository extends BaseRepository {
           accuracy: (row['accuracy'] as num?)?.toDouble(),
           speed: (row['speed'] as num?)?.toDouble(),
           recordedAt:
-              DateTime.tryParse(row['recorded_at'] as String? ?? '') ??
+              DateTime.tryParse(
+                row['recorded_at'] as String? ?? '',
+              )?.toLocal() ??
               startedAt.add(Duration(seconds: i)),
         ),
       );

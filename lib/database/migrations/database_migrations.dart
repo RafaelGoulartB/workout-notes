@@ -231,6 +231,9 @@ abstract final class DatabaseMigrations {
     if (step(56)) {
       await _upgradeToV56(db);
     }
+    if (step(57)) {
+      await normalizeRunTimestamps(db);
+    }
   }
 
   /// Statements that create the v56 indexes. Also used by `onCreate`.
@@ -276,6 +279,50 @@ abstract final class DatabaseMigrations {
     ]) {
       await db.execute(sql);
     }
+  }
+
+  /// Columns of `run_activities` that native spools used to import as UTC
+  /// instants (`...Z`).
+  static const List<String> _runTimestampColumns = [
+    'started_at',
+    'ended_at',
+    'created_at',
+    'updated_at',
+  ];
+
+  /// Rewrites UTC run timestamps as local wall-clock ISO strings without an
+  /// offset, the format used by every other date in the app. Day attribution
+  /// relies on `yyyy-MM-dd` prefixes and string ranges, so a 21:30 run in
+  /// UTC-3 (stored `...T00:30Z`) used to land on the next day. The conversion
+  /// runs in Dart because SQLite cannot know the device time zone.
+  ///
+  /// Also applied to restored backups, which may predate the fix.
+  static Future<void> normalizeRunTimestamps(DatabaseExecutor db) async {
+    final rows = await db.query(
+      'run_activities',
+      columns: ['id', ..._runTimestampColumns],
+      where: _runTimestampColumns.map((c) => "$c LIKE '%Z'").join(' OR '),
+    );
+    if (rows.isEmpty) return;
+    final batch = db.batch();
+    for (final row in rows) {
+      final values = <String, Object?>{};
+      for (final column in _runTimestampColumns) {
+        final text = row[column] as String?;
+        if (text == null || !text.endsWith('Z')) continue;
+        final parsed = DateTime.tryParse(text);
+        if (parsed == null) continue;
+        values[column] = parsed.toLocal().toIso8601String();
+      }
+      if (values.isEmpty) continue;
+      batch.update(
+        'run_activities',
+        values,
+        where: 'id = ?',
+        whereArgs: [row['id']],
+      );
+    }
+    await batch.commit(noResult: true);
   }
 
   /// Runs one idempotent migration statement.

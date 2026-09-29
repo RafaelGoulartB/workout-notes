@@ -2,6 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:workout_notes/models/cardio_activity_type.dart';
+import 'package:workout_notes/models/goal.dart';
+import 'package:workout_notes/repositories/goal_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'support/test_db.dart';
 
@@ -161,5 +163,80 @@ void main() {
       row['point_count'] as int,
       lessThan(row['original_point_count'] as int),
     );
+  });
+
+  group('local day attribution of native (UTC) timestamps', () {
+    // 21:30 local imported as a UTC instant: in UTC-3 that is 00:30Z of the
+    // next day, which used to be filed under the wrong calendar day.
+    Map<String, dynamic> eveningSpool(String id, DateTime localStart) => {
+      'activity': {
+        'id': id,
+        'status': 'completed',
+        'started_at': localStart.toUtc().toIso8601String(),
+        'ended_at': localStart
+            .add(const Duration(minutes: 30))
+            .toUtc()
+            .toIso8601String(),
+        'duration_seconds': 1800,
+        'moving_time_seconds': 1800,
+        'distance_meters': 5000.0,
+      },
+      'points': const <Map<String, dynamic>>[],
+    };
+
+    test('stores local ISO strings without an offset', () async {
+      final start = DateTime(2026, 5, 10, 21, 30);
+      final imported = await repository.importNativeSpool(
+        eveningSpool('evening', start),
+      );
+      expect(imported.startedAt, start);
+      expect(imported.startedAt.isUtc, isFalse);
+
+      final row = (await database.query(
+        'run_activities',
+        where: 'id = ?',
+        whereArgs: ['evening'],
+      )).single;
+      expect(row['started_at'], start.toIso8601String());
+      expect(row['ended_at'], DateTime(2026, 5, 10, 22).toIso8601String());
+      expect(row['started_at'], isNot(endsWith('Z')));
+    });
+
+    test('a 21:30 run belongs to that local day in the calendar', () async {
+      await repository.importNativeSpool(
+        eveningSpool('evening', DateTime(2026, 5, 10, 21, 30)),
+      );
+      final byDay = await repository.getActivitiesByMonth(2026, 5);
+      expect(byDay.keys, ['2026-05-10']);
+      final range = await repository.listActivities(
+        startedFrom: DateTime(2026, 5, 10),
+        startedBefore: DateTime(2026, 5, 11),
+      );
+      expect(range.map((a) => a.id), ['evening']);
+    });
+
+    test('goal contributions use the local day of the run', () async {
+      final today = DateTime.now();
+      final start = DateTime(today.year, today.month, today.day, 21, 30);
+      await repository.importNativeSpool(eveningSpool('evening', start));
+      final goal = Goal(
+        id: 'g',
+        title: 'Cardio',
+        scope: GoalScope.aerobic,
+        metric: GoalMetric.days,
+        period: GoalPeriod.weekly,
+        targetValue: 3,
+        createdAt: today,
+      );
+      final contributions = await GoalRepository().getContributingWorkouts(
+        goal,
+      );
+      expect(contributions.map((c) => c.workoutId), contains('evening'));
+      final key = start.toIso8601String().substring(0, 10);
+      expect(
+        contributions.firstWhere((c) => c.workoutId == 'evening').date,
+        key,
+      );
+    });
   });
 }
