@@ -1,4 +1,5 @@
 import '../database/database_helper.dart';
+import 'package:workout_notes/services/ai_tool_math.dart';
 
 /// Read-only, AI-facing workout queries.
 ///
@@ -196,7 +197,7 @@ class AiWorkoutToolService {
         'totalReps': totalReps,
         'totalDistance': totalDistance,
         'exerciseTimeSeconds': exerciseTimeSeconds,
-        'averageRpe': _average(rpes),
+        'averageRpe': AiToolMath.average(rpes),
       },
       'exercises': byEntry.values.toList(),
     };
@@ -285,7 +286,7 @@ class AiWorkoutToolService {
       'filters': {'startDate': startDate, 'endDate': endDate},
       'sessionCount': sessions.length,
       'totalSets': allSets.length,
-      'avgWeight': _average(weights),
+      'avgWeight': AiToolMath.average(weights),
       'avgReps': reps.isEmpty
           ? null
           : reps.reduce((a, b) => a + b) / reps.length,
@@ -386,14 +387,14 @@ class AiWorkoutToolService {
     final history = await exerciseHistory(
       exerciseId,
       limit: 1000,
-      startDate: _date(start),
-      endDate: _date(end),
+      startDate: AiToolMath.isoDay(start),
+      endDate: AiToolMath.isoDay(end),
     );
     return {
       'exerciseId': exerciseId,
       'weeksBack': weeks,
-      'startDate': _date(start),
-      'endDate': _date(end),
+      'startDate': AiToolMath.isoDay(start),
+      'endDate': AiToolMath.isoDay(end),
       'dataPoints': history['history'],
       'sessionCount': history['sessionCount'],
     };
@@ -417,13 +418,13 @@ class AiWorkoutToolService {
         AND s.is_complete = 1 AND s.is_warmup = 0
       ORDER BY w.date ASC
     ''',
-      [_date(firstMonday), _date(today)],
+      [AiToolMath.isoDay(firstMonday), AiToolMath.isoDay(today)],
     );
     final buckets = <String, Map<String, Map<String, dynamic>>>{};
     for (final row in rows) {
       final date = DateTime.parse(row['date'] as String);
       final monday = date.subtract(Duration(days: date.weekday - 1));
-      final weekKey = _date(monday);
+      final weekKey = AiToolMath.isoDay(monday);
       final categoryId = row['category_id'] as String;
       final category = buckets
           .putIfAbsent(weekKey, () => {})
@@ -456,9 +457,10 @@ class AiWorkoutToolService {
     for (var offset = weeks - 1; offset >= 0; offset--) {
       final start = currentMonday.subtract(Duration(days: offset * 7));
       output.add({
-        'startDate': _date(start),
-        'endDate': _date(start.add(const Duration(days: 6))),
-        'categories': buckets[_date(start)]?.values.toList() ?? const [],
+        'startDate': AiToolMath.isoDay(start),
+        'endDate': AiToolMath.isoDay(start.add(const Duration(days: 6))),
+        'categories':
+            buckets[AiToolMath.isoDay(start)]?.values.toList() ?? const [],
       });
     }
     return {'weeksBack': weeks, 'weeks': output};
@@ -589,7 +591,7 @@ class AiWorkoutToolService {
         AND (COALESCE(s.distance, 0) > 0 OR COALESCE(s.time_seconds, 0) > 0)
       ORDER BY w.date ASC
     ''',
-      [_date(start), _date(end)],
+      [AiToolMath.isoDay(start), AiToolMath.isoDay(end)],
     );
     final modalities = <String, Map<String, dynamic>>{};
     final sessions = <Map<String, dynamic>>[];
@@ -644,8 +646,8 @@ class AiWorkoutToolService {
     }).toList();
     return {
       'weeksBack': weeks,
-      'startDate': _date(start),
-      'endDate': _date(end),
+      'startDate': AiToolMath.isoDay(start),
+      'endDate': AiToolMath.isoDay(end),
       'byModality': byModality,
       'sessions': sessions,
     };
@@ -738,7 +740,7 @@ class AiWorkoutToolService {
     }
     return sessions.values.map((session) {
       final rpes = session.remove('rpeValues') as List<double>;
-      session['averageRpe'] = _average(rpes);
+      session['averageRpe'] = AiToolMath.average(rpes);
       return session;
     }).toList();
   }
@@ -783,13 +785,6 @@ class AiWorkoutToolService {
     if (workout['start_time'] != null) return 'in_progress';
     return 'planned';
   }
-
-  double? _average(Iterable<double> values) {
-    if (values.isEmpty) return null;
-    return values.reduce((a, b) => a + b) / values.length;
-  }
-
-  String _date(DateTime date) => date.toIso8601String().substring(0, 10);
 }
 
 class _RecordCandidate {

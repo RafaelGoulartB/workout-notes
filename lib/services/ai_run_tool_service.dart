@@ -9,6 +9,7 @@ import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/utils/run_achievement_engine.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
+import 'package:workout_notes/services/ai_tool_math.dart';
 
 /// Read-only, AI-facing access to recorded cardio activities and running plans.
 ///
@@ -49,12 +50,12 @@ class AiRunToolService {
     }
     if (startDate != null) {
       where.add('started_at >= ?');
-      args.add('${_date(DateTime.parse(startDate))}T00:00:00');
+      args.add('${AiToolMath.isoDay(DateTime.parse(startDate))}T00:00:00');
     }
     if (endDate != null) {
       where.add('started_at < ?');
       args.add(
-        '${_date(DateTime.parse(endDate).add(const Duration(days: 1)))}T00:00:00',
+        '${AiToolMath.isoDay(DateTime.parse(endDate).add(const Duration(days: 1)))}T00:00:00',
       );
     }
     final whereSql = where.join(' AND ');
@@ -171,7 +172,7 @@ class AiRunToolService {
           ? null
           : {
               'id': scheduled.id,
-              'date': _date(scheduled.date),
+              'date': AiToolMath.isoDay(scheduled.date),
               'status': scheduled.status.value,
               'notes': scheduled.notes,
             },
@@ -218,8 +219,8 @@ class AiRunToolService {
     }
     return {
       'weeksBack': weeks,
-      'startDate': _date(start),
-      'endDate': _date(end),
+      'startDate': AiToolMath.isoDay(start),
+      'endDate': AiToolMath.isoDay(end),
       'recordedActivities': recent.length,
       'byActivityType': [
         for (final entry in byType.entries) _aggregate(entry.key, entry.value),
@@ -250,7 +251,7 @@ class AiRunToolService {
       'period': period,
       'periodStart': stats.periodStart == null
           ? null
-          : _date(stats.periodStart!),
+          : AiToolMath.isoDay(stats.periodStart!),
       'runCount': stats.runCount,
       'totalDistanceMeters': stats.totalDistanceMeters,
       'totalMovingTimeSeconds': stats.totalMovingTimeSeconds,
@@ -280,7 +281,7 @@ class AiRunToolService {
       'weeklyTrend': [
         for (final week in stats.weeklyBuckets)
           {
-            'weekStart': _date(week.weekStart),
+            'weekStart': AiToolMath.isoDay(week.weekStart),
             'runs': week.runCount,
             'distanceMeters': week.distanceMeters,
             'movingTimeSeconds': week.movingTimeSeconds,
@@ -289,7 +290,7 @@ class AiRunToolService {
       'paceTrend': [
         for (final point in stats.paceTrend)
           {
-            'date': _date(point.date),
+            'date': AiToolMath.isoDay(point.date),
             'paceSecPerKm': point.paceSecPerKm,
             'distanceMeters': point.distanceMeters,
           },
@@ -312,7 +313,7 @@ class AiRunToolService {
                 {
                   'place': placement.tier.place,
                   'activityId': placement.activity.id,
-                  'date': _date(placement.activity.startedAt),
+                  'date': AiToolMath.isoDay(placement.activity.startedAt),
                   'value': placement.value,
                   'formattedValue': RunAchievementEngine.formatValue(
                     placement.kind,
@@ -423,13 +424,13 @@ class AiRunToolService {
       }
     }
     return {
-      'startDate': _date(start),
-      'endDate': _date(end),
+      'startDate': AiToolMath.isoDay(start),
+      'endDate': AiToolMath.isoDay(end),
       'scheduledRuns': [
         for (final run in scheduled)
           {
             'id': run.id,
-            'date': _date(run.date),
+            'date': AiToolMath.isoDay(run.date),
             'status': run.status.value,
             'runPlanId': run.runPlanId,
             'runPlanName': planCache[run.runPlanId]?.name,
@@ -534,11 +535,15 @@ class AiRunToolService {
     'weeks': plan.weeks,
     'status': plan.status.value,
     'isActivated': plan.isActivated,
-    'activatedAt': plan.activatedAt == null ? null : _date(plan.activatedAt!),
+    'activatedAt': plan.activatedAt == null
+        ? null
+        : AiToolMath.isoDay(plan.activatedAt!),
     'currentWeek': plan.activeWeekIndexOn(_now()) == null
         ? null
         : plan.activeWeekIndexOn(_now())! + 1,
-    'raceDate': plan.raceDate == null ? null : _date(plan.raceDate!),
+    'raceDate': plan.raceDate == null
+        ? null
+        : AiToolMath.isoDay(plan.raceDate!),
     'completionCount': plan.completionCount,
     'progress': {
       'totalSessions': progress.totalSessions,
@@ -577,10 +582,4 @@ class AiRunToolService {
         },
     ],
   };
-
-  static String _date(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
 }

@@ -1,6 +1,7 @@
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/services/sleep_goal_service.dart';
+import 'package:workout_notes/services/ai_tool_math.dart';
 
 /// Read-only sleep queries exposed to the AI Coach.
 ///
@@ -16,7 +17,9 @@ class AiSleepToolService {
       _now = now ?? DateTime.now;
 
   Future<Map<String, dynamic>> nightDetail({String? date}) async {
-    final resolvedDate = _validatedDate(date ?? _date(_now()));
+    final resolvedDate = AiToolMath.validatedIsoDate(
+      date ?? AiToolMath.isoDay(_now()),
+    );
     final database = await db.database;
     final entries = await database.query(
       'sleep_entries',
@@ -71,7 +74,7 @@ class AiSleepToolService {
         'deepSleepMinutes': session?['deep_sleep_minutes'],
         'unknownMinutes': session?['unknown_minutes'],
         'awakeningCount': session?['awakening_count'],
-        'efficiencyPct': _roundOrNull(
+        'efficiencyPct': AiToolMath.round1OrNull(
           (session?['sleep_efficiency'] as num?)?.toDouble() ??
               computedEfficiency,
         ),
@@ -119,9 +122,11 @@ class AiSleepToolService {
   Future<Map<String, dynamic>> history({int days = 30, String? endDate}) async {
     days = days.clamp(1, 31);
     final database = await db.database;
-    final end = _validatedDate(endDate ?? _date(_now()));
+    final end = AiToolMath.validatedIsoDate(
+      endDate ?? AiToolMath.isoDay(_now()),
+    );
     final endDay = DateTime.parse(end);
-    final start = _date(endDay.subtract(Duration(days: days - 1)));
+    final start = AiToolMath.isoDay(endDay.subtract(Duration(days: days - 1)));
     final entries = await database.query(
       'sleep_entries',
       where: 'date BETWEEN ? AND ?',
@@ -140,9 +145,9 @@ class AiSleepToolService {
       'endDate': end,
       'windowDays': days,
       'recordedNights': nights.length,
-      'coveragePct': _round(nights.length / days * 100),
+      'coveragePct': AiToolMath.round1(nights.length / days * 100),
       'nights': nights,
-      'previousEndDate': _date(
+      'previousEndDate': AiToolMath.isoDay(
         DateTime.parse(start).subtract(const Duration(days: 1)),
       ),
       'dataSemantics':
@@ -165,7 +170,9 @@ class AiSleepToolService {
     final goalMinutes = SleepGoalService.normalize(
       rawGoal ?? SleepGoalService.defaultGoalMinutes,
     );
-    final start30 = _date(_now().subtract(const Duration(days: 29)));
+    final start30 = AiToolMath.isoDay(
+      _now().subtract(const Duration(days: 29)),
+    );
 
     return {
       'dailyGoalMinutes': goalMinutes,
@@ -212,7 +219,7 @@ class AiSleepToolService {
       'wakeTimeMinutesAfterMidnight': entry['wake_time_minutes'],
       'wakeTimeLocal': _clock(entry['wake_time_minutes']),
       'timeInBedMinutes': timeInBed?.toInt(),
-      'efficiencyPct': _roundOrNull(
+      'efficiencyPct': AiToolMath.round1OrNull(
         (session?['sleep_efficiency'] as num?)?.toDouble() ??
             _efficiency(duration.effectiveMinutes, timeInBed?.toDouble()),
       ),
@@ -267,14 +274,14 @@ class AiSleepToolService {
       'stageAvailableNights': stageAvailable,
       'stageCoveragePct': monitored == 0
           ? 0.0
-          : _round(stageAvailable / monitored * 100),
-      'averageSleepMinutes': _roundOrNull(average),
+          : AiToolMath.round1(stageAvailable / monitored * 100),
+      'averageSleepMinutes': AiToolMath.round1OrNull(average),
       'differenceFromGoalMinutes': average == null
           ? null
-          : _round(average - goalMinutes),
+          : AiToolMath.round1(average - goalMinutes),
       'goalAchievementPct': average == null
           ? null
-          : _round(average / goalMinutes * 100),
+          : AiToolMath.round1(average / goalMinutes * 100),
       'nightsMeetingGoal': (row['nights_meeting_goal'] as num?)?.toInt() ?? 0,
     };
   }
@@ -341,25 +348,6 @@ class AiSleepToolService {
     final minute = normalized % 60;
     return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
   }
-
-  static String _validatedDate(String value) {
-    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)) {
-      throw const FormatException('date must use YYYY-MM-DD');
-    }
-    final parsed = DateTime.tryParse(value);
-    if (parsed == null || _date(parsed) != value) {
-      throw const FormatException('date is invalid');
-    }
-    return value;
-  }
-
-  static String _date(DateTime value) =>
-      value.toIso8601String().substring(0, 10);
-
-  static double _round(double value) => (value * 10).round() / 10;
-
-  static double? _roundOrNull(double? value) =>
-      value == null ? null : _round(value);
 }
 
 class _ResolvedDuration {

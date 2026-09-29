@@ -6,6 +6,7 @@ import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
+import 'package:workout_notes/services/ai_tool_math.dart';
 
 /// Read-only nutrition queries exposed to the AI Coach.
 ///
@@ -30,7 +31,9 @@ class AiNutritionToolService {
        _now = now ?? DateTime.now;
 
   Future<Map<String, dynamic>> diaryDay({String? date}) async {
-    final resolvedDate = _validatedDate(date ?? _date(_now()));
+    final resolvedDate = AiToolMath.validatedIsoDate(
+      date ?? AiToolMath.isoDay(_now()),
+    );
     final database = await db.database;
     final logs = await database.query(
       'meal_logs',
@@ -82,9 +85,11 @@ class AiNutritionToolService {
   Future<Map<String, dynamic>> history({int days = 30, String? endDate}) async {
     days = days.clamp(1, 31);
     final database = await db.database;
-    final end = _validatedDate(endDate ?? _date(_now()));
+    final end = AiToolMath.validatedIsoDate(
+      endDate ?? AiToolMath.isoDay(_now()),
+    );
     final endDay = DateTime.parse(end);
-    final start = _date(endDay.subtract(Duration(days: days - 1)));
+    final start = AiToolMath.isoDay(endDay.subtract(Duration(days: days - 1)));
     final rows = await database.rawQuery(
       '''
       SELECT ml.date, mli.*
@@ -114,7 +119,7 @@ class AiNutritionToolService {
       'endDate': end,
       'windowDays': days,
       'loggedDays': daily.length,
-      'coveragePct': _round(daily.length / days * 100),
+      'coveragePct': AiToolMath.round1(daily.length / days * 100),
       'days': daily,
       'nullSemantics':
           'missing days are absent; null nutrients were not reported and are not zero',
@@ -124,8 +129,8 @@ class AiNutritionToolService {
   Future<Map<String, dynamic>> micronutrientSummary({int days = 30}) async {
     days = days.clamp(1, 90);
     final database = await db.database;
-    final end = _date(_now());
-    final start = _date(_now().subtract(Duration(days: days - 1)));
+    final end = AiToolMath.isoDay(_now());
+    final start = AiToolMath.isoDay(_now().subtract(Duration(days: days - 1)));
     final rows = await database.rawQuery(
       '''
       SELECT ml.date, mli.food_name_snapshot, mli.brand_snapshot,
@@ -168,31 +173,33 @@ class AiNutritionToolService {
         ..sort((a, b) => b.total.compareTo(a.total));
       nutrients[field.$2] = {
         'unit': field.$3,
-        'totalFromReportedValues': totals.isEmpty ? null : _round(total),
+        'totalFromReportedValues': totals.isEmpty
+            ? null
+            : AiToolMath.round1(total),
         'averageOnReportedDays': totals.isEmpty
             ? null
-            : _round(total / totals.length),
+            : AiToolMath.round1(total / totals.length),
         'minimumReportedDay': totals.isEmpty
             ? null
-            : _round(totals.reduce((a, b) => a < b ? a : b)),
+            : AiToolMath.round1(totals.reduce((a, b) => a < b ? a : b)),
         'maximumReportedDay': totals.isEmpty
             ? null
-            : _round(totals.reduce((a, b) => a > b ? a : b)),
+            : AiToolMath.round1(totals.reduce((a, b) => a > b ? a : b)),
         'reportedDays': totals.length,
         'dayCoveragePct': loggedDays.isEmpty
             ? 0.0
-            : _round(totals.length / loggedDays.length * 100),
+            : AiToolMath.round1(totals.length / loggedDays.length * 100),
         'reportedItems': reportedItems,
         'itemCoveragePct': rows.isEmpty
             ? 0.0
-            : _round(reportedItems / rows.length * 100),
+            : AiToolMath.round1(reportedItems / rows.length * 100),
         'topFoodSources': topSources
             .take(3)
             .map(
               (source) => {
                 'name': source.name,
                 'brand': source.brand,
-                'total': _round(source.total),
+                'total': AiToolMath.round1(source.total),
               },
             )
             .toList(),
@@ -534,7 +541,7 @@ class AiNutritionToolService {
         seen = true;
         sum += value;
       }
-      result[field.$2] = seen ? _round(sum) : null;
+      result[field.$2] = seen ? AiToolMath.round1(sum) : null;
     }
     return result;
   }
@@ -546,7 +553,9 @@ class AiNutritionToolService {
       fields[field.$2] = {
         'reportedItems': reported,
         'totalItems': rows.length,
-        'pct': rows.isEmpty ? 0.0 : _round(reported / rows.length * 100),
+        'pct': rows.isEmpty
+            ? 0.0
+            : AiToolMath.round1(reported / rows.length * 100),
       };
     }
     return {'byNutrient': fields};
@@ -556,7 +565,7 @@ class AiNutritionToolService {
     for (final field in _allNutrients)
       field.$2: rows.isEmpty
           ? 0.0
-          : _round(
+          : AiToolMath.round1(
               rows.where((row) => row[field.$1] != null).length /
                   rows.length *
                   100,
@@ -582,22 +591,6 @@ class AiNutritionToolService {
       return null;
     }
   }
-
-  static String _validatedDate(String value) {
-    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)) {
-      throw const FormatException('date must use YYYY-MM-DD');
-    }
-    final parsed = DateTime.tryParse(value);
-    if (parsed == null || _date(parsed) != value) {
-      throw const FormatException('date is invalid');
-    }
-    return value;
-  }
-
-  static String _date(DateTime value) =>
-      value.toIso8601String().substring(0, 10);
-
-  static double _round(double value) => (value * 10).round() / 10;
 
   static double? _doubleOrNull(String? value) =>
       value == null ? null : double.tryParse(value);
