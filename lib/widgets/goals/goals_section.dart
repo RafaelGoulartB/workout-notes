@@ -7,8 +7,9 @@ import 'package:workout_notes/repositories/settings_repository.dart';
 import 'package:workout_notes/screens/workout/goal_detail_screen.dart';
 import 'package:workout_notes/widgets/goals/goal_card.dart';
 import 'package:workout_notes/widgets/goals/goal_form_sheet.dart';
+import 'package:workout_notes/widgets/run/run_ui.dart';
 
-/// Renders goals as a vertical list with an add action.
+/// Goals card: one divided row per goal and an add row at the end.
 class GoalsSection extends StatefulWidget {
   final DatabaseHelper db;
   final SettingsRepository settingsRepo;
@@ -21,12 +22,16 @@ class GoalsSection extends StatefulWidget {
   /// screen can show a summary next to its section header.
   final void Function(int achieved, int total)? onSummaryChanged;
 
+  /// Wraps the list in its own card; turn off when the host already is one.
+  final bool framed;
+
   const GoalsSection({
     super.key,
     required this.db,
     required this.settingsRepo,
     this.allowedScopes = const [GoalScope.anaerobic, GoalScope.aerobic],
     this.onSummaryChanged,
+    this.framed = true,
   });
 
   @override
@@ -115,7 +120,9 @@ class _GoalsSectionState extends State<GoalsSection> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AppLocalizations.of(context)!.commonError(e.toString())),
+          content: Text(
+            AppLocalizations.of(context)!.commonError(e.toString()),
+          ),
         ),
       );
     }
@@ -140,7 +147,9 @@ class _GoalsSectionState extends State<GoalsSection> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AppLocalizations.of(context)!.commonError(e.toString())),
+          content: Text(
+            AppLocalizations.of(context)!.commonError(e.toString()),
+          ),
         ),
       );
     }
@@ -174,9 +183,9 @@ class _GoalsSectionState extends State<GoalsSection> {
     if (confirm != true) return;
     await _goalRepo.delete(goal.id);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(loc.goalDeleted)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(loc.goalDeleted)));
     await _load();
   }
 
@@ -208,91 +217,96 @@ class _GoalsSectionState extends State<GoalsSection> {
       );
     }
 
-    if (_goals.isEmpty) {
-      return _buildEmpty(theme, loc);
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i < _goals.length; i++) ...[
-          if (i > 0) const SizedBox(height: 8),
-          GoalCard(
-            goal: _goals[i],
-            progress: _progressByGoal[_goals[i].id] ??
-                GoalProgress.empty(DateTime.now()),
-            isKm: _isKm,
-            onTap: () => _openDetail(_goals[i]),
-            onEdit: () => _editGoal(_goals[i]),
-            onTogglePause: () => _togglePause(_goals[i]),
-            onDelete: () => _deleteGoal(_goals[i]),
-          ),
-        ],
-        const SizedBox(height: 4),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: _addGoal,
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              minimumSize: const Size(0, 36),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    final colors = theme.colorScheme;
+    final addRow = InkWell(
+      onTap: _addGoal,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 44,
+              child: Icon(Icons.add_rounded, size: 22, color: colors.primary),
             ),
-            icon: const Icon(Icons.add, size: 18),
-            label: Text(loc.goalGridAdd),
-          ),
+            const SizedBox(width: 12),
+            Text(
+              loc.goalGridAdd,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: colors.primary,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
+    );
+
+    final list = _goals.isEmpty
+        ? _buildEmpty(theme, loc)
+        : RunDividedList(
+            children: [
+              for (final goal in _goals)
+                GoalCard(
+                  goal: goal,
+                  progress:
+                      _progressByGoal[goal.id] ??
+                      GoalProgress.empty(DateTime.now()),
+                  isKm: _isKm,
+                  onTap: () => _openDetail(goal),
+                  onEdit: () => _editGoal(goal),
+                  onTogglePause: () => _togglePause(goal),
+                  onDelete: () => _deleteGoal(goal),
+                ),
+              addRow,
+            ],
+          );
+
+    if (!widget.framed) return list;
+    return RunSectionCard(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      child: list,
     );
   }
 
   Widget _buildEmpty(ThemeData theme, AppLocalizations loc) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withAlpha(80),
+    final colors = theme.colorScheme;
+    return InkWell(
+      onTap: _addGoal,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+        child: Row(
+          children: [
+            const RunIconBadge(Icons.flag_outlined, size: 44, iconSize: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    loc.goalEmpty,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    loc.goalEmptyRowSubtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              onPressed: _addGoal,
+              tooltip: loc.goalGridAdd,
+              icon: const Icon(Icons.add_rounded),
+            ),
+          ],
         ),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withAlpha(28),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.flag_outlined,
-              size: 28,
-              color: theme.colorScheme.primary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            loc.goalEmpty,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            loc.goalEmptySubtitle,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 14),
-          FilledButton.tonalIcon(
-            onPressed: _addGoal,
-            icon: const Icon(Icons.add, size: 18),
-            label: Text(loc.goalGridAdd),
-          ),
-        ],
       ),
     );
   }

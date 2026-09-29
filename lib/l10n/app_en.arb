@@ -3930,5 +3930,15 @@
   "workoutHomeLegendPlanned": "Planned",
   "activeWorkoutTimerNotStarted": "Not started",
   "activeWorkoutSetsProgress": "{done}/{total}",
-  "@activeWorkoutSetsProgress": {"placeholders": {"done": {"type": "int"}, "total": {"type": "int"}}}
+  "@activeWorkoutSetsProgress": {"placeholders": {"done": {"type": "int"}, "total": {"type": "int"}}},
+  "goalStatusOnTrack": "On track",
+  "goalStatusBehind": "Behind",
+  "goalStatusDone": "Done",
+  "goalStatusPaused": "Paused",
+  "goalRowLeft": "{value} to go",
+  "@goalRowLeft": {"placeholders": {"value": {"type": "String"}}},
+  "goalRowDaysUnit": "days",
+  "goalEmptyRowSubtitle": "Set a weekly or monthly target",
+  "goalRowLeftDays": "{count, plural, =1{1 day to go} other{{count} days to go}}",
+  "@goalRowLeftDays": {"placeholders": {"count": {"type": "int"}}}
 }

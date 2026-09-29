@@ -3752,5 +3752,13 @@
   "workoutHomeLegendDone": "Feito",
   "workoutHomeLegendPlanned": "Planejado",
   "activeWorkoutTimerNotStarted": "Não iniciado",
-  "activeWorkoutSetsProgress": "{done}/{total}"
+  "activeWorkoutSetsProgress": "{done}/{total}",
+  "goalStatusOnTrack": "No ritmo",
+  "goalStatusBehind": "Atrasada",
+  "goalStatusDone": "Batida",
+  "goalStatusPaused": "Pausada",
+  "goalRowLeft": "faltam {value}",
+  "goalRowDaysUnit": "dias",
+  "goalEmptyRowSubtitle": "Defina um alvo semanal ou mensal",
+  "goalRowLeftDays": "{count, plural, =1{falta 1 dia} other{faltam {count} dias}}"
 }

@@ -74,6 +74,7 @@ class _StrengthGoalsCardState extends State<StrengthGoalsCard> {
         db: DatabaseHelper.instance,
         settingsRepo: DatabaseHelper.instance.settingsRepo,
         allowedScopes: const [GoalScope.anaerobic],
+        framed: false,
         onSummaryChanged: (achieved, total) {
           if (!mounted || (achieved == _achieved && total == _total)) return;
           setState(() {
