@@ -137,4 +137,41 @@ void main() {
       expect(events.single.remainingSeconds, 10);
     });
   });
+
+  group('skip and preview', () {
+    RunIntervalEngine engine3() => RunIntervalEngine(
+      preset: const RunIntervalPreset(
+        workMetric: RunIntervalMetric.distance,
+        workValue: 400,
+        restMetric: RunIntervalMetric.time,
+        restValue: 60,
+        repeats: 2,
+      ),
+    );
+
+    test('skip ends the phase and starts the next one', () {
+      final engine = engine3()..start();
+      expect(engine.snapshot.nextPhase, RunIntervalPhase.rest);
+      expect(engine.snapshot.nextMetric, RunIntervalMetric.time);
+      expect(engine.snapshot.nextTarget, 60);
+
+      expect(engine.skip().single.kind, RunIntervalEventKind.restStarted);
+      expect(engine.snapshot.phase, RunIntervalPhase.rest);
+      expect(engine.snapshot.nextPhase, RunIntervalPhase.work);
+      expect(engine.snapshot.nextTarget, 400);
+
+      expect(engine.skip().single.kind, RunIntervalEventKind.workStarted);
+      expect(engine.snapshot.workIndex, 2);
+      // Last work rep: nothing follows it.
+      expect(engine.snapshot.nextPhase, isNull);
+
+      expect(engine.skip().single.kind, RunIntervalEventKind.completed);
+      expect(engine.snapshot.phase, RunIntervalPhase.done);
+      expect(engine.skip(), isEmpty);
+    });
+
+    test('skip is a no-op while idle', () {
+      expect(engine3().skip(), isEmpty);
+    });
+  });
 }

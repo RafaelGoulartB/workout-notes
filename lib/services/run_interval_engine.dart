@@ -11,6 +11,12 @@ class RunIntervalSnapshot {
   final RunIntervalMetric currentMetric;
   final int currentTarget;
 
+  /// What follows the running phase ("up next" preview); null when the set
+  /// ends here.
+  final RunIntervalPhase? nextPhase;
+  final RunIntervalMetric? nextMetric;
+  final int? nextTarget;
+
   const RunIntervalSnapshot({
     required this.phase,
     required this.workIndex,
@@ -19,6 +25,9 @@ class RunIntervalSnapshot {
     required this.remaining,
     required this.currentMetric,
     required this.currentTarget,
+    this.nextPhase,
+    this.nextMetric,
+    this.nextTarget,
   });
 
   const RunIntervalSnapshot.idle()
@@ -105,7 +114,43 @@ class RunIntervalEngine {
       remaining: (target - _phaseAccum).clamp(0.0, target),
       currentMetric: metric,
       currentTarget: target.round(),
+      nextPhase: _nextPhase(),
+      nextMetric: _nextMetric(),
+      nextTarget: _nextTarget(),
     );
+  }
+
+  RunIntervalPhase? _nextPhase() {
+    if (_phase == RunIntervalPhase.work) {
+      if (_workIndex >= _preset.repeats) return null;
+      return _preset.restValue > 0
+          ? RunIntervalPhase.rest
+          : RunIntervalPhase.work;
+    }
+    if (_phase == RunIntervalPhase.rest) {
+      return _workIndex >= _preset.repeats ? null : RunIntervalPhase.work;
+    }
+    return null;
+  }
+
+  RunIntervalMetric? _nextMetric() => switch (_nextPhase()) {
+    RunIntervalPhase.work => _preset.workMetric,
+    RunIntervalPhase.rest => _preset.restMetric,
+    _ => null,
+  };
+
+  int? _nextTarget() => switch (_nextPhase()) {
+    RunIntervalPhase.work => _preset.workValue,
+    RunIntervalPhase.rest => _preset.restValue,
+    _ => null,
+  };
+
+  /// Ends the current work/rest phase right now ("skip step").
+  List<RunIntervalEvent> skip() {
+    if (_phase != RunIntervalPhase.work && _phase != RunIntervalPhase.rest) {
+      return const [];
+    }
+    return _advancePhase();
   }
 
   /// Starts the first work segment. Returns start event or empty.

@@ -122,6 +122,12 @@ class RunIntervalEngineNative(
         return events
     }
 
+    /** Ends the current work/rest phase now ("skip step"). */
+    fun skip(): List<RunIntervalEvent> {
+        if (phase != RunIntervalPhase.work && phase != RunIntervalPhase.rest) return emptyList()
+        return advancePhase()
+    }
+
     private fun advancePhase(): List<RunIntervalEvent> {
         val events = mutableListOf<RunIntervalEvent>()
         if (phase == RunIntervalPhase.work) {

@@ -163,6 +163,27 @@ class RunVoicePhrases {
 
   String resumed() => _pt ? 'Corrida retomada.' : 'Resumed.';
 
+  String autoPaused() => _pt ? 'Pausa automática.' : 'Auto paused.';
+
+  String autoResumed() => _pt ? 'Retomando.' : 'Resuming.';
+
+  String lapSummary({
+    required int index,
+    required double distanceMeters,
+    required int durationSeconds,
+    required double? paceSecPerKm,
+  }) {
+    final head = _pt ? 'Volta $index.' : 'Lap $index.';
+    final distance = distanceMeters >= 1
+        ? ' ${_distanceSpeech(distanceMeters.toInt())}.'
+        : '';
+    final time = ' ${_durationSpeech(durationSeconds)}.';
+    final pace = _validPace(paceSecPerKm)
+        ? ' Pace ${_paceSpeech(paceSecPerKm!)}.'
+        : '';
+    return '$head$distance$time$pace';
+  }
+
   String testAnnouncement() => _pt
       ? 'Áudio do treinador pronto. Pace de 5 minutos e 30 segundos por quilômetro.'
       : 'Voice coach ready. Pace 5 minutes 30 seconds per kilometer.';

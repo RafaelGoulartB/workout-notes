@@ -1,31 +1,36 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
+import 'package:workout_notes/models/run_data_field.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_review_draft.dart';
-import 'package:workout_notes/models/run_session_goal.dart';
 import 'package:workout_notes/models/run_session_context.dart';
-import 'package:workout_notes/models/scheduled_run.dart';
-import 'package:workout_notes/repositories/run_plan_repository.dart';
-import 'package:workout_notes/services/run_workout_step_engine.dart';
-import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import 'package:workout_notes/widgets/run/run_permission_onboarding_sheet.dart';
-import 'package:workout_notes/models/run_split.dart';
+import 'package:workout_notes/models/run_session_goal.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
-import 'package:workout_notes/models/run_voice_settings.dart';
+import 'package:workout_notes/models/scheduled_run.dart';
+import 'package:workout_notes/repositories/body_measurement_repository.dart';
+import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/screens/run/run_post_run_review_screen.dart';
 import 'package:workout_notes/screens/run/run_voice_settings_screen.dart';
-import 'package:workout_notes/services/run_interval_engine.dart';
 import 'package:workout_notes/services/run_audio_gate_service.dart';
+import 'package:workout_notes/services/run_data_fields_store.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
 import 'package:workout_notes/services/run_voice_coach.dart';
+import 'package:workout_notes/services/run_workout_step_engine.dart';
 import 'package:workout_notes/services/stationary_bike_tracking_service.dart';
-import 'package:workout_notes/utils/run_formatters.dart';
+import 'package:workout_notes/widgets/run/record/run_data_fields_grid.dart';
+import 'package:workout_notes/widgets/run/record/run_goal_sheet.dart';
+import 'package:workout_notes/widgets/run/record/run_record_countdown.dart';
+import 'package:workout_notes/widgets/run/record/run_record_indoor.dart';
+import 'package:workout_notes/widgets/run/record/run_record_map.dart';
+import 'package:workout_notes/widgets/run/record/run_record_sheet.dart';
+import 'package:workout_notes/widgets/run/record/run_record_top_bar.dart';
+import 'package:workout_notes/widgets/run/run_permission_onboarding_sheet.dart';
 
 class RunRecordScreen extends StatefulWidget {
   /// Structured session to execute. When set, the step engine drives the cues
@@ -47,22 +52,25 @@ class RunRecordScreen extends StatefulWidget {
   State<RunRecordScreen> createState() => _RunRecordScreenState();
 }
 
+enum _RunLeaveAction { stay, background, discard }
+
 class _RunRecordScreenState extends State<RunRecordScreen> {
   static const _permissionOnboardingSeenKey =
       'run_permission_onboarding_seen_v1';
+  static const _maxSheetSize = 0.90;
 
   final _service = RunTrackingService.instance;
-  final _bikeService = StationaryBikeTrackingService.instance;
+  final _indoorService = StationaryBikeTrackingService.instance;
   final _mapController = MapController();
   final _coach = RunVoiceCoach();
+  final _planRepo = RunPlanRepository();
+
   bool _busy = false;
   bool _sheetExpanded = false;
   double _lastCollapsedSize = 0.40;
 
-  /// Real height of the collapsed sheet content, reported by [_MeasureHeight].
-  /// The estimate below is only the first-frame fallback: it has to be updated
-  /// by hand every time a row is added to the sheet, and when it lags behind
-  /// (as it did for the plan tile) the action buttons fall off the bottom.
+  /// Real height of the collapsed sheet content, reported by the sheet. The
+  /// estimate is only the first-frame fallback.
   double _measuredSheetH = 0;
 
   /// Identity of the live sheet. A change means it will be recreated, and a
@@ -72,21 +80,30 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   RunSessionGoal _goal = const RunSessionGoal.defaults();
   RunAudioCapabilities _audioCapabilities =
       const RunAudioCapabilities.unknown();
-  final _planRepo = RunPlanRepository();
   RunPlanWorkout? _resolvedPlanWorkout;
   ScheduledRun? _resolvedScheduledRun;
+
+  /// Today's planned session offered as a one-tap suggestion, and whether the
+  /// attached workout came from it (only then can it be detached again).
+  ScheduledRun? _todayRun;
+  bool _attachedFromSuggestion = false;
   bool _gpsPreparing = false;
   int _stableGpsFixes = 0;
   DateTime? _lastStableFixAt;
   int? _countdown;
+  bool _countdownSkipped = false;
   bool _allowPop = false;
   late CardioActivityType _activityType;
 
-  bool get _isStationaryBike =>
-      _activityType == CardioActivityType.stationaryBike;
+  /// The camera follows the runner until the user pans or zooms the map.
+  bool _followMap = true;
+  List<RunDataField> _fields = RunDataFieldLayout.defaults;
+  double _bodyWeightKg = 70;
+
+  bool get _isIndoor => _activityType.isIndoor;
 
   RunTrackingState get _trackingState =>
-      _isStationaryBike ? _bikeService.state : _service.state;
+      _isIndoor ? _indoorService.state : _service.state;
 
   /// The planned session, either passed directly or carried by a scheduled run.
   RunPlanWorkout? get _planWorkout =>
@@ -100,18 +117,24 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   @override
   void initState() {
     super.initState();
-    _activityType = _bikeService.isActive
-        ? CardioActivityType.stationaryBike
-        : widget.planWorkout != null || widget.scheduledRun != null
-        ? CardioActivityType.running
+    final hasPlan = widget.planWorkout != null || widget.scheduledRun != null;
+    _activityType = _indoorService.isActive
+        ? _indoorService.activityType
+        : hasPlan
+        // A planned workout is a run; only the treadmill is a valid variant.
+        ? (widget.initialActivityType == CardioActivityType.treadmill
+              ? CardioActivityType.treadmill
+              : CardioActivityType.running)
         : widget.initialActivityType;
     _resolvedPlanWorkout = widget.planWorkout ?? widget.scheduledRun?.workout;
     _resolvedScheduledRun = widget.scheduledRun;
     _service.addListener(_onChanged);
-    _bikeService.addListener(_onBikeChanged);
+    _indoorService.addListener(_onIndoorChanged);
     _coach.addListener(_onCoachChanged);
     _service.initialize();
     _prepareCoach();
+    _loadPreferences();
+    _loadTodayWorkout();
   }
 
   /// The collapsed sheet content just reported its real height. Resize the
@@ -119,6 +142,41 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   void _onSheetContentHeight(double height) {
     if (!mounted || (height - _measuredSheetH).abs() < 1) return;
     setState(() => _measuredSheetH = height);
+  }
+
+  Future<void> _loadPreferences() async {
+    final fields = await RunDataFieldsStore.instance.load();
+    var weight = 70.0;
+    try {
+      weight = await BodyMeasurementRepository().getLatestWeightKg() ?? 70;
+    } catch (_) {
+      // Optional table on partially migrated databases: keep the default.
+    }
+    if (!mounted) return;
+    setState(() {
+      _fields = fields;
+      _bodyWeightKg = weight;
+    });
+  }
+
+  /// Offers today's planned session when the screen was opened "empty".
+  Future<void> _loadTodayWorkout() async {
+    if (widget.planWorkout != null || widget.scheduledRun != null) return;
+    if (_service.state.isActive || _indoorService.isActive) return;
+    try {
+      final runs = await _planRepo.getScheduledRunsForDate(DateTime.now());
+      ScheduledRun? planned;
+      for (final run in runs) {
+        if (run.isPlanned && run.workout != null) {
+          planned = run;
+          break;
+        }
+      }
+      if (!mounted) return;
+      setState(() => _todayRun = planned);
+    } catch (_) {
+      // No plan tables yet (fresh install): simply no suggestion.
+    }
   }
 
   Future<void> _prepareCoach() async {
@@ -158,9 +216,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
           : _coach.intervalsOn;
       _audioCapabilities = audioCapabilities;
     });
-    if (!_isStationaryBike &&
-        !activeState.isActive &&
-        activeState.locationGranted) {
+    if (!_isIndoor && !activeState.isActive && activeState.locationGranted) {
       await _prepareGps();
     }
   }
@@ -168,7 +224,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   @override
   void dispose() {
     _service.removeListener(_onChanged);
-    _bikeService.removeListener(_onBikeChanged);
+    _indoorService.removeListener(_onIndoorChanged);
     _coach.removeListener(_onCoachChanged);
     if (!_service.state.isActive) {
       _coach.endSession();
@@ -184,34 +240,52 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   void _onChanged() {
     if (!mounted) return;
     setState(() {});
-    if (_isStationaryBike) return;
+    if (_isIndoor) return;
     final state = _service.state;
-    if (state.lat != null && state.lng != null) {
-      try {
-        _mapController.move(
-          LatLng(state.lat!, state.lng!),
-          _mapController.camera.zoom,
-        );
-      } catch (_) {
-        // The neutral preflight map has not mounted FlutterMap yet.
-      }
+    if (_followMap && state.lat != null && state.lng != null) {
+      _moveMapTo(state.lat!, state.lng!);
     }
     _coach.onTrackingUpdate(state);
   }
 
-  void _onBikeChanged() {
+  void _moveMapTo(double lat, double lng) {
+    try {
+      _mapController.move(LatLng(lat, lng), _mapController.camera.zoom);
+    } catch (_) {
+      // The neutral preflight map has not mounted FlutterMap yet.
+    }
+  }
+
+  void _onIndoorChanged() {
     if (!mounted) return;
     setState(() {});
   }
 
+  /// The user panned or zoomed: stop chasing the runner until they ask.
+  void _onMapMovedByUser() {
+    if (_followMap && mounted) setState(() => _followMap = false);
+  }
+
+  void _recenterMap() {
+    setState(() => _followMap = true);
+    final state = _service.state;
+    if (state.lat != null && state.lng != null) {
+      _moveMapTo(state.lat!, state.lng!);
+    }
+  }
+
   void _setActivityType(CardioActivityType value) {
-    if (_trackingState.isActive || _planWorkout != null) return;
+    if (_trackingState.isActive) return;
+    // A workout attached to the run rules out the bike.
+    if (_planWorkout != null && value == CardioActivityType.stationaryBike) {
+      return;
+    }
     setState(() {
       _activityType = value;
       _measuredSheetH = 0;
       _sheetExpanded = false;
     });
-    if (value == CardioActivityType.running && _service.state.locationGranted) {
+    if (value.usesGps && _service.state.locationGranted) {
       _prepareGps();
     }
   }
@@ -227,7 +301,9 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     if (!mounted) return;
     if (!_service.state.isActive) {
       setState(() {
-        _intervalsOn = _coach.settings.intervalsEnabledByDefault;
+        _intervalsOn = _planWorkout == null
+            ? _coach.settings.intervalsEnabledByDefault
+            : false;
         _audioCapabilities = audioCapabilities;
       });
     } else {
@@ -249,10 +325,69 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     _coach.setGoal(goal);
   }
 
+  Future<void> _editGoal() async {
+    if (_service.state.isActive) return;
+    final result = await showRunGoalSheet(context, goal: _goal);
+    if (result != null && mounted) _setGoal(result);
+  }
+
   void _setIntervals(bool value) {
     if (_planWorkout != null || _service.state.isActive) return;
     setState(() => _intervalsOn = value);
     _coach.setIntervalsOn(value);
+  }
+
+  /// One tap: run today's planned session instead of a free run.
+  void _useTodayWorkout() {
+    final run = _todayRun;
+    final workout = run?.workout;
+    if (run == null || workout == null || _service.state.isActive) return;
+    setState(() {
+      _resolvedScheduledRun = run;
+      _resolvedPlanWorkout = workout;
+      _attachedFromSuggestion = true;
+      if (_activityType == CardioActivityType.stationaryBike) {
+        _activityType = CardioActivityType.running;
+      }
+      _intervalsOn = false;
+    });
+    _coach.setIntervalsOn(false);
+    _coach.setPlanWorkout(workout);
+  }
+
+  void _detachPlan() {
+    if (!_attachedFromSuggestion || _service.state.isActive) return;
+    setState(() {
+      _resolvedScheduledRun = null;
+      _resolvedPlanWorkout = null;
+      _attachedFromSuggestion = false;
+    });
+    _coach.setPlanWorkout(null);
+  }
+
+  Future<void> _customizeFields() async {
+    await showRunDataFieldsSheet(
+      context,
+      initial: _fields,
+      onChanged: (next) {
+        if (!mounted) return;
+        setState(() => _fields = RunDataFieldLayout.sanitize(next));
+        RunDataFieldsStore.instance.save(next);
+      },
+    );
+  }
+
+  Future<void> _replaceField(int index) async {
+    if (index < 0 || index >= _fields.length) return;
+    final picked = await showRunDataFieldPicker(
+      context,
+      replacing: _fields[index],
+      current: _fields,
+    );
+    if (picked == null || !mounted) return;
+    final next = [..._fields]..[index] = picked;
+    setState(() => _fields = next);
+    RunDataFieldsStore.instance.save(next);
   }
 
   Future<RunGpsFix?> _prepareGps() async {
@@ -280,14 +415,24 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     }
   }
 
+  /// Counts down [RunVoiceSettings.countdownSeconds] before recording; a tap
+  /// anywhere skips the rest.
   Future<void> _runCountdown() async {
-    for (var value = 3; value >= 1; value--) {
-      if (!mounted) return;
+    final seconds = _coach.settings.countdownSeconds;
+    if (seconds <= 0) return;
+    _countdownSkipped = false;
+    for (var value = seconds; value >= 1; value--) {
+      if (!mounted || _countdownSkipped) break;
       setState(() => _countdown = value);
-      await Future<void>.delayed(const Duration(seconds: 1));
+      // Wait in slices so a tap ends the countdown at once.
+      for (var i = 0; i < 10 && mounted && !_countdownSkipped; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
     }
     if (mounted) setState(() => _countdown = null);
   }
+
+  void _skipCountdown() => _countdownSkipped = true;
 
   Future<bool> _confirmStartWithoutGps() async {
     final loc = AppLocalizations.of(context)!;
@@ -349,18 +494,18 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     return _showPermissionOnboarding();
   }
 
+  RunSessionContext _sessionContext() => RunSessionContext(
+    planWorkoutId: _planWorkout?.id,
+    scheduledRunId: _scheduledRun?.id,
+    goal: _goal,
+    intervalsOn: _intervalsOn,
+    planSteps: _planWorkout?.stepsJson() ?? const [],
+  );
+
   Future<void> _startDebugSimulation() async {
     setState(() => _busy = true);
     try {
-      await _service.setSessionContext(
-        RunSessionContext(
-          planWorkoutId: _planWorkout?.id,
-          scheduledRunId: _scheduledRun?.id,
-          goal: _goal,
-          intervalsOn: _intervalsOn,
-          planSteps: _planWorkout?.stepsJson() ?? const [],
-        ),
-      );
+      await _service.setSessionContext(_sessionContext());
       var startLat = -23.5505;
       var startLng = -46.6333;
       try {
@@ -419,15 +564,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
         return;
       }
 
-      await _service.setSessionContext(
-        RunSessionContext(
-          planWorkoutId: _planWorkout?.id,
-          scheduledRunId: _scheduledRun?.id,
-          goal: _goal,
-          intervalsOn: _intervalsOn,
-          planSteps: _planWorkout?.stepsJson() ?? const [],
-        ),
-      );
+      await _service.setSessionContext(_sessionContext());
       await _runCountdown();
       if (!mounted) return;
       final ok = await _service.start();
@@ -447,36 +584,70 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   }
 
   Future<void> _startSelectedActivity() async {
-    if (!_isStationaryBike) {
+    if (!_isIndoor) {
       await _ensurePermissionAndStart();
       return;
     }
-    if (_service.state.isActive) return;
+    if (_indoorService.isActive) return;
     setState(() => _busy = true);
     try {
       await _runCountdown();
       if (!mounted) return;
-      await _bikeService.start();
+      await _indoorService.start(
+        type: _activityType,
+        context: _planWorkout == null ? null : _sessionContext(),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
+
+  Future<void> _pause() =>
+      _isIndoor ? _indoorService.pause() : _service.pause();
+
+  Future<void> _resume() =>
+      _isIndoor ? _indoorService.resume() : _service.resume();
+
+  /// Marks a manual lap and confirms it with a haptic tick and a short toast.
+  Future<void> _lap() async {
+    final loc = AppLocalizations.of(context)!;
+    final lap = await _service.lap();
+    if (lap == null || !mounted) return;
+    HapticFeedback.mediumImpact();
+    // Confirm on screen right away; the spoken summary can take a while.
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          content: Text(loc.runLapMarked(lap.index)),
+        ),
+      );
+    await _coach.announceLap(lap);
+  }
+
+  Future<void> _skipStep() async {
+    await _coach.skipStep();
+    if (mounted) setState(() {});
+  }
+
+  String _finishTitle(AppLocalizations loc) =>
+      _activityType == CardioActivityType.stationaryBike
+      ? loc.stationaryBikeFinishConfirm
+      : loc.runRecordFinishConfirm;
+
+  String _finishBody(AppLocalizations loc) => _isIndoor
+      ? loc.stationaryBikeFinishConfirmBody
+      : loc.runRecordFinishConfirmBody;
 
   Future<void> _finish() async {
     final loc = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(
-          _isStationaryBike
-              ? loc.stationaryBikeFinishConfirm
-              : loc.runRecordFinishConfirm,
-        ),
-        content: Text(
-          _isStationaryBike
-              ? loc.stationaryBikeFinishConfirmBody
-              : loc.runRecordFinishConfirmBody,
-        ),
+        title: Text(_finishTitle(loc)),
+        content: Text(_finishBody(loc)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -493,8 +664,8 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
 
     setState(() => _busy = true);
     try {
-      final draft = _isStationaryBike
-          ? await _bikeService.stopForReview()
+      final draft = _isIndoor
+          ? await _indoorService.stopForReview()
           : await _finishRunForReview();
       if (!mounted) return;
       if (draft != null) {
@@ -522,18 +693,19 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
 
   Future<void> _discard({bool confirm = true}) async {
     final loc = AppLocalizations.of(context)!;
+    final bike = _activityType == CardioActivityType.stationaryBike;
     final confirmed = !confirm
         ? true
         : await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
               title: Text(
-                _isStationaryBike
+                bike
                     ? loc.stationaryBikeReviewDiscardTitle
                     : loc.runRecordDiscardConfirm,
               ),
               content: Text(
-                _isStationaryBike
+                _isIndoor
                     ? loc.stationaryBikeReviewDiscardBody
                     : loc.runRecordDiscardConfirmBody,
               ),
@@ -552,8 +724,8 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     if (confirmed != true || !mounted) return;
     setState(() => _busy = true);
     try {
-      if (_isStationaryBike) {
-        await _bikeService.discard();
+      if (_isIndoor) {
+        await _indoorService.discard();
       } else {
         await _coach.endSession();
         await _service.discard();
@@ -567,18 +739,15 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   Future<void> _handleLeaveRequested() async {
     if (!_trackingState.isActive || _busy) return;
     final loc = AppLocalizations.of(context)!;
+    final bike = _activityType == CardioActivityType.stationaryBike;
     final action = await showDialog<_RunLeaveAction>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(
-          _isStationaryBike
-              ? loc.stationaryBikeLeaveTitle
-              : loc.runRecordLeaveTitle,
+          bike ? loc.stationaryBikeLeaveTitle : loc.runRecordLeaveTitle,
         ),
         content: Text(
-          _isStationaryBike
-              ? loc.stationaryBikeLeaveBody
-              : loc.runRecordLeaveBody,
+          _isIndoor ? loc.stationaryBikeLeaveBody : loc.runRecordLeaveBody,
         ),
         actions: [
           TextButton(
@@ -592,7 +761,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
           FilledButton(
             onPressed: () => Navigator.pop(ctx, _RunLeaveAction.background),
             child: Text(
-              _isStationaryBike
+              _isIndoor
                   ? loc.stationaryBikeKeepActive
                   : loc.runRecordKeepRunning,
             ),
@@ -602,7 +771,8 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     );
     if (!mounted || action == null || action == _RunLeaveAction.stay) return;
     if (action == _RunLeaveAction.discard) {
-      await _discard(confirm: false);
+      // "Discard" here still asks once more: it throws the recording away.
+      await _discard();
       return;
     }
     setState(() => _allowPop = true);
@@ -623,9 +793,129 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     return '$quality · ${accuracy.round()} m';
   }
 
+  Widget _buildBackground(
+    AppLocalizations loc,
+    RunTrackingState state,
+    LatLng? center,
+    List<LatLng> trail,
+  ) {
+    if (_isIndoor) {
+      return RunIndoorBackdrop(
+        type: _activityType,
+        active: state.isActive,
+        paused: state.isPaused,
+      );
+    }
+    if (center == null) {
+      return RunRecordMapPlaceholder(label: _gpsStatusLabel(loc, state));
+    }
+    return RunRecordMap(
+      controller: _mapController,
+      center: center,
+      trail: trail,
+      onUserMoved: _onMapMovedByUser,
+    );
+  }
+
+  /// Bottom sheet: collapsed it hugs its content, expanded it shows the laps
+  /// and every split.
+  Widget _buildSheet(
+    BuildContext context,
+    RunTrackingState state, {
+    required RunGoalSnapshot goalSnapshot,
+    required RunStepSnapshot stepSnapshot,
+  }) {
+    final media = MediaQuery.of(context);
+    final notificationsNeedAttention =
+        _service.permissionState.notificationsNeedAttention;
+    final showDebug =
+        kDebugMode &&
+        !_isIndoor &&
+        !state.isActive &&
+        _service.canDebugSimulate;
+    final systemBottom = media.viewPadding.bottom;
+    final bottomPad = (systemBottom > 0 ? systemBottom : 16.0) + 16.0;
+    // First-frame fallback until the real height is measured.
+    final estimate = (state.isActive ? 330.0 : 470.0) + bottomPad;
+    final wanted = _measuredSheetH > 0 ? _measuredSheetH : estimate;
+    final collapsedSize = (wanted / media.size.height).clamp(
+      0.28,
+      _maxSheetSize,
+    );
+    _lastCollapsedSize = collapsedSize;
+    final canExpand = _maxSheetSize - collapsedSize > 0.01;
+    // Recreating the sheet is the only way to change its min size, so the key
+    // carries just that.
+    final sheetKey = 'run-sheet-${collapsedSize.toStringAsFixed(3)}';
+    if (_lastSheetKey != null && _lastSheetKey != sheetKey && _sheetExpanded) {
+      // A recreated sheet starts collapsed; bring the content back in sync so
+      // it always fits the extent it lands on.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _sheetExpanded) {
+          setState(() => _sheetExpanded = false);
+        }
+      });
+    }
+    _lastSheetKey = sheetKey;
+    final locked = state.isActive;
+    return DraggableScrollableSheet(
+      key: ValueKey(sheetKey),
+      initialChildSize: collapsedSize,
+      minChildSize: collapsedSize,
+      maxChildSize: _maxSheetSize,
+      snap: true,
+      snapSizes: canExpand ? [collapsedSize, _maxSheetSize] : null,
+      builder: (context, scrollController) {
+        return RunRecordSheet(
+          scrollController: scrollController,
+          onContentHeight: _onSheetContentHeight,
+          state: state,
+          activityType: _activityType,
+          busy: _busy || _gpsPreparing,
+          expanded: _sheetExpanded,
+          showDebugSimulate: showDebug,
+          fields: _fields,
+          bodyWeightKg: _bodyWeightKg,
+          onCustomizeFields: _customizeFields,
+          onFieldLongPress: _replaceField,
+          intervalsOn: !_isIndoor && _intervalsOn,
+          intervalSnapshot: _coach.intervalSnapshot,
+          intervalPreset: _coach.settings.interval,
+          planWorkout: _planWorkout,
+          onDetachPlan: _attachedFromSuggestion ? _detachPlan : null,
+          todayWorkout: _todayRun?.workout,
+          onUseTodayWorkout: _useTodayWorkout,
+          stepSnapshot: stepSnapshot,
+          goal: _goal,
+          goalSnapshot: goalSnapshot,
+          onEditGoal: locked ? null : _editGoal,
+          onClearGoal: locked
+              ? null
+              : () => _setGoal(const RunSessionGoal.defaults()),
+          onIntervalsChanged: locked || _planWorkout != null
+              ? null
+              : _setIntervals,
+          voiceEnabled: _coach.settings.enabled,
+          headphonesOnly: _coach.settings.headphonesOnly,
+          headsetConnected: _audioCapabilities.headsetConnected,
+          notificationsNeedAttention: notificationsNeedAttention,
+          onActivityTypeChanged: locked ? null : _setActivityType,
+          onOpenVoiceSettings: _openVoiceSettings,
+          onOpenPermissions: _showPermissionOnboarding,
+          onStart: _startSelectedActivity,
+          onDebugSimulate: _startDebugSimulation,
+          onPause: _pause,
+          onResume: _resume,
+          onLap: _lap,
+          onFinish: _finish,
+          onSkipStep: _skipStep,
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
     final state = _trackingState;
     final hasLocation = state.lat != null && state.lng != null;
@@ -633,8 +923,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     final trail = state.trail
         .map((p) => LatLng(p.lat, p.lng))
         .toList(growable: false);
-    final interval = _coach.intervalSnapshot;
-    final goalSnap = _coach.goalSnapshotFor(state);
+    final goalSnapshot = _coach.goalSnapshotFor(state);
     final nativeStep = state.nativeStepSnapshot;
     final stepSnapshot = nativeStep == null
         ? _coach.stepSnapshot
@@ -648,184 +937,37 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
       child: Scaffold(
         body: Stack(
           children: [
-            if (_isStationaryBike)
-              _StationaryBikeBackdrop(
-                active: state.isActive,
-                paused: state.isPaused,
-              )
-            else if (center == null)
-              ColoredBox(
-                color: theme.colorScheme.surfaceContainerLow,
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 240),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.location_searching_rounded,
-                          size: 48,
-                          color: theme.colorScheme.primary,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          _gpsStatusLabel(loc, state),
-                          style: theme.textTheme.titleMedium,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              )
-            else
-              FlutterMap(
-                mapController: _mapController,
-                options: MapOptions(
-                  initialCenter: center,
-                  initialZoom: 16,
-                  interactionOptions: const InteractionOptions(
-                    flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-                  ),
-                ),
-                children: [
-                  TileLayer(
-                    urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.workoutnotes.workout_notes',
-                  ),
-                  if (trail.length >= 2)
-                    PolylineLayer(
-                      polylines: [
-                        Polyline(
-                          points: trail,
-                          color: theme.colorScheme.primary,
-                          strokeWidth: 5,
-                        ),
-                      ],
-                    ),
-                  MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: center,
-                        width: 22,
-                        height: 22,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primary,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 3),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    Material(
-                      color: theme.colorScheme.surface.withValues(alpha: 0.92),
-                      shape: const CircleBorder(),
-                      child: IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: state.isActive
-                            ? _handleLeaveRequested
-                            : () => Navigator.pop(context),
-                      ),
-                    ),
-                    const Spacer(),
-                    if (!_isStationaryBike)
-                      Material(
-                        color: theme.colorScheme.surface.withValues(
-                          alpha: 0.92,
-                        ),
-                        shape: const CircleBorder(),
-                        child: IconButton(
-                          icon: const Icon(Icons.settings_outlined),
-                          tooltip: loc.runRecordSettings,
-                          onPressed: _openVoiceSettings,
-                        ),
-                      ),
-                    if (!_isStationaryBike && _service.isDebugSimulating)
-                      Container(
-                        margin: const EdgeInsets.only(left: 8),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.tertiaryContainer,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          loc.runRecordDebugSimulating,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onTertiaryContainer,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    if (!_isStationaryBike &&
-                        !state.isActive &&
-                        !_service.isDebugSimulating)
-                      Container(
-                        margin: const EdgeInsets.only(left: 8),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surface.withValues(
-                            alpha: 0.92,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          _gpsStatusLabel(loc, state),
-                          style: theme.textTheme.labelMedium,
-                        ),
-                      ),
-                    if (!_isStationaryBike &&
-                        state.isActive &&
-                        (state.hasWeakGps ||
-                            (state.isRecording &&
-                                state.lat == null &&
-                                !_service.isDebugSimulating)))
-                      Container(
-                        margin: const EdgeInsets.only(left: 8),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.errorContainer,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          state.lat == null
-                              ? loc.runRecordWaitingGps
-                              : loc.runRecordWeakGps,
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: theme.colorScheme.onErrorContainer,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
+            _buildBackground(loc, state, center, trail),
+            RunRecordTopBar(
+              state: state,
+              usesGps: !_isIndoor,
+              debugSimulating: _service.isDebugSimulating,
+              gpsLabel: _gpsStatusLabel(loc, state),
+              onClose: state.isActive
+                  ? _handleLeaveRequested
+                  : () => Navigator.pop(context),
+              onSettings: _openVoiceSettings,
             ),
+            if (!_isIndoor && center != null && !_followMap)
+              SafeArea(
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 68, right: 12),
+                    child: RunRecenterButton(onPressed: _recenterMap),
+                  ),
+                ),
+              ),
             NotificationListener<DraggableScrollableNotification>(
               onNotification: (notification) {
-                // Evita trocar o conteúdo (altura) no meio do gesto — isso
-                // causava o "para no meio" porque o SingleChildScrollView
-                // mudava de tamanho enquanto o usuário arrastava. Só atualiza
-                // quando o sheet já assentou num snap.
+                // Only swap the content (its height) once the sheet has
+                // settled on a snap point: doing it mid-drag made the sheet
+                // stop halfway as its scroll view changed size under the
+                // gesture.
                 final nearCollapsed =
                     (notification.extent - _lastCollapsedSize).abs() < 0.03;
-                final nearExpanded = (notification.extent - 0.90).abs() < 0.03;
+                final nearExpanded =
+                    (notification.extent - _maxSheetSize).abs() < 0.03;
                 if (!nearCollapsed && !nearExpanded) return false;
                 final expanded = notification.extent >= 0.75;
                 if (expanded != _sheetExpanded && mounted) {
@@ -834,1690 +976,24 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                 return false;
               },
               child: Builder(
-                builder: (context) {
-                  final hasSplitSummary = state.splits.isNotEmpty;
-                  final showDebug =
-                      kDebugMode &&
-                      !_isStationaryBike &&
-                      !state.isActive &&
-                      _service.canDebugSimulate;
-                  final notificationsNeedAttention =
-                      _service.permissionState.notificationsNeedAttention;
-                  final showPermissionBanner =
-                      !_isStationaryBike &&
-                      !state.isActive &&
-                      state.supported &&
-                      (!state.locationGranted || notificationsNeedAttention);
-                  final hasIntervalStatus =
-                      !_isStationaryBike && state.isActive && _intervalsOn;
-                  final media = MediaQuery.of(context);
-                  final systemBottom = media.viewPadding.bottom;
-                  final bottomPad =
-                      (systemBottom > 0 ? systemBottom : 16.0) + 16.0;
-                  // Sheet height tracks only the widgets that are on screen —
-                  // no reserved empty slots for hidden intervals/splits.
-                  var contentH = 23.0; // handle
-                  if (showPermissionBanner) {
-                    contentH += 100;
-                  }
-                  contentH += 72; // metrics
-                  contentH += 12;
-                  contentH += 22; // section label
-                  contentH += _goal.enabled && state.isActive ? 64.0 : 52.0;
-                  if (hasIntervalStatus) {
-                    contentH += interval.isActive ? 64.0 : 52.0;
-                  }
-                  if (hasSplitSummary) {
-                    contentH += 10 + 72;
-                    if (state.splits.length > 1) contentH += 20;
-                  }
-                  contentH += 12 + 52; // gap + primary actions
-                  if (showDebug) contentH += 38;
-                  contentH += bottomPad;
-                  // Once the sheet has been laid out, trust the measurement over
-                  // the estimate — that is what keeps the buttons on screen no
-                  // matter which rows the session happens to show.
-                  final wanted = _measuredSheetH > 0
-                      ? _measuredSheetH
-                      : contentH;
-                  const maxSize = 0.90;
-                  final collapsedSize = (wanted / media.size.height).clamp(
-                    0.28,
-                    maxSize,
-                  );
-                  _lastCollapsedSize = collapsedSize;
-                  final canExpand = maxSize - collapsedSize > 0.01;
-                  // Recreating the sheet is the only way to change its min size,
-                  // so the key carries just that. It used to also carry
-                  // isActive/splits/intervals, which recreated the sheet mid-run
-                  // (first split completing) and dropped it back to the collapsed
-                  // extent while the expanded content was still on screen —
-                  // pushing the action buttons below the fold.
-                  final sheetKey =
-                      'run-sheet-${collapsedSize.toStringAsFixed(3)}';
-                  if (_lastSheetKey != null &&
-                      _lastSheetKey != sheetKey &&
-                      _sheetExpanded) {
-                    // A recreated sheet starts collapsed; bring the content back
-                    // in sync so it always fits the extent it lands on.
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted && _sheetExpanded) {
-                        setState(() => _sheetExpanded = false);
-                      }
-                    });
-                  }
-                  _lastSheetKey = sheetKey;
-                  return DraggableScrollableSheet(
-                    key: ValueKey(sheetKey),
-                    initialChildSize: collapsedSize,
-                    minChildSize: collapsedSize,
-                    maxChildSize: maxSize,
-                    snap: true,
-                    snapSizes: canExpand ? [collapsedSize, maxSize] : null,
-                    builder: (context, scrollController) {
-                      return _MetricsSheet(
-                        scrollController: scrollController,
-                        onContentHeight: _onSheetContentHeight,
-                        state: state,
-                        activityType: _activityType,
-                        busy: _busy || _gpsPreparing,
-                        expanded: _sheetExpanded,
-                        showDebugSimulate: showDebug,
-                        intervalsOn: !_isStationaryBike && _intervalsOn,
-                        intervalSnapshot: interval,
-                        intervalPreset: _coach.settings.interval,
-                        planWorkout: _isStationaryBike ? null : _planWorkout,
-                        stepSnapshot: stepSnapshot,
-                        goal: _goal,
-                        goalSnapshot: goalSnap,
-                        onGoalChanged: _isStationaryBike || state.isActive
-                            ? null
-                            : _setGoal,
-                        onIntervalsChanged:
-                            state.isActive || _planWorkout != null
-                            ? null
-                            : _setIntervals,
-                        voiceEnabled: _coach.settings.enabled,
-                        headphonesOnly: _coach.settings.headphonesOnly,
-                        headsetConnected: _audioCapabilities.headsetConnected,
-                        notificationsNeedAttention: notificationsNeedAttention,
-                        onActivityTypeChanged:
-                            state.isActive || _planWorkout != null
-                            ? null
-                            : _setActivityType,
-                        onOpenVoiceSettings: _openVoiceSettings,
-                        onOpenPermissions: _showPermissionOnboarding,
-                        onStart: _startSelectedActivity,
-                        onDebugSimulate: _startDebugSimulation,
-                        onPause: () => _isStationaryBike
-                            ? _bikeService.pause()
-                            : _service.pause(),
-                        onResume: () => _isStationaryBike
-                            ? _bikeService.resume()
-                            : _service.resume(),
-                        onFinish: _finish,
-                      );
-                    },
-                  );
-                },
+                builder: (context) => _buildSheet(
+                  context,
+                  state,
+                  goalSnapshot: goalSnapshot,
+                  stepSnapshot: stepSnapshot,
+                ),
               ),
             ),
             if (_countdown != null)
               Positioned.fill(
-                child: ColoredBox(
-                  color: Colors.black.withValues(alpha: 0.52),
-                  child: Center(
-                    child: Text(
-                      '$_countdown',
-                      semanticsLabel: loc.runRecordCountdown('$_countdown'),
-                      style: theme.textTheme.displayLarge?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 104,
-                      ),
-                    ),
-                  ),
+                child: RunRecordCountdown(
+                  value: _countdown!,
+                  onSkip: _skipCountdown,
                 ),
               ),
           ],
         ),
       ),
-    );
-  }
-}
-
-enum _RunLeaveAction { stay, background, discard }
-
-class _StationaryBikeBackdrop extends StatelessWidget {
-  final bool active;
-  final bool paused;
-
-  const _StationaryBikeBackdrop({required this.active, required this.paused});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final loc = AppLocalizations.of(context)!;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.secondaryContainer,
-            theme.colorScheme.surfaceContainerLow,
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
-      child: Align(
-        alignment: const Alignment(0, -0.42),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 116,
-                height: 116,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.secondary.withValues(alpha: 0.16),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.pedal_bike_rounded,
-                  size: 62,
-                  color: theme.colorScheme.secondary,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                loc.stationaryBikeIndoorHeadline,
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                active
-                    ? (paused
-                          ? loc.stationaryBikePaused
-                          : loc.stationaryBikeTiming)
-                    : loc.cardioActivityStationaryBikeSubtitle,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ActivityTypeSelector extends StatelessWidget {
-  final CardioActivityType value;
-  final ValueChanged<CardioActivityType>? onChanged;
-
-  const _ActivityTypeSelector({required this.value, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final loc = AppLocalizations.of(context)!;
-    final isBike = value == CardioActivityType.stationaryBike;
-    return Material(
-      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
-      borderRadius: BorderRadius.circular(14),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        key: const ValueKey('cardio-activity-selector'),
-        onTap: onChanged == null ? null : () => _openPicker(context),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-          child: Row(
-            children: [
-              Icon(
-                isBike
-                    ? Icons.pedal_bike_rounded
-                    : Icons.directions_run_rounded,
-                size: 21,
-                color: theme.colorScheme.primary,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      loc.cardioActivityPickerLabel.toUpperCase(),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      isBike
-                          ? loc.cardioActivityStationaryBike
-                          : loc.cardioActivityRunning,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (onChanged != null)
-                Icon(
-                  Icons.unfold_more_rounded,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openPicker(BuildContext context) async {
-    final loc = AppLocalizations.of(context)!;
-    final selected = await showModalBottomSheet<CardioActivityType>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                loc.cardioActivityPickerTitle,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 12),
-              _ActivityChoiceTile(
-                icon: Icons.directions_run_rounded,
-                title: loc.cardioActivityRunning,
-                subtitle: loc.cardioActivityRunningSubtitle,
-                selected: value == CardioActivityType.running,
-                onTap: () => Navigator.pop(context, CardioActivityType.running),
-              ),
-              const SizedBox(height: 8),
-              _ActivityChoiceTile(
-                icon: Icons.pedal_bike_rounded,
-                title: loc.cardioActivityStationaryBike,
-                subtitle: loc.cardioActivityStationaryBikeSubtitle,
-                selected: value == CardioActivityType.stationaryBike,
-                onTap: () =>
-                    Navigator.pop(context, CardioActivityType.stationaryBike),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (selected != null && selected != value) onChanged?.call(selected);
-  }
-}
-
-class _ActivityChoiceTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _ActivityChoiceTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: selected
-          ? theme.colorScheme.primaryContainer
-          : theme.colorScheme.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(16),
-      clipBehavior: Clip.antiAlias,
-      child: ListTile(
-        onTap: onTap,
-        leading: Icon(icon),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-        subtitle: Text(subtitle),
-        trailing: selected ? const Icon(Icons.check_circle_rounded) : null,
-      ),
-    );
-  }
-}
-
-class _IndoorInfoCard extends StatelessWidget {
-  const _IndoorInfoCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final loc = AppLocalizations.of(context)!;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.location_off_outlined,
-            size: 20,
-            color: theme.colorScheme.onSecondaryContainer,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              loc.stationaryBikeIndoorBody,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSecondaryContainer,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MetricsSheet extends StatelessWidget {
-  final ScrollController scrollController;
-
-  /// Reports the height of the collapsed content so the sheet can hug it.
-  final ValueChanged<double> onContentHeight;
-  final RunTrackingState state;
-  final CardioActivityType activityType;
-  final bool busy;
-  final bool expanded;
-  final bool showDebugSimulate;
-  final bool intervalsOn;
-  final RunIntervalSnapshot intervalSnapshot;
-  final RunIntervalPreset intervalPreset;
-  final RunPlanWorkout? planWorkout;
-  final RunStepSnapshot stepSnapshot;
-  final RunSessionGoal goal;
-  final RunGoalSnapshot goalSnapshot;
-  final ValueChanged<RunSessionGoal>? onGoalChanged;
-  final ValueChanged<bool>? onIntervalsChanged;
-  final bool voiceEnabled;
-  final bool headphonesOnly;
-  final bool headsetConnected;
-  final bool notificationsNeedAttention;
-  final ValueChanged<CardioActivityType>? onActivityTypeChanged;
-  final VoidCallback onOpenVoiceSettings;
-  final VoidCallback onOpenPermissions;
-  final VoidCallback onStart;
-  final VoidCallback onDebugSimulate;
-  final VoidCallback onPause;
-  final VoidCallback onResume;
-  final VoidCallback onFinish;
-
-  const _MetricsSheet({
-    required this.scrollController,
-    required this.onContentHeight,
-    required this.state,
-    required this.activityType,
-    required this.busy,
-    required this.expanded,
-    required this.showDebugSimulate,
-    required this.intervalsOn,
-    required this.intervalSnapshot,
-    required this.intervalPreset,
-    required this.planWorkout,
-    required this.stepSnapshot,
-    required this.goal,
-    required this.goalSnapshot,
-    required this.onGoalChanged,
-    required this.onIntervalsChanged,
-    required this.voiceEnabled,
-    required this.headphonesOnly,
-    required this.headsetConnected,
-    required this.notificationsNeedAttention,
-    required this.onActivityTypeChanged,
-    required this.onOpenVoiceSettings,
-    required this.onOpenPermissions,
-    required this.onStart,
-    required this.onDebugSimulate,
-    required this.onPause,
-    required this.onResume,
-    required this.onFinish,
-  });
-
-  RunSplit? get _lastCompleted {
-    if (state.splits.isEmpty) return null;
-    return state.splits.last;
-  }
-
-  RunSplit? get _bestCompleted {
-    RunSplit? best;
-    for (final split in state.splits) {
-      final pace = split.paceSecPerKm;
-      if (pace == null || !pace.isFinite) continue;
-      if (best == null || pace < (best.paceSecPerKm ?? double.infinity)) {
-        best = split;
-      }
-    }
-    return best;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final loc = AppLocalizations.of(context)!;
-    final pace =
-        state.currentPaceSecPerKm ??
-        (state.distanceMeters > 0
-            ? state.movingTimeSeconds / (state.distanceMeters / 1000.0)
-            : null);
-    final allSplits = state.displaySplits;
-    final last = _lastCompleted;
-    final best = _bestCompleted;
-    final isStationaryBike = activityType == CardioActivityType.stationaryBike;
-
-    final actionButtonStyle = FilledButton.styleFrom(
-      minimumSize: const Size.fromHeight(52),
-      textStyle: theme.textTheme.titleSmall?.copyWith(
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.2,
-      ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-    );
-    final outlineActionStyle = OutlinedButton.styleFrom(
-      minimumSize: const Size.fromHeight(52),
-      textStyle: theme.textTheme.titleSmall?.copyWith(
-        fontWeight: FontWeight.w700,
-      ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      side: BorderSide(
-        color: theme.colorScheme.outline.withValues(alpha: 0.7),
-        width: 1.5,
-      ),
-    );
-
-    final systemBottom = MediaQuery.viewPaddingOf(context).bottom;
-    final bottomPad = (systemBottom > 0 ? systemBottom : 16.0) + 16.0;
-
-    final Widget actions;
-    if (busy) {
-      actions = const Padding(
-        padding: EdgeInsets.symmetric(vertical: 12),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    } else if (!state.isActive) {
-      actions = Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          FilledButton.icon(
-            onPressed: onStart,
-            style: actionButtonStyle,
-            icon: const Icon(Icons.play_arrow_rounded, size: 26),
-            label: Text(loc.runRecordStart),
-          ),
-          if (showDebugSimulate) ...[
-            const SizedBox(height: 2),
-            TextButton.icon(
-              onPressed: onDebugSimulate,
-              style: TextButton.styleFrom(
-                foregroundColor: theme.colorScheme.onSurfaceVariant,
-                minimumSize: const Size.fromHeight(36),
-                textStyle: theme.textTheme.labelMedium,
-              ),
-              icon: const Icon(Icons.bug_report_outlined, size: 16),
-              label: Text(loc.runRecordDebugSimulate),
-            ),
-          ],
-        ],
-      );
-    } else {
-      actions = Row(
-        children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: state.isPaused ? onResume : onPause,
-              style: outlineActionStyle,
-              icon: Icon(
-                state.isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-                size: 22,
-              ),
-              label: Text(
-                state.isPaused ? loc.runRecordResume : loc.runRecordPause,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: FilledButton.icon(
-              onPressed: onFinish,
-              style: actionButtonStyle,
-              icon: const Icon(Icons.stop_rounded, size: 22),
-              label: Text(loc.runRecordFinish),
-            ),
-          ),
-        ],
-      );
-    }
-
-    // Collapsed: hug content. Expanded: metrics + buttons stay put; only
-    // splits scroll. Sheet max is 90% of the screen.
-    const sheetRadius = BorderRadius.vertical(top: Radius.circular(28));
-
-    Widget buildHandle() {
-      return Center(
-        child: Container(
-          width: 44,
-          height: 5,
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(999),
-          ),
-        ),
-      );
-    }
-
-    Widget buildPermissionBanner() {
-      if (isStationaryBike) return const SizedBox.shrink();
-      final locationMissing = !state.locationGranted;
-      if (state.isActive ||
-          !state.supported ||
-          (!locationMissing && !notificationsNeedAttention)) {
-        return const SizedBox.shrink();
-      }
-      final backgroundColor = locationMissing
-          ? theme.colorScheme.errorContainer
-          : theme.colorScheme.secondaryContainer;
-      final foregroundColor = locationMissing
-          ? theme.colorScheme.onErrorContainer
-          : theme.colorScheme.onSecondaryContainer;
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: backgroundColor.withValues(alpha: 0.7),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                locationMissing
-                    ? loc.runRecordPermissionNeeded
-                    : loc.runPermissionsNotificationsBanner,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: foregroundColor,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              TextButton(
-                onPressed: onOpenPermissions,
-                style: TextButton.styleFrom(foregroundColor: foregroundColor),
-                child: Text(loc.runPermissionsSetupAction),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    Widget buildMetrics() {
-      return Row(
-        children: [
-          Expanded(
-            child: _Metric(
-              label: loc.runRecordTime,
-              value: RunFormatters.duration(state.durationSeconds),
-              emphasize: state.isActive,
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 40,
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45),
-          ),
-          Expanded(
-            child: _Metric(
-              label: loc.runRecordDistance,
-              value: RunFormatters.distanceKm(state.distanceMeters),
-              unit: 'km',
-              emphasize: state.isActive,
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 40,
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45),
-          ),
-          Expanded(
-            child: _Metric(
-              label: isStationaryBike
-                  ? loc.stationaryBikeAverageSpeed
-                  : loc.runRecordPace,
-              value: isStationaryBike
-                  ? _formatSpeed(state.distanceMeters, state.movingTimeSeconds)
-                  : RunFormatters.pace(pace),
-              unit: isStationaryBike
-                  ? loc.stationaryBikeSpeedUnit
-                  : loc.runRecordPaceUnit,
-              emphasize: state.isActive,
-            ),
-          ),
-        ],
-      );
-    }
-
-    Widget buildHeader() {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          buildHandle(),
-          buildPermissionBanner(),
-          buildMetrics(),
-          const SizedBox(height: 12),
-          _ActivityTypeSelector(
-            value: activityType,
-            onChanged: onActivityTypeChanged,
-          ),
-          if (isStationaryBike) ...[
-            const SizedBox(height: 10),
-            const _IndoorInfoCard(),
-          ] else ...[
-            const SizedBox(height: 12),
-            _RunPlanCard(
-              goal: goal,
-              goalSnapshot: goalSnapshot,
-              intervalsOn: intervalsOn,
-              intervalSnapshot: intervalSnapshot,
-              intervalPreset: intervalPreset,
-              planWorkout: planWorkout,
-              stepSnapshot: stepSnapshot,
-              active: state.isActive,
-              onGoalChanged: onGoalChanged,
-              onIntervalsChanged: onIntervalsChanged,
-              voiceEnabled: voiceEnabled,
-              headphonesOnly: headphonesOnly,
-              headsetConnected: headsetConnected,
-              onOpenVoiceSettings: onOpenVoiceSettings,
-            ),
-          ],
-        ],
-      );
-    }
-
-    Widget buildCollapsedSplits() {
-      if (last == null && best == null) return const SizedBox.shrink();
-      return Padding(
-        padding: const EdgeInsets.only(top: 10),
-        child: _SplitSummaryList(
-          lastTitle: loc.runRecordSplitLast,
-          bestTitle: loc.runRecordSplitBest,
-          last: last,
-          best: best,
-          emptyLabel: '—',
-          expandHint: state.splits.length > 1
-              ? loc.runRecordSplitsExpandHint
-              : null,
-        ),
-      );
-    }
-
-    final splitsHeader = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: 16),
-        Text(
-          loc.runRecordSplitsTitle,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.6,
-          ),
-        ),
-        const SizedBox(height: 8),
-        if (allSplits.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(
-              children: [
-                const Expanded(flex: 2, child: SizedBox.shrink()),
-                Expanded(
-                  child: Text(
-                    loc.runRecordSplitTime,
-                    textAlign: TextAlign.end,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    loc.runRecordSplitPace,
-                    textAlign: TextAlign.end,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-
-    final sheet = Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.98),
-        borderRadius: sheetRadius,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 20,
-            offset: const Offset(0, -6),
-          ),
-        ],
-      ),
-      // Fix: sheet deve usar sempre o mesmo scrollable com o controller do
-      // DraggableScrollableSheet. Antes, expandido era Column+Expanded(ListView)
-      // e recolhido SingleChildScrollView — trocar o tipo no meio do gesto
-      // (via extent >= 0.75) destacava o controller e travava para baixo.
-      // Tentativa anterior de manter header/actions pinados fora do scroll
-      // quebrou o arraste para cima, pois o gesto no header não chegava ao
-      // controller. Agora todo o conteúdo fica dentro de um único
-      // SingleChildScrollView com o scrollController, então qualquer ponto
-      // do sheet arrasta/expande e, quando no topo, recolhe.
-      child: SingleChildScrollView(
-        controller: scrollController,
-        physics: const ClampingScrollPhysics(),
-        // Measured only while collapsed: expanded content is the full splits
-        // list, which must not drive the collapsed height. The scroll view
-        // gives its child unbounded height, so this is the intrinsic height.
-        child: _MeasureHeight(
-          onHeight: expanded ? null : onContentHeight,
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(20, 8, 20, bottomPad),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                buildHeader(),
-                if (expanded && !isStationaryBike) ...[
-                  splitsHeader,
-                  if (allSplits.isEmpty)
-                    Text(
-                      loc.runRecordSplitsEmpty,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    )
-                  else
-                    ...allSplits.map((s) => _SplitRow(split: s)),
-                  const SizedBox(height: 12),
-                ] else ...[
-                  const SizedBox(height: 10),
-                  buildCollapsedSplits(),
-                  const SizedBox(height: 12),
-                ],
-                actions,
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
-    return sheet;
-  }
-
-  String _formatSpeed(double distanceMeters, int movingSeconds) {
-    if (distanceMeters <= 0 || movingSeconds <= 0) return '--';
-    final speed = (distanceMeters / 1000) / (movingSeconds / 3600);
-    return speed.toStringAsFixed(1);
-  }
-}
-
-/// Reports its child's laid-out height, without affecting layout. Lets the run
-/// sheet size itself from what it actually renders instead of from an estimate
-/// that has to be kept in sync by hand.
-class _MeasureHeight extends SingleChildRenderObjectWidget {
-  final ValueChanged<double>? onHeight;
-
-  const _MeasureHeight({required this.onHeight, required Widget super.child});
-
-  @override
-  _RenderMeasureHeight createRenderObject(BuildContext context) =>
-      _RenderMeasureHeight(onHeight);
-
-  @override
-  void updateRenderObject(
-    BuildContext context,
-    _RenderMeasureHeight renderObject,
-  ) {
-    renderObject.onHeight = onHeight;
-  }
-}
-
-class _RenderMeasureHeight extends RenderProxyBox {
-  _RenderMeasureHeight(this.onHeight);
-
-  ValueChanged<double>? onHeight;
-  double _reported = 0;
-
-  @override
-  void performLayout() {
-    super.performLayout();
-    final callback = onHeight;
-    if (callback == null) return;
-    final height = size.height;
-    if ((height - _reported).abs() < 1) return;
-    _reported = height;
-    // setState is illegal during layout — report on the next frame.
-    WidgetsBinding.instance.addPostFrameCallback((_) => callback(height));
-  }
-}
-
-class _RunPlanCard extends StatelessWidget {
-  final RunSessionGoal goal;
-  final RunGoalSnapshot goalSnapshot;
-  final bool intervalsOn;
-  final RunIntervalSnapshot intervalSnapshot;
-  final RunIntervalPreset intervalPreset;
-  final RunPlanWorkout? planWorkout;
-  final RunStepSnapshot stepSnapshot;
-  final bool active;
-  final ValueChanged<RunSessionGoal>? onGoalChanged;
-  final ValueChanged<bool>? onIntervalsChanged;
-  final bool voiceEnabled;
-  final bool headphonesOnly;
-  final bool headsetConnected;
-  final VoidCallback onOpenVoiceSettings;
-
-  const _RunPlanCard({
-    required this.goal,
-    required this.goalSnapshot,
-    required this.intervalsOn,
-    required this.intervalSnapshot,
-    required this.intervalPreset,
-    required this.planWorkout,
-    required this.stepSnapshot,
-    required this.active,
-    required this.onGoalChanged,
-    required this.onIntervalsChanged,
-    required this.voiceEnabled,
-    required this.headphonesOnly,
-    required this.headsetConnected,
-    required this.onOpenVoiceSettings,
-  });
-
-  /// While recording, show where in the session we are; before starting,
-  /// show what the session is.
-  String _planSubtitle(AppLocalizations loc, RunPlanWorkout plan) {
-    if (!stepSnapshot.isActive) {
-      if (stepSnapshot.isDone && active) return loc.runRecordIntervalDone;
-      return '${RunPlanUi.kindLabel(loc, plan.kind)} · '
-          '${RunPlanUi.sessionSummary(loc, plan)}';
-    }
-    final role = RunPlanUi.roleLabel(loc, stepSnapshot.role);
-    if (stepSnapshot.repTotal > 1) {
-      return '$role · '
-          '${loc.runRecordPlanRepOf(stepSnapshot.repIndex, stepSnapshot.repTotal)}';
-    }
-    return '$role · '
-        '${loc.runRecordPlanStepOf(stepSnapshot.stepIndex + 1, stepSnapshot.totalSteps)}';
-  }
-
-  String _formatGoalValue(RunSessionGoal g) {
-    if (g.metric == RunIntervalMetric.time) {
-      return RunFormatters.duration(g.value);
-    }
-    if (g.value >= 1000 && g.value % 1000 == 0) {
-      return '${g.value ~/ 1000} km';
-    }
-    if (g.value >= 1000) {
-      return '${(g.value / 1000).toStringAsFixed(1)} km';
-    }
-    return '${g.value} m';
-  }
-
-  String _formatRemaining(RunGoalSnapshot snap) {
-    if (snap.goal.metric == RunIntervalMetric.time) {
-      return RunFormatters.duration(snap.remaining.round());
-    }
-    final m = snap.remaining;
-    if (m >= 1000) return '${(m / 1000).toStringAsFixed(2)} km';
-    return '${m.round()} m';
-  }
-
-  String _formatIntervalAmount(RunIntervalMetric metric, int value) {
-    if (metric == RunIntervalMetric.time) return RunFormatters.duration(value);
-    if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)} km';
-    return '$value m';
-  }
-
-  Future<void> _editGoal(BuildContext context) async {
-    if (onGoalChanged == null) return;
-    final loc = AppLocalizations.of(context)!;
-    var draft = goal.enabled
-        ? goal
-        : goal.copyWith(
-            enabled: true,
-            value: goal.value > 0 ? goal.value : 5000,
-          );
-
-    final result = await showDialog<RunSessionGoal>(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              insetPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 24,
-              ),
-              title: Text(loc.runRecordGoalPickTitle),
-              content: SizedBox(
-                width: MediaQuery.sizeOf(context).width,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SegmentedButton<RunIntervalMetric>(
-                      segments: [
-                        ButtonSegment(
-                          value: RunIntervalMetric.distance,
-                          label: Text(loc.runIntervalMetricDistance),
-                        ),
-                        ButtonSegment(
-                          value: RunIntervalMetric.time,
-                          label: Text(loc.runIntervalMetricTime),
-                        ),
-                      ],
-                      selected: {draft.metric},
-                      onSelectionChanged: (set) {
-                        final metric = set.first;
-                        setDialogState(() {
-                          draft = draft.copyWith(
-                            metric: metric,
-                            value: metric == RunIntervalMetric.distance
-                                ? 5000
-                                : 1800,
-                          );
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    if (draft.metric == RunIntervalMetric.distance)
-                      DropdownButtonFormField<int>(
-                        key: ValueKey('goal-dist-${draft.value}'),
-                        initialValue: _nearestDistance(draft.value),
-                        decoration: InputDecoration(
-                          labelText: loc.runIntervalDistance,
-                        ),
-                        items: [
-                          for (final m in const [
-                            1000,
-                            2000,
-                            3000,
-                            5000,
-                            10000,
-                            21097,
-                          ])
-                            DropdownMenuItem(
-                              value: m,
-                              child: Text(
-                                m >= 1000
-                                    ? (m % 1000 == 0
-                                          ? '${m ~/ 1000} km'
-                                          : '${(m / 1000).toStringAsFixed(1)} km')
-                                    : '$m m',
-                              ),
-                            ),
-                        ],
-                        onChanged: (v) {
-                          if (v == null) return;
-                          setDialogState(
-                            () => draft = draft.copyWith(value: v),
-                          );
-                        },
-                      )
-                    else
-                      DropdownButtonFormField<int>(
-                        key: ValueKey('goal-time-${draft.value}'),
-                        initialValue: _nearestTime(draft.value),
-                        decoration: InputDecoration(
-                          labelText: loc.runIntervalDuration,
-                        ),
-                        items: [
-                          for (final s in const [
-                            600,
-                            900,
-                            1200,
-                            1800,
-                            2700,
-                            3600,
-                          ])
-                            DropdownMenuItem(
-                              value: s,
-                              child: Text(RunFormatters.duration(s)),
-                            ),
-                        ],
-                        onChanged: (v) {
-                          if (v == null) return;
-                          setDialogState(
-                            () => draft = draft.copyWith(value: v),
-                          );
-                        },
-                      ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () =>
-                      Navigator.pop(ctx, draft.copyWith(enabled: false)),
-                  child: Text(loc.runRecordGoalNone),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-                ),
-                FilledButton(
-                  onPressed: () =>
-                      Navigator.pop(ctx, draft.copyWith(enabled: true)),
-                  child: Text(loc.commonSave),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-    if (result != null) onGoalChanged!(result);
-  }
-
-  int _nearestDistance(int value) {
-    const options = [1000, 2000, 3000, 5000, 10000, 21097];
-    return options.reduce(
-      (a, b) => (a - value).abs() <= (b - value).abs() ? a : b,
-    );
-  }
-
-  int _nearestTime(int value) {
-    const options = [600, 900, 1200, 1800, 2700, 3600];
-    return options.reduce(
-      (a, b) => (a - value).abs() <= (b - value).abs() ? a : b,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final loc = AppLocalizations.of(context)!;
-
-    String? intervalPhase;
-    if (intervalsOn && active) {
-      switch (intervalSnapshot.phase) {
-        case RunIntervalPhase.work:
-          intervalPhase = loc.runRecordIntervalWork(
-            intervalSnapshot.workIndex,
-            intervalSnapshot.totalWorks,
-          );
-        case RunIntervalPhase.rest:
-          intervalPhase = loc.runRecordIntervalRest;
-        case RunIntervalPhase.done:
-          intervalPhase = loc.runRecordIntervalDone;
-        case RunIntervalPhase.idle:
-          intervalPhase = null;
-      }
-    }
-
-    String goalSubtitle;
-    if (!goal.enabled) {
-      goalSubtitle = onGoalChanged != null && !active
-          ? '${loc.runRecordGoalNone} · ${loc.runRecordGoalTapToChange}'
-          : loc.runRecordGoalNone;
-    } else if (goalSnapshot.completed) {
-      goalSubtitle = loc.runRecordGoalDone;
-    } else if (active) {
-      goalSubtitle = loc.runRecordGoalRemaining(_formatRemaining(goalSnapshot));
-    } else {
-      goalSubtitle = onGoalChanged != null
-          ? '${_formatGoalValue(goal)} · ${loc.runRecordGoalTapToChange}'
-          : _formatGoalValue(goal);
-    }
-
-    final showIntervalStatus = intervalsOn && active;
-    final plan = planWorkout;
-    final showGoal = !active || goal.enabled;
-    final showQuickIntervals = plan == null && (!active || intervalsOn);
-    final voiceSubtitle = !voiceEnabled
-        ? loc.runRecordVoiceOff
-        : headphonesOnly && !headsetConnected
-        ? loc.runRecordVoiceHeadsetMissing
-        : loc.runRecordVoiceReady;
-
-    // An active run without a goal should not show the empty goal tile. Keep
-    // the section when it still has a plan or interval status to display.
-    if (!showGoal && plan == null && !showIntervalStatus) {
-      return const SizedBox.shrink();
-    }
-
-    final sectionDivider = Divider(
-      height: 1,
-      indent: 12,
-      endIndent: 12,
-      color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45),
-    );
-    final goalTile = _PlanOptionTile(
-      icon: Icons.flag_rounded,
-      title: loc.runRecordGoal,
-      subtitle: goalSubtitle,
-      selected: goal.enabled,
-      showChevron: onGoalChanged != null && !active,
-      onTap: onGoalChanged == null ? null : () => _editGoal(context),
-      trailing: active
-          ? const SizedBox.shrink()
-          : Switch.adaptive(
-              value: goal.enabled,
-              onChanged: onGoalChanged == null
-                  ? null
-                  : (v) {
-                      if (v && !goal.enabled) {
-                        _editGoal(context);
-                      } else {
-                        onGoalChanged!(goal.copyWith(enabled: v));
-                      }
-                    },
-            ),
-      footer: goal.enabled && active
-          ? ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: goalSnapshot.progress.clamp(0.0, 1.0),
-                minHeight: 4,
-              ),
-            )
-          : null,
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 6),
-          child: Text(
-            loc.runRecordPlanSection.toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(
-              letterSpacing: 1.0,
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest.withValues(
-              alpha: 0.65,
-            ),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Column(
-            children: [
-              if (!active) ...[
-                _PlanOptionTile(
-                  icon: Icons.record_voice_over_outlined,
-                  title: loc.runVoiceEnabled,
-                  subtitle: voiceSubtitle,
-                  selected:
-                      voiceEnabled && (!headphonesOnly || headsetConnected),
-                  showChevron: true,
-                  trailing: const SizedBox.shrink(),
-                  onTap: onOpenVoiceSettings,
-                ),
-                sectionDivider,
-              ],
-              if (showGoal) goalTile,
-              if (plan != null) ...[
-                if (showGoal) sectionDivider,
-                _PlanOptionTile(
-                  icon: RunPlanUi.kindIcon(plan.kind),
-                  title: loc.runRecordPlanSessionTitle,
-                  subtitle: _planSubtitle(loc, plan),
-                  selected: true,
-                  trailing: stepSnapshot.isActive
-                      ? Text(
-                          stepSnapshot.metric == RunIntervalMetric.distance
-                              ? '${stepSnapshot.remaining.round()} m'
-                              : RunFormatters.duration(
-                                  stepSnapshot.remaining.round(),
-                                ),
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-                  footer: stepSnapshot.isActive
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(999),
-                          child: LinearProgressIndicator(
-                            value: stepSnapshot.progress.clamp(0.0, 1.0),
-                            minHeight: 4,
-                          ),
-                        )
-                      : null,
-                ),
-              ],
-              if (showQuickIntervals) ...[
-                if (showGoal || plan != null) sectionDivider,
-                _PlanOptionTile(
-                  icon: Icons.av_timer_rounded,
-                  title: loc.runRecordIntervals,
-                  subtitle: active
-                      ? (intervalPhase ?? loc.runRecordIntervals)
-                      : loc.runIntervalPresetSummary(
-                          _formatIntervalAmount(
-                            intervalPreset.workMetric,
-                            intervalPreset.workValue,
-                          ),
-                          _formatIntervalAmount(
-                            intervalPreset.restMetric,
-                            intervalPreset.restValue,
-                          ),
-                          intervalPreset.repeats,
-                        ),
-                  selected: intervalsOn,
-                  trailing: active && intervalSnapshot.isActive
-                      ? Text(
-                          intervalSnapshot.currentMetric ==
-                                  RunIntervalMetric.distance
-                              ? '${intervalSnapshot.remaining.round()} m'
-                              : RunFormatters.duration(
-                                  intervalSnapshot.remaining.round(),
-                                ),
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        )
-                      : Switch.adaptive(
-                          value: intervalsOn,
-                          onChanged: onIntervalsChanged,
-                        ),
-                  footer: intervalSnapshot.isActive
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(999),
-                          child: LinearProgressIndicator(
-                            value: intervalSnapshot.progress.clamp(0.0, 1.0),
-                            minHeight: 4,
-                          ),
-                        )
-                      : null,
-                ),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _PlanOptionTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool selected;
-  final bool showChevron;
-  final VoidCallback? onTap;
-  final Widget trailing;
-  final Widget? footer;
-
-  const _PlanOptionTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.selected,
-    required this.trailing,
-    this.showChevron = false,
-    this.onTap,
-    this.footer,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final iconBg = selected
-        ? theme.colorScheme.primaryContainer
-        : theme.colorScheme.surfaceContainerHighest;
-    final iconColor = selected
-        ? theme.colorScheme.onPrimaryContainer
-        : theme.colorScheme.onSurfaceVariant;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: iconBg,
-                      borderRadius: BorderRadius.circular(9),
-                    ),
-                    child: Icon(icon, size: 18, color: iconColor),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(
-                            text: title,
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          TextSpan(
-                            text: '  ·  $subtitle',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (showChevron)
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      size: 20,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  trailing,
-                ],
-              ),
-              if (footer != null) ...[const SizedBox(height: 6), footer!],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SplitSummaryList extends StatelessWidget {
-  final String lastTitle;
-  final String bestTitle;
-  final RunSplit? last;
-  final RunSplit? best;
-  final String emptyLabel;
-  final String? expandHint;
-
-  const _SplitSummaryList({
-    required this.lastTitle,
-    required this.bestTitle,
-    required this.last,
-    required this.best,
-    required this.emptyLabel,
-    this.expandHint,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest.withValues(
-              alpha: 0.65,
-            ),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Column(
-            children: [
-              _SplitSummaryRow(
-                title: lastTitle,
-                split: last,
-                emptyLabel: emptyLabel,
-              ),
-              Divider(
-                height: 1,
-                indent: 12,
-                endIndent: 12,
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45),
-              ),
-              _SplitSummaryRow(
-                title: bestTitle,
-                split: best,
-                emptyLabel: emptyLabel,
-                highlight: true,
-              ),
-            ],
-          ),
-        ),
-        if (expandHint != null) ...[
-          const SizedBox(height: 6),
-          Text(
-            expandHint!,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _SplitSummaryRow extends StatelessWidget {
-  final String title;
-  final RunSplit? split;
-  final String emptyLabel;
-  final bool highlight;
-
-  const _SplitSummaryRow({
-    required this.title,
-    required this.split,
-    required this.emptyLabel,
-    this.highlight = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final loc = AppLocalizations.of(context)!;
-    final accent = highlight ? theme.colorScheme.primary : null;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 3,
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: accent ?? theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          if (split == null)
-            Text(
-              emptyLabel,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            )
-          else ...[
-            Text(
-              loc.runRecordSplitKm(split!.km),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              RunFormatters.paceWithUnit(split!.paceSecPerKm),
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: accent,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              RunFormatters.duration(split!.durationSeconds),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _SplitRow extends StatelessWidget {
-  final RunSplit split;
-
-  const _SplitRow({required this.split});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final loc = AppLocalizations.of(context)!;
-    final label = split.isPartial
-        ? loc.runRecordSplitPartial(split.km)
-        : loc.runRecordSplitKm(split.km);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              label,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                fontWeight: split.isPartial ? FontWeight.w600 : FontWeight.w500,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              RunFormatters.duration(split.durationSeconds),
-              textAlign: TextAlign.end,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              RunFormatters.pace(split.paceSecPerKm),
-              textAlign: TextAlign.end,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Metric extends StatelessWidget {
-  final String label;
-  final String value;
-  final String? unit;
-  final bool emphasize;
-
-  const _Metric({
-    required this.label,
-    required this.value,
-    this.unit,
-    this.emphasize = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      children: [
-        Text(
-          label.toUpperCase(),
-          style: theme.textTheme.labelMedium?.copyWith(
-            letterSpacing: 0.9,
-            fontWeight: FontWeight.w700,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          value,
-          style:
-              (emphasize
-                      ? theme.textTheme.headlineMedium
-                      : theme.textTheme.headlineSmall)
-                  ?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    height: 1.05,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-        ),
-        if (unit != null) ...[
-          const SizedBox(height: 2),
-          Text(
-            unit!,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ],
     );
   }
 }

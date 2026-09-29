@@ -87,6 +87,19 @@ class RunNativeVoiceService {
     }
   }
 
+  /// Skips the current structured step / interval phase natively. Returns
+  /// true when the native controller advanced (and spoke) the next step.
+  Future<bool> skipStep() async {
+    if (!_isAndroid) return false;
+    try {
+      return await _methods.invokeMethod<bool>('skipStep') ?? false;
+    } on MissingPluginException {
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> speakTest() async {
     if (!_isAndroid) return false;
     try {

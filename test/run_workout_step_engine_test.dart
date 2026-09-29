@@ -397,4 +397,123 @@ void main() {
       expect(engine.snapshot.isDone, isTrue);
     });
   });
+
+  group('skip step and next-step preview', () {
+    RunWorkoutStepEngine started() {
+      final engine = RunWorkoutStepEngine()
+        ..configure(
+          workout([
+            step(order: 0, role: RunStepRole.warmup, value: 1000),
+            step(
+              order: 1,
+              role: RunStepRole.work,
+              value: 400,
+              repeatGroup: 1,
+              repeatCount: 2,
+            ),
+            step(
+              order: 2,
+              role: RunStepRole.recovery,
+              metric: RunIntervalMetric.time,
+              value: 90,
+              repeatGroup: 1,
+              repeatCount: 2,
+            ),
+            step(order: 3, role: RunStepRole.cooldown, value: 500),
+          ]),
+        );
+      engine.start();
+      return engine;
+    }
+
+    test('skip advances, announces the next step and keeps the partial', () {
+      final engine = started();
+      engine.tick(recording: true, distanceMeters: 300, movingTimeSeconds: 90);
+
+      final events = engine.skip();
+
+      expect(events.map((e) => e.kind), [
+        RunStepEventKind.stepCompleted,
+        RunStepEventKind.stepStarted,
+      ]);
+      expect(events.last.role, RunStepRole.work);
+      expect(engine.snapshot.stepIndex, 1);
+      expect(engine.snapshot.progress, 0);
+      expect(engine.results.single.distanceMeters, 300);
+      expect(engine.results.single.durationSeconds, 90);
+    });
+
+    test('snapshot previews the following step', () {
+      final engine = started();
+      var snapshot = engine.snapshot;
+      expect(snapshot.hasNext, isTrue);
+      expect(snapshot.nextRole, RunStepRole.work);
+      expect(snapshot.nextTarget, 400);
+      expect(snapshot.nextRepIndex, 1);
+      expect(snapshot.nextRepTotal, 2);
+
+      engine.skip(); // -> work 1/2
+      snapshot = engine.snapshot;
+      expect(snapshot.nextRole, RunStepRole.recovery);
+      expect(snapshot.nextMetric, RunIntervalMetric.time);
+      expect(snapshot.nextTarget, 90);
+
+      // Last step has no preview.
+      engine
+        ..skip()
+        ..skip()
+        ..skip()
+        ..skip();
+      expect(engine.snapshot.role, RunStepRole.cooldown);
+      expect(engine.snapshot.hasNext, isFalse);
+    });
+
+    test('skipping the last step completes the workout', () {
+      final engine = started();
+      // warmup, 2x(work + recovery), cooldown: five skips reach the last step.
+      for (var i = 0; i < 5; i++) {
+        engine.skip();
+      }
+      expect(engine.snapshot.role, RunStepRole.cooldown);
+      final events = engine.skip();
+      expect(
+        events.map((e) => e.kind),
+        contains(RunStepEventKind.workoutCompleted),
+      );
+      expect(engine.snapshot.isDone, isTrue);
+      expect(engine.skip(), isEmpty);
+    });
+
+    test('skip does nothing before the session starts', () {
+      final engine = RunWorkoutStepEngine()
+        ..configure(
+          workout([step(order: 0, role: RunStepRole.steady, value: 5000)]),
+        );
+      expect(engine.skip(), isEmpty);
+    });
+
+    test('preview survives the native snapshot wire format', () {
+      final snapshot = RunStepSnapshot.fromMap({
+        'phase': 'running',
+        'stepIndex': 1,
+        'totalSteps': 4,
+        'role': 'work',
+        'metric': 'distance',
+        'target': 400,
+        'nextRole': 'recovery',
+        'nextMetric': 'time',
+        'nextTarget': 90,
+        'nextRepIndex': 1,
+        'nextRepTotal': 2,
+      });
+      expect(snapshot.hasNext, isTrue);
+      expect(snapshot.nextRole, RunStepRole.recovery);
+      expect(snapshot.nextMetric, RunIntervalMetric.time);
+      final last = RunStepSnapshot.fromMap({
+        'phase': 'running',
+        'nextRole': null,
+      });
+      expect(last.hasNext, isFalse);
+    });
+  });
 }

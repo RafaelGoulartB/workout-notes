@@ -28,6 +28,7 @@ class RunTrackingService : Service(), LocationListener {
         const val ACTION_RESTORE = "com.workoutnotes.workout_notes.run.RESTORE"
         const val ACTION_STOP = "com.workoutnotes.workout_notes.run.STOP"
         const val ACTION_DISCARD = "com.workoutnotes.workout_notes.run.DISCARD"
+        const val ACTION_LAP = "com.workoutnotes.workout_notes.run.LAP"
 
         private const val WAKE_LOCK_WINDOW_MS = 6 * 60 * 60 * 1000L
         private const val MAX_ACCURACY_METERS = 40f
@@ -53,6 +54,12 @@ class RunTrackingService : Service(), LocationListener {
         fun resumeCurrent(): Map<String, Any?> {
             val service = activeInstance ?: return lastState ?: mapOf("status" to "idle")
             service.resumeRun()
+            return service.stateMap()
+        }
+
+        fun lapCurrent(): Map<String, Any?> {
+            val service = activeInstance ?: return lastState ?: mapOf("status" to "idle")
+            service.lapRun()
             return service.stateMap()
         }
 
@@ -192,6 +199,15 @@ class RunTrackingService : Service(), LocationListener {
     private val completedSplits = mutableListOf<Map<String, Any?>>()
     private var nextSplitAtMeters = 1000.0
     private var lastSplitMovingSeconds = 0
+
+    // Auto-pause: the run stays "recording" but its clock and distance stop
+    // while the detector reports stillness. Reported to Dart as `auto_paused`.
+    private val autoPauseDetector = RunAutoPauseDetector()
+    private var autoPaused = false
+    private var autoPausedAtMillis = 0L
+    private var totalAutoPausedMillis = 0L
+    private val lapTracker = RunLapTracker()
+
     // Native debug simulation (emulator background survives like real GPS)
     private var isNativeDebugSim: Boolean = false
     private var debugTick: Int = 0
@@ -204,6 +220,7 @@ class RunTrackingService : Service(), LocationListener {
             if (status == "recording" || status == "paused") {
                 renewWakeLockIfNeeded()
                 tickCount += 1
+                if (status == "recording") reconcileAutoPauseSetting()
                 // Native debug sim synthesizes movement even with no GPS.
                 if (isNativeDebugSim && status == "recording") {
                     synthesizeDebugTick()
@@ -323,6 +340,7 @@ class RunTrackingService : Service(), LocationListener {
             }
             ACTION_PAUSE -> pauseRun()
             ACTION_RESUME -> resumeRun()
+            ACTION_LAP -> lapRun()
             ACTION_RESTORE -> {
                 if (activeInstance == null || status == "idle") {
                     restoreActiveSessionIfNeeded()
@@ -372,6 +390,7 @@ class RunTrackingService : Service(), LocationListener {
         completedSplits.clear()
         nextSplitAtMeters = 1000.0
         lastSplitMovingSeconds = 0
+        resetAutoPauseAndLaps()
         tickCount = 0
 
         val session = mutableMapOf<String, Any?>(
@@ -442,6 +461,7 @@ class RunTrackingService : Service(), LocationListener {
         completedSplits.clear()
         nextSplitAtMeters = 1000.0
         lastSplitMovingSeconds = 0
+        resetAutoPauseAndLaps()
         tickCount = 0
 
         val session = mutableMapOf<String, Any?>(
@@ -555,6 +575,11 @@ class RunTrackingService : Service(), LocationListener {
             "paused" -> "paused"
             else -> "recording"
         }
+        totalAutoPausedMillis = recovery.totalAutoPausedMillis
+        autoPaused = restoredStatus == "recording" && recovery.autoPausedAtMillis > 0L
+        autoPausedAtMillis = if (autoPaused) recovery.autoPausedAtMillis else 0L
+        autoPauseDetector.reset(startPaused = autoPaused)
+        restoreLaps(session)
         status = restoredStatus
         session["status"] = restoredStatus
         spool.updateActivity(session)
@@ -598,6 +623,7 @@ class RunTrackingService : Service(), LocationListener {
 
     private fun pauseRun() {
         if (status != "recording") return
+        closeAutoPauseInterval()
         status = "paused"
         pausedAtMillis = System.currentTimeMillis()
         // Drop anchor so resume does not credit distance moved while paused.
@@ -613,6 +639,11 @@ class RunTrackingService : Service(), LocationListener {
     }
 
     private fun resumeRun() {
+        // "Resume" while auto-paused means "I'm moving, carry on".
+        if (status == "recording" && autoPaused) {
+            endAutoPause()
+            return
+        }
         if (status != "paused") return
         if (pausedAtMillis > 0L) {
             totalPausedMillis += System.currentTimeMillis() - pausedAtMillis
@@ -620,6 +651,7 @@ class RunTrackingService : Service(), LocationListener {
         }
         status = "recording"
         lastLocation = null
+        autoPauseDetector.reset()
         activity?.let {
             it["status"] = "recording"
         }
@@ -647,10 +679,14 @@ class RunTrackingService : Service(), LocationListener {
             totalPausedMillis += System.currentTimeMillis() - pausedAtMillis
             pausedAtMillis = 0L
         }
+        closeAutoPauseInterval()
 
         val endedAt = System.currentTimeMillis()
         val durationSeconds = max(0, ((endedAt - startedAtMillis) / 1000L).toInt())
-        val movingTimeSeconds = max(0, durationSeconds - (totalPausedMillis / 1000L).toInt())
+        val movingTimeSeconds = max(
+            0,
+            durationSeconds - ((totalPausedMillis + totalAutoPausedMillis) / 1000L).toInt(),
+        )
         val avgPace = RunGeoMath.paceSecPerKm(distanceMeters, movingTimeSeconds)
         val calories = RunGeoMath.estimateCalories(distanceMeters)
 
@@ -663,6 +699,8 @@ class RunTrackingService : Service(), LocationListener {
         session["max_pace_sec_per_km"] = maxPaceSecPerKm
         session["calories"] = calories
         session["splits"] = completedSplits.toList()
+        // Manual laps: the remainder after the last lap closes the set.
+        lapTracker.closeFinal(distanceMeters, movingTimeSeconds)
         persistRuntimeSnapshot(session)
         spool.updateActivity(session)
 
@@ -691,13 +729,7 @@ class RunTrackingService : Service(), LocationListener {
 
     private fun promoteToForeground(runStatus: String) {
         RunTrackingNotification.ensureChannel(this)
-        val notification = RunTrackingNotification.build(
-            this,
-            startedAtMillis,
-            distanceMeters,
-            elapsedSeconds(),
-            runStatus,
-        )
+        val notification = buildNotification(runStatus)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val types = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION or
                 android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
@@ -759,6 +791,26 @@ class RunTrackingService : Service(), LocationListener {
         currentLat = location.latitude
         currentLng = location.longitude
         currentAccuracy = if (location.hasAccuracy()) location.accuracy else null
+
+        if (autoPauseActive()) {
+            val event = autoPauseDetector.onFix(
+                location.time,
+                location.latitude,
+                location.longitude,
+                if (location.hasSpeed()) location.speed.toDouble() else null,
+                currentAccuracy,
+            )
+            when (event) {
+                RunAutoPauseDetector.Event.PAUSE -> beginAutoPause()
+                RunAutoPauseDetector.Event.RESUME -> endAutoPause()
+                RunAutoPauseDetector.Event.NONE -> Unit
+            }
+        }
+        if (autoPaused) {
+            // Standing still: keep the map dot alive, but no distance or route.
+            publishState()
+            return
+        }
 
         val previous = lastLocation
         if (previous == null) {
@@ -891,6 +943,101 @@ class RunTrackingService : Service(), LocationListener {
         }
     }
 
+    private fun autoPauseActive(): Boolean =
+        !isNativeDebugSim &&
+            voiceController.autoPauseEnabled &&
+            // A structured session or interval set owns its own clock: standing
+            // still during a timed recovery must not freeze it.
+            !voiceController.hasPlan &&
+            !voiceController.intervalsEnabled
+
+    /** The setting can change mid-run (voice settings, intervals armed). */
+    private fun reconcileAutoPauseSetting() {
+        if (autoPauseActive()) return
+        if (autoPaused) endAutoPause() else autoPauseDetector.reset()
+    }
+
+    private fun beginAutoPause() {
+        if (autoPaused || status != "recording") return
+        autoPaused = true
+        autoPausedAtMillis = System.currentTimeMillis()
+        lastLocation = null
+        currentPaceSecPerKm = null
+        persistLiveTotals()
+        updateNotification()
+        publishState()
+    }
+
+    private fun endAutoPause() {
+        if (!autoPaused) return
+        closeAutoPauseInterval()
+        autoPauseDetector.reset()
+        // The next fix re-anchors, so the stop credits no distance.
+        lastLocation = null
+        persistLiveTotals()
+        updateNotification()
+        publishState()
+    }
+
+    /** Folds an open auto-pause into the total (no notification/publish). */
+    private fun closeAutoPauseInterval() {
+        if (autoPausedAtMillis > 0L) {
+            totalAutoPausedMillis += System.currentTimeMillis() - autoPausedAtMillis
+        }
+        autoPaused = false
+        autoPausedAtMillis = 0L
+    }
+
+    private fun resetAutoPauseAndLaps() {
+        autoPaused = false
+        autoPausedAtMillis = 0L
+        totalAutoPausedMillis = 0L
+        autoPauseDetector.reset()
+        lapTracker.reset()
+    }
+
+    private fun restoreLaps(session: Map<String, Any?>) {
+        val laps = mutableListOf<Map<String, Any?>>()
+        (session["laps"] as? List<*>)?.forEach { row ->
+            if (row is Map<*, *>) {
+                @Suppress("UNCHECKED_CAST")
+                laps.add(row as Map<String, Any?>)
+            }
+        }
+        lapTracker.restore(
+            laps,
+            (session["lap_start_distance_meters"] as? Number)?.toDouble() ?: 0.0,
+            (session["lap_start_moving_seconds"] as? Number)?.toInt() ?: 0,
+        )
+    }
+
+    /** Marks a manual lap at the current distance / moving time. */
+    fun lapRun(): Map<String, Any?>? {
+        if (finished || status != "recording") return null
+        val lap = lapTracker.mark(distanceMeters, movingSeconds()) ?: return null
+        persistLiveTotals()
+        try {
+            voiceController.announceLap(lap)
+        } catch (_: Throwable) {
+        }
+        publishState()
+        return lap
+    }
+
+    /** Skips the current structured step / interval phase. */
+    fun skipStep(): Boolean {
+        val skipped = try {
+            voiceController.skipStep()
+        } catch (_: Throwable) {
+            false
+        }
+        if (skipped) {
+            persistVoicePlan()
+            publishState()
+        }
+        return skipped
+    }
+
     private fun persistLiveTotals() {
         val session = activity ?: return
         val durationSeconds = elapsedSeconds()
@@ -910,6 +1057,11 @@ class RunTrackingService : Service(), LocationListener {
     private fun persistRuntimeSnapshot(session: MutableMap<String, Any?>) {
         session["paused_at_millis"] = pausedAtMillis.takeIf { it > 0L }
         session["total_paused_millis"] = totalPausedMillis
+        session["auto_paused_at_millis"] = autoPausedAtMillis.takeIf { it > 0L }
+        session["total_auto_paused_millis"] = totalAutoPausedMillis
+        session["laps"] = lapTracker.completedLaps()
+        session["lap_start_distance_meters"] = lapTracker.startDistanceMeters
+        session["lap_start_moving_seconds"] = lapTracker.startMovingSeconds
         session["last_split_moving_seconds"] = lastSplitMovingSeconds
         session["next_split_at_meters"] = nextSplitAtMeters
         session["voice_engine_snapshot_json"] = voiceController.engineSnapshotJson()
@@ -927,7 +1079,12 @@ class RunTrackingService : Service(), LocationListener {
         } else {
             0L
         }
-        val pausedTotal = totalPausedMillis + pausedExtra
+        val autoExtra = if (autoPaused && autoPausedAtMillis > 0L) {
+            System.currentTimeMillis() - autoPausedAtMillis
+        } else {
+            0L
+        }
+        val pausedTotal = totalPausedMillis + pausedExtra + totalAutoPausedMillis + autoExtra
         return max(0, elapsedSeconds() - (pausedTotal / 1000L).toInt())
     }
 
@@ -953,6 +1110,9 @@ class RunTrackingService : Service(), LocationListener {
             "point_count" to pointSeq,
             "splits" to splits,
             "current_split" to partial,
+            "auto_paused" to (autoPaused && status == "recording"),
+            "laps" to lapTracker.completedLaps(),
+            "current_lap" to lapTracker.current(distanceMeters, movingSeconds()),
             "session_context" to sessionContextMap(),
             "step_snapshot" to voiceController.stepSnapshotMap(),
         )
@@ -971,23 +1131,28 @@ class RunTrackingService : Service(), LocationListener {
                 currentPaceSecPerKm = currentPaceSecPerKm,
                 lat = currentLat,
                 accuracyMeters = currentAccuracy,
-                isRecording = status == "recording",
+                isRecording = status == "recording" && !autoPaused,
                 isPaused = status == "paused",
                 splitsCount = completedSplits.size,
                 currentSplitPace = null,
                 splits = completedSplits.toList(),
+                autoPaused = autoPaused && status == "recording",
             )
         } catch (_: Throwable) {}
     }
 
+    private fun buildNotification(runStatus: String) = RunTrackingNotification.build(
+        this,
+        startedAtMillis,
+        distanceMeters,
+        movingSeconds(),
+        currentPaceSecPerKm,
+        runStatus,
+        autoPaused = autoPaused && runStatus == "recording",
+    )
+
     private fun updateNotification() {
-        val notification = RunTrackingNotification.build(
-            this,
-            startedAtMillis,
-            distanceMeters,
-            elapsedSeconds(),
-            status,
-        )
+        val notification = buildNotification(status)
         val manager = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
         manager.notify(RunTrackingNotification.NOTIFICATION_ID, notification)
     }

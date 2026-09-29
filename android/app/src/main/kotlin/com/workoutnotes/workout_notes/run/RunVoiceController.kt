@@ -46,6 +46,7 @@ class RunVoiceController(private val context: Context) {
     private var paceDeviationDirection: Int = 0
     private var paceCorrectionSpoken: Boolean = false
     private var wasPaused: Boolean? = null
+    private var wasAutoPaused: Boolean? = null
 
     // Persisted settings cache
     @Volatile private var settingsLoaded = false
@@ -141,6 +142,9 @@ class RunVoiceController(private val context: Context) {
     val hasPlan: Boolean get() = stepEngine.hasPlan
     val intervalsEnabled: Boolean get() = intervalsOn
 
+    /** Auto-pause is a user setting, but structured sessions own their clock. */
+    val autoPauseEnabled: Boolean get() = settings.autoPause
+
     fun goalJson(): String = goal.toJson().toString()
 
     fun restoreGoalJson(raw: String?) {
@@ -205,6 +209,7 @@ class RunVoiceController(private val context: Context) {
         paceDeviationDirection = 0
         paceCorrectionSpoken = false
         wasPaused = null
+        wasAutoPaused = null
         intervalEngine.reset()
         if (plan != null) setPlanSteps(RunWorkoutStepNative.listFromAny(plan))
         stepEngine.reset()
@@ -229,6 +234,39 @@ class RunVoiceController(private val context: Context) {
     fun shutdown() {
         end()
         tts.shutdown()
+    }
+
+    /**
+     * Moves the structured session (or the quick interval set) to its next
+     * step and speaks it. Returns false when there is nothing to skip.
+     */
+    fun skipStep(): Boolean {
+        if (!active) return false
+        val spoken = mutableListOf<String>()
+        if (stepEngine.hasPlan) {
+            if (stepEngine.snapshot.phase != RunStepEnginePhase.running) return false
+            for (event in stepEngine.skip()) phraseForStep(event)?.let { spoken.add(it) }
+        } else if (intervalsOn) {
+            val phase = intervalEngine.snapshot.phase
+            if (phase != RunIntervalPhase.work && phase != RunIntervalPhase.rest) return false
+            for (event in intervalEngine.skip()) {
+                if (settings.announceIntervals) phraseForInterval(event)?.let { spoken.add(it) }
+            }
+        } else {
+            return false
+        }
+        spoken.firstOrNull()?.let { speakIfAllowed(it) }
+        return true
+    }
+
+    /** Spoken summary of a manual lap that was just marked. */
+    fun announceLap(lap: Map<String, Any?>) {
+        if (!active || !settings.enabled || !settings.announceLaps) return
+        val index = (lap["lap_index"] as? Number)?.toInt() ?: return
+        val distance = (lap["distance_meters"] as? Number)?.toDouble() ?: 0.0
+        val duration = (lap["duration_seconds"] as? Number)?.toInt() ?: 0
+        val pace = (lap["pace_sec_per_km"] as? Number)?.toDouble()
+        speakIfAllowed(phrases.lapSummary(index, distance.toInt(), duration, pace))
     }
 
     fun speakTest() {
@@ -272,11 +310,20 @@ class RunVoiceController(private val context: Context) {
         splitsCount: Int,
         currentSplitPace: Double?,
         splits: List<Map<String, Any?>>,
+        autoPaused: Boolean = false,
     ) {
         if (!active) return
         if (!settings.enabled) return
 
         val phrases = mutableListOf<String>()
+
+        if (isRecording || isPaused || autoPaused) {
+            val previousAuto = wasAutoPaused
+            wasAutoPaused = autoPaused
+            if (previousAuto != null && previousAuto != autoPaused && settings.announceAutoPause) {
+                phrases.add(if (autoPaused) this.phrases.autoPaused() else this.phrases.autoResumed())
+            }
+        }
 
         if (isRecording || isPaused) {
             val previousPaused = wasPaused
@@ -396,8 +443,13 @@ class RunVoiceController(private val context: Context) {
             }
         }
 
-        if (!stepEngine.hasPlan && settings.announcePaceWarning && settings.targetPaceSecPerKm != null && isRecording) {
-            stablePacePhrase(distanceMeters, movingTimeSeconds)?.let { out.add(it) }
+        // A pace goal set for this run wins over the global target and turns the
+        // warnings on for the session.
+        val sessionPace = goal.paceTargetSecPerKm
+        val paceTarget = sessionPace ?: settings.targetPaceSecPerKm?.takeIf { settings.announcePaceWarning }
+        val paceTolerance = if (sessionPace != null) goal.paceTolerancePercent else settings.paceTolerancePercent
+        if (!stepEngine.hasPlan && paceTarget != null && isRecording) {
+            stablePacePhrase(distanceMeters, movingTimeSeconds, paceTarget, paceTolerance)?.let { out.add(it) }
         }
 
         return out
@@ -416,7 +468,12 @@ class RunVoiceController(private val context: Context) {
         return phrases.goalRemaining(goal.metric, remaining)
     }
 
-    private fun stablePacePhrase(distanceMeters: Double, movingTimeSeconds: Int): String? {
+    private fun stablePacePhrase(
+        distanceMeters: Double,
+        movingTimeSeconds: Int,
+        target: Int,
+        tolerancePercent: Int,
+    ): String? {
         val now = System.currentTimeMillis()
         paceSamples.addLast(RunVoicePacePoint(now, distanceMeters, movingTimeSeconds))
         while (paceSamples.isNotEmpty() && now - paceSamples.first().atMillis > 25_000) paceSamples.removeFirst()
@@ -426,8 +483,7 @@ class RunVoiceController(private val context: Context) {
         val distance = distanceMeters - first.distanceMeters
         if (elapsed < 12 || distance < 40) return null
         val pace = elapsed / (distance / 1000.0)
-        val target = settings.targetPaceSecPerKm ?: return null
-        val tolerance = settings.paceTolerancePercent / 100.0
+        val tolerance = tolerancePercent / 100.0
         val direction = if (pace < target * (1 - tolerance)) -1 else if (pace > target * (1 + tolerance)) 1 else 0
         if (direction == 0) {
             paceDeviationSince = 0L

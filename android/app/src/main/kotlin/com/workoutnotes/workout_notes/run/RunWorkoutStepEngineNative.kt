@@ -301,6 +301,18 @@ class RunWorkoutStepEngineNative {
             "targetPaceMaxSecPerKm" to current?.targetPaceMaxSecPerKm,
             "workRepsDone" to snap.workRepsDone,
             "workRepsTotal" to snap.workRepsTotal,
+        ) + nextStepMap()
+    }
+
+    /** What comes after the running step, for the "up next" preview. */
+    private fun nextStepMap(): Map<String, Any?> {
+        val next = if (phase == RunStepEnginePhase.running) steps.getOrNull(index + 1) else null
+        return mapOf(
+            "nextRole" to next?.step?.role?.name,
+            "nextMetric" to next?.step?.metric?.name,
+            "nextTarget" to next?.step?.value,
+            "nextRepIndex" to next?.repIndex,
+            "nextRepTotal" to next?.repTotal,
         )
     }
 
@@ -454,6 +466,44 @@ class RunWorkoutStepEngineNative {
             paceCueSpoken = false
             events.add(event(RunStepEventKind.stepStarted, current))
         }
+        return events
+    }
+
+    /**
+     * Moves on to the next step now ("skip step"). The skipped step keeps what
+     * was actually run in the results, exactly like a step that timed out.
+     */
+    fun skip(): List<RunStepEventNative> {
+        if (phase != RunStepEnginePhase.running || index !in steps.indices) return emptyList()
+        val events = mutableListOf<RunStepEventNative>()
+        val current = steps[index]
+        events.add(event(RunStepEventKind.stepCompleted, current))
+        recordResult(current)
+        if (index >= steps.size - 1) {
+            phase = RunStepEnginePhase.done
+            index = steps.size
+            events.add(
+                RunStepEventNative(
+                    kind = RunStepEventKind.workoutCompleted,
+                    stepIndex = -1,
+                    totalSteps = steps.size,
+                    role = current.step.role,
+                    repIndex = current.repIndex,
+                    repTotal = current.repTotal,
+                    metric = current.step.metric,
+                    target = current.step.value,
+                )
+            )
+            return events
+        }
+        index++
+        val next = steps[index]
+        accum = 0.0
+        stepDistance = 0.0
+        stepSeconds = 0
+        remainingCueSpoken = false
+        paceCueSpoken = false
+        events.add(event(RunStepEventKind.stepStarted, next))
         return events
     }
 

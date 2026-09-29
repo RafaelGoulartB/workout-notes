@@ -69,6 +69,14 @@ class RunStepSnapshot {
   final int workRepsDone;
   final int workRepsTotal;
 
+  /// The step that follows the running one, for the "up next" preview. Null on
+  /// the last step and outside a running session.
+  final RunStepRole? nextRole;
+  final RunIntervalMetric? nextMetric;
+  final int? nextTarget;
+  final int nextRepIndex;
+  final int nextRepTotal;
+
   const RunStepSnapshot({
     required this.phase,
     required this.stepIndex,
@@ -84,6 +92,11 @@ class RunStepSnapshot {
     this.targetPaceMaxSecPerKm,
     required this.workRepsDone,
     required this.workRepsTotal,
+    this.nextRole,
+    this.nextMetric,
+    this.nextTarget,
+    this.nextRepIndex = 0,
+    this.nextRepTotal = 0,
   });
 
   const RunStepSnapshot.idle()
@@ -125,8 +138,21 @@ class RunStepSnapshot {
       targetPaceMaxSecPerKm: (map['targetPaceMaxSecPerKm'] as num?)?.toDouble(),
       workRepsDone: (map['workRepsDone'] as num?)?.toInt() ?? 0,
       workRepsTotal: (map['workRepsTotal'] as num?)?.toInt() ?? 0,
+      nextRole: map['nextRole'] == null
+          ? null
+          : RunStepRole.fromString(map['nextRole'] as String?),
+      nextMetric: map['nextMetric'] == null
+          ? null
+          : (map['nextMetric'] == 'time'
+                ? RunIntervalMetric.time
+                : RunIntervalMetric.distance),
+      nextTarget: (map['nextTarget'] as num?)?.toInt(),
+      nextRepIndex: (map['nextRepIndex'] as num?)?.toInt() ?? 0,
+      nextRepTotal: (map['nextRepTotal'] as num?)?.toInt() ?? 0,
     );
   }
+
+  bool get hasNext => nextRole != null && (nextTarget ?? 0) > 0;
 
   bool get isActive => phase == RunStepEnginePhase.running;
   bool get isDone => phase == RunStepEnginePhase.done;
@@ -213,6 +239,7 @@ class RunWorkoutStepEngine {
       );
     }
     final current = _steps[_index];
+    final next = _index + 1 < _steps.length ? _steps[_index + 1] : null;
     final target = current.step.value.toDouble();
     return RunStepSnapshot(
       phase: _phase,
@@ -229,6 +256,11 @@ class RunWorkoutStepEngine {
       targetPaceMaxSecPerKm: current.step.targetPaceMaxSecPerKm,
       workRepsDone: workRepsDone,
       workRepsTotal: workRepsTotal,
+      nextRole: next?.step.role,
+      nextMetric: next?.step.metric,
+      nextTarget: next?.step.value,
+      nextRepIndex: next?.repIndex ?? 0,
+      nextRepTotal: next?.repTotal ?? 0,
     );
   }
 
@@ -368,6 +400,47 @@ class RunWorkoutStepEngine {
       _paceCueSpoken = false;
       events.add(_event(RunStepEventKind.stepStarted, current));
     }
+    return events;
+  }
+
+  /// Moves on to the next step right now ("skip step"). The skipped step keeps
+  /// what was actually run in [results], like one that timed out.
+  List<RunStepEvent> skip() {
+    if (_phase != RunStepEnginePhase.running ||
+        _index < 0 ||
+        _index >= _steps.length) {
+      return const [];
+    }
+    final current = _steps[_index];
+    final events = <RunStepEvent>[
+      _event(RunStepEventKind.stepCompleted, current),
+    ];
+    _recordResult(current);
+    if (_index >= _steps.length - 1) {
+      _phase = RunStepEnginePhase.done;
+      _index = _steps.length;
+      events.add(
+        RunStepEvent(
+          kind: RunStepEventKind.workoutCompleted,
+          stepIndex: -1,
+          totalSteps: _steps.length,
+          role: current.step.role,
+          repIndex: current.repIndex,
+          repTotal: current.repTotal,
+          metric: current.step.metric,
+          target: current.step.value,
+        ),
+      );
+      return events;
+    }
+    _index++;
+    final next = _steps[_index];
+    _accum = 0;
+    _stepDistance = 0;
+    _stepSeconds = 0;
+    _remainingCueSpoken = false;
+    _paceCueSpoken = false;
+    events.add(_event(RunStepEventKind.stepStarted, next));
     return events;
   }
 

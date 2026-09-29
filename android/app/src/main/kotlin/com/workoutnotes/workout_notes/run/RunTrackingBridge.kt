@@ -73,6 +73,7 @@ class RunTrackingBridge(private val context: Context) :
             "startDebugSimulation" -> startDebugSimulation(call, result)
             "pause" -> result.success(RunTrackingService.pauseCurrent())
             "resume" -> result.success(RunTrackingService.resumeCurrent())
+            "lap" -> result.success(RunTrackingService.lapCurrent())
             "stop" -> result.success(RunTrackingService.stopCurrent(context))
             "discard" -> {
                 val id = call.arguments as? String

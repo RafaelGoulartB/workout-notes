@@ -1,8 +1,10 @@
 import 'dart:math' as math;
 
 import 'package:uuid/uuid.dart';
+import 'package:workout_notes/models/run_lap.dart';
 import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
+import 'package:workout_notes/utils/run_lap_log.dart';
 
 /// Pure debug GPS path generator. Not used in release builds.
 class RunDebugSimulator {
@@ -27,6 +29,7 @@ class RunDebugSimulator {
   double lng;
   final List<RunLatLng> trail = [];
   final List<RunSplit> completedSplits = [];
+  final RunLapLog lapLog = RunLapLog();
   int _lastSplitMovingSeconds = 0;
   double _nextSplitAtMeters = 1000;
   int _tick = 0;
@@ -39,8 +42,8 @@ class RunDebugSimulator {
     required this.startedAt,
     required this.startLat,
     required this.startLng,
-  })  : lat = startLat,
-        lng = startLng {
+  }) : lat = startLat,
+       lng = startLng {
     trail.add(RunLatLng(startLat, startLng));
   }
 
@@ -67,8 +70,10 @@ class RunDebugSimulator {
     final surge = (tick % 28) < 4 ? 2.8 : 0.0;
     // Soft dip mid-cycle so one km is clearly slower than another.
     final dip = (tick % 55) > 40 ? -2.2 : 0.0;
-    return (baseMetersPerSecond + slowWave + fastWave + surge + dip)
-        .clamp(minMetersPerSecond, maxMetersPerSecond);
+    return (baseMetersPerSecond + slowWave + fastWave + surge + dip).clamp(
+      minMetersPerSecond,
+      maxMetersPerSecond,
+    );
   }
 
   /// Advances one second of simulated movement.
@@ -105,7 +110,10 @@ class RunDebugSimulator {
 
   void _recordCompletedSplits() {
     while (distanceMeters >= _nextSplitAtMeters) {
-      final splitDuration = math.max(0, movingSeconds - _lastSplitMovingSeconds);
+      final splitDuration = math.max(
+        0,
+        movingSeconds - _lastSplitMovingSeconds,
+      );
       completedSplits.add(
         RunSplit(
           km: (_nextSplitAtMeters / 1000).round(),
@@ -149,6 +157,10 @@ class RunDebugSimulator {
     return movingSeconds / (distanceMeters / 1000.0);
   }
 
+  /// Marks a manual lap at the simulated distance / moving time.
+  RunLap? markLap() =>
+      lapLog.mark(distanceMeters: distanceMeters, movingSeconds: movingSeconds);
+
   /// Last step length (meters) — exposed for tests.
   double get lastStepMeters => _lastStepMeters;
 
@@ -170,15 +182,20 @@ class RunDebugSimulator {
       trail: List.unmodifiable(trail),
       splits: List.unmodifiable(completedSplits),
       currentSplit: currentPartialSplit,
+      laps: lapLog.laps,
+      currentLap: lapLog.current(
+        distanceMeters: distanceMeters,
+        movingSeconds: movingSeconds,
+      ),
       errorCode: null,
       errorMessage: null,
     );
   }
 
   RunTrackingState toPausedState({required bool locationGranted}) {
-    return toState(locationGranted: locationGranted).copyWith(
-      status: RunTrackingState.paused,
-    );
+    return toState(
+      locationGranted: locationGranted,
+    ).copyWith(status: RunTrackingState.paused);
   }
 
   /// Spool-shaped payload for [RunRepository.importNativeSpool].
@@ -213,6 +230,13 @@ class RunDebugSimulator {
         'calories': (distanceMeters / 1000.0 * 70).round(),
         'title': 'Debug Run',
         'notes': 'Simulated debug run',
+        'laps': [
+          for (final lap in lapLog.closedLaps(
+            distanceMeters: distanceMeters,
+            movingSeconds: movingSeconds,
+          ))
+            lap.toMap(activityId),
+        ],
       },
       'points': points,
     };

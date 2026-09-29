@@ -208,6 +208,35 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
     }
   }
 
+  String _countdownLabel(AppLocalizations loc, int seconds) => seconds <= 0
+      ? loc.runVoiceCountdownOff
+      : loc.runVoiceCountdownSeconds(seconds);
+
+  Future<void> _pickCountdown() async {
+    final loc = AppLocalizations.of(context)!;
+    final choice = await showModalBottomSheet<int>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final seconds in RunVoiceSettings.countdownOptions)
+              ListTile(
+                title: Text(_countdownLabel(loc, seconds)),
+                trailing: seconds == _settings.countdownSeconds
+                    ? const Icon(Icons.check)
+                    : null,
+                onTap: () => Navigator.pop(ctx, seconds),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (choice != null) {
+      await _persist(_settings.copyWith(countdownSeconds: choice));
+    }
+  }
+
   Future<void> _pickPaceTolerance() async {
     final loc = AppLocalizations.of(context)!;
     final choice = await showModalBottomSheet<int>(
@@ -338,7 +367,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
         return RunFormatters.duration(value);
       }
       return value >= 1000
-          ? '${(value / 1000).toStringAsFixed(1)} km'
+          ? '${RunFormatters.decimal(value / 1000, 1)} km'
           : '$value m';
     }
 
@@ -407,6 +436,26 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                       subtitle: loc.runVoiceMuteOnCallSubtitle,
                       value: s.muteDuringCall,
                       onChanged: (v) => _persist(s.copyWith(muteDuringCall: v)),
+                    ),
+                  ],
+                ),
+                SettingsSectionHeader(text: loc.runVoiceSectionRunning),
+                SettingsCard(
+                  children: [
+                    SettingsSwitchTile(
+                      icon: Icons.pause_circle_outline,
+                      title: loc.runAutoPauseSetting,
+                      subtitle: loc.runAutoPauseSettingSubtitle,
+                      value: s.autoPause,
+                      onChanged: (v) => _persist(s.copyWith(autoPause: v)),
+                    ),
+                    const SettingsCardDivider(),
+                    SettingsLinkTile(
+                      icon: Icons.timer_outlined,
+                      title: loc.runVoiceCountdown,
+                      subtitle:
+                          '${_countdownLabel(loc, s.countdownSeconds)} · ${loc.runVoiceCountdownSubtitle}',
+                      onTap: _pickCountdown,
                     ),
                   ],
                 ),
@@ -479,6 +528,23 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                       value: s.announceGpsStatus,
                       onChanged: (v) =>
                           _persist(s.copyWith(announceGpsStatus: v)),
+                    ),
+                    const SettingsCardDivider(),
+                    SettingsSwitchTile(
+                      icon: Icons.pause_circle_outline,
+                      title: loc.runVoiceAnnounceAutoPause,
+                      subtitle: loc.runVoiceAnnounceAutoPauseSubtitle,
+                      value: s.announceAutoPause,
+                      onChanged: (v) =>
+                          _persist(s.copyWith(announceAutoPause: v)),
+                    ),
+                    const SettingsCardDivider(),
+                    SettingsSwitchTile(
+                      icon: Icons.flag_circle_outlined,
+                      title: loc.runVoiceAnnounceLaps,
+                      subtitle: loc.runVoiceAnnounceLapsSubtitle,
+                      value: s.announceLaps,
+                      onChanged: (v) => _persist(s.copyWith(announceLaps: v)),
                     ),
                     const SettingsCardDivider(),
                     SettingsSwitchTile(

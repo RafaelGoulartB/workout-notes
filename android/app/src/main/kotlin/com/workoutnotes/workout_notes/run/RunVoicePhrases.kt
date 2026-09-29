@@ -105,6 +105,16 @@ class RunVoicePhrases(private val language: RunVoiceLanguage) {
 
     fun paused(): String = if (pt) "Corrida pausada." else "Paused."
     fun resumed(): String = if (pt) "Corrida retomada." else "Resumed."
+    fun autoPaused(): String = if (pt) "Pausa automática." else "Auto paused."
+    fun autoResumed(): String = if (pt) "Retomando." else "Resuming."
+
+    fun lapSummary(index: Int, distanceMeters: Int, durationSeconds: Int, paceSecPerKm: Double?): String {
+        val head = if (pt) "Volta $index." else "Lap $index."
+        val distance = if (distanceMeters >= 1) " ${distanceSpeech(distanceMeters)}." else ""
+        val time = " ${durationSpeech(durationSeconds)}."
+        val pace = if (validPace(paceSecPerKm)) " Pace ${paceSpeech(paceSecPerKm!!)}." else ""
+        return "$head$distance$time$pace"
+    }
     fun testAnnouncement(): String = if (pt) {
         "Áudio do treinador pronto. Pace de 5 minutos e 30 segundos por quilômetro."
     } else {

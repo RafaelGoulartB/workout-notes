@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_activity.dart';
+import 'package:workout_notes/models/run_lap.dart';
 import 'package:workout_notes/models/run_permission_state.dart';
 import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/models/run_session_context.dart';
@@ -423,6 +425,27 @@ class RunTrackingService extends ChangeNotifier {
     }
   }
 
+  /// Marks a manual lap. Returns the lap just closed, or null when it was
+  /// ignored (accidental double tap, nothing recording).
+  Future<RunLap?> lap() async {
+    final before = _state.laps.length;
+    if (_debugSim != null && !_nativeDebugSim) {
+      if (!_state.isRecording) return null;
+      final lap = _debugSim!.markLap();
+      if (lap != null) _publishDebugState();
+      return lap;
+    }
+    if (!_isAndroid || !_state.isRecording) return null;
+    try {
+      final result = await methods.invokeMapMethod<String, dynamic>('lap');
+      if (result != null) _applyNativeState(result);
+    } catch (error) {
+      _setError('lap_error', error.toString());
+      return null;
+    }
+    return _state.laps.length > before ? _state.laps.last : null;
+  }
+
   Future<void> resume() async {
     if (_debugSim != null) {
       if (_nativeDebugSim && _isAndroid) {
@@ -439,7 +462,8 @@ class RunTrackingService extends ChangeNotifier {
       _publishDebugState();
       return;
     }
-    if (!_isAndroid || !_state.isPaused) return;
+    // "Resume" also ends an auto-pause early ("I'm moving, carry on").
+    if (!_isAndroid || !(_state.isPaused || _state.isAutoPaused)) return;
     try {
       final result = await methods.invokeMapMethod<String, dynamic>('resume');
       if (result != null) _applyNativeState(result);
@@ -620,6 +644,11 @@ class RunTrackingService extends ChangeNotifier {
         activity['distance_meters'] = distanceMeters.clamp(0, 1000000);
         // Recalculate the estimate from the reviewed metrics.
         activity.remove('calories');
+        // Treadmill: the pace only exists once the console distance is typed.
+        if (CardioActivityType.fromDatabase(activity['activity_type']) ==
+            CardioActivityType.treadmill) {
+          activity.remove('avg_pace_sec_per_km');
+        }
       }
       payload['activity'] = activity;
 

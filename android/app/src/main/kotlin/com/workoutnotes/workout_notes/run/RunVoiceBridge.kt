@@ -96,6 +96,10 @@ class RunVoiceBridge(private val context: Context) : MethodChannel.MethodCallHan
                 pendingPlan = null
                 result.success(null)
             }
+            "skipStep" -> {
+                val svc = RunTrackingService.activeInstanceForVoice()
+                result.success(svc?.skipStep() ?: false)
+            }
             "stepResults" -> {
                 // Native is the source of truth for a structured session: it keeps
                 // cueing (and measuring) while the Flutter engine is dead.

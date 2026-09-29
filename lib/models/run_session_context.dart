@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:workout_notes/models/run_session_goal.dart';
-import 'package:workout_notes/models/run_voice_settings.dart';
 
 /// Durable identity and per-run configuration for an active GPS session.
 ///
@@ -29,11 +28,7 @@ class RunSessionContext {
   Map<String, dynamic> toMap() => {
     'plan_workout_id': planWorkoutId,
     'scheduled_run_id': scheduledRunId,
-    'goal': {
-      'enabled': goal.enabled,
-      'metric': goal.metric.name,
-      'value': goal.value,
-    },
+    'goal': goal.toMap(),
     'intervals_on': intervalsOn,
     'plan_steps': planSteps,
   };
@@ -54,13 +49,9 @@ class RunSessionContext {
     return RunSessionContext(
       planWorkoutId: map['plan_workout_id'] as String?,
       scheduledRunId: map['scheduled_run_id'] as String?,
-      goal: RunSessionGoal(
-        enabled: goalMap['enabled'] as bool? ?? false,
-        metric: goalMap['metric'] == 'time'
-            ? RunIntervalMetric.time
-            : RunIntervalMetric.distance,
-        value: (goalMap['value'] as num?)?.toInt() ?? 5000,
-      ),
+      goal: goalMap.isEmpty
+          ? const RunSessionGoal.defaults()
+          : RunSessionGoal.fromMap(goalMap),
       intervalsOn: map['intervals_on'] as bool? ?? false,
       planSteps: (map['plan_steps'] as List? ?? const [])
           .whereType<Map>()

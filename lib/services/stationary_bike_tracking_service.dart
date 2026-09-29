@@ -4,14 +4,17 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_review_draft.dart';
+import 'package:workout_notes/models/run_session_context.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 
-/// In-app timer for stationary-bike sessions.
+/// In-app timer for indoor sessions: stationary bike and treadmill.
 ///
 /// Unlike outdoor running, this tracker deliberately has no location or native
 /// GPS dependency. Elapsed values are derived from timestamps so they remain
 /// correct when Flutter pauses periodic timers while the app is backgrounded.
+/// The distance is typed on the review screen. (The class keeps its original
+/// name; see [IndoorTrackingService].)
 class StationaryBikeTrackingService extends ChangeNotifier {
   static final StationaryBikeTrackingService instance =
       StationaryBikeTrackingService._();
@@ -22,6 +25,10 @@ class StationaryBikeTrackingService extends ChangeNotifier {
 
   final RunRepository _repository = RunRepository();
   RunTrackingState _state = const RunTrackingState.initial(supported: true);
+  CardioActivityType _activityType = CardioActivityType.stationaryBike;
+
+  /// Planned session the runner attached (treadmill runs may complete one).
+  RunSessionContext? _sessionContext;
   Timer? _ticker;
   DateTime? _resumedAt;
   int _accumulatedMovingSeconds = 0;
@@ -30,8 +37,21 @@ class StationaryBikeTrackingService extends ChangeNotifier {
 
   bool get isActive => _state.isActive;
 
-  Future<bool> start() async {
+  /// The indoor activity being timed (or last started).
+  CardioActivityType get activityType => _activityType;
+
+  /// Starts timing. [context] links a planned workout: a treadmill run then
+  /// completes that plan session when the review is saved, like an outdoor run.
+  Future<bool> start({
+    CardioActivityType type = CardioActivityType.stationaryBike,
+    RunSessionContext? context,
+  }) async {
+    assert(type.isIndoor, 'Only indoor activities use the timer service');
     if (_state.isActive) return true;
+    _activityType = type.isIndoor ? type : CardioActivityType.stationaryBike;
+    _sessionContext = _activityType == CardioActivityType.treadmill
+        ? context
+        : null;
     final now = DateTime.now();
     _accumulatedMovingSeconds = 0;
     _resumedAt = now;
@@ -95,13 +115,17 @@ class StationaryBikeTrackingService extends ChangeNotifier {
       'schema_version': 1,
       'activity': <String, dynamic>{
         'id': activityId,
-        'activity_type': CardioActivityType.stationaryBike.databaseValue,
+        'activity_type': _activityType.databaseValue,
         'started_at': (snapshot.startedAt ?? endedAt).toIso8601String(),
         'ended_at': endedAt.toIso8601String(),
         'duration_seconds': snapshot.durationSeconds,
         'moving_time_seconds': snapshot.movingTimeSeconds,
         'distance_meters': 0.0,
         'status': 'pending_review',
+        if (_sessionContext?.planWorkoutId != null)
+          'plan_workout_id': _sessionContext!.planWorkoutId,
+        if (_sessionContext?.scheduledRunId != null)
+          'scheduled_run_id': _sessionContext!.scheduledRunId,
       },
       'points': <Map<String, dynamic>>[],
     };
@@ -147,6 +171,7 @@ class StationaryBikeTrackingService extends ChangeNotifier {
   }
 
   void _reset() {
+    _sessionContext = null;
     _accumulatedMovingSeconds = 0;
     _resumedAt = null;
     _state = const RunTrackingState.initial(supported: true);
@@ -159,3 +184,6 @@ class StationaryBikeTrackingService extends ChangeNotifier {
     super.dispose();
   }
 }
+
+/// The tracker handles every indoor (no-GPS) activity, not just the bike.
+typedef IndoorTrackingService = StationaryBikeTrackingService;
