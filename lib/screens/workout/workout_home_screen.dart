@@ -2,18 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
-import 'package:workout_notes/services/strength_routine_day_inference.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
-import 'package:workout_notes/repositories/strength_repository.dart';
 import 'package:workout_notes/screens/strength/strength_home_screen.dart';
 import 'package:workout_notes/services/run_today_service.dart';
-import 'package:workout_notes/services/run_tracking_service.dart';
-import 'package:workout_notes/services/stationary_bike_tracking_service.dart';
 import 'package:workout_notes/services/strength_today_service.dart';
-import 'package:workout_notes/utils/load_generation.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_week_analytics.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
@@ -21,13 +16,11 @@ import 'package:workout_notes/widgets/load_error_view.dart';
 import 'package:workout_notes/widgets/workout/active_session_banner.dart';
 import 'package:workout_notes/widgets/run/run_pending_review_banner.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
-import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
+import 'package:workout_notes/screens/workout/workout_home_controller.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_format.dart';
 import 'package:workout_notes/widgets/strength/home/workout_home_widgets.dart';
-import '../../repositories/workout_repository.dart';
-import '../../repositories/run_repository.dart';
 import '../../services/rest_timer_service.dart';
 import 'active_workout_screen.dart';
 import '../run/run_record_screen.dart';
@@ -35,6 +28,7 @@ import '../run/run_stats_screen.dart';
 import 'calendar_screen.dart';
 import 'settings_screen.dart';
 import 'rest_timer_screen.dart';
+import 'package:workout_notes/widgets/workout/workout_home_chrome.dart';
 
 /// The Treino tab: live banners, this week across gym and running, and the
 /// two hub entries (Musculação and Corrida) with a start button each.
@@ -45,242 +39,23 @@ class WorkoutHomeScreen extends StatefulWidget {
   State<WorkoutHomeScreen> createState() => _WorkoutHomeScreenState();
 }
 
-/// Everything one load of the hub reads.
-class _HomeData {
-  final List<Map<String, dynamic>> active;
-  final WorkoutWeekOverview overview;
-  final StrengthHomeSnapshot? strengthSnapshot;
-  final RunHomeSnapshot? runSnapshot;
-  final bool hasHistory;
-  final List<WorkoutDayMark> weekDays;
-  final List<StrengthWorkoutSummary> recentGym;
-  final List<RunActivity> recentCardio;
-  final Map<String, StrengthCategoryInfo> categories;
-  final double strengthAverageSessions;
-
-  const _HomeData({
-    required this.active,
-    required this.overview,
-    required this.strengthSnapshot,
-    required this.runSnapshot,
-    required this.hasHistory,
-    required this.weekDays,
-    required this.recentGym,
-    required this.recentCardio,
-    required this.categories,
-    required this.strengthAverageSessions,
-  });
-}
-
 class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
-  final _workoutRepo = WorkoutRepository();
-  final _strengthRepo = StrengthRepository();
-  final _strengthToday = StrengthTodayService();
-  final _runRepo = RunRepository();
+  final _controller = WorkoutHomeController();
   final _timerService = RestTimerService.instance;
-  final _runTrackingService = RunTrackingService.instance;
-  final _bikeTrackingService = StationaryBikeTrackingService.instance;
-  final _generation = LoadGeneration();
-  bool _isLoading = true;
-  bool _hasLoaded = false;
-  bool _loadFailed = false;
-  List<Map<String, dynamic>> _activeWorkouts = [];
-
-  // Whether a run / a bike session is being recorded. The hub only rebuilds
-  // when this flips; the banners follow the live tracking state themselves.
-  bool _runActive = false;
-  bool _bikeActive = false;
-
-  WorkoutWeekOverview _overview = WorkoutWeekOverview.empty;
-  StrengthHomeSnapshot? _strengthSnapshot;
-  RunHomeSnapshot? _runSnapshot;
-  bool _hasHistory = false;
-  List<WorkoutDayMark> _weekDays = const [];
-  List<StrengthWorkoutSummary> _recentGym = const [];
-  List<RunActivity> _recentCardio = const [];
-  Map<String, StrengthCategoryInfo> _categories = const {};
-  double _strengthAverageSessions = 0;
-
-  // Bumped on every reload so the unsaved-run banner re-reads its list.
-  int _pendingReviewRefresh = 0;
 
   @override
   void initState() {
     super.initState();
-    _runActive = _runTrackingService.state.isActive;
-    _bikeActive = _bikeTrackingService.state.isActive;
-    _runTrackingService.addListener(_onTrackingChanged);
-    _bikeTrackingService.addListener(_onTrackingChanged);
-    _runTrackingService.initialize().catchError((Object _) {});
-    _loadData();
+    _controller.load();
   }
 
   @override
   void dispose() {
-    _generation.invalidate();
-    _runTrackingService.removeListener(_onTrackingChanged);
-    _bikeTrackingService.removeListener(_onTrackingChanged);
+    _controller.dispose();
     super.dispose();
   }
 
-  void _onTrackingChanged() {
-    final run = _runTrackingService.state.isActive;
-    final bike = _bikeTrackingService.state.isActive;
-    if (!mounted || (run == _runActive && bike == _bikeActive)) return;
-    setState(() {
-      _runActive = run;
-      _bikeActive = bike;
-    });
-  }
-
-  Future<T?> _safe<T>(Future<T> future) async {
-    try {
-      return await future;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// Reloads the hub. Only the newest load applies its result, and a failed
-  /// one keeps whatever is already on screen (with a retry), instead of
-  /// passing for an empty history.
-  Future<void> _loadData() async {
-    final token = _generation.begin();
-    setState(() {
-      _pendingReviewRefresh++;
-      if (!_hasLoaded) _isLoading = true;
-    });
-    try {
-      final data = await _fetchData();
-      if (!mounted || !_generation.isCurrent(token)) return;
-      setState(() {
-        _activeWorkouts = data.active;
-        _overview = data.overview;
-        _strengthSnapshot = data.strengthSnapshot;
-        _runSnapshot = data.runSnapshot;
-        _weekDays = data.weekDays;
-        _recentGym = data.recentGym;
-        _recentCardio = data.recentCardio;
-        _strengthAverageSessions = data.strengthAverageSessions;
-        _categories = data.categories;
-        _hasHistory = data.hasHistory;
-        _hasLoaded = true;
-        _loadFailed = false;
-        _isLoading = false;
-      });
-    } catch (_) {
-      if (!mounted || !_generation.isCurrent(token)) return;
-      setState(() {
-        _loadFailed = true;
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<_HomeData> _fetchData() async {
-    final now = DateTime.now();
-    // Links old workouts to their routine day; the strength snapshot reads
-    // that link, so it goes first.
-    await StrengthRoutineDayInference.runOnce();
-    final today = DateTime(now.year, now.month, now.day);
-    final monday = StrengthWeekAnalytics.mondayOf(today);
-    // A year of history is enough for a week streak and keeps the reads
-    // cheap; older weeks never change the number shown.
-    final since = monday.subtract(const Duration(days: 7 * 52));
-
-    // The rest is independent, so the awaits no longer chain (SQLite still
-    // serialises the statements). Only this week's runs are read in full —
-    // the plan card needs them; the year is read as light stamps.
-    final weekRuns = _runRepo
-        .listActivities(limit: null, activityType: null, startedFrom: monday)
-        .then((all) => all.where((a) => a.isRunning).toList());
-    final (
-      active,
-      stamps,
-      cardio,
-      recentCardio,
-      strengthSnapshot,
-      runSnapshot,
-      recentGym,
-      categories,
-    ) = await (
-      _workoutRepo.getActiveWorkouts(),
-      _strengthRepo.loadWorkoutStamps(from: since),
-      _runRepo.listCardioStamps(startedFrom: since),
-      _runRepo.listRecentCardio(limit: 3, startedFrom: since),
-      _safe(_strengthToday.load(now: now)),
-      weekRuns.then((runs) => _safe(RunTodayService().load(activities: runs))),
-      _safe(_strengthRepo.loadFinishedWorkouts(limit: 3)),
-      _safe(_strengthRepo.loadCategories()),
-    ).wait;
-
-    // Monday–Sunday marks: what was done and what the plans expect.
-    final plannedStrengthDays =
-        strengthSnapshot?.plannedStrengthDays ?? const <int>[];
-    final weekDays = [
-      for (var i = 0; i < 7; i++)
-        () {
-          final date = monday.add(Duration(days: i));
-          return WorkoutDayMark(
-            date: date,
-            strengthDone: stamps.any((g) => DateUtils.isSameDay(g.date, date)),
-            // Sub-minute sessions are aborted starts, not runs.
-            runDone: cardio.any(
-              (a) =>
-                  a.isRunning &&
-                  a.countsAsSession &&
-                  DateUtils.isSameDay(a.startedAt.toLocal(), date),
-            ),
-            strengthPlanned: plannedStrengthDays.contains(date.weekday),
-            runPlanned: (runSnapshot?.weekPlan ?? const []).any(
-              (d) => DateUtils.isSameDay(d.date, date),
-            ),
-          );
-        }(),
-    ];
-
-    final overview = WorkoutWeekOverview.compute(
-      gym: stamps,
-      cardio: [
-        for (final a in cardio)
-          WorkoutCardioStamp(
-            date: _dateOnly(a.startedAt.toLocal()),
-            durationSeconds: a.movingTimeSeconds > 0
-                ? a.movingTimeSeconds
-                : a.durationSeconds,
-            runDistanceMeters: a.isRunning ? a.distanceMeters : 0,
-          ),
-      ],
-      now: now,
-    );
-
-    return _HomeData(
-      active: active,
-      overview: overview,
-      strengthSnapshot: strengthSnapshot,
-      runSnapshot: runSnapshot,
-      hasHistory: stamps.isNotEmpty || cardio.isNotEmpty,
-      weekDays: weekDays,
-      recentGym: recentGym ?? const <StrengthWorkoutSummary>[],
-      recentCardio: recentCardio,
-      categories: categories ?? const <String, StrengthCategoryInfo>{},
-      strengthAverageSessions: _averageWeeklySessions(stamps, monday),
-    );
-  }
-
-  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
-
-  /// Sessions per week over the last 12 calendar weeks (this one
-  /// included) — the same default period the gym hub averages over, so both
-  /// screens show the same goal.
-  static double _averageWeeklySessions(
-    List<StrengthWorkoutStamp> stamps,
-    DateTime monday,
-  ) {
-    const weeks = 12;
-    final from = monday.subtract(const Duration(days: 7 * (weeks - 1)));
-    return stamps.where((s) => !s.date.isBefore(from)).length / weeks;
-  }
+  Future<void> _loadData() => _controller.load();
 
   // ===================== ACTIONS =====================
   Future<void> _startWorkout() async {
@@ -288,7 +63,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => ActiveWorkoutScreen(
-          suggestedDay: _strengthSnapshot?.today.startDay,
+          suggestedDay: _controller.strengthSnapshot?.today.startDay,
         ),
       ),
     );
@@ -298,10 +73,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   /// Starts today's suggested routine day (or a blank workout); resumes the
   /// unfinished workout of the day when there is one.
   Future<void> _trainStrength() async {
-    if (_activeWorkouts.isNotEmpty) {
-      return _openActiveWorkout(_activeWorkouts.first);
+    if (_controller.activeWorkouts.isNotEmpty) {
+      return _openActiveWorkout(_controller.activeWorkouts.first);
     }
-    final day = _strengthSnapshot?.today.startDay;
+    final day = _controller.strengthSnapshot?.today.startDay;
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -346,7 +121,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     // ready to run; without one this is a plain free run.
     // Resuming a run that is already recording never swaps its session.
     RunPlannedSession? planned;
-    if (!_runTrackingService.state.isActive) {
+    if (!_controller.runTracking.state.isActive) {
       try {
         final snapshot = await RunTodayService().load();
         if (snapshot.today.status == RunTodayStatus.planned) {
@@ -389,12 +164,16 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     ).format(DateTime.now());
   }
 
-  bool get _hasAnyHistory =>
-      _hasHistory || _activeWorkouts.isNotEmpty || _runActive || _bikeActive;
-
   // ===================== BUILD =====================
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: _controller,
+      builder: (context, _) => _buildScreen(context),
+    );
+  }
+
+  Widget _buildScreen(BuildContext context) {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
 
@@ -412,44 +191,44 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         automaticallyImplyLeading: false,
         actions: _buildAppBarActions(theme, loc),
       ),
-      body: _isLoading
-          ? const _LoadingSkeleton()
-          : (_loadFailed && !_hasLoaded)
+      body: _controller.isLoading
+          ? const WorkoutHomeLoadingSkeleton()
+          : (_controller.loadFailed && !_controller.hasLoaded)
           ? LoadErrorView(onRetry: _loadData)
           : RefreshIndicator(
               onRefresh: _loadData,
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
-                  if (_loadFailed)
+                  if (_controller.loadFailed)
                     SliverToBoxAdapter(
                       child: LoadErrorBanner(onRetry: _loadData),
                     ),
                   // The week hero leads; live sessions sit right below it.
-                  if (_hasAnyHistory)
+                  if (_controller.hasAnyHistory)
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                       sliver: SliverToBoxAdapter(child: _buildWeekHero()),
                     ),
-                  if (_activeWorkouts.isNotEmpty)
+                  if (_controller.activeWorkouts.isNotEmpty)
                     SliverToBoxAdapter(
                       child: _buildActiveBanner(
                         theme,
                         loc,
-                        _activeWorkouts.first,
+                        _controller.activeWorkouts.first,
                       ),
                     ),
-                  if (_runActive)
+                  if (_controller.runActive)
                     SliverToBoxAdapter(
                       child: _buildActiveRunBanner(theme, loc),
                     ),
                   SliverToBoxAdapter(
                     child: RunPendingReviewBanner(
-                      refreshToken: _pendingReviewRefresh,
+                      refreshToken: _controller.pendingReviewRefresh,
                       onChanged: _loadData,
                     ),
                   ),
-                  if (_bikeActive)
+                  if (_controller.bikeActive)
                     SliverToBoxAdapter(
                       child: _buildActiveBikeBanner(theme, loc),
                     ),
@@ -457,7 +236,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
-                        if (!_hasAnyHistory) ...[
+                        if (!_controller.hasAnyHistory) ...[
                           _buildFirstTimeEmpty(theme, loc),
                           const SizedBox(height: 20),
                           _buildAreas(loc),
@@ -482,24 +261,24 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
 
   // ===================== WEEK / TODAY / AREAS / RECENT =====================
   Widget _buildWeekHero() {
-    final strength = _strengthSnapshot;
+    final strength = _controller.strengthSnapshot;
     final strengthGoal = StrengthWeekGoal.resolve(
       planSessions: strength?.planSessionsPerWeek,
       userSessions: strength?.userWeeklyGoalSessions,
-      averageSessions: _strengthAverageSessions,
+      averageSessions: _controller.strengthAverageSessions,
     )?.sessions;
-    final run = _runSnapshot;
+    final run = _controller.runSnapshot;
     final runGoal = run?.plan?.weekPlannedMeters ?? run?.userWeeklyGoalMeters;
     final now = DateTime.now();
 
     return WorkoutWeekHero(
-      strengthDone: _overview.strengthSessions,
+      strengthDone: _controller.overview.strengthSessions,
       strengthGoal: strengthGoal,
-      runMeters: _overview.runMeters,
+      runMeters: _controller.overview.runMeters,
       runGoalMeters: runGoal != null && runGoal > 0 ? runGoal : null,
-      activeSeconds: _overview.activeSeconds,
-      streakWeeks: _overview.streakWeeks,
-      days: _weekDays,
+      activeSeconds: _controller.overview.activeSeconds,
+      streakWeeks: _controller.overview.streakWeeks,
+      days: _controller.weekDays,
       today: DateTime(now.year, now.month, now.day),
       onOpenStrength: _openStrengthHub,
       onOpenRun: _openRunHub,
@@ -511,8 +290,8 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
 
   Widget _buildToday(AppLocalizations loc) {
     final colors = Theme.of(context).colorScheme;
-    final strength = _strengthSnapshot?.today;
-    final run = _runSnapshot?.today;
+    final strength = _controller.strengthSnapshot?.today;
+    final run = _controller.runSnapshot?.today;
     final items = <WorkoutTodayItem>[];
 
     if (strength?.status == StrengthTodayStatus.planned &&
@@ -628,8 +407,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     String? last(DateTime? date) => date == null
         ? null
         : loc.workoutHomeAreaStrengthLast(DateFormat.MMMd(locale).format(date));
-    final lastGym = _recentGym.isEmpty ? null : _recentGym.first.date;
-    final runs = _recentCardio.where((a) => a.isRunning);
+    final lastGym = _controller.recentGym.isEmpty
+        ? null
+        : _controller.recentGym.first.date;
+    final runs = _controller.recentCardio.where((a) => a.isRunning);
     final lastRun = runs.isEmpty ? null : runs.first.startedAt.toLocal();
 
     return IntrinsicHeight(
@@ -642,7 +423,9 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
               icon: Icons.fitness_center,
               color: colors.primary,
               title: loc.workoutHomeHubStrengthTitle,
-              line1: loc.workoutHomeHubStrengthWeek(_overview.strengthSessions),
+              line1: loc.workoutHomeHubStrengthWeek(
+                _controller.overview.strengthSessions,
+              ),
               line2: last(lastGym),
               onTap: _openStrengthHub,
             ),
@@ -655,7 +438,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
               color: colors.tertiary,
               title: loc.workoutHomeHubRunTitle,
               line1: loc.workoutHomeHubRunWeek(
-                RunFormatters.distanceWithUnit(_overview.runMeters),
+                RunFormatters.distanceWithUnit(_controller.overview.runMeters),
               ),
               line2: last(lastRun),
               onTap: _openRunHub,
@@ -670,10 +453,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   List<WorkoutRecentItem> _recentItems(AppLocalizations loc) {
     final colors = Theme.of(context).colorScheme;
     final items = <(DateTime, WorkoutRecentItem)>[];
-    for (final w in _recentGym) {
+    for (final w in _controller.recentGym) {
       final category = w.dominantCategoryId == null
           ? null
-          : _categories[w.dominantCategoryId];
+          : _controller.categories[w.dominantCategoryId];
       items.add((
         w.startTime ?? w.date,
         WorkoutRecentItem(
@@ -693,7 +476,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         ),
       ));
     }
-    for (final a in _recentCardio) {
+    for (final a in _controller.recentCardio) {
       final started = a.startedAt.toLocal();
       final title = a.title?.trim().isNotEmpty == true
           ? a.title!
@@ -732,8 +515,11 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   String? _muscleLabel(AppLocalizations loc, StrengthWorkoutSummary w) {
     final names = [
       for (final id in w.categoryIds.take(2))
-        if (_categories[id] != null)
-          ExerciseLocaleHelper.categoryName(loc, _categories[id]!.row),
+        if (_controller.categories[id] != null)
+          ExerciseLocaleHelper.categoryName(
+            loc,
+            _controller.categories[id]!.row,
+          ),
     ];
     return names.isEmpty ? null : names.join(' · ');
   }
@@ -761,7 +547,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       ListenableBuilder(
         listenable: _timerService,
         builder: (context, _) => _timerService.isActive
-            ? _TimerPill(
+            ? WorkoutHomeTimerPill(
                 remainingSeconds: _timerService.remainingSeconds,
                 isRunning: _timerService.isRunning,
                 isPaused: _timerService.isPaused,
@@ -863,9 +649,9 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       background: theme.colorScheme.secondaryContainer,
       foreground: theme.colorScheme.onSecondaryContainer,
       title: loc.workoutHomeRunOngoing,
-      refresh: _runTrackingService,
+      refresh: _controller.runTracking,
       subtitle: () {
-        final state = _runTrackingService.state;
+        final state = _controller.runTracking.state;
         final subtitle = loc.workoutHomeRunActiveSubtitle(
           RunFormatters.distanceWithUnit(state.distanceMeters),
           RunFormatters.duration(state.durationSeconds),
@@ -888,9 +674,9 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       background: theme.colorScheme.secondaryContainer,
       foreground: theme.colorScheme.onSecondaryContainer,
       title: loc.cardioActivityStationaryBike,
-      refresh: _bikeTrackingService,
+      refresh: _controller.bikeTracking,
       subtitle: () {
-        final state = _bikeTrackingService.state;
+        final state = _controller.bikeTracking.state;
         final time = RunFormatters.duration(state.durationSeconds);
         return state.isPaused
             ? '${loc.workoutHomeRunPaused} · $time'
@@ -959,106 +745,3 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
 }
 
 // ===================== SHARED WIDGETS =====================
-
-/// Loading skeleton — keeps the layout stable so the transition into real
-/// content doesn't cause a jarring jump.
-class _LoadingSkeleton extends StatelessWidget {
-  const _LoadingSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = theme.colorScheme.surfaceContainerHighest;
-    BoxDecoration box({double r = 8}) =>
-        BoxDecoration(color: color, borderRadius: BorderRadius.circular(r));
-    Widget line({required double h, double? w, double r = 8}) => Container(
-      height: h,
-      width: w,
-      decoration: box(r: r),
-    );
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        line(h: 24, w: 180),
-        const SizedBox(height: 8),
-        line(h: 14, w: 240),
-        const SizedBox(height: 20),
-        line(h: 90, r: 20),
-        const SizedBox(height: 20),
-        line(h: 12, w: 80),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: line(h: 90, r: 16)),
-            const SizedBox(width: 12),
-            Expanded(child: line(h: 90, r: 16)),
-          ],
-        ),
-        const SizedBox(height: 20),
-        line(h: 12, w: 60),
-        const SizedBox(height: 12),
-        line(h: 110, r: 16),
-        const SizedBox(height: 20),
-        line(h: 12, w: 100),
-        const SizedBox(height: 12),
-        line(h: 64, r: 12),
-        const SizedBox(height: 8),
-        line(h: 64, r: 12),
-      ],
-    );
-  }
-}
-
-class _TimerPill extends StatelessWidget {
-  final int remainingSeconds;
-  final bool isRunning;
-  final bool isPaused;
-  final String shortTime;
-  final VoidCallback onTap;
-
-  const _TimerPill({
-    required this.remainingSeconds,
-    required this.isRunning,
-    required this.isPaused,
-    required this.shortTime,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isUrgent = remainingSeconds <= 5 && isRunning;
-    final bg = isUrgent
-        ? Colors.red.withAlpha(40)
-        : theme.colorScheme.primaryContainer;
-    final fg = isUrgent ? Colors.red : theme.colorScheme.onPrimaryContainer;
-
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(isPaused ? Icons.pause : Icons.timer, size: 18, color: fg),
-            const SizedBox(width: 4),
-            Text(
-              shortTime,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: fg,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
