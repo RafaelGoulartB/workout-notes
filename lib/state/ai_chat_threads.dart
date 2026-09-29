@@ -7,7 +7,7 @@ extension AiChatThreadManagement on AiChatService {
 
   Future<void> refreshThreads({bool notify = true}) async {
     try {
-      final rows = await _db.getAiChatThreadsPage(
+      final rows = await _db.aiChatRepo.getAiChatThreadsPage(
         limit: _threadPageSize + 1,
       );
       final hasOlder = rows.length > _threadPageSize;
@@ -28,7 +28,7 @@ extension AiChatThreadManagement on AiChatService {
     _state = _state.copyWith(isLoadingOlderThreads: true);
     _emit();
     try {
-      final rows = await _db.getAiChatThreadsPage(
+      final rows = await _db.aiChatRepo.getAiChatThreadsPage(
         limit: _threadPageSize + 1,
         offset: _state.threads.length,
       );
@@ -67,7 +67,7 @@ extension AiChatThreadManagement on AiChatService {
   Future<void> openThread(String threadId) async {
     if (_state.activeThreadId == threadId) return;
     try {
-      final rows = await _db.getAiChatMessagesThreadPage(
+      final rows = await _db.aiChatRepo.getAiChatMessagesThreadPage(
         threadId,
         limit: _messagePageSize + 1,
       );
@@ -109,7 +109,7 @@ extension AiChatThreadManagement on AiChatService {
     _state = _state.copyWith(isLoadingOlderMessages: true);
     _emit();
     try {
-      final rows = await _db.getAiChatMessagesThreadPage(
+      final rows = await _db.aiChatRepo.getAiChatMessagesThreadPage(
         threadId,
         limit: _messagePageSize + 1,
         offset: _state.messages.length,
@@ -140,14 +140,14 @@ extension AiChatThreadManagement on AiChatService {
   Future<void> deleteThread(String threadId) async {
     var attachments = <AiImageAttachment>[];
     try {
-      final rows = await _db.getAiChatMessagesThread(threadId);
+      final rows = await _db.aiChatRepo.getAiChatMessagesThread(threadId);
       attachments = rows
           .map(AiChatMessage.fromRow)
           .expand((message) => message.attachments)
           .toList();
     } catch (_) {}
     try {
-      await _db.deleteAiChatThread(threadId);
+      await _db.aiChatRepo.deleteAiChatThread(threadId);
       await _imageStore.deleteAll(attachments);
       final threads = _state.threads.where((t) => t.id != threadId).toList();
       final clearActive = _state.activeThreadId == threadId;
@@ -170,7 +170,7 @@ extension AiChatThreadManagement on AiChatService {
     final trimmed = title.trim();
     if (trimmed.isEmpty) return false;
     try {
-      await _db.renameAiChatThread(threadId, trimmed);
+      await _db.aiChatRepo.renameAiChatThread(threadId, trimmed);
       await refreshThreads(notify: false);
       _state = _state.copyWith(clearError: true);
       _emit();
@@ -184,7 +184,7 @@ extension AiChatThreadManagement on AiChatService {
 
   Future<bool> setThreadPinned(String threadId, bool isPinned) async {
     try {
-      await _db.setAiChatThreadPinned(threadId, isPinned);
+      await _db.aiChatRepo.setAiChatThreadPinned(threadId, isPinned);
       await refreshThreads(notify: false);
       _state = _state.copyWith(clearError: true);
       _emit();

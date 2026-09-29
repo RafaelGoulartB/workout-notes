@@ -113,7 +113,7 @@ void main() {
         });
       }
 
-      final latest = await helper.getAiChatMessagesThreadPage(
+      final latest = await helper.aiChatRepo.getAiChatMessagesThreadPage(
         'thread',
         limit: 3,
       );
@@ -123,7 +123,7 @@ void main() {
         'message-104',
       ]);
 
-      await helper.upsertAiChatMessages('thread', [
+      await helper.aiChatRepo.upsertAiChatMessages('thread', [
         {
           'id': 'message-104',
           'role': 'assistant',

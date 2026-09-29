@@ -944,7 +944,7 @@ class AiToolRegistry {
     final id =
         (args['routine_id'] as String?) ?? (args['routineId'] as String?);
     if (id == null) return {'error': 'routine_id é obrigatório'};
-    final r = await db.getRoutine(id);
+    final r = await db.routineRepo.getRoutine(id);
     if (r == null) return {'error': 'rotina não encontrada'};
     final rawDb = await db.database;
     final rows = await rawDb.rawQuery(
@@ -1017,7 +1017,7 @@ class AiToolRegistry {
   ) async {
     final type = args['type'] as String?;
     final limit = _boundedInt(args, 'limit', 20, 1, 50);
-    final rows = await db.getBodyMeasurements(type: type, limit: limit);
+    final rows = await db.bodyMeasurementRepo.getBodyMeasurements(type: type, limit: limit);
     return {
       'type': type,
       'measurements': rows

@@ -931,7 +931,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     final food = await Navigator.of(context).push<Food>(
       MaterialPageRoute(
         builder: (_) => ManualFoodScreen(
-          repository: DatabaseHelper.instance.nutritionRepository,
+          repository: DatabaseHelper.instance.nutritionRepo,
           source: FoodSource.aiCoach,
           initial: proposal.draft,
         ),
