@@ -515,6 +515,8 @@ class AiNutritionToolService {
           'name': effective.phase?.name,
           'week': effective.weekNumber,
           'totalWeeks': effective.totalWeeks,
+          if (effective.trainingDay != null)
+            'dayType': effective.trainingDay! ? 'training' : 'rest',
         },
     };
   }

@@ -11,9 +11,12 @@ import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_projection.dart';
 import 'package:workout_notes/models/periodization_routine_suggestion.dart';
 import 'package:workout_notes/models/periodization_run_suggestion.dart';
+import 'package:workout_notes/models/periodization_schedule.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
+import 'package:workout_notes/periodization/phase_kind.dart';
+import 'package:workout_notes/periodization/phase_week_plan.dart';
 import 'package:workout_notes/periodization/run_plan_week_resolver.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 
@@ -224,6 +227,412 @@ class PeriodizationRepository extends BaseRepository {
       }
     });
     return plan;
+  }
+
+  /// Creates a plan whose phases run back to back from [startDate], each
+  /// lasting its entry's weeks. New phases store their `seedTarget` as the
+  /// first target version.
+  Future<PeriodizationPlan> createChainedPlan({
+    required String name,
+    required DateTime startDate,
+    required List<PhaseScheduleEntry> phases,
+    String? notes,
+    bool activate = true,
+  }) {
+    final ranges = chainPhaseRanges(startDate, phases.map((p) => p.weeks));
+    return createPlanWithPhases(
+      name: name,
+      startDate: startDate,
+      notes: notes,
+      activate: activate,
+      phases: [
+        for (var i = 0; i < phases.length; i++)
+          PeriodizationPhaseDraft(
+            name: phases[i].name,
+            templateKey: phases[i].templateKey,
+            color: phases[i].color,
+            intent: phases[i].intent,
+            startDate: ranges[i].start,
+            endDate: ranges[i].end,
+            target: phases[i].seedTarget,
+          ),
+      ],
+    );
+  }
+
+  /// Rewrites a plan's schedule: name, start and the ordered phase list.
+  ///
+  /// Phases are chained (each starts the day after the previous one ends).
+  /// An existing phase that moves carries its target versions along, keeping
+  /// each version on the same phase week; versions that end up past the
+  /// phase's new end are dropped. Phases missing from [phases] are deleted
+  /// (their targets and check-ins cascade); entries without an id are
+  /// created with their `seedTarget`.
+  Future<void> replanPlan({
+    required String planId,
+    required String name,
+    required DateTime startDate,
+    required List<PhaseScheduleEntry> phases,
+    String? notes,
+  }) async {
+    if (name.trim().isEmpty) {
+      throw const PeriodizationValidationException('name_required');
+    }
+    if (phases.isEmpty) {
+      throw const PeriodizationValidationException('plan_requires_phase');
+    }
+    for (final entry in phases) {
+      _validateNameAndDates(entry.name, startDate, startDate);
+      if (entry.weeks < 1 || entry.weeks > 104) {
+        throw const PeriodizationValidationException('invalid_date_range');
+      }
+      final seed = entry.id == null ? entry.seedTarget : null;
+      if (seed != null && !seed.isEmpty) _validateTarget(seed);
+    }
+    final plan = await getPlan(planId);
+    if (plan == null) {
+      throw const PeriodizationValidationException('plan_not_found');
+    }
+    final existing = {
+      for (final phase in await getPhases(planId)) phase.id: phase,
+    };
+    final ranges = chainPhaseRanges(startDate, phases.map((p) => p.weeks));
+    final keptIds = phases.map((p) => p.id).whereType<String>().toSet();
+    final now = DateTime.now().toIso8601String();
+    final database = await db;
+    await database.transaction((txn) async {
+      await txn.update(
+        'periodization_plans',
+        {
+          'name': name.trim(),
+          'notes': _optional(notes),
+          'start_date': _date(ranges.first.start),
+          'end_date': _date(ranges.last.end),
+          'updated_at': now,
+        },
+        where: 'id = ?',
+        whereArgs: [planId],
+      );
+      for (final id in existing.keys.where((id) => !keptIds.contains(id))) {
+        await txn.delete(
+          'periodization_phases',
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+      }
+      for (var index = 0; index < phases.length; index++) {
+        final entry = phases[index];
+        final range = ranges[index];
+        final original = entry.id == null ? null : existing[entry.id];
+        if (original == null) {
+          final phaseId = _uuid.v4();
+          await txn.insert(
+            'periodization_phases',
+            PeriodizationPhase(
+              id: phaseId,
+              planId: planId,
+              name: entry.name.trim(),
+              templateKey: entry.templateKey,
+              color: entry.color,
+              startDate: range.start,
+              endDate: range.end,
+              intent: _optional(entry.intent),
+              orderIndex: index,
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            ).toMap(),
+          );
+          if (entry.seedTarget case final target? when !target.isEmpty) {
+            await _validateRoutineReferences(txn, [target]);
+            await txn.insert(
+              'phase_targets',
+              _targetMap(
+                target,
+                phaseId: phaseId,
+                version: 1,
+                validFrom: range.start,
+              ),
+            );
+          }
+          continue;
+        }
+        await txn.update(
+          'periodization_phases',
+          {
+            'name': entry.name.trim(),
+            'template_key': entry.templateKey,
+            'color': entry.color,
+            'intent': _optional(entry.intent),
+            'start_date': _date(range.start),
+            'end_date': _date(range.end),
+            'order_index': index,
+            'updated_at': now,
+          },
+          where: 'id = ?',
+          whereArgs: [original.id],
+        );
+        final shift = range.start.difference(original.startDate).inDays;
+        if (shift != 0) {
+          await txn.rawUpdate(
+            'UPDATE phase_targets SET valid_from = date(valid_from, ?) '
+            'WHERE phase_id = ?',
+            ['${shift >= 0 ? '+' : ''}$shift days', original.id],
+          );
+        }
+        // A version starting after the new end can never apply; keep the
+        // first version even then so a shrunk phase never loses its targets.
+        await txn.rawDelete(
+          '''
+          DELETE FROM phase_targets
+          WHERE phase_id = ? AND valid_from > ?
+            AND version != (
+              SELECT MIN(version) FROM phase_targets WHERE phase_id = ?
+            )
+          ''',
+          [original.id, _date(range.end), original.id],
+        );
+      }
+    });
+  }
+
+  /// Appends [entry] after the plan's last phase and returns the new phase.
+  Future<PeriodizationPhase> appendPhase(
+    String planId,
+    PhaseScheduleEntry entry,
+  ) async {
+    final plan = await getPlan(planId);
+    if (plan == null) {
+      throw const PeriodizationValidationException('plan_not_found');
+    }
+    final phases = await getPhases(planId);
+    await replanPlan(
+      planId: planId,
+      name: plan.name,
+      notes: plan.notes,
+      startDate: phases.isEmpty ? plan.startDate : phases.first.startDate,
+      phases: [
+        for (final item in phases)
+          PhaseScheduleEntry(
+            id: item.id,
+            name: item.name,
+            templateKey: item.templateKey ?? PhaseKind.custom.key,
+            color: item.color,
+            intent: item.intent,
+            weeks: item.totalWeeks,
+          ),
+        entry,
+      ],
+    );
+    return (await getPhases(planId)).last;
+  }
+
+  /// Start/end dates of phases laid back to back from [start].
+  static List<({DateTime start, DateTime end})> chainPhaseRanges(
+    DateTime start,
+    Iterable<int> weeks,
+  ) {
+    var cursor = _day(start);
+    final ranges = <({DateTime start, DateTime end})>[];
+    for (final count in weeks) {
+      final end = cursor.add(Duration(days: 7 * count - 1));
+      ranges.add((start: cursor, end: end));
+      cursor = end.add(const Duration(days: 1));
+    }
+    return ranges;
+  }
+
+  /// Saves a phase's identity and its weekly targets from phase week
+  /// [fromWeek] on (`weeks[0]` is week [fromWeek]). Earlier weeks keep their
+  /// stored targets — they are history.
+  Future<void> savePhaseSetup(
+    String phaseId, {
+    required String name,
+    required String templateKey,
+    required int color,
+    String? intent,
+    required List<PeriodizationTarget> weeks,
+    required int fromWeek,
+  }) async {
+    final phase = await getPhase(phaseId);
+    if (phase == null) {
+      throw const PeriodizationValidationException('phase_not_found');
+    }
+    _validateNameAndDates(name, phase.startDate, phase.endDate);
+    final boundary = phase.startDate.add(Duration(days: 7 * fromWeek));
+    if (weeks.isNotEmpty) {
+      _validateWeeklyWindow(boundary, phase.startDate, phase.endDate, weeks);
+    }
+    final database = await db;
+    await database.transaction((txn) async {
+      await txn.update(
+        'periodization_phases',
+        {
+          'name': name.trim(),
+          'template_key': templateKey,
+          'color': color,
+          'intent': _optional(intent),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [phaseId],
+      );
+      if (weeks.isNotEmpty) {
+        await _replaceTargetsFrom(
+          txn,
+          phaseId: phaseId,
+          phaseEnd: phase.endDate,
+          boundary: boundary,
+          weeks: weeks,
+        );
+      }
+    });
+  }
+
+  /// The effective target of each phase week (index 0 = first week), read
+  /// at each week's start. Null entries are weeks without any target.
+  Future<List<PeriodizationTarget?>> getWeeklyTargets(
+    PeriodizationPhase phase,
+  ) async {
+    final history = await getTargetHistory(phase.id);
+    return [
+      for (var week = 0; week < phase.totalWeeks; week++)
+        history.isEmpty
+            ? null
+            : _targetForDate(
+                history,
+                phase.startDate.add(Duration(days: 7 * week)),
+              ),
+    ];
+  }
+
+  /// What the active plan expects on [date], or null outside any phase.
+  Future<PeriodizationDayPlan?> getDayPlan(DateTime date) async {
+    final day = _day(date);
+    final phase = await getEffectivePhase(day);
+    if (phase == null) return null;
+    final target = await getEffectiveTarget(phase.id, date: day);
+    return dayPlanFor(phase, target, day);
+  }
+
+  /// Resolves the template week of [phase] around [date] with [target].
+  Future<PeriodizationDayPlan> dayPlanFor(
+    PeriodizationPhase phase,
+    PeriodizationTarget? target,
+    DateTime date, {
+    Map<String, RunPlan?>? runPlanCache,
+  }) async {
+    final day = _day(date);
+    RunPlan? runPlan;
+    int? runPlanWeek;
+    final planId = target?.runPlanIds.firstOrNull;
+    if (planId != null) {
+      final cache = runPlanCache ?? <String, RunPlan?>{};
+      if (!cache.containsKey(planId)) {
+        final database = await db;
+        cache[planId] = await _tableExists(database, 'run_plans')
+            ? await RunPlanRepository().getPlan(planId)
+            : null;
+      }
+      runPlan = cache[planId];
+      if (runPlan != null) {
+        const resolver = RunPlanWeekResolver();
+        runPlanWeek = resolver.planWeekFor(
+          phaseWeek: resolver.phaseWeekOf(
+            phaseStart: phase.startDate,
+            date: day,
+          ),
+          planWeeks: runPlan.weeks,
+          startWeek: target?.runPlanStartWeek ?? 0,
+        );
+      }
+    }
+    return PeriodizationDayPlan(
+      phase: phase,
+      target: target,
+      weekNumber: phase.weekAt(day),
+      totalWeeks: phase.totalWeeks,
+      week: PhaseWeekPlan.build(
+        target: target,
+        runPlan: runPlan,
+        runPlanWeek: runPlanWeek,
+      ),
+      runPlan: runPlan,
+      runPlanWeek: runPlanWeek,
+      date: day,
+    );
+  }
+
+  /// Dates (`yyyy-MM-dd`) in [start]..[end] with a finished strength workout
+  /// and with a completed run — what ticks days off in the week strips.
+  Future<({Set<String> strength, Set<String> runs})> getActivityDates(
+    DateTime start,
+    DateTime end,
+  ) async {
+    final database = await db;
+    final strengthRows = await database.rawQuery(
+      '''
+      SELECT DISTINCT date FROM workouts
+      WHERE end_time IS NOT NULL AND date BETWEEN ? AND ?
+      ''',
+      [_date(start), _date(end)],
+    );
+    final runs = <String>{};
+    if (await _tableExists(database, 'run_activities')) {
+      final hasType = await _columnExists(
+        database,
+        'run_activities',
+        'activity_type',
+      );
+      final rows = await database.rawQuery(
+        '''
+        SELECT DISTINCT date(started_at) AS day FROM run_activities
+        WHERE status = 'completed'
+          ${hasType ? "AND activity_type = 'running'" : ''}
+          AND date(started_at) BETWEEN ? AND ?
+        ''',
+        [_date(start), _date(end)],
+      );
+      runs.addAll(rows.map((row) => row['day']).whereType<String>());
+    }
+    return (
+      strength: strengthRows
+          .map((row) => (row['date'] as String?)?.substring(0, 10))
+          .whereType<String>()
+          .toSet(),
+      runs: runs,
+    );
+  }
+
+  /// Ends [phaseId] at the end of its current week and pulls the following
+  /// phases earlier so the plan stays back to back.
+  Future<void> endPhaseThisWeek(String phaseId, {DateTime? today}) async {
+    final phase = await getPhase(phaseId);
+    if (phase == null) {
+      throw const PeriodizationValidationException('phase_not_found');
+    }
+    final plan = await getPlan(phase.planId);
+    if (plan == null) {
+      throw const PeriodizationValidationException('plan_not_found');
+    }
+    final weeks = phase.weekAt(_day(today ?? DateTime.now())).clamp(1, 104);
+    final phases = await getPhases(plan.id);
+    await replanPlan(
+      planId: plan.id,
+      name: plan.name,
+      notes: plan.notes,
+      startDate: phases.first.startDate,
+      phases: [
+        for (final item in phases)
+          PhaseScheduleEntry(
+            id: item.id,
+            name: item.name,
+            templateKey: item.templateKey ?? PhaseKind.custom.key,
+            color: item.color,
+            intent: item.intent,
+            weeks: item.id == phaseId ? weeks : item.totalWeeks,
+          ),
+      ],
+    );
   }
 
   Future<void> updatePlan(PeriodizationPlan plan) async {
@@ -771,35 +1180,13 @@ class PeriodizationRepository extends BaseRepository {
     if (effective.isAfter(phase.endDate)) {
       throw const PeriodizationValidationException('target_outside_phase');
     }
-    final saved = PeriodizationTarget(
+    // copyWith carries every field (linked routines, run plans, the template
+    // week): building a fresh target here used to drop new fields silently.
+    final saved = target.copyWith(
       id: _uuid.v4(),
       phaseId: phaseId,
       version: version,
       validFrom: effective,
-      calories: target.calories,
-      proteinG: target.proteinG,
-      carbsG: target.carbsG,
-      fatG: target.fatG,
-      proteinGPerKg: target.proteinGPerKg,
-      fatGPerKg: target.fatGPerKg,
-      weightKgUsed: target.weightKgUsed,
-      workoutsPerWeek: target.workoutsPerWeek,
-      minSetsPerWeek: target.minSetsPerWeek,
-      maxSetsPerWeek: target.maxSetsPerWeek,
-      minRpe: target.minRpe,
-      maxRpe: target.maxRpe,
-      // Linked routines and running plans have to ride along: dropping them
-      // here silently unlinked the phase every time a new version was saved.
-      routineIds: target.routineIds,
-      runSessionsPerWeek: target.runSessionsPerWeek,
-      runWeeklyDistanceMeters: target.runWeeklyDistanceMeters,
-      longRunDistanceMeters: target.longRunDistanceMeters,
-      qualitySessionsPerWeek: target.qualitySessionsPerWeek,
-      runPlanIds: target.runPlanIds,
-      runPlanStartWeek: target.runPlanStartWeek,
-      targetWeightKg: target.targetWeightKg,
-      weeklyWeightChangePercent: target.weeklyWeightChangePercent,
-      sleepHours: target.sleepHours,
       createdAt: DateTime.now(),
     );
     final database = await db;
@@ -1389,6 +1776,7 @@ class PeriodizationRepository extends BaseRepository {
     var nutritionTargetDaysLogged = 0;
     double nutritionAdherenceSum = 0;
     var sleepTargetDays = 0;
+    final runPlanCache = <String, RunPlan?>{};
     for (
       var date = start;
       !date.isAfter(end);
@@ -1407,13 +1795,24 @@ class PeriodizationRepository extends BaseRepository {
         plannedSetsMaximumSum += target!.maxSetsPerWeek! / 7;
         hasPlannedSetsMaximum = true;
       }
-      final nutrientTargets = <(double?, double?)>[
-        (target?.calories, null),
-        (target?.proteinG, null),
-        (target?.carbsG, null),
-        (target?.fatG, null),
+      // Training and rest days can carry different nutrition targets.
+      final trainingDay = target == null || !target.hasRestDayNutrition
+          ? true
+          : (await dayPlanFor(
+                  phase,
+                  target,
+                  date,
+                  runPlanCache: runPlanCache,
+                )).trainingDay ??
+                true;
+      final dayNutrition = target?.nutritionFor(trainingDay: trainingDay);
+      final targetValues = [
+        dayNutrition?.calories,
+        dayNutrition?.proteinG,
+        dayNutrition?.carbsG,
+        dayNutrition?.fatG,
       ];
-      if (nutrientTargets.any((item) => item.$1 != null)) {
+      if (targetValues.any((value) => value != null)) {
         nutritionTargetDays++;
         final actual = nutritionByDate[_date(date)];
         if (actual != null) nutritionTargetDaysLogged++;
@@ -1422,12 +1821,6 @@ class PeriodizationRepository extends BaseRepository {
           (actual?['protein_g'] as num?)?.toDouble(),
           (actual?['carbs_g'] as num?)?.toDouble(),
           (actual?['fat_g'] as num?)?.toDouble(),
-        ];
-        final targetValues = [
-          target?.calories,
-          target?.proteinG,
-          target?.carbsG,
-          target?.fatG,
         ];
         var score = 0.0;
         var configured = 0;
@@ -1986,33 +2379,11 @@ class PeriodizationRepository extends BaseRepository {
     required int version,
     required DateTime validFrom,
   }) {
-    final remapped = PeriodizationTarget(
+    final remapped = target.copyWith(
       id: _uuid.v4(),
       phaseId: phaseId,
       version: version,
       validFrom: validFrom,
-      calories: target.calories,
-      proteinG: target.proteinG,
-      carbsG: target.carbsG,
-      fatG: target.fatG,
-      proteinGPerKg: target.proteinGPerKg,
-      fatGPerKg: target.fatGPerKg,
-      weightKgUsed: target.weightKgUsed,
-      workoutsPerWeek: target.workoutsPerWeek,
-      minSetsPerWeek: target.minSetsPerWeek,
-      maxSetsPerWeek: target.maxSetsPerWeek,
-      minRpe: target.minRpe,
-      maxRpe: target.maxRpe,
-      routineIds: target.routineIds,
-      runSessionsPerWeek: target.runSessionsPerWeek,
-      runWeeklyDistanceMeters: target.runWeeklyDistanceMeters,
-      longRunDistanceMeters: target.longRunDistanceMeters,
-      qualitySessionsPerWeek: target.qualitySessionsPerWeek,
-      runPlanIds: target.runPlanIds,
-      runPlanStartWeek: target.runPlanStartWeek,
-      targetWeightKg: target.targetWeightKg,
-      weeklyWeightChangePercent: target.weeklyWeightChangePercent,
-      sleepHours: target.sleepHours,
       createdAt: DateTime.now(),
     );
     return remapped.toMap();
