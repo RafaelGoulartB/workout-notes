@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
@@ -8,8 +10,9 @@ import 'package:workout_notes/widgets/run/run_ui.dart';
 
 enum ActiveWorkoutTimerPhase { idle, running, paused, finished }
 
-/// Top of the active workout: workout timer, set progress, sets done, live
-/// volume and the expandable per-muscle comparison with the last session.
+/// Compact top of the active workout: a ring with sets done, the workout
+/// clock with its status and live volume, and a round play/pause button.
+/// Tapping the card expands the per-muscle comparison with the last session.
 class ActiveWorkoutHeader extends StatelessWidget {
   final ActiveWorkoutTimerPhase phase;
   final String elapsed;
@@ -47,193 +50,279 @@ class ActiveWorkoutHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
-    final hasComparison = categories.isNotEmpty;
+    final hasComparison = totalSets > 0 && categories.isNotEmpty;
+    final clock = DateFormat('HH:mm');
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: colors.onSurfaceVariant,
+      fontFeatures: RunUi.tabular,
+    );
+
+    // Status under the clock: not started / started at / paused / range.
+    final start = startedAt;
+    final (String status, Color? statusColor) = switch (phase) {
+      ActiveWorkoutTimerPhase.idle => (loc.activeWorkoutTimerNotStarted, null),
+      ActiveWorkoutTimerPhase.running => (
+        start == null
+            ? ''
+            : '${loc.activeWorkoutTimerStartLabel} ${clock.format(start)}',
+        null,
+      ),
+      ActiveWorkoutTimerPhase.paused => (loc.restTimerPaused, colors.tertiary),
+      ActiveWorkoutTimerPhase.finished => (
+        start != null && endedAt != null
+            ? '${clock.format(start)} → ${clock.format(endedAt!)}'
+            : loc.activeWorkoutTimerDuration,
+        null,
+      ),
+    };
+    final details = [
+      if (status.isNotEmpty) status,
+      if (totalSets > 0) StrengthWorkoutFormat.volume(volume),
+    ];
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-      child: RunHeroCard(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+      child: Material(
+        color: colors.surfaceContainerLow,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(RunUi.cardRadius),
+          side: BorderSide(color: RunUi.divider(colors)),
+        ),
+        child: InkWell(
+          onTap: hasComparison ? onToggleExpanded : null,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                RunIconBadge(
-                  switch (phase) {
-                    ActiveWorkoutTimerPhase.idle =>
-                      Icons.play_circle_outline_rounded,
-                    ActiveWorkoutTimerPhase.running => Icons.timer_outlined,
-                    ActiveWorkoutTimerPhase.paused =>
-                      Icons.pause_circle_outline_rounded,
-                    ActiveWorkoutTimerPhase.finished =>
-                      Icons.check_circle_outline_rounded,
-                  },
-                  size: 42,
-                  iconSize: 22,
-                  color: phase == ActiveWorkoutTimerPhase.paused
-                      ? colors.tertiary
-                      : colors.primary,
-                ),
-                const SizedBox(width: 12),
-                Expanded(child: _timerText(context, loc)),
-                if (phase != ActiveWorkoutTimerPhase.finished)
-                  _timerButton(loc),
-              ],
-            ),
-            if (totalSets > 0) ...[
-              const SizedBox(height: 14),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: completedSets / totalSets,
-                  minHeight: 6,
-                  backgroundColor: colors.surfaceContainerHighest,
-                ),
-              ),
-              const SizedBox(height: 12),
-              InkWell(
-                onTap: hasComparison ? onToggleExpanded : null,
-                borderRadius: BorderRadius.circular(RunUi.tileRadius),
-                child: Row(
+                Row(
                   children: [
+                    _SetsRing(
+                      done: completedSets,
+                      total: totalSets,
+                      label: loc.activeWorkoutSetsProgress(
+                        completedSets,
+                        totalSets,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: RunStatRow(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          RunStatTile(
-                            icon: Icons.repeat_rounded,
-                            label: loc.commonSets,
-                            value: '$completedSets',
-                            unit: '/$totalSets',
+                          Text(
+                            phase == ActiveWorkoutTimerPhase.idle
+                                ? '00:00'
+                                : elapsed,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              height: 1.1,
+                              fontFeatures: RunUi.tabular,
+                              color: phase == ActiveWorkoutTimerPhase.idle
+                                  ? colors.onSurfaceVariant
+                                  : null,
+                            ),
                           ),
-                          RunStatTile(
-                            icon: Icons.monitor_weight_outlined,
-                            label: loc.commonVolume,
-                            value: StrengthWorkoutFormat.volume(volume),
+                          const SizedBox(height: 2),
+                          Text.rich(
+                            TextSpan(
+                              children: [
+                                for (var i = 0; i < details.length; i++) ...[
+                                  if (i > 0) const TextSpan(text: ' · '),
+                                  TextSpan(
+                                    text: details[i],
+                                    style: i == 0 && statusColor != null
+                                        ? TextStyle(
+                                            color: statusColor,
+                                            fontWeight: FontWeight.w700,
+                                          )
+                                        : null,
+                                  ),
+                                ],
+                              ],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: muted,
                           ),
                         ],
                       ),
                     ),
                     if (hasComparison)
-                      AnimatedRotation(
-                        turns: expanded ? 0.5 : 0,
-                        duration: const Duration(milliseconds: 180),
-                        child: Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          color: colors.onSurfaceVariant,
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: AnimatedRotation(
+                          turns: expanded ? 0.5 : 0,
+                          duration: const Duration(milliseconds: 180),
+                          child: Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: colors.onSurfaceVariant,
+                          ),
                         ),
+                      ),
+                    if (phase != ActiveWorkoutTimerPhase.finished)
+                      _timerButton(loc, colors)
+                    else
+                      Icon(
+                        Icons.check_circle_rounded,
+                        color: colors.primary,
+                        size: 28,
                       ),
                   ],
                 ),
-              ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOutCubic,
-                alignment: Alignment.topCenter,
-                child: expanded && hasComparison
-                    ? _MuscleComparison(categories: categories)
-                    : const SizedBox(width: double.infinity),
-              ),
-            ],
-          ],
+                if (totalSets > 0)
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.topCenter,
+                    child: expanded && hasComparison
+                        ? _MuscleComparison(categories: categories)
+                        : const SizedBox(width: double.infinity),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _timerText(BuildContext context, AppLocalizations loc) {
+  /// Round play / pause action.
+  Widget _timerButton(AppLocalizations loc, ColorScheme colors) {
+    final (
+      IconData icon,
+      String tooltip,
+      VoidCallback onPressed,
+      bool tonal,
+    ) = switch (phase) {
+      ActiveWorkoutTimerPhase.idle => (
+        Icons.play_arrow_rounded,
+        loc.activeWorkoutStart,
+        onStart,
+        false,
+      ),
+      ActiveWorkoutTimerPhase.paused => (
+        Icons.play_arrow_rounded,
+        loc.restTimerResume,
+        onResume,
+        false,
+      ),
+      _ => (Icons.pause_rounded, loc.restTimerPause, onPause, true),
+    };
+    final style = IconButton.styleFrom(
+      minimumSize: const Size(46, 46),
+      iconSize: 26,
+    );
+    return tonal
+        ? IconButton.filledTonal(
+            style: style,
+            tooltip: tooltip,
+            onPressed: onPressed,
+            icon: Icon(icon),
+          )
+        : IconButton.filled(
+            style: style,
+            tooltip: tooltip,
+            onPressed: onPressed,
+            icon: Icon(icon),
+          );
+  }
+}
+
+/// Completed working sets as a small ring with "done/total" inside.
+class _SetsRing extends StatelessWidget {
+  final int done;
+  final int total;
+  final String label;
+
+  const _SetsRing({
+    required this.done,
+    required this.total,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final clock = DateFormat('HH:mm');
-    final muted = theme.textTheme.bodySmall?.copyWith(
-      color: colors.onSurfaceVariant,
+    final progress = total <= 0 ? 0.0 : (done / total).clamp(0.0, 1.0);
+    return SizedBox(
+      width: 46,
+      height: 46,
+      child: CustomPaint(
+        painter: _SetsRingPainter(
+          progress: progress,
+          color: colors.primary,
+          track: colors.surfaceContainerHighest,
+        ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: FittedBox(
+              child: Text(
+                total <= 0 ? '0' : label,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontFeatures: RunUi.tabular,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
-    final start = startedAt;
-    switch (phase) {
-      case ActiveWorkoutTimerPhase.idle:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              loc.activeWorkoutTimerTitle,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            Text(loc.activeWorkoutStartTimerTooltip, style: muted),
-          ],
-        );
-      case ActiveWorkoutTimerPhase.running:
-      case ActiveWorkoutTimerPhase.paused:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              elapsed,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                fontFeatures: RunUi.tabular,
-              ),
-            ),
-            Row(
-              children: [
-                if (phase == ActiveWorkoutTimerPhase.paused) ...[
-                  RunPill(label: loc.restTimerPaused, color: colors.tertiary),
-                  const SizedBox(width: 8),
-                ],
-                if (start != null)
-                  Flexible(
-                    child: Text(
-                      '${loc.activeWorkoutTimerStartLabel} ${clock.format(start)}',
-                      style: muted,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-              ],
-            ),
-          ],
-        );
-      case ActiveWorkoutTimerPhase.finished:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${loc.activeWorkoutTimerDuration} $elapsed',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                fontFeatures: RunUi.tabular,
-              ),
-            ),
-            if (start != null && endedAt != null)
-              Text(
-                '${clock.format(start)} → ${clock.format(endedAt!)}',
-                style: muted,
-              ),
-          ],
-        );
-    }
+  }
+}
+
+class _SetsRingPainter extends CustomPainter {
+  final double progress;
+  final Color color;
+  final Color track;
+
+  const _SetsRingPainter({
+    required this.progress,
+    required this.color,
+    required this.track,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const stroke = 4.0;
+    final rect = Rect.fromLTWH(
+      stroke / 2,
+      stroke / 2,
+      size.width - stroke,
+      size.height - stroke,
+    );
+    canvas.drawArc(
+      rect,
+      0,
+      math.pi * 2,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = stroke
+        ..color = track,
+    );
+    if (progress <= 0) return;
+    canvas.drawArc(
+      rect,
+      -math.pi / 2,
+      math.pi * 2 * progress,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = stroke
+        ..strokeCap = StrokeCap.round
+        ..color = color,
+    );
   }
 
-  Widget _timerButton(AppLocalizations loc) {
-    switch (phase) {
-      case ActiveWorkoutTimerPhase.idle:
-        return FilledButton(
-          onPressed: onStart,
-          child: Text(loc.activeWorkoutStart),
-        );
-      case ActiveWorkoutTimerPhase.running:
-        return FilledButton.tonal(
-          onPressed: onPause,
-          child: Text(loc.restTimerPause),
-        );
-      case ActiveWorkoutTimerPhase.paused:
-        return FilledButton(
-          onPressed: onResume,
-          child: Text(loc.restTimerResume),
-        );
-      case ActiveWorkoutTimerPhase.finished:
-        return const SizedBox.shrink();
-    }
-  }
+  @override
+  bool shouldRepaint(_SetsRingPainter old) =>
+      old.progress != progress || old.color != color || old.track != track;
 }
 
 /// Current vs last-session volume per muscle group.

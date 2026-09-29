@@ -121,19 +121,19 @@ void main() {
     testWidgets('shows timer, sets done and live volume', (tester) async {
       var paused = false;
       await tester.pumpWidget(header(onPause: () => paused = true));
+      // Ring with sets done, the clock, and its status with live volume.
+      expect(find.text('3/8'), findsOneWidget);
       expect(find.text('12:34'), findsOneWidget);
-      expect(find.text('Started at 18:05'), findsOneWidget);
-      expect(find.text('3'), findsOneWidget);
-      expect(find.text('/8'), findsOneWidget);
-      expect(find.text('4.2 t'), findsOneWidget);
-      await tester.tap(find.text('Pause'));
+      expect(find.textContaining('Started at 18:05'), findsOneWidget);
+      expect(find.textContaining('4.2 t'), findsOneWidget);
+      await tester.tap(find.byTooltip('Pause'));
       expect(paused, isTrue);
     });
 
     testWidgets('paused shows the pill and a resume action', (tester) async {
       await tester.pumpWidget(header(phase: ActiveWorkoutTimerPhase.paused));
-      expect(find.text('PAUSED'), findsOneWidget);
-      expect(find.text('Resume'), findsOneWidget);
+      expect(find.textContaining('PAUSED'), findsOneWidget);
+      expect(find.byTooltip('Resume'), findsOneWidget);
     });
 
     testWidgets('expanded reveals the per-muscle comparison', (tester) async {
