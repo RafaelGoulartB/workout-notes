@@ -110,22 +110,6 @@ class NutritionRepository extends BaseRepository {
     return _detailsFor(Food.fromMap(foodRows.first));
   }
 
-  /// Returns one food by (source, externalId), or null when missing.
-  Future<FoodWithDetails?> getFoodBySource({
-    required String source,
-    required String externalId,
-  }) async {
-    final db = await this.db;
-    final foodRows = await db.query(
-      'foods',
-      where: 'source = ? AND external_id = ?',
-      whereArgs: [source, externalId],
-      limit: 1,
-    );
-    if (foodRows.isEmpty) return null;
-    return _detailsFor(Food.fromMap(foodRows.first));
-  }
-
   /// Upserts a food plus its variants and servings in a single
   /// transaction. Used both for remote gateway results and manual
   /// entries.
@@ -1097,16 +1081,6 @@ class NutritionRepository extends BaseRepository {
     );
   }
 
-  /// Daily consumed totals for the last [days] days (including today),
-  /// oldest first. Each row has `date` plus all tracked nutrient sums;
-  /// days without any logged item are absent.
-  Future<List<Map<String, dynamic>>> getDailyNutritionHistory({
-    int days = 30,
-  }) => getDailyNutritionHistoryForRange(
-    startDate: DateTime.now().subtract(Duration(days: days - 1)),
-    endDate: DateTime.now(),
-  );
-
   Future<List<Map<String, dynamic>>> getDailyNutritionHistoryForRange({
     required DateTime startDate,
     required DateTime endDate,
@@ -1457,15 +1431,6 @@ class NutritionRepository extends BaseRepository {
   // Calorie balance analytics
   // ===================================================================
 
-  /// Per-day totals for the [days] window, oldest first. Days with no
-  /// logged items are emitted with `calories` (and the macros) null so
-  /// the screen can render continuous timelines and detect missed days.
-  Future<List<DailyCalorieTotal>> getDailyCalorieTotals({required int days}) =>
-      getDailyCalorieTotalsForRange(
-        startDate: DateTime.now().subtract(Duration(days: days - 1)),
-        endDate: DateTime.now(),
-      );
-
   Future<List<DailyCalorieTotal>> getDailyCalorieTotalsForRange({
     required DateTime startDate,
     required DateTime endDate,
@@ -1505,17 +1470,6 @@ class NutritionRepository extends BaseRepository {
     return result;
   }
 
-  /// Top calorie-contributing foods in the [days] window, ordered by
-  /// summed calories. Items whose food was deleted contribute nothing.
-  Future<List<CalorieContributor>> getTopCalorieContributors({
-    required int days,
-    int limit = 10,
-  }) => getTopCalorieContributorsForRange(
-    startDate: DateTime.now().subtract(Duration(days: days - 1)),
-    endDate: DateTime.now(),
-    limit: limit,
-  );
-
   Future<List<CalorieContributor>> getTopCalorieContributorsForRange({
     required DateTime startDate,
     required DateTime endDate,
@@ -1553,15 +1507,6 @@ class NutritionRepository extends BaseRepository {
         .toList();
   }
 
-  /// Calorie distribution across meal types in the [days] window.
-  /// Excludes days with no logged items and meal types that never
-  /// appear so the chart only renders what the user actually uses.
-  Future<List<MealTypeCalories>> getCaloriesByMealType({required int days}) =>
-      getCaloriesByMealTypeForRange(
-        startDate: DateTime.now().subtract(Duration(days: days - 1)),
-        endDate: DateTime.now(),
-      );
-
   Future<List<MealTypeCalories>> getCaloriesByMealTypeForRange({
     required DateTime startDate,
     required DateTime endDate,
@@ -1594,15 +1539,6 @@ class NutritionRepository extends BaseRepository {
           ),
         )
         .toList();
-  }
-
-  /// Daily consumed totals for the [days] window — same shape as
-  /// [getDailyNutritionHistory] but only the calories column, for the
-  /// rolling-average chart.
-  Future<List<DailyCalorieTotal>> getDailyCaloriesForRolling({
-    required int days,
-  }) async {
-    return getDailyCalorieTotals(days: days);
   }
 
   // ===================================================================

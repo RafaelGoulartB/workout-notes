@@ -21,15 +21,6 @@ class SleepMonitorRepository extends BaseRepository {
   final SleepEntryRepositoryAdapter _sleepEntries =
       SleepEntryRepositoryAdapter();
 
-  Future<List<SleepMonitorSession>> getSessions({int? limit}) async {
-    final rows = await (await db).query(
-      'sleep_monitor_sessions',
-      orderBy: 'started_at DESC',
-      limit: limit,
-    );
-    return rows.map(SleepMonitorSession.fromMap).toList();
-  }
-
   Future<List<SleepMonitorSession>> getUnestimatedSessions() async {
     final database = await db;
     if (!await _tableExists(database, 'sleep_monitor_sessions')) {
@@ -50,23 +41,6 @@ class SleepMonitorRepository extends BaseRepository {
       limit: 5,
     );
     return rows.map(SleepMonitorSession.fromMap).toList();
-  }
-
-  /// Counts alarms completed through the emergency mission.
-  ///
-  /// Legacy methods remain included so changing the challenge to 500 taps
-  /// does not hide completions already stored on the device.
-  Future<int> getEmergencyDismissalCount() async {
-    final rows = await (await db).rawQuery(
-      'SELECT COUNT(*) AS count FROM sleep_monitor_sessions '
-      'WHERE alarm_dismiss_method IN (?, ?, ?)',
-      [
-        SleepMonitorSession.dismissEmergency500Taps,
-        SleepMonitorSession.dismissEmergency1000Taps,
-        SleepMonitorSession.dismissEmergency100Taps,
-      ],
-    );
-    return Sqflite.firstIntValue(rows) ?? 0;
   }
 
   Future<SleepMonitorSession?> getSession(String id) async {

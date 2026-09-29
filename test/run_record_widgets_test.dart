@@ -26,6 +26,7 @@ import 'package:workout_notes/widgets/run/record/run_goal_sheet.dart';
 import 'package:workout_notes/widgets/run/record/run_record_countdown.dart';
 import 'package:workout_notes/widgets/run/record/run_record_sheet.dart';
 import 'package:workout_notes/widgets/run/record/run_record_step_card.dart';
+import 'support/run_plan_fixtures.dart';
 
 RunTrackingState _recording({bool autoPaused = false}) => RunTrackingState(
   supported: true,
@@ -741,7 +742,7 @@ void main() {
         ),
       );
       await tester.runAsync(
-        () => repo.scheduleRun(
+        () => scheduleRunFixture(repo, 
           date: DateTime.now(),
           runPlanId: plan!.id,
           runPlanWorkoutId: workout!.id,

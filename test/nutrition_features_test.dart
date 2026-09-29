@@ -653,42 +653,6 @@ void main() {
   });
 
   // ===================================================================
-  // History
-  // ===================================================================
-
-  group('daily history', () {
-    test('aggregates per-date totals across meals', () async {
-      final banana = await createFood('Banana', calories: 90, carbs: 22);
-      final rice = await createFood('Arroz', calories: 130, carbs: 28);
-      final today = DateTime.now();
-      final date1 = DateTime(
-        today.year,
-        today.month,
-        today.day,
-      ).subtract(const Duration(days: 1)).toIso8601String().substring(0, 10);
-      final date2 = DateTime(
-        today.year,
-        today.month,
-        today.day,
-      ).toIso8601String().substring(0, 10);
-      await logMeal(date1, 'breakfast', banana);
-      await logMeal(date1, 'lunch', rice, quantity: 200);
-      await logMeal(date2, 'breakfast', banana, quantity: 50);
-
-      final history = await repository.getDailyNutritionHistory(days: 2);
-      expect(history, hasLength(2));
-      expect(history.first['date'], date1);
-      expect(
-        (history.first['calories'] as num).toDouble(),
-        closeTo(90 + 260, 0.01),
-      );
-      expect(history.last['date'], date2);
-      expect((history.last['calories'] as num).toDouble(), closeTo(45, 0.01));
-      expect((history.last['protein_g'] as num).toDouble(), closeTo(5, 0.01));
-    });
-  });
-
-  // ===================================================================
   // Meal types catalog (configured in the nutrition settings)
   // ===================================================================
 

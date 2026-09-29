@@ -76,23 +76,6 @@ class AiChatRepository extends BaseRepository {
     return id;
   }
 
-  Future<void> replaceAiChatMessages(
-    String threadId,
-    List<Map<String, dynamic>> messages,
-  ) async {
-    final db = await this.db;
-    await db.transaction((txn) async {
-      await txn.delete(
-        'ai_chat_messages',
-        where: 'thread_id = ?',
-        whereArgs: [threadId],
-      );
-      for (final m in messages) {
-        await txn.insert('ai_chat_messages', m);
-      }
-    });
-  }
-
   Future<void> upsertAiChatMessages(
     String threadId,
     List<Map<String, dynamic>> messages,
@@ -107,15 +90,6 @@ class AiChatRepository extends BaseRepository {
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
     await batch.commit(noResult: true);
-  }
-
-  Future<List<Map<String, dynamic>>> getAiChatThreads() async {
-    final db = await this.db;
-    return db.query(
-      'ai_chat_threads',
-      where: 'archived = 0',
-      orderBy: 'is_pinned DESC, updated_at DESC',
-    );
   }
 
   Future<List<Map<String, dynamic>>> getAiChatThreadsPage({

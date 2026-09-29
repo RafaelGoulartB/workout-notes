@@ -36,7 +36,7 @@ void main() {
       expect(imported.sleepEntryId, isNotNull);
       expect(await repository.getUnestimatedSessions(), isEmpty);
       await repository.importNativeSpool(spool);
-      expect((await repository.getSessions()).length, 1);
+      expect((await database.query('sleep_monitor_sessions')).length, 1);
       expect(await database.query('sleep_entries'), hasLength(1));
     },
   );
@@ -356,32 +356,6 @@ void main() {
     expect(restored.alarmAt, session.alarmAt);
   });
 
-  test('counts current and legacy emergency dismissals only', () async {
-    final start = DateTime.utc(2026, 8, 1, 22);
-    final methods = <String>[
-      SleepMonitorSession.dismissEmergency500Taps,
-      SleepMonitorSession.dismissEmergency1000Taps,
-      SleepMonitorSession.dismissEmergency100Taps,
-      SleepMonitorSession.dismissBarcode,
-      SleepMonitorSession.dismissButton,
-    ];
-
-    for (var index = 0; index < methods.length; index++) {
-      await database.insert('sleep_monitor_sessions', {
-        'id': 'emergency-session-$index',
-        'status': SleepMonitorSession.completed,
-        'started_at': start.toIso8601String(),
-        'utc_offset_start_minutes': -180,
-        'sensor_mode': 'audio',
-        'algorithm_version': SleepMonitorSession.defaultAlgorithmVersion,
-        'alarm_dismiss_method': methods[index],
-        'created_at': start.toIso8601String(),
-      });
-    }
-
-    expect(await repository.getEmergencyDismissalCount(), 3);
-  });
-
   test(
     'imports idempotently and computes quiet/noisy periods and events',
     () async {
@@ -391,7 +365,7 @@ void main() {
       final second = await repository.importNativeSpool(spool);
 
       expect(first.id, second.id);
-      expect(await repository.getSessions(), hasLength(1));
+      expect(await database.query('sleep_monitor_sessions'), hasLength(1));
       expect(await repository.getSegments(first.id), isEmpty);
       expect(first.quietMinutes, 1);
       expect(first.noisyMinutes, 1);
@@ -423,7 +397,7 @@ void main() {
 
     expect(imported.sleepEntryId, isNull);
     expect(await database.query('sleep_entries'), isEmpty);
-    expect(await repository.getSessions(), hasLength(1));
+    expect(await database.query('sleep_monitor_sessions'), hasLength(1));
   });
 
   test('does not create a sleep entry for a sub-minute test session', () async {

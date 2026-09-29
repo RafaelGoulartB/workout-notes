@@ -1123,13 +1123,7 @@ void main() {
           if (mostUsedExercise != null) {
             await analyticsRepo.getExerciseHistory(mostUsedExercise);
           }
-          await analyticsRepo.getWeeklyVolume(weeks: 4);
-          await analyticsRepo.getAnaerobicVolumeByCategory(
-            now.subtract(const Duration(days: 30)),
-            now,
-            bySets: false,
-          );
-          await analyticsRepo.getTopExercisesByVolume(limit: 10);
+          await analyticsRepo.getWorkoutOverviewStats();
           if (recentWorkout != null) {
             await workoutRepo.getWorkout(recentWorkout);
             final entries = await workoutRepo.getWorkoutExercises(recentWorkout);
@@ -1156,18 +1150,8 @@ void main() {
             },
           );
         }
-        queryTimes['volume semanal (4 semanas)'] = await _timed(() async {
-          await analyticsRepo.getWeeklyVolume(weeks: 4);
-        });
-        queryTimes['volume por categoria (30d)'] = await _timed(() async {
-          await analyticsRepo.getAnaerobicVolumeByCategory(
-            now.subtract(const Duration(days: 30)),
-            now,
-            bySets: false,
-          );
-        });
-        queryTimes['top exercicios (all-time)'] = await _timed(() async {
-          await analyticsRepo.getTopExercisesByVolume(limit: 10);
+        queryTimes['visao geral treinos (totais)'] = await _timed(() async {
+          await analyticsRepo.getWorkoutOverviewStats();
         });
         if (recentWorkout != null) {
           queryTimes['detalhe treino + sets'] = await _timed(() async {

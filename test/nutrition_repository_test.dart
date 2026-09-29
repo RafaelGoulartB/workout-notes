@@ -657,7 +657,7 @@ void main() {
         ),
       );
       expect(
-        await repository.getFoodBySource(source: 'gateway', externalId: 'b'),
+        await repository.getFoodWithDetails('food-b'),
         isNull,
       );
     });
@@ -837,41 +837,6 @@ void main() {
   });
 
   group('calorie balance', () {
-    test('counts the calorie goal only on days with logged food', () async {
-      final food = await repository.createManualFood(
-        name: 'Refeição do dia',
-        referenceAmount: 100,
-        referenceUnit: 'g',
-        referenceValues: const NutritionValues(calories: 1500),
-      );
-      final details = await repository.getFoodWithDetails(food.id);
-      final variant = details!.variants.first;
-      final today = DateTime.now().toIso8601String().substring(0, 10);
-      await repository.addMealLogItem(
-        date: today,
-        mealType: 'lunch',
-        food: food,
-        variant: variant,
-        conversion: const NutritionConversion(
-          quantity: 100,
-          unit: 'g',
-          referenceAmount: 100,
-          referenceUnit: 'g',
-        ),
-      );
-
-      for (final days in [7, 30]) {
-        final balance = await repository.getCalorieBalance(
-          days: days,
-          goal: 2000,
-        );
-        expect(balance.daysLogged, 1);
-        expect(balance.totalConsumed, 1500);
-        expect(balance.totalGoal, 2000);
-        expect(balance.balance, -500);
-      }
-    });
-
     test('calendar range queries exclude records outside the period', () async {
       final food = await repository.createManualFood(
         name: 'Range food',
@@ -903,9 +868,8 @@ void main() {
         startDate: start,
         endDate: end,
       );
-      final balance = await repository.getCalorieBalanceForRange(
-        startDate: start,
-        endDate: end,
+      final balance = repository.calculateCalorieBalance(
+        dailies: dailies,
         goal: 1000,
       );
       final history = await repository.getDailyNutritionHistoryForRange(

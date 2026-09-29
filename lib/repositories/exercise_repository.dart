@@ -1,4 +1,3 @@
-import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'base_repository.dart';
 
@@ -26,48 +25,6 @@ class ExerciseRepository extends BaseRepository {
   Future<List<Map<String, dynamic>>> getCategories() async {
     final db = await this.db;
     return db.query('exercise_categories', orderBy: 'order_index ASC');
-  }
-
-  Future<Map<String, dynamic>?> getCategory(String id) async {
-    final db = await this.db;
-    final result = await db.query(
-      'exercise_categories',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    return result.isEmpty ? null : result.first;
-  }
-
-  Future<String> addCategory(String name, int color) async {
-    final db = await this.db;
-    final id = const Uuid().v4();
-    final count =
-        Sqflite.firstIntValue(
-          await db.rawQuery('SELECT COUNT(*) FROM exercise_categories'),
-        ) ??
-        0;
-    await db.insert('exercise_categories', {
-      'id': id,
-      'name': name,
-      'color': color,
-      'order_index': count,
-    });
-    return id;
-  }
-
-  Future<void> updateCategory(String id, String name, int color) async {
-    final db = await this.db;
-    await db.update(
-      'exercise_categories',
-      {'name': name, 'color': color},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
-
-  Future<void> deleteCategory(String id) async {
-    final db = await this.db;
-    await db.delete('exercise_categories', where: 'id = ?', whereArgs: [id]);
   }
 
   // ===================================================================

@@ -42,7 +42,7 @@ void main() {
       isPinned: true,
     );
 
-    var threads = await helper.aiChatRepo.getAiChatThreads();
+    var threads = await helper.aiChatRepo.getAiChatThreadsPage(limit: 100);
     expect(threads.map((thread) => thread['id']), ['pinned', 'recent']);
 
     await helper.aiChatRepo.upsertAiChatThread(
@@ -52,7 +52,7 @@ void main() {
       updatedAt: newer,
       isPinned: true,
     );
-    threads = await helper.aiChatRepo.getAiChatThreads();
+    threads = await helper.aiChatRepo.getAiChatThreadsPage(limit: 100);
     expect(threads.first['is_pinned'], 1);
   });
 
@@ -101,7 +101,7 @@ void main() {
     );
 
     await helper.aiChatRepo.renameAiChatThread('thread', 'After');
-    final thread = (await helper.aiChatRepo.getAiChatThreads()).single;
+    final thread = (await helper.aiChatRepo.getAiChatThreadsPage(limit: 100)).single;
     expect(thread['title'], 'After');
     expect(thread['updated_at'], timestamp.toIso8601String());
   });
@@ -132,7 +132,7 @@ void main() {
       createdAt: timestamp,
     );
 
-    await helper.aiChatRepo.replaceAiChatMessages('thread-images', [message.toRow()]);
+    await helper.aiChatRepo.upsertAiChatMessages('thread-images', [message.toRow()]);
     final restored = AiChatMessage.fromRow(
       (await helper.aiChatRepo.getAiChatMessagesThread('thread-images')).single,
     );

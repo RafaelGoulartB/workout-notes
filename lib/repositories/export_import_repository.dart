@@ -714,47 +714,6 @@ class ExportImportRepository extends BaseRepository {
   }
 
   // ------------------------------------------------------------------
-  // CSV export (read-only query, unchanged)
-  // ------------------------------------------------------------------
-
-  Future<List<Map<String, dynamic>>> exportWorkoutsCsvData({
-    String? exerciseId,
-    DateTime? startDate,
-    DateTime? endDate,
-  }) async {
-    final db = await this.db;
-    var query = '''
-      SELECT w.date, e.name as exercise, ec.name as category,
-        s.weight, s.reps, s.distance, s.time_seconds,
-        s.is_warmup, s.rpe, s.comment as set_comment,
-        w.comment as workout_comment
-      FROM sets s
-      JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
-      JOIN exercises e ON ee.exercise_id = e.id
-      LEFT JOIN exercise_categories ec ON e.category_id = ec.id
-      JOIN workouts w ON ee.workout_id = w.id
-      WHERE 1=1
-    ''';
-    final args = <dynamic>[];
-
-    if (exerciseId != null) {
-      query += ' AND e.id = ?';
-      args.add(exerciseId);
-    }
-    if (startDate != null) {
-      query += ' AND w.date >= ?';
-      args.add(startDate.toIso8601String().substring(0, 10));
-    }
-    if (endDate != null) {
-      query += ' AND w.date <= ?';
-      args.add(endDate.toIso8601String().substring(0, 10));
-    }
-
-    query += ' ORDER BY w.date DESC, s.order_index ASC';
-    return db.rawQuery(query, args);
-  }
-
-  // ------------------------------------------------------------------
   // Delete all user data (keeps seed categories & exercises)
   // ------------------------------------------------------------------
 
