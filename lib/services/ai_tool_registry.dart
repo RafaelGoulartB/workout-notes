@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/ai_message_role.dart';
@@ -100,6 +102,13 @@ class AiToolRegistry {
         _specsByName['propose_routine_change']!.schema,
     ];
   }
+
+  int? _fullChatSchemaChars;
+
+  /// Length of the JSON encoding of the full [openAiChatToolsSchema]. The
+  /// catalog is static, so it is measured once instead of on every round.
+  int chatToolsSchemaCharacters() =>
+      _fullChatSchemaChars ??= jsonEncode(openAiChatToolsSchema()).length;
 
   /// Names of every read tool in the catalog.
   Set<String> get readToolNames => {

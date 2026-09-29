@@ -117,7 +117,11 @@ class AiChatService extends ChangeNotifier {
   AiSettingsNotifier? _settings;
   bool _isReady = false;
   Future<void>? _readyFuture;
-  final Map<String, String> _persistedMessageSignatures = {};
+
+  /// Last persisted instance and row signature per message id. Messages are
+  /// immutable, so an identical instance is known-clean without re-encoding.
+  final Map<String, ({AiChatMessage message, String signature})>
+  _persistedMessages = {};
   _AiTurnDiagnostics? _activeTurnDiagnostics;
   String? _activeReasoningEffort;
 
@@ -513,10 +517,11 @@ class AiChatService extends ChangeNotifier {
       names: const {'propose_manual_food_creation'},
       includeRoutineProposal: false,
     );
+    final fullSchemaChars = _tools.chatToolsSchemaCharacters();
     final historyBudget = _historyBudgetFor(
       systemPrompt: systemPrompt,
       contextJson: contextJson,
-      toolsSchema: fullSchema,
+      toolsSchemaChars: fullSchemaChars,
     );
     final threadSummary = manualFoodTextTurn
         ? null
@@ -543,11 +548,14 @@ class AiChatService extends ChangeNotifier {
       final wire = manualFoodRound
           ? _buildManualFoodProposalWire(current)
           : _buildWireMessages(current, options);
+      // The request is encoded once per round; every estimate and the
+      // diagnostics reuse this length (the schema length is cached).
+      final wireChars = jsonEncode(wire).length;
       // Tools stay available while the request fits the turn budget. Beyond
       // that (or past the round cap) the model must answer with what it has.
       final inputExceeded =
           (lastPromptTokens ?? 0) > kMaxTurnInputTokens ||
-          _estimateWireTokens(wire, fullSchema) > kMaxTurnInputTokens;
+          _estimateWireTokens(wireChars, fullSchemaChars) > kMaxTurnInputTokens;
       final allowTools = round < kMaxToolRounds && !inputExceeded;
       final toolsSchema = !allowTools
           ? null
@@ -576,7 +584,7 @@ class AiChatService extends ChangeNotifier {
             : 'followup_provider_request',
         round: round + 1,
         schemaToolCount: toolsSchema?.length ?? 0,
-        requestCharacters: jsonEncode(wire).length,
+        requestCharacters: wireChars,
         tools: toolsSchema == null
             ? const []
             : (toolsSchema
@@ -603,8 +611,12 @@ class AiChatService extends ChangeNotifier {
               hasImages: imageDataUrls.isNotEmpty,
             );
       _calibrateTokenScale(
-        wire: wire,
-        toolsSchema: toolsSchema,
+        wireChars: wireChars,
+        toolsSchemaChars: toolsSchema == null
+            ? 0
+            : identical(toolsSchema, fullSchema)
+            ? fullSchemaChars
+            : jsonEncode(toolsSchema).length,
         promptTokens: completion.promptTokens,
       );
       lastPromptTokens = completion.promptTokens;
@@ -878,6 +890,9 @@ class AiChatService extends ChangeNotifier {
     }
     return buffer.toString();
   }
+
+  @visibleForTesting
+  Future<void> persistCurrentThreadForTest() => _persistCurrentThread();
 
   @visibleForTesting
   String transcriptForSummaryForTest(List<AiChatMessage> messages) =>

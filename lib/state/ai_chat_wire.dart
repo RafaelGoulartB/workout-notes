@@ -289,15 +289,12 @@ extension AiChatWireTesting on AiChatService {
     return (raw * _tokenScale).ceil();
   }
 
-  int _estimateWireTokens(
-    List<Map<String, dynamic>> wire,
-    List<Map<String, dynamic>>? toolsSchema,
-  ) {
+  /// Token estimate for a request whose JSON lengths are already known
+  /// (callers encode `wire` once per round and reuse the cached schema size).
+  int _estimateWireTokens(int wireChars, int toolsSchemaChars) {
     final raw =
-        TokenEstimator.estimateText(jsonEncode(wire)) +
-        (toolsSchema == null
-            ? 0
-            : TokenEstimator.estimateText(jsonEncode(toolsSchema)));
+        TokenEstimator.estimateChars(wireChars) +
+        TokenEstimator.estimateChars(toolsSchemaChars);
     return (raw * _tokenScale).ceil();
   }
 
@@ -305,16 +302,14 @@ extension AiChatWireTesting on AiChatService {
   /// reported, so history budgets track the real tokenizer of the active
   /// model. Kept in memory only; nothing about usage is persisted or shown.
   void _calibrateTokenScale({
-    required List<Map<String, dynamic>> wire,
-    required List<Map<String, dynamic>>? toolsSchema,
+    required int wireChars,
+    required int toolsSchemaChars,
     required int? promptTokens,
   }) {
     if (promptTokens == null || promptTokens <= 0) return;
     final rawEstimate =
-        TokenEstimator.estimateText(jsonEncode(wire)) +
-        (toolsSchema == null
-            ? 0
-            : TokenEstimator.estimateText(jsonEncode(toolsSchema)));
+        TokenEstimator.estimateChars(wireChars) +
+        TokenEstimator.estimateChars(toolsSchemaChars);
     if (rawEstimate <= 0) return;
     _tokenScale = (promptTokens / rawEstimate).clamp(0.6, 2.5);
   }
@@ -322,14 +317,14 @@ extension AiChatWireTesting on AiChatService {
   int _historyBudgetFor({
     required String systemPrompt,
     required Map<String, dynamic> contextJson,
-    required List<Map<String, dynamic>> toolsSchema,
+    required int toolsSchemaChars,
   }) {
     final fixedTokens =
         ((TokenEstimator.estimateText(systemPrompt) +
                     TokenEstimator.estimateText(_dataGroundingPolicy) +
                     TokenEstimator.estimateText(_routineMutationPolicy) +
                     TokenEstimator.estimateText(jsonEncode(contextJson)) +
-                    TokenEstimator.estimateText(jsonEncode(toolsSchema)) +
+                    TokenEstimator.estimateChars(toolsSchemaChars) +
                     80) *
                 _tokenScale)
             .ceil();
@@ -347,7 +342,10 @@ extension AiChatWireTesting on AiChatService {
   ) {
     final currentNames = _tools.toolNamesForQuery(latestUserText);
     if (currentNames.isNotEmpty) return currentNames;
-    return _tools.toolNamesForQuery(_routingQuery(messages, latestUserText));
+    final routingQuery = _routingQuery(messages, latestUserText);
+    // Only a follow-up widens the query; otherwise the answer is unchanged.
+    if (routingQuery == latestUserText) return currentNames;
+    return _tools.toolNamesForQuery(routingQuery);
   }
 
   String _routingQuery(List<AiChatMessage> messages, String latestUserText) {

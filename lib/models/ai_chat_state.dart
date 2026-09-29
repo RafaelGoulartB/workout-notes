@@ -27,6 +27,10 @@ class AiChatState {
   final bool hasOlderThreads;
   final bool isLoadingOlderThreads;
 
+  /// Total stored conversations (not just the loaded pages); null until the
+  /// first count arrives.
+  final int? totalThreadCount;
+
   const AiChatState({
     this.threads = const [],
     this.activeThreadId,
@@ -41,6 +45,7 @@ class AiChatState {
     this.isLoadingOlderMessages = false,
     this.hasOlderThreads = false,
     this.isLoadingOlderThreads = false,
+    this.totalThreadCount,
   });
 
   bool get isSending =>
@@ -81,19 +86,22 @@ class AiChatState {
     bool? isLoadingOlderMessages,
     bool? hasOlderThreads,
     bool? isLoadingOlderThreads,
+    int? totalThreadCount,
   }) {
     return AiChatState(
       threads: threads ?? this.threads,
-      activeThreadId:
-          clearActiveThread ? null : (activeThreadId ?? this.activeThreadId),
+      activeThreadId: clearActiveThread
+          ? null
+          : (activeThreadId ?? this.activeThreadId),
       messages: messages ?? this.messages,
       phase: phase ?? this.phase,
       error: clearError ? null : (error ?? this.error),
       errorDetails: clearError
           ? null
           : (errorDetails ?? (error != null ? null : this.errorDetails)),
-      phaseMessage:
-          clearPhaseMessage ? null : (phaseMessage ?? this.phaseMessage),
+      phaseMessage: clearPhaseMessage
+          ? null
+          : (phaseMessage ?? this.phaseMessage),
       phaseToolCount: phaseToolCount ?? this.phaseToolCount,
       routineProposals: routineProposals ?? this.routineProposals,
       hasOlderMessages: hasOlderMessages ?? this.hasOlderMessages,
@@ -102,6 +110,7 @@ class AiChatState {
       hasOlderThreads: hasOlderThreads ?? this.hasOlderThreads,
       isLoadingOlderThreads:
           isLoadingOlderThreads ?? this.isLoadingOlderThreads,
+      totalThreadCount: totalThreadCount ?? this.totalThreadCount,
     );
   }
 }

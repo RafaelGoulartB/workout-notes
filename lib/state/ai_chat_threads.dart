@@ -1,5 +1,20 @@
 part of 'ai_chat_service.dart';
 
+/// A page of SQLite thread-search results.
+class AiThreadSearchPage {
+  final List<AiChatThread> threads;
+  final bool hasMore;
+
+  /// Total matches; only set on the first page.
+  final int? total;
+
+  const AiThreadSearchPage({
+    required this.threads,
+    required this.hasMore,
+    this.total,
+  });
+}
+
 /// Public thread lifecycle operations kept separate from turn execution.
 extension AiChatThreadManagement on AiChatService {
   static const int _messagePageSize = 100;
@@ -11,16 +26,38 @@ extension AiChatThreadManagement on AiChatService {
         limit: _threadPageSize + 1,
       );
       final hasOlder = rows.length > _threadPageSize;
+      final total = await _db.aiChatRepo.countAiChatThreads();
       _state = _state.copyWith(
-        threads: rows
-            .take(_threadPageSize)
-            .map(AiChatThread.fromRow)
-            .toList(),
+        threads: rows.take(_threadPageSize).map(AiChatThread.fromRow).toList(),
         hasOlderThreads: hasOlder,
         isLoadingOlderThreads: false,
+        totalThreadCount: total,
       );
       if (notify) _emit();
     } catch (_) {}
+  }
+
+  /// One page of threads matching [query] straight from SQLite (title,
+  /// preview and message text), so conversations outside the loaded pages are
+  /// found too. [total] is only computed for the first page.
+  Future<AiThreadSearchPage> searchThreads(
+    String query, {
+    int offset = 0,
+    int limit = _threadPageSize,
+  }) async {
+    final rows = await _db.aiChatRepo.searchAiChatThreadsPage(
+      query: query,
+      limit: limit + 1,
+      offset: offset,
+    );
+    final total = offset == 0
+        ? await _db.aiChatRepo.countAiChatThreads(query: query)
+        : null;
+    return AiThreadSearchPage(
+      threads: rows.take(limit).map(AiChatThread.fromRow).toList(),
+      hasMore: rows.length > limit,
+      total: total,
+    );
   }
 
   Future<void> loadOlderThreads() async {
@@ -60,7 +97,7 @@ extension AiChatThreadManagement on AiChatService {
       clearError: true,
       phase: AiTurnPhase.idle,
     );
-    _persistedMessageSignatures.clear();
+    _persistedMessages.clear();
     _emit();
   }
 
@@ -74,11 +111,14 @@ extension AiChatThreadManagement on AiChatService {
       final hasOlder = rows.length > _messagePageSize;
       final visibleRows = hasOlder ? rows.sublist(1) : rows;
       final messages = visibleRows.map(AiChatMessage.fromRow).toList();
-      _persistedMessageSignatures
+      _persistedMessages
         ..clear()
         ..addEntries(
           messages.map(
-            (message) => MapEntry(message.id, jsonEncode(message.toRow())),
+            (message) => MapEntry(message.id, (
+              message: message,
+              signature: jsonEncode(message.toRow()),
+            )),
           ),
         );
       final proposals = await _routineMutations.getThreadProposals(threadId);
@@ -117,9 +157,12 @@ extension AiChatThreadManagement on AiChatService {
       final hasOlder = rows.length > _messagePageSize;
       final visibleRows = hasOlder ? rows.sublist(1) : rows;
       final older = visibleRows.map(AiChatMessage.fromRow).toList();
-      _persistedMessageSignatures.addEntries(
+      _persistedMessages.addEntries(
         older.map(
-          (message) => MapEntry(message.id, jsonEncode(message.toRow())),
+          (message) => MapEntry(message.id, (
+            message: message,
+            signature: jsonEncode(message.toRow()),
+          )),
         ),
       );
       _state = _state.copyWith(
@@ -151,9 +194,12 @@ extension AiChatThreadManagement on AiChatService {
       await _imageStore.deleteAll(attachments);
       final threads = _state.threads.where((t) => t.id != threadId).toList();
       final clearActive = _state.activeThreadId == threadId;
-      if (clearActive) _persistedMessageSignatures.clear();
+      if (clearActive) _persistedMessages.clear();
       _state = _state.copyWith(
         threads: threads,
+        totalThreadCount: _state.totalThreadCount == null
+            ? null
+            : (_state.totalThreadCount! - 1).clamp(0, 1 << 30),
         clearActiveThread: clearActive,
         messages: clearActive ? const [] : _state.messages,
         hasOlderMessages: clearActive ? false : _state.hasOlderMessages,

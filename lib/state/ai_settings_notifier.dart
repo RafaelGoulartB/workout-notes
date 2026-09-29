@@ -126,6 +126,11 @@ class AiSettingsNotifier extends ChangeNotifier {
        _settings = _loadInitial();
 
   AiSettings get settings => _settings;
+
+  /// The app language the user picked in Settings (`pt` or `en`); the same
+  /// preference that drives the UI locale.
+  String get appLanguageCode =>
+      prefs.getString('app_locale') == 'pt' ? 'pt' : 'en';
   bool get isLoaded => _loaded;
   bool get isConfigured => _settings.isConfigured;
   AiProvider? get activeProvider => _settings.activeProvider;

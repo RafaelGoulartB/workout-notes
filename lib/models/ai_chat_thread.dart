@@ -1,4 +1,16 @@
 class AiChatThread {
+  /// Neutral marker stored for threads that have no user-derived title. It is
+  /// localized at presentation time, never persisted in a language.
+  static const String genericTitle = '';
+
+  /// Titles older builds stored in Portuguese for untitled threads.
+  static const Set<String> _legacyGenericTitles = {
+    'nova conversa',
+    'conversa',
+    'new conversation',
+    'conversation',
+  };
+
   final String id;
   final String title;
   final DateTime createdAt;
@@ -16,6 +28,15 @@ class AiChatThread {
     this.archived = false,
     this.isPinned = false,
   });
+
+  /// True when the title is the untitled marker (or a legacy generic title).
+  bool get hasGenericTitle =>
+      title.trim().isEmpty ||
+      _legacyGenericTitles.contains(title.trim().toLowerCase());
+
+  /// The title to show: the stored one, or [fallback] (localized by the UI)
+  /// when the thread is untitled.
+  String displayTitle(String fallback) => hasGenericTitle ? fallback : title;
 
   AiChatThread copyWith({
     String? title,
