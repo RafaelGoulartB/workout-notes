@@ -41,4 +41,19 @@
     <string name="traditional_alarm_snooze_detail">Snooze for %1$d min (%2$d/%3$d)</string>
     <string name="traditional_alarm_mission_cancelled">Mission not completed. Scan the code to dismiss the alarm.</string>
     <string name="traditional_alarm_mission_wrong_code">That code does not match. Try again.</string>
+    <string name="medication_reminder_channel_name">Medication reminders</string>
+    <string name="medication_reminder_channel_description">Reminders to take your medication</string>
+    <string name="medication_alarm_channel_name">Medication alarms</string>
+    <string name="medication_alarm_channel_description">Rings when a dose was not confirmed in time</string>
+    <string name="medication_reminder_title">Time for your medication</string>
+    <string name="medication_reminder_confirm_hint">Tap to confirm you took it.</string>
+    <string name="medication_alarm_title">Medication not confirmed</string>
+    <string name="medication_alarm_body">This dose was not confirmed yet. Take it and confirm to stop the alarm.</string>
+    <string name="medication_confirm_body">Did you take this dose?</string>
+    <string name="medication_already_logged">This dose is already logged.</string>
+    <string name="medication_dose_time">Dose at %1$s</string>
+    <string name="medication_taken">I took it</string>
+    <string name="medication_skip">Skip this dose</string>
+    <string name="medication_not_now">Not now</string>
+    <string name="medication_open_confirmation">Confirm dose</string>
 </resources>

@@ -41,4 +41,19 @@
     <string name="traditional_alarm_snooze_detail">Sonecar por %1$d min (%2$d/%3$d)</string>
     <string name="traditional_alarm_mission_cancelled">Missão não concluída. Leia o código para desligar o alarme.</string>
     <string name="traditional_alarm_mission_wrong_code">O código não confere. Tente novamente.</string>
+    <string name="medication_reminder_channel_name">Lembretes de remédio</string>
+    <string name="medication_reminder_channel_description">Lembretes para tomar seus remédios</string>
+    <string name="medication_alarm_channel_name">Alarmes de remédio</string>
+    <string name="medication_alarm_channel_description">Toca quando uma dose não foi confirmada a tempo</string>
+    <string name="medication_reminder_title">Hora do remédio</string>
+    <string name="medication_reminder_confirm_hint">Toque para confirmar que você tomou.</string>
+    <string name="medication_alarm_title">Remédio não confirmado</string>
+    <string name="medication_alarm_body">Esta dose ainda não foi confirmada. Tome e confirme para parar o alarme.</string>
+    <string name="medication_confirm_body">Você tomou esta dose?</string>
+    <string name="medication_already_logged">Esta dose já foi registrada.</string>
+    <string name="medication_dose_time">Dose das %1$s</string>
+    <string name="medication_taken">Tomei o remédio</string>
+    <string name="medication_skip">Pular esta dose</string>
+    <string name="medication_not_now">Agora não</string>
+    <string name="medication_open_confirmation">Confirmar dose</string>
 </resources>

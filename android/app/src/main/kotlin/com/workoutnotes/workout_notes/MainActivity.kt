@@ -4,6 +4,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import com.workoutnotes.workout_notes.medication.MedicationReminderBridge
 import com.workoutnotes.workout_notes.run.RunAudioBridge
 import com.workoutnotes.workout_notes.run.RunTrackingBridge
 import com.workoutnotes.workout_notes.run.RunVoiceBridge
@@ -57,6 +58,10 @@ class MainActivity : FlutterActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             "workout_notes/traditional_alarms/methods",
         ).setMethodCallHandler(traditionalAlarmBridge)
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "workout_notes/medication/methods",
+        ).setMethodCallHandler(MedicationReminderBridge(applicationContext))
     }
 
     override fun onResume() {
