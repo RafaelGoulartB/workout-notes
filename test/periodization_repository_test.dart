@@ -7,16 +7,18 @@ import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'support/periodization_fixtures.dart';
+import 'support/sql_capture.dart';
 import 'support/test_db.dart';
 
 void main() {
   late Database database;
+  late SqlLog sqlLog;
   late PeriodizationRepository repository;
 
   setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
-    database = await installTestDb();
+    (database, sqlLog) = await installCountingTestDb();
     repository = PeriodizationRepository();
   });
 
@@ -466,6 +468,70 @@ void main() {
     expect(suggestion?.routineDayId, 'routine-b-day');
     expect(suggestion?.routineDayCount, 2);
     expect(suggestion?.completedWorkouts, 1);
+  });
+
+  test('routine suggestion reads routines in bulk, not one by one', () async {
+    final today = DateTime.now();
+    final start = DateTime(today.year, today.month, today.day - 2);
+    final end = DateTime(today.year, today.month, today.day + 2);
+    final routineIds = [for (var i = 0; i < 4; i++) 'routine-$i'];
+    for (final id in routineIds) {
+      await database.insert('routines', {
+        'id': id,
+        'name': 'Routine $id',
+        'created_at': today.toIso8601String(),
+      });
+      for (var d = 0; d < 2; d++) {
+        await database.insert('routine_days', {
+          'id': '$id-day$d',
+          'routine_id': id,
+          'name': 'Day $d',
+          'order_index': d,
+        });
+      }
+    }
+    await repository.createPlanWithPhases(
+      name: 'Many routines',
+      startDate: start,
+      phases: [
+        PeriodizationPhaseDraft(
+          name: 'Current phase',
+          color: 1,
+          startDate: start,
+          endDate: end,
+          target: PeriodizationTarget(
+            id: '',
+            phaseId: '',
+            version: 0,
+            validFrom: start,
+            routineIds: routineIds,
+            createdAt: today,
+          ),
+        ),
+      ],
+    );
+    // Three finished sessions: the fourth day of the sequence is next.
+    for (var i = 0; i < 3; i++) {
+      await database.insert('workouts', {
+        'id': 'done-$i',
+        'date': _testDate(today),
+        'end_time': today.toIso8601String(),
+        'routine_id': routineIds[i],
+        'created_at': today.toIso8601String(),
+      });
+    }
+
+    sqlLog.clear();
+    final suggestion = await repository.getRoutineSuggestion(today);
+    final reads = sqlLog.reads;
+
+    expect(suggestion?.routineId, 'routine-1');
+    expect(suggestion?.routineDayId, 'routine-1-day1');
+    expect(suggestion?.routineDayCount, 8);
+    expect(suggestion?.completedWorkouts, 3);
+    // Same query count as with a single routine (phase, target, routines,
+    // days, completed count): nothing scales with the routine count.
+    expect(reads, lessThanOrEqualTo(6));
   });
 
   test(

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
@@ -565,77 +566,103 @@ class NutritionRepository extends BaseRepository {
         mealType: mealType,
         name: name,
       );
-      final consumed = conversion.apply(variant.values);
-      // The conversion already carries the exact serving chosen in the
-      // quantity sheet. Looking it up by the generic `serving` unit is
-      // ambiguous when a food defines more than one portion.
-      final serving =
-          conversion.serving ??
-          availableServings.firstWhereOrNull(
-            (s) => s.label == conversion.unit || s.unit == conversion.unit,
-          );
-      final snapshot = NutritionSnapshot(
-        version: NutritionSnapshot.currentVersion,
-        source: food.source,
-        externalId: food.externalId,
-        foodName: food.name,
-        foodBrand: food.brand,
-        variantLabel: variant.label,
-        referenceAmount: variant.referenceAmount,
-        referenceUnit: variant.referenceUnit,
-        quantity: conversion.quantity,
-        unit: conversion.unit,
-        gramsEquivalent: serving?.gramsEquivalent,
-        mlEquivalent: serving?.mlEquivalent,
-        consumed: consumed,
-        isEstimated: variant.isEstimated,
-        hasMissingValues: consumed.hasMissingFields,
-      );
-      final item = MealLogItem(
-        id: _uuid.v4(),
-        mealLogId: log.id,
-        foodId: food.id,
-        foodVariantId: variant.id,
-        foodNameSnapshot: food.name,
-        brandSnapshot: food.brand,
-        quantity: conversion.quantity,
-        unit: conversion.unit,
-        calories: consumed.calories,
-        proteinG: consumed.proteinG,
-        carbsG: consumed.carbsG,
-        fatG: consumed.fatG,
-        saturatedFatG: consumed.saturatedFatG,
-        monounsaturatedFatG: consumed.monounsaturatedFatG,
-        polyunsaturatedFatG: consumed.polyunsaturatedFatG,
-        transFatG: consumed.transFatG,
-        fiberG: consumed.fiberG,
-        sugarsG: consumed.sugarsG,
-        sodiumMg: consumed.sodiumMg,
-        potassiumMg: consumed.potassiumMg,
-        calciumMg: consumed.calciumMg,
-        ironMg: consumed.ironMg,
-        magnesiumMg: consumed.magnesiumMg,
-        zincMg: consumed.zincMg,
-        vitaminAUg: consumed.vitaminAUg,
-        vitaminCMg: consumed.vitaminCMg,
-        vitaminDUg: consumed.vitaminDUg,
-        vitaminB12Ug: consumed.vitaminB12Ug,
-        snapshotJson: snapshot.encode(),
-        createdAt: DateTime.now(),
+      final item = _buildMealLogItem(
+        log: log,
+        food: food,
+        variant: variant,
+        conversion: conversion,
+        availableServings: availableServings,
       );
       await txn.insert('meal_log_items', item.toMap());
-      if (food.id.isNotEmpty) {
-        try {
-          await txn.update(
-            'foods',
-            {'last_used_at': DateTime.now().toIso8601String()},
-            where: 'id = ?',
-            whereArgs: [food.id],
-          );
-        } catch (_) {}
-      }
+      await _touchFoods(txn, [food.id], item.createdAt);
       return item;
     });
+  }
+
+  /// Builds the meal-log row (with its nutrition snapshot) for logging
+  /// [conversion] of [variant] into [log]. Pure: nothing is written.
+  MealLogItem _buildMealLogItem({
+    required MealLog log,
+    required Food food,
+    required FoodVariant variant,
+    required NutritionConversion conversion,
+    required List<FoodServing> availableServings,
+  }) {
+    final consumed = conversion.apply(variant.values);
+    // The conversion already carries the exact serving chosen in the
+    // quantity sheet. Looking it up by the generic `serving` unit is
+    // ambiguous when a food defines more than one portion.
+    final serving =
+        conversion.serving ??
+        availableServings.firstWhereOrNull(
+          (s) => s.label == conversion.unit || s.unit == conversion.unit,
+        );
+    final snapshot = NutritionSnapshot(
+      version: NutritionSnapshot.currentVersion,
+      source: food.source,
+      externalId: food.externalId,
+      foodName: food.name,
+      foodBrand: food.brand,
+      variantLabel: variant.label,
+      referenceAmount: variant.referenceAmount,
+      referenceUnit: variant.referenceUnit,
+      quantity: conversion.quantity,
+      unit: conversion.unit,
+      gramsEquivalent: serving?.gramsEquivalent,
+      mlEquivalent: serving?.mlEquivalent,
+      consumed: consumed,
+      isEstimated: variant.isEstimated,
+      hasMissingValues: consumed.hasMissingFields,
+    );
+    final item = MealLogItem(
+      id: _uuid.v4(),
+      mealLogId: log.id,
+      foodId: food.id,
+      foodVariantId: variant.id,
+      foodNameSnapshot: food.name,
+      brandSnapshot: food.brand,
+      quantity: conversion.quantity,
+      unit: conversion.unit,
+      calories: consumed.calories,
+      proteinG: consumed.proteinG,
+      carbsG: consumed.carbsG,
+      fatG: consumed.fatG,
+      saturatedFatG: consumed.saturatedFatG,
+      monounsaturatedFatG: consumed.monounsaturatedFatG,
+      polyunsaturatedFatG: consumed.polyunsaturatedFatG,
+      transFatG: consumed.transFatG,
+      fiberG: consumed.fiberG,
+      sugarsG: consumed.sugarsG,
+      sodiumMg: consumed.sodiumMg,
+      potassiumMg: consumed.potassiumMg,
+      calciumMg: consumed.calciumMg,
+      ironMg: consumed.ironMg,
+      magnesiumMg: consumed.magnesiumMg,
+      zincMg: consumed.zincMg,
+      vitaminAUg: consumed.vitaminAUg,
+      vitaminCMg: consumed.vitaminCMg,
+      vitaminDUg: consumed.vitaminDUg,
+      vitaminB12Ug: consumed.vitaminB12Ug,
+      snapshotJson: snapshot.encode(),
+      createdAt: DateTime.now(),
+    );
+    return item;
+  }
+
+  /// Marks foods as recently used with one statement. Empty ids (foods that
+  /// were never persisted) are ignored.
+  Future<void> _touchFoods(
+    DatabaseExecutor executor,
+    Iterable<String> foodIds,
+    DateTime usedAt,
+  ) async {
+    final ids = foodIds.where((id) => id.isNotEmpty).toSet().toList();
+    if (ids.isEmpty) return;
+    await executor.rawUpdate(
+      'UPDATE foods SET last_used_at = ? '
+      'WHERE id IN (${List.filled(ids.length, '?').join(', ')})',
+      [usedAt.toIso8601String(), ...ids],
+    );
   }
 
   /// Updates the quantity/unit of an existing item, regenerating its
@@ -948,44 +975,33 @@ class NutritionRepository extends BaseRepository {
       await executor.insert('meal_log_items', clone.toMap());
       if (item.foodId != null) touchedFoods.add(item.foodId!);
     }
-    for (final foodId in touchedFoods) {
-      try {
-        await executor.update(
-          'foods',
-          {'last_used_at': createdAt.toIso8601String()},
-          where: 'id = ?',
-          whereArgs: [foodId],
-        );
-      } catch (_) {}
-    }
+    await _touchFoods(executor, touchedFoods, createdAt);
     return items.length;
   }
 
-  /// Returns all meal logs and their items for the given day.
+  /// Returns all meal logs and their items for the given day, with two
+  /// queries however many sections the day has.
   Future<List<MealLogWithItems>> getDayMeals(String date) async {
     _validateDate(date);
     final db = await this.db;
-    final logs = await db.query(
+    final logs = (await db.query(
       'meal_logs',
       where: 'date = ?',
       whereArgs: [date],
-    );
-    final result = <MealLogWithItems>[];
-    for (final log in logs) {
-      final meal = MealLog.fromMap(log);
-      final items = await db.query(
-        'meal_log_items',
-        where: 'meal_log_id = ?',
-        whereArgs: [meal.id],
-        orderBy: 'created_at ASC',
-      );
-      result.add(
-        MealLogWithItems(
-          log: meal,
-          items: items.map(MealLogItem.fromMap).toList(),
-        ),
-      );
+    )).map(MealLog.fromMap).toList();
+    if (logs.isEmpty) return const [];
+    final itemRows = await _selectIn(db, 'meal_log_items', 'meal_log_id', [
+      for (final log in logs) log.id,
+    ], orderBy: 'created_at ASC');
+    final itemsByLog = <String, List<MealLogItem>>{};
+    for (final row in itemRows) {
+      final item = MealLogItem.fromMap(row);
+      itemsByLog.putIfAbsent(item.mealLogId, () => []).add(item);
     }
+    final result = [
+      for (final log in logs)
+        MealLogWithItems(log: log, items: itemsByLog[log.id] ?? const []),
+    ];
     // Order by creation so sections appear in the order they were
     // added to the day (custom meal sections have no fixed order).
     result.sort((a, b) {
@@ -1333,15 +1349,29 @@ class NutritionRepository extends BaseRepository {
     return _savedMealWithItems(db, rows.first);
   }
 
-  /// All saved meals, alphabetically, with items and live totals.
+  /// All saved meals, alphabetically, with items and live totals. Items,
+  /// variants and servings are loaded in batch for every meal at once.
   Future<List<SavedMealWithItems>> getSavedMeals() async {
     final db = await this.db;
     final rows = await db.query('saved_meals', orderBy: 'name ASC');
-    final result = <SavedMealWithItems>[];
-    for (final row in rows) {
-      result.add(await _savedMealWithItems(db, row));
+    if (rows.isEmpty) return const [];
+    final meals = rows.map(SavedMeal.fromMap).toList();
+    final itemRows = await _selectIn(db, 'saved_meal_items', 'saved_meal_id', [
+      for (final meal in meals) meal.id,
+    ], orderBy: 'order_index ASC');
+    final itemsByMeal = <String, List<SavedMealItem>>{};
+    for (final row in itemRows) {
+      final item = SavedMealItem.fromMap(row);
+      itemsByMeal.putIfAbsent(item.savedMealId, () => []).add(item);
     }
-    return result;
+    final context = await _loadVariantContext(db, [
+      for (final item in itemRows)
+        if (item['food_variant_id'] != null) item['food_variant_id'] as String,
+    ]);
+    return [
+      for (final meal in meals)
+        _savedMealFrom(meal, itemsByMeal[meal.id] ?? const [], context),
+    ];
   }
 
   /// Deletes a saved meal; its items cascade.
@@ -1355,6 +1385,11 @@ class NutritionRepository extends BaseRepository {
   /// snapshots the meal type's display name onto a newly created log.
   /// Returns the number of items added and the number skipped because
   /// their food was deleted from the cache.
+  ///
+  /// Atomic: foods, variants and servings are resolved in batch first, then
+  /// the section and every item are written in one transaction. A write
+  /// failure rolls everything back and is rethrown (never counted as
+  /// "skipped"), so retrying cannot duplicate ingredients.
   Future<({int added, int skipped})> addSavedMealToDate({
     required String date,
     required String mealType,
@@ -1366,33 +1401,34 @@ class NutritionRepository extends BaseRepository {
     if (meal == null) {
       throw const NutritionValidationException('saved_meal_not_found');
     }
-    final section = await ensureMealLog(
-      date: date,
-      mealType: mealType,
-      name: mealName,
-    );
-    var added = 0;
+    final db = await this.db;
+    final details = await _detailsByFoodId(db, [
+      for (final item in meal.items)
+        if (item.foodId != null && item.foodVariantId != null) item.foodId!,
+    ]);
+
+    final planned =
+        <
+          ({
+            Food food,
+            FoodVariant variant,
+            NutritionConversion conversion,
+            List<FoodServing> servings,
+          })
+        >[];
     var skipped = 0;
     for (final item in meal.items) {
-      if (item.foodId == null || item.foodVariantId == null) {
+      final food = item.foodId == null ? null : details[item.foodId!];
+      if (food == null || item.foodVariantId == null || food.variants.isEmpty) {
         skipped++;
         continue;
       }
-      final details = await getFoodWithDetails(item.foodId!);
-      if (details == null) {
-        skipped++;
-        continue;
-      }
-      final variants = details.variants;
-      if (variants.isEmpty) {
-        skipped++;
-        continue;
-      }
+      final variants = food.variants;
       final variant = variants.firstWhere(
         (v) => v.id == item.foodVariantId,
         orElse: () => variants.first,
       );
-      final servings = details.servings[variant.id] ?? const <FoodServing>[];
+      final servings = food.servings[variant.id] ?? const <FoodServing>[];
       final serving = _resolveSavedMealServing(
         servings: servings,
         variantId: variant.id,
@@ -1414,17 +1450,38 @@ class NutritionRepository extends BaseRepository {
         skipped++;
         continue;
       }
-      await addMealLogItem(
-        date: date,
-        mealType: section.mealType,
-        food: details.food,
+      planned.add((
+        food: food.food,
         variant: variant,
         conversion: conversion,
-        availableServings: servings,
-      );
-      added++;
+        servings: servings,
+      ));
     }
-    return (added: added, skipped: skipped);
+
+    await db.transaction((txn) async {
+      final section = await _ensureMealLogIn(
+        txn,
+        date: date,
+        mealType: mealType,
+        name: mealName,
+      );
+      final batch = txn.batch();
+      for (final entry in planned) {
+        final item = _buildMealLogItem(
+          log: section,
+          food: entry.food,
+          variant: entry.variant,
+          conversion: entry.conversion,
+          availableServings: entry.servings,
+        );
+        batch.insert('meal_log_items', item.toMap());
+      }
+      await batch.commit(noResult: true);
+      await _touchFoods(txn, [
+        for (final entry in planned) entry.food.id,
+      ], DateTime.now());
+    });
+    return (added: planned.length, skipped: skipped);
   }
 
   // ===================================================================
@@ -1607,36 +1664,98 @@ class NutritionRepository extends BaseRepository {
   // Internal helpers
   // ===================================================================
 
-  Future<List<FoodVariant>> _loadVariants(String foodId) async {
-    final db = await this.db;
-    final rows = await db.query(
-      'food_variants',
-      where: 'food_id = ?',
-      whereArgs: [foodId],
-      orderBy: 'reference_amount ASC',
-    );
-    return rows.map(FoodVariant.fromMap).toList();
-  }
-
-  /// Loads a food's variants and their servings.
+  /// Loads a food's variants and their servings (two queries in total).
   Future<FoodWithDetails> _detailsFor(Food food) async {
-    final variants = await _loadVariants(food.id);
-    final servings = <String, List<FoodServing>>{};
-    for (final v in variants) {
-      servings[v.id] = await _loadServings(v.id);
-    }
-    return FoodWithDetails(food: food, variants: variants, servings: servings);
+    final db = await this.db;
+    final details = await _loadDetails(db, [food]);
+    return details[food.id]!;
   }
 
-  Future<List<FoodServing>> _loadServings(String variantId) async {
-    final db = await this.db;
-    final rows = await db.query(
+  /// Loads several foods with their variants and servings using two queries
+  /// (all variants, then all servings) instead of one per food or variant.
+  Future<Map<String, FoodWithDetails>> _loadDetails(
+    DatabaseExecutor db,
+    List<Food> foods,
+  ) async {
+    if (foods.isEmpty) return const {};
+    final variantRows = await _selectIn(db, 'food_variants', 'food_id', [
+      for (final food in foods) food.id,
+    ], orderBy: 'reference_amount ASC');
+    final variantsByFood = <String, List<FoodVariant>>{};
+    for (final row in variantRows) {
+      final variant = FoodVariant.fromMap(row);
+      variantsByFood.putIfAbsent(variant.foodId, () => []).add(variant);
+    }
+    final servingRows = await _selectIn(
+      db,
       'food_servings',
-      where: 'food_variant_id = ?',
-      whereArgs: [variantId],
+      'food_variant_id',
+      [for (final row in variantRows) row['id'] as String],
       orderBy: 'label ASC',
     );
-    return rows.map(FoodServing.fromMap).toList();
+    final servingsByVariant = <String, List<FoodServing>>{};
+    for (final row in servingRows) {
+      final serving = FoodServing.fromMap(row);
+      servingsByVariant
+          .putIfAbsent(serving.foodVariantId, () => [])
+          .add(serving);
+    }
+    return {
+      for (final food in foods)
+        food.id: FoodWithDetails(
+          food: food,
+          variants: variantsByFood[food.id] ?? const [],
+          servings: {
+            for (final variant in variantsByFood[food.id] ?? const [])
+              variant.id:
+                  servingsByVariant[variant.id] ?? const <FoodServing>[],
+          },
+        ),
+    };
+  }
+
+  /// Foods by id with their variants and servings: three queries whatever
+  /// the number of [foodIds]. Missing foods are simply absent.
+  Future<Map<String, FoodWithDetails>> _detailsByFoodId(
+    DatabaseExecutor db,
+    List<String> foodIds,
+  ) async {
+    final ids = foodIds.toSet().toList();
+    if (ids.isEmpty) return const {};
+    final foods = (await _selectIn(
+      db,
+      'foods',
+      'id',
+      ids,
+    )).map(Food.fromMap).toList();
+    return _loadDetails(db, foods);
+  }
+
+  /// `SELECT * FROM [table] WHERE [column] IN (...)`, chunked to stay under
+  /// SQLite's bound-variable limit. [orderBy] applies within each chunk, which
+  /// keeps every group's rows ordered as long as a group's rows share a value
+  /// of [column] (the usual parent-id lookups).
+  Future<List<Map<String, Object?>>> _selectIn(
+    DatabaseExecutor db,
+    String table,
+    String column,
+    List<String> ids, {
+    String? orderBy,
+  }) async {
+    const chunkSize = 500;
+    final rows = <Map<String, Object?>>[];
+    for (var i = 0; i < ids.length; i += chunkSize) {
+      final chunk = ids.sublist(i, math.min(i + chunkSize, ids.length));
+      rows.addAll(
+        await db.query(
+          table,
+          where: '$column IN (${List.filled(chunk.length, '?').join(', ')})',
+          whereArgs: chunk,
+          orderBy: orderBy,
+        ),
+      );
+    }
+    return rows;
   }
 
   /// Loads a saved meal with its items and recomputes the nutrition
@@ -1653,13 +1772,54 @@ class NutritionRepository extends BaseRepository {
       orderBy: 'order_index ASC',
     );
     final items = itemRows.map(SavedMealItem.fromMap).toList();
-    final computed = await _computeSavedMealTotals(db, items, meal.portions);
+    final context = await _loadVariantContext(db, [
+      for (final item in items)
+        if (item.foodVariantId != null) item.foodVariantId!,
+    ]);
+    return _savedMealFrom(meal, items, context);
+  }
+
+  /// A saved meal with live totals computed from already-loaded variants.
+  SavedMealWithItems _savedMealFrom(
+    SavedMeal meal,
+    List<SavedMealItem> items,
+    _VariantContext context,
+  ) {
+    final computed = _computeSavedMealTotalsIn(context, items, meal.portions);
     return SavedMealWithItems(
       meal: meal,
       items: items,
       totals: computed.totals,
       consumedByItem: computed.byItem,
     );
+  }
+
+  /// Variants and servings of [variantIds], two queries in total.
+  Future<_VariantContext> _loadVariantContext(
+    DatabaseExecutor db,
+    List<String> variantIds,
+  ) async {
+    final ids = variantIds.toSet().toList();
+    final variants = <String, FoodVariant>{};
+    final servingsByVariant = <String, List<FoodServing>>{};
+    if (ids.isNotEmpty) {
+      for (final row in await _selectIn(db, 'food_variants', 'id', ids)) {
+        final v = FoodVariant.fromMap(row);
+        variants[v.id] = v;
+      }
+      final servingRows = await _selectIn(
+        db,
+        'food_servings',
+        'food_variant_id',
+        ids,
+        orderBy: 'label ASC',
+      );
+      for (final row in servingRows) {
+        final s = FoodServing.fromMap(row);
+        servingsByVariant.putIfAbsent(s.foodVariantId, () => []).add(s);
+      }
+    }
+    return _VariantContext(variants, servingsByVariant);
   }
 
   /// Recomputes a saved meal's nutrition from the live food cache by
@@ -1669,12 +1829,12 @@ class NutritionRepository extends BaseRepository {
   /// logging the template would add. Items whose food/variant was
   /// deleted or whose unit can no longer be resolved contribute
   /// nothing.
-  Future<({NutritionValues? totals, Map<String, NutritionValues> byItem})>
-  _computeSavedMealTotals(
-    DatabaseExecutor db,
+  ({NutritionValues? totals, Map<String, NutritionValues> byItem})
+  _computeSavedMealTotalsIn(
+    _VariantContext context,
     List<SavedMealItem> items,
     double portions,
-  ) async {
+  ) {
     final records = [
       for (final item in items)
         (
@@ -1686,11 +1846,7 @@ class NutritionRepository extends BaseRepository {
           servingMlEquivalent: item.servingMlEquivalent,
         ),
     ];
-    final computed = await _computeSavedMealTotalsFromRecords(
-      db,
-      records,
-      portions,
-    );
+    final computed = _totalsFromRecords(context, records, portions);
     final byItem = <String, NutritionValues>{};
     for (var i = 0; i < items.length; i++) {
       final v = computed.byIndex[i];
@@ -1744,9 +1900,9 @@ class NutritionRepository extends BaseRepository {
     );
   }
 
-  /// Inner computation shared by [_computeSavedMealTotals] (saved items)
-  /// and [previewSavedMealTotals] (editor drafts). Each record is the
-  /// minimum shape needed to replay the conversion.
+  /// Inner computation for [previewSavedMealTotals] (editor drafts): loads the
+  /// variants the records point at, then replays each conversion. Each record
+  /// is the minimum shape needed to replay the conversion.
   Future<({NutritionValues? totals, Map<int, NutritionValues> byIndex})>
   _computeSavedMealTotalsFromRecords(
     DatabaseExecutor db,
@@ -1763,34 +1919,36 @@ class NutritionRepository extends BaseRepository {
     records,
     double portions,
   ) async {
+    final context = await _loadVariantContext(db, [
+      for (final record in records)
+        if (record.foodVariantId != null) record.foodVariantId!,
+    ]);
+    return _totalsFromRecords(context, records, portions);
+  }
+
+  /// Replays each record's conversion against already-loaded variants and sums
+  /// the result. Shared by saved meals and editor previews.
+  ({NutritionValues? totals, Map<int, NutritionValues> byIndex})
+  _totalsFromRecords(
+    _VariantContext context,
+    List<
+      ({
+        String? foodVariantId,
+        double quantity,
+        String unit,
+        String? servingLabel,
+        double? servingGramsEquivalent,
+        double? servingMlEquivalent,
+      })
+    >
+    records,
+    double portions,
+  ) {
     if (records.isEmpty) {
       return (totals: null, byIndex: <int, NutritionValues>{});
     }
-    final variantIds = <String>[];
-    for (final item in records) {
-      if (item.foodVariantId != null) variantIds.add(item.foodVariantId!);
-    }
-    final variants = <String, FoodVariant>{};
-    final servingsByVariant = <String, List<FoodServing>>{};
-    if (variantIds.isNotEmpty) {
-      final ph = List.filled(variantIds.length, '?').join(',');
-      final variantRows = await db.rawQuery(
-        'SELECT * FROM food_variants WHERE id IN ($ph)',
-        variantIds,
-      );
-      for (final row in variantRows) {
-        final v = FoodVariant.fromMap(row);
-        variants[v.id] = v;
-      }
-      final servingRows = await db.rawQuery(
-        'SELECT * FROM food_servings WHERE food_variant_id IN ($ph) ORDER BY label ASC',
-        variantIds,
-      );
-      for (final row in servingRows) {
-        final s = FoodServing.fromMap(row);
-        servingsByVariant.putIfAbsent(s.foodVariantId, () => []).add(s);
-      }
-    }
+    final variants = context.variants;
+    final servingsByVariant = context.servingsByVariant;
     var calories = 0.0;
     var proteinG = 0.0;
     var carbsG = 0.0;
@@ -1955,45 +2113,17 @@ class NutritionRepository extends BaseRepository {
   ) async {
     if (foodRows.isEmpty) return const [];
     final db = await this.db;
-    final foodIds = foodRows.map((r) => r['id'] as String).toList();
-    final placeholders = List.filled(foodIds.length, '?').join(',');
-    final variantRows = await db.rawQuery(
-      'SELECT * FROM food_variants WHERE food_id IN ($placeholders) ORDER BY reference_amount ASC',
-      foodIds,
-    );
-    final variantsByFood = <String, List<FoodVariant>>{};
-    for (final row in variantRows) {
-      final v = FoodVariant.fromMap(row);
-      variantsByFood.putIfAbsent(v.foodId, () => []).add(v);
-    }
-    final variantIds = variantRows.map((r) => r['id'] as String).toList();
-    final servingsByVariant = <String, List<FoodServing>>{};
-    if (variantIds.isNotEmpty) {
-      final ph = List.filled(variantIds.length, '?').join(',');
-      final servingRows = await db.rawQuery(
-        'SELECT * FROM food_servings WHERE food_variant_id IN ($ph) ORDER BY label ASC',
-        variantIds,
-      );
-      for (final row in servingRows) {
-        final s = FoodServing.fromMap(row);
-        servingsByVariant.putIfAbsent(s.foodVariantId, () => []).add(s);
-      }
-    }
-    return foodRows.map((row) {
-      final food = Food.fromMap(row);
-      final variants = variantsByFood[food.id] ?? const <FoodVariant>[];
-      return FoodSearchResultLite(
-        food: food,
-        primaryVariant: variants.isEmpty ? null : variants.first,
-        variants: variants,
-        servings: variants.isEmpty
-            ? const {}
-            : {
-                for (final v in variants)
-                  v.id: servingsByVariant[v.id] ?? const <FoodServing>[],
-              },
-      );
-    }).toList();
+    final foods = foodRows.map(Food.fromMap).toList();
+    final details = await _loadDetails(db, foods);
+    return [
+      for (final food in foods)
+        FoodSearchResultLite(
+          food: food,
+          primaryVariant: details[food.id]!.variants.firstOrNull,
+          variants: details[food.id]!.variants,
+          servings: details[food.id]!.servings,
+        ),
+    ];
   }
 
   /// Brand token used for ranking/`WHERE` brand matches: the first
@@ -2329,4 +2459,12 @@ class MealTypeCalories {
     required this.totalCalories,
     required this.itemCount,
   });
+}
+
+/// Variants and their servings, loaded together for saved-meal maths.
+class _VariantContext {
+  final Map<String, FoodVariant> variants;
+  final Map<String, List<FoodServing>> servingsByVariant;
+
+  const _VariantContext(this.variants, this.servingsByVariant);
 }

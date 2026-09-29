@@ -785,26 +785,38 @@ class PeriodizationRepository extends BaseRepository {
               String dayName,
             })
           >[];
+      // Two queries for every linked routine instead of two per routine.
+      final routineRows = await database.query(
+        'routines',
+        columns: ['id', 'name'],
+        where: 'id IN (${List.filled(routineIds.length, '?').join(', ')})',
+        whereArgs: routineIds,
+      );
+      final routineNames = {
+        for (final row in routineRows) row['id'] as String: row['name'],
+      };
+      final dayRows = await database.query(
+        'routine_days',
+        where:
+            'routine_id IN (${List.filled(routineIds.length, '?').join(', ')})',
+        whereArgs: routineIds,
+        orderBy: 'order_index ASC',
+      );
+      final daysByRoutine = <String, List<Map<String, Object?>>>{};
+      for (final row in dayRows) {
+        daysByRoutine
+            .putIfAbsent(row['routine_id'] as String, () => [])
+            .add(row);
+      }
       for (final routineId in routineIds) {
-        final routineRows = await database.query(
-          'routines',
-          where: 'id = ?',
-          whereArgs: [routineId],
-          limit: 1,
-        );
-        if (routineRows.isEmpty) continue;
-        final routineDays = await database.query(
-          'routine_days',
-          where: 'routine_id = ?',
-          whereArgs: [routineId],
-          orderBy: 'order_index ASC',
-        );
-        for (final day in routineDays) {
+        final routineName = routineNames[routineId];
+        if (routineName == null) continue;
+        for (final routineDay in daysByRoutine[routineId] ?? const []) {
           sequence.add((
             routineId: routineId,
-            routineName: routineRows.first['name'] as String,
-            dayId: day['id'] as String,
-            dayName: day['name'] as String? ?? '',
+            routineName: routineName as String,
+            dayId: routineDay['id'] as String,
+            dayName: routineDay['name'] as String? ?? '',
           ));
         }
       }
