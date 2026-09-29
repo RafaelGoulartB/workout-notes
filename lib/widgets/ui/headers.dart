@@ -7,6 +7,9 @@ class AppSectionHeader extends StatelessWidget {
   final Widget? trailing;
   final EdgeInsets padding;
 
+  /// Tighter spacing used by settings-style screens.
+  static const EdgeInsets compactPadding = EdgeInsets.fromLTRB(4, 20, 4, 8);
+
   const AppSectionHeader(
     this.title, {
     super.key,
@@ -34,6 +37,35 @@ class AppSectionHeader extends StatelessWidget {
           ?trailing,
         ],
       ),
+    );
+  }
+}
+
+/// Icon-led bold title at the top of a card ("Basics", "Defaults").
+class AppCardTitle extends StatelessWidget {
+  final IconData? icon;
+  final String title;
+
+  const AppCardTitle({super.key, this.icon, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 18, color: theme.colorScheme.primary),
+          const SizedBox(width: 8),
+        ],
+        Flexible(
+          child: Text(
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

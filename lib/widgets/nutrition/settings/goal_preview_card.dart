@@ -3,6 +3,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/screens/workout/periodization_home_screen.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
 import 'package:workout_notes/utils/nutrition_goal_suggest.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Compact summary card showing the calorie headline + macro split bars.
 /// Replaces the previous full-size preview block so the screen starts
@@ -78,91 +79,83 @@ class GoalPreviewCard extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80),
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.pie_chart_outline_rounded,
-                    size: 16,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    label ?? loc.nutritionSettingsPreviewLabel,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onSurfaceVariant,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              if (headline != null) ...[
-                Text(
-                  loc.nutritionPreviewGoal(_formatNum(headline)),
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    height: 1.1,
-                  ),
-                ),
-                const SizedBox(height: 2),
-              ],
-              if (tdee != null)
-                Text(
-                  loc.nutritionPreviewTdee(_formatNum(tdee!)),
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              if (tdee != null && adjustmentPercent != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    _relationshipLabel(loc),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              if (macroTotal > 0) ...[
-                const SizedBox(height: 12),
-                MacroBar(
-                  label: loc.nutritionProgressProtein,
-                  value: proteinKcal,
-                  total: macroTotal,
-                  color: theme.colorScheme.tertiary,
-                ),
-                const SizedBox(height: 6),
-                MacroBar(
-                  label: loc.nutritionProgressCarbs,
-                  value: carbsKcal,
-                  total: macroTotal,
-                  color: theme.colorScheme.secondary,
-                ),
-                const SizedBox(height: 6),
-                MacroBar(
-                  label: loc.nutritionProgressFat,
-                  value: fatKcal,
-                  total: macroTotal,
+      child: AppSectionCard(
+        margin: const EdgeInsets.all(4),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.pie_chart_outline_rounded,
+                  size: 16,
                   color: theme.colorScheme.primary,
                 ),
+                const SizedBox(width: 6),
+                Text(
+                  label ?? loc.nutritionSettingsPreviewLabel,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurfaceVariant,
+                    letterSpacing: 0.4,
+                  ),
+                ),
               ],
+            ),
+            const SizedBox(height: 6),
+            if (headline != null) ...[
+              Text(
+                loc.nutritionPreviewGoal(_formatNum(headline)),
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(height: 2),
             ],
-          ),
+            if (tdee != null)
+              Text(
+                loc.nutritionPreviewTdee(_formatNum(tdee!)),
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            if (tdee != null && adjustmentPercent != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  _relationshipLabel(loc),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            if (macroTotal > 0) ...[
+              const SizedBox(height: 12),
+              MacroBar(
+                label: loc.nutritionProgressProtein,
+                value: proteinKcal,
+                total: macroTotal,
+                color: theme.colorScheme.tertiary,
+              ),
+              const SizedBox(height: 6),
+              MacroBar(
+                label: loc.nutritionProgressCarbs,
+                value: carbsKcal,
+                total: macroTotal,
+                color: theme.colorScheme.secondary,
+              ),
+              const SizedBox(height: 6),
+              MacroBar(
+                label: loc.nutritionProgressFat,
+                value: fatKcal,
+                total: macroTotal,
+                color: theme.colorScheme.primary,
+              ),
+            ],
+          ],
         ),
       ),
     );

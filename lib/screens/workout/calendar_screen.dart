@@ -14,6 +14,7 @@ import '../../repositories/workout_repository.dart';
 import '../../repositories/routine_repository.dart';
 import 'workout_detail_screen.dart';
 import 'future_workout_planner_screen.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -280,15 +281,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   : AppLocalizations.of(
                                       context,
                                     )!.calendarInProgress;
-                              return Card(
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  side: BorderSide(
-                                    color: theme.colorScheme.outlineVariant
-                                        .withAlpha(80),
-                                  ),
-                                ),
+                              return AppSectionCard(
+                                margin: const EdgeInsets.all(4),
+                                radius: 12,
+                                padding: EdgeInsets.zero,
                                 child: ListTile(
                                   leading: Container(
                                     padding: const EdgeInsets.all(8),
@@ -535,12 +531,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Widget _completedRunCard(RunActivity activity) {
     final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
+    return AppSectionCard(
+      margin: const EdgeInsets.all(4),
+      radius: 12,
+      padding: EdgeInsets.zero,
       child: ListTile(
         leading: Container(
           padding: const EdgeInsets.all(8),

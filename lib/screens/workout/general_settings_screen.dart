@@ -3,6 +3,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/main.dart';
 import 'package:workout_notes/screens/workout/settings_preferences_controller.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// App-wide appearance preferences: theme mode, accent colour and language.
 class GeneralSettingsScreen extends StatefulWidget {
@@ -60,7 +61,7 @@ class _GeneralSettingsScreenState extends State<GeneralSettingsScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
               // ===== APARÊNCIA =====
-              SettingsSectionHeader(text: loc.settingsSectionAppearance),
+              AppSectionHeader(loc.settingsSectionAppearance, padding: AppSectionHeader.compactPadding),
               SettingsCard(
                 title: loc.settingsThemeMode,
                 icon: Icons.dark_mode_outlined,

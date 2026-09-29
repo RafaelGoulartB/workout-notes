@@ -9,6 +9,7 @@ import 'package:workout_notes/screens/workout/plan_settings_screen.dart';
 import 'package:workout_notes/screens/workout/sleep_settings_screen.dart';
 import 'package:workout_notes/screens/workout/workout_settings_screen.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Application-wide settings entry point. The same screen is opened from the
 /// workout, sleep and nutrition tabs so global preferences never appear to
@@ -30,7 +31,7 @@ class AppSettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
-          SettingsSectionHeader(text: loc.settingsAppPreferencesSection),
+          AppSectionHeader(loc.settingsAppPreferencesSection, padding: AppSectionHeader.compactPadding),
           SettingsCard(
             children: [
               SettingsLinkTile(
@@ -42,7 +43,7 @@ class AppSettingsScreen extends StatelessWidget {
               ),
             ],
           ),
-          SettingsSectionHeader(text: loc.settingsBySectionTitle),
+          AppSectionHeader(loc.settingsBySectionTitle, padding: AppSectionHeader.compactPadding),
           SettingsCard(
             children: [
               SettingsLinkTile(
@@ -81,7 +82,7 @@ class AppSettingsScreen extends StatelessWidget {
               ),
             ],
           ),
-          SettingsSectionHeader(text: loc.settingsResourcesSection),
+          AppSectionHeader(loc.settingsResourcesSection, padding: AppSectionHeader.compactPadding),
           SettingsCard(
             children: [
               SettingsLinkTile(

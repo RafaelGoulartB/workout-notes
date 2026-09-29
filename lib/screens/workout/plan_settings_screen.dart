@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/main.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Plan section preferences. Currently controls whether the Plan tab is
 /// shown in the main navigation bar.
@@ -38,7 +39,7 @@ class _PlanSettingsScreenState extends State<PlanSettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
-          SettingsSectionHeader(text: loc.settingsSectionPlan),
+          AppSectionHeader(loc.settingsSectionPlan, padding: AppSectionHeader.compactPadding),
           SettingsCard(
             children: [
               SettingsSwitchTile(

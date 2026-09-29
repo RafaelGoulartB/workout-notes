@@ -117,6 +117,35 @@ class AppStatTile extends StatelessWidget {
   }
 }
 
+/// Thin vertical divider between the columns of a stat row.
+class AppStatDivider extends StatelessWidget {
+  final double height;
+
+  /// Horizontal margin on each side.
+  final double margin;
+
+  /// Defaults to the soft outline used by the nutrition macro rows.
+  final Color? color;
+
+  const AppStatDivider({
+    super.key,
+    this.height = 36,
+    this.margin = 6,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: height,
+      margin: EdgeInsets.symmetric(horizontal: margin),
+      color:
+          color ?? Theme.of(context).colorScheme.outlineVariant.withAlpha(70),
+    );
+  }
+}
+
 /// Row of [AppStatTile]s separated by thin vertical dividers.
 class AppStatRow extends StatelessWidget {
   final List<Widget> children;
@@ -130,12 +159,7 @@ class AppStatRow extends StatelessWidget {
       children: [
         for (var i = 0; i < children.length; i++) ...[
           if (i > 0)
-            Container(
-              width: 1,
-              height: 34,
-              margin: const EdgeInsets.symmetric(horizontal: 8),
-              color: divider,
-            ),
+            AppStatDivider(height: 34, margin: 8, color: divider),
           Expanded(child: children[i]),
         ],
       ],

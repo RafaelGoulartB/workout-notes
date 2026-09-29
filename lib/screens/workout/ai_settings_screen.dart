@@ -10,6 +10,7 @@ import '../../utils/ai_error_localizer.dart';
 import '../../widgets/ai/ai_provider_picker_sheet.dart';
 import '../../widgets/empty_state_placeholder.dart';
 import '../../widgets/settings/settings.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class AiSettingsScreen extends StatefulWidget {
   const AiSettingsScreen({super.key});
@@ -48,14 +49,14 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           _buildConnectionStatus(settings),
-          SettingsSectionHeader(text: l10n.aiSettingsSectionConnection),
+          AppSectionHeader(l10n.aiSettingsSectionConnection, padding: AppSectionHeader.compactPadding),
           _buildProvidersCard(settings),
-          SettingsSectionHeader(text: l10n.aiSettingsSectionBehavior),
+          AppSectionHeader(l10n.aiSettingsSectionBehavior, padding: AppSectionHeader.compactPadding),
           _buildResponseStyleCard(settings),
           _buildContextModeCard(settings),
-          SettingsSectionHeader(text: l10n.aiSettingsSectionAppearance),
+          AppSectionHeader(l10n.aiSettingsSectionAppearance, padding: AppSectionHeader.compactPadding),
           _buildAppearanceCard(settings),
-          SettingsSectionHeader(text: l10n.aiSettingsSectionAdvanced),
+          AppSectionHeader(l10n.aiSettingsSectionAdvanced, padding: AppSectionHeader.compactPadding),
           _buildAdvancedCard(),
           _buildAboutCard(),
         ],

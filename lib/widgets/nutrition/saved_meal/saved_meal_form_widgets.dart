@@ -1,6 +1,7 @@
 import 'package:workout_notes/screens/workout/saved_meal_editor_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class SavedMealDetailsCard extends StatelessWidget {
   final TextEditingController nameController;
@@ -22,130 +23,122 @@ class SavedMealDetailsCard extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
     final fieldColor = theme.colorScheme.surfaceContainerHighest.withAlpha(75);
 
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0,
+    return AppSectionCard(
       color: theme.colorScheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(75)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                SavedMealSectionIcon(
-                  icon: Icons.restaurant_menu_rounded,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  loc.nutritionSavedMealDetails,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: nameController,
-              textCapitalization: TextCapitalization.sentences,
-              textInputAction: TextInputAction.next,
-              decoration: InputDecoration(
-                labelText: loc.nutritionSavedMealName,
-                prefixIcon: const Icon(Icons.edit_outlined, size: 20),
-                filled: true,
-                fillColor: fieldColor,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(
-                    color: theme.colorScheme.outlineVariant.withAlpha(65),
-                  ),
+      radius: 18,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SavedMealSectionIcon(
+                icon: Icons.restaurant_menu_rounded,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                loc.nutritionSavedMealDetails,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              validator: (value) => (value == null || value.trim().isEmpty)
-                  ? loc.nutritionFieldRequired
-                  : null,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              loc.nutritionSavedMealPortions,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: nameController,
+            textCapitalization: TextCapitalization.sentences,
+            textInputAction: TextInputAction.next,
+            decoration: InputDecoration(
+              labelText: loc.nutritionSavedMealName,
+              prefixIcon: const Icon(Icons.edit_outlined, size: 20),
+              filled: true,
+              fillColor: fieldColor,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: theme.colorScheme.outlineVariant.withAlpha(65),
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: SizedBox(
-                width: 196,
-                child: Row(
-                  children: [
-                    SavedMealPortionButton(
-                      icon: Icons.remove_rounded,
-                      tooltip: loc.nutritionSavedMealDecreasePortions,
-                      onPressed: onDecreasePortions,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextFormField(
-                        controller: portionsController,
-                        textAlign: TextAlign.center,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
+            validator: (value) => (value == null || value.trim().isEmpty)
+                ? loc.nutritionFieldRequired
+                : null,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            loc.nutritionSavedMealPortions,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: SizedBox(
+              width: 196,
+              child: Row(
+                children: [
+                  SavedMealPortionButton(
+                    icon: Icons.remove_rounded,
+                    tooltip: loc.nutritionSavedMealDecreasePortions,
+                    onPressed: onDecreasePortions,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      controller: portionsController,
+                      textAlign: TextAlign.center,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: fieldColor,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 12,
                         ),
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: fieldColor,
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 12,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: theme.colorScheme.outlineVariant.withAlpha(
-                                65,
-                              ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: theme.colorScheme.outlineVariant.withAlpha(
+                              65,
                             ),
                           ),
                         ),
-                        validator: (value) {
-                          final parsed = double.tryParse(
-                            (value ?? '').trim().replaceAll(',', '.'),
-                          );
-                          if (parsed == null || parsed <= 0) {
-                            return loc.nutritionInvalidQuantity;
-                          }
-                          return null;
-                        },
                       ),
+                      validator: (value) {
+                        final parsed = double.tryParse(
+                          (value ?? '').trim().replaceAll(',', '.'),
+                        );
+                        if (parsed == null || parsed <= 0) {
+                          return loc.nutritionInvalidQuantity;
+                        }
+                        return null;
+                      },
                     ),
-                    const SizedBox(width: 8),
-                    SavedMealPortionButton(
-                      icon: Icons.add_rounded,
-                      tooltip: loc.nutritionSavedMealIncreasePortions,
-                      onPressed: onIncreasePortions,
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 8),
+                  SavedMealPortionButton(
+                    icon: Icons.add_rounded,
+                    tooltip: loc.nutritionSavedMealIncreasePortions,
+                    onPressed: onIncreasePortions,
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -256,16 +249,11 @@ class SavedMealIngredientCard extends StatelessWidget {
     ].join(' · ');
     final calories = ingredient.calories;
 
-    return Card(
+    return AppSectionCard(
       key: ValueKey(ingredient.id),
-      margin: EdgeInsets.zero,
-      elevation: 0,
       color: theme.colorScheme.surfaceContainerLow,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(75)),
-      ),
+      radius: 14,
+      padding: EdgeInsets.zero,
       child: InkWell(
         onTap: enabled ? onEdit : null,
         child: Padding(

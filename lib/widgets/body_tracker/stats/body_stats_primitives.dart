@@ -90,22 +90,6 @@ class DeltaBadge extends StatelessWidget {
   }
 }
 
-class HeroDivider extends StatelessWidget {
-  final Color color;
-
-  const HeroDivider({super.key, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 34,
-      margin: const EdgeInsets.symmetric(horizontal: 6),
-      color: color,
-    );
-  }
-}
-
 class HeroMetric extends StatelessWidget {
   final IconData icon;
   final Color color;
@@ -301,31 +285,6 @@ class BodyStatsSectionHeader extends StatelessWidget {
           letterSpacing: 1.5,
           color: theme.colorScheme.onSurfaceVariant,
         ),
-      ),
-    );
-  }
-}
-
-/// Outlined rounded card that wraps each stats section.
-class BodyStatsCard extends StatelessWidget {
-  const BodyStatsCard({super.key, required this.child, this.padding});
-
-  final Widget child;
-  final EdgeInsets? padding;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Padding(
-        padding: padding ?? const EdgeInsets.all(16),
-        child: child,
       ),
     );
   }

@@ -8,6 +8,7 @@ import 'package:workout_notes/repositories/export_import_repository.dart';
 import 'package:workout_notes/services/export_service.dart';
 import 'package:workout_notes/widgets/settings/backup_flows.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Data & privacy: CSV/JSON exports, backup restore, about and delete-all.
 /// The developer test-data entry only exists in debug builds, behind a
@@ -277,7 +278,7 @@ class _DataPrivacyScreenState extends State<DataPrivacyScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           // ===== EXPORTAÇÕES =====
-          SettingsSectionHeader(text: loc.settingsSectionExports),
+          AppSectionHeader(loc.settingsSectionExports, padding: AppSectionHeader.compactPadding),
           SettingsCard(
             children: [
               SettingsLinkTile(
@@ -291,7 +292,7 @@ class _DataPrivacyScreenState extends State<DataPrivacyScreen> {
           ),
 
           // ===== DADOS =====
-          SettingsSectionHeader(text: loc.settingsSectionData),
+          AppSectionHeader(loc.settingsSectionData, padding: AppSectionHeader.compactPadding),
           SettingsCard(
             children: [
               SettingsLinkTile(

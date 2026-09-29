@@ -1,6 +1,7 @@
 import 'package:workout_notes/screens/workout/manual_food_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class NutritionExpandableSection extends StatelessWidget {
   final IconData icon;
@@ -21,15 +22,9 @@ class NutritionExpandableSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0,
+    return AppSectionCard(
       color: theme.colorScheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      clipBehavior: Clip.antiAlias,
+      padding: EdgeInsets.zero,
       child: ExpansionTile(
         initiallyExpanded: initiallyExpanded,
         shape: const Border(),

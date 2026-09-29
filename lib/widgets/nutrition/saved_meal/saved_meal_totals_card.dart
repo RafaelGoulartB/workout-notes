@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/widgets/nutrition/saved_meal/saved_meal_form_widgets.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Card that summarises the live nutrition totals for the saved meal
 /// being edited. Mirrors the visual language of the home screen
@@ -31,121 +32,113 @@ class SavedMealTotalsCard extends StatelessWidget {
     final showTotals = totals != null;
     final showPerPortion = portions > 1;
 
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0,
+    return AppSectionCard(
       color: theme.colorScheme.surfaceContainerLow,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(75)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                SavedMealSectionIcon(
-                  icon: Icons.local_fire_department_rounded,
-                  color: theme.colorScheme.primary,
+      radius: 18,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SavedMealSectionIcon(
+                icon: Icons.local_fire_department_rounded,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  loc.nutritionSavedMealTotalsTitle,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (isComputing) ...[
+                SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    loc.nutritionSavedMealTotalsTitle,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+              ],
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  loc.nutritionSavedMealFoodsCount(ingredientCount),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                if (isComputing) ...[
-                  SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 1.5,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (!showTotals)
+            Text(
+              hasIngredients
+                  ? loc.nutritionSavedMealTotalsPartial
+                  : loc.nutritionSavedMealTotalsEmpty,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            )
+          else ...[
+            SavedMealCaloriesRow(calories: totals!.calories ?? 0),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: SavedMealMacroColumn(
+                    label: loc.nutritionProgressProtein,
+                    grams: totals!.proteinG ?? 0,
+                    color: NutritionMacroColors.protein,
                   ),
-                  const SizedBox(width: 10),
-                ],
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
+                ),
+                const AppStatDivider(),
+                Expanded(
+                  child: SavedMealMacroColumn(
+                    label: loc.nutritionProgressCarbs,
+                    grams: totals!.carbsG ?? 0,
+                    color: NutritionMacroColors.carbs,
                   ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    loc.nutritionSavedMealFoodsCount(ingredientCount),
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
+                ),
+                const AppStatDivider(),
+                Expanded(
+                  child: SavedMealMacroColumn(
+                    label: loc.nutritionProgressFat,
+                    grams: totals!.fatG ?? 0,
+                    color: NutritionMacroColors.fat,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            if (!showTotals)
-              Text(
-                hasIngredients
-                    ? loc.nutritionSavedMealTotalsPartial
-                    : loc.nutritionSavedMealTotalsEmpty,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              )
-            else ...[
-              SavedMealCaloriesRow(calories: totals!.calories ?? 0),
+            if (showPerPortion) ...[
               const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: SavedMealMacroColumn(
-                      label: loc.nutritionProgressProtein,
-                      grams: totals!.proteinG ?? 0,
-                      color: NutritionMacroColors.protein,
-                    ),
-                  ),
-                  SavedMealMacroDivider(theme: theme),
-                  Expanded(
-                    child: SavedMealMacroColumn(
-                      label: loc.nutritionProgressCarbs,
-                      grams: totals!.carbsG ?? 0,
-                      color: NutritionMacroColors.carbs,
-                    ),
-                  ),
-                  SavedMealMacroDivider(theme: theme),
-                  Expanded(
-                    child: SavedMealMacroColumn(
-                      label: loc.nutritionProgressFat,
-                      grams: totals!.fatG ?? 0,
-                      color: NutritionMacroColors.fat,
-                    ),
-                  ),
-                ],
+              Container(
+                height: 1,
+                color: theme.colorScheme.outlineVariant.withAlpha(60),
               ),
-              if (showPerPortion) ...[
-                const SizedBox(height: 14),
-                Container(
-                  height: 1,
-                  color: theme.colorScheme.outlineVariant.withAlpha(60),
-                ),
-                const SizedBox(height: 10),
-                SavedMealPerPortionRow(
-                  totals: totals!,
-                  portions: portions,
-                  label: loc.nutritionSavedMealTotalsPerPortion,
-                ),
-              ],
+              const SizedBox(height: 10),
+              SavedMealPerPortionRow(
+                totals: totals!,
+                portions: portions,
+                label: loc.nutritionSavedMealTotalsPerPortion,
+              ),
             ],
           ],
-        ),
+        ],
       ),
     );
   }
@@ -254,20 +247,6 @@ class SavedMealMacroColumn extends StatelessWidget {
   static String _formatGrams(double value) {
     if (value == value.roundToDouble()) return value.toStringAsFixed(0);
     return value.toStringAsFixed(1);
-  }
-}
-
-class SavedMealMacroDivider extends StatelessWidget {
-  final ThemeData theme;
-  const SavedMealMacroDivider({super.key, required this.theme});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 36,
-      margin: const EdgeInsets.symmetric(horizontal: 6),
-      color: theme.colorScheme.outlineVariant.withAlpha(70),
-    );
   }
 }
 

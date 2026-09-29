@@ -4,6 +4,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Headline card of the sleep tab, laid out like the nutrition day summary:
 /// how long the latest night was, how much of the goal that is, its time
@@ -44,7 +45,8 @@ class SleepLastNightCard extends StatelessWidget {
       label:
           '${loc.sleepLastNight}: ${SleepUi.duration(loc, slept)}, '
           '${reached ? loc.sleepGoalReached : loc.sleepGoalMissed}',
-      child: SleepCard(
+      child: AppSoftCard(
+        padding: SleepUi.cardPadding,
         onTap: onTap,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

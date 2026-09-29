@@ -12,6 +12,9 @@ abstract final class SleepUi {
   static const Color deep = Colors.indigo;
   static const Color unknown = Colors.grey;
 
+  /// Inner padding of the sleep cards (an [AppSoftCard]).
+  static const EdgeInsets cardPadding = EdgeInsets.fromLTRB(20, 18, 16, 16);
+
   /// "7h 30min", "25min" under an hour, or "--" when unknown.
   static String duration(AppLocalizations loc, int? minutes) {
     if (minutes == null) return '--';
@@ -135,43 +138,6 @@ class SleepDateBadge extends StatelessWidget {
   }
 }
 
-/// Card surface used across the sleep screens. It matches the nutrition
-/// "day summary" card: soft diagonal gradient, no border, 20 px radius.
-class SleepCard extends StatelessWidget {
-  final Widget child;
-  final VoidCallback? onTap;
-
-  const SleepCard({super.key, required this.child, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final body = Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 16, 16),
-      child: child,
-    );
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(20),
-      clipBehavior: Clip.antiAlias,
-      child: Ink(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              colors.surfaceContainerHighest.withAlpha(200),
-              colors.surfaceContainerLow,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: onTap == null ? body : InkWell(onTap: onTap, child: body),
-      ),
-    );
-  }
-}
-
 /// Card title row: tinted icon, bold title and an optional trailing widget
 /// (a chevron on tappable cards).
 class SleepCardHeader extends StatelessWidget {
@@ -286,20 +252,6 @@ class SleepStat extends StatelessWidget {
   }
 }
 
-class SleepStatDivider extends StatelessWidget {
-  const SleepStatDivider({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 36,
-      margin: const EdgeInsets.symmetric(horizontal: 6),
-      color: Theme.of(context).colorScheme.outlineVariant.withAlpha(70),
-    );
-  }
-}
-
 /// Row of [SleepStat]s with thin dividers between them.
 class SleepStatRow extends StatelessWidget {
   final List<Widget> children;
@@ -311,7 +263,7 @@ class SleepStatRow extends StatelessWidget {
     return Row(
       children: [
         for (var i = 0; i < children.length; i++) ...[
-          if (i > 0) const SleepStatDivider(),
+          if (i > 0) const AppStatDivider(),
           Expanded(child: children[i]),
         ],
       ],

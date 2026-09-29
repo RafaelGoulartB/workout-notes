@@ -8,6 +8,7 @@ import 'package:workout_notes/widgets/goals/goal_contributing_workouts.dart';
 import 'package:workout_notes/widgets/goals/goal_form_sheet.dart';
 import 'package:workout_notes/widgets/goals/goal_formatters.dart';
 import 'package:workout_notes/widgets/goals/goal_progress_ring.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Detail screen for a single goal: current period progress with pacing,
 /// the workouts that fed it, and how previous periods ended.
@@ -437,71 +438,63 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
     final projection = current.currentValue / elapsed * totalDays;
     final onTrack = projection + 0.0001 >= current.targetValue;
 
-    return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            Expanded(
-              child: !isComplete
-                  ? _PaceTile(
-                      icon: Icons.flag_outlined,
-                      label: loc.goalRemainingLabel,
-                      value: _short(remaining),
-                      color: color,
-                    )
-                  : surplus > 0
-                      // Only worth a number when the period actually went
-                      // past the target.
-                      ? _PaceTile(
-                          icon: Icons.emoji_events_outlined,
-                          label: loc.goalSurplusLabel,
-                          value: '+${_short(surplus)}',
-                          color: const Color(0xFF43A047),
-                        )
-                      : _PaceTile(
-                          icon: Icons.emoji_events_outlined,
-                          label: loc.goalStatusAchieved,
-                          value: '100%',
-                          color: const Color(0xFF43A047),
-                        ),
+    return AppSectionCard(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Expanded(
+            child: !isComplete
+                ? _PaceTile(
+                    icon: Icons.flag_outlined,
+                    label: loc.goalRemainingLabel,
+                    value: _short(remaining),
+                    color: color,
+                  )
+                : surplus > 0
+                    // Only worth a number when the period actually went
+                    // past the target.
+                    ? _PaceTile(
+                        icon: Icons.emoji_events_outlined,
+                        label: loc.goalSurplusLabel,
+                        value: '+${_short(surplus)}',
+                        color: const Color(0xFF43A047),
+                      )
+                    : _PaceTile(
+                        icon: Icons.emoji_events_outlined,
+                        label: loc.goalStatusAchieved,
+                        value: '100%',
+                        color: const Color(0xFF43A047),
+                      ),
+          ),
+          _PaceDivider(theme: theme),
+          Expanded(
+            child: _goal.metric == GoalMetric.days
+                ? _PaceTile(
+                    icon: Icons.today_outlined,
+                    label: loc.goalDaysLeftLabel,
+                    // Same count the header shows, so the two never disagree.
+                    value: '${current.daysRemaining}',
+                    color: theme.colorScheme.onSurface,
+                  )
+                : _PaceTile(
+                    icon: Icons.speed_outlined,
+                    label: loc.goalPerDayLabel,
+                    value: isComplete ? '—' : _short(neededPerDay),
+                    color: theme.colorScheme.onSurface,
+                  ),
+          ),
+          _PaceDivider(theme: theme),
+          Expanded(
+            child: _PaceTile(
+              icon: onTrack
+                  ? Icons.trending_up_rounded
+                  : Icons.trending_down_rounded,
+              label: loc.goalProjectionLabel,
+              value: _short(projection),
+              color: onTrack ? const Color(0xFF43A047) : Colors.orange,
             ),
-            _PaceDivider(theme: theme),
-            Expanded(
-              child: _goal.metric == GoalMetric.days
-                  ? _PaceTile(
-                      icon: Icons.today_outlined,
-                      label: loc.goalDaysLeftLabel,
-                      // Same count the header shows, so the two never disagree.
-                      value: '${current.daysRemaining}',
-                      color: theme.colorScheme.onSurface,
-                    )
-                  : _PaceTile(
-                      icon: Icons.speed_outlined,
-                      label: loc.goalPerDayLabel,
-                      value: isComplete ? '—' : _short(neededPerDay),
-                      color: theme.colorScheme.onSurface,
-                    ),
-            ),
-            _PaceDivider(theme: theme),
-            Expanded(
-              child: _PaceTile(
-                icon: onTrack
-                    ? Icons.trending_up_rounded
-                    : Icons.trending_down_rounded,
-                label: loc.goalProjectionLabel,
-                value: _short(projection),
-                color: onTrack ? const Color(0xFF43A047) : Colors.orange,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -523,40 +516,31 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
   Widget _buildHistory(ThemeData theme, AppLocalizations loc, Color color) {
     final isPortuguese = Localizations.localeOf(context).languageCode == 'pt';
     if (_history.isEmpty) {
-      return Card(
-        elevation: 0,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side:
-              BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-          child: Column(
-            children: [
-              Icon(
-                Icons.history,
-                size: 36,
-                color: theme.colorScheme.onSurfaceVariant.withAlpha(100),
+      return AppSectionCard(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        child: Column(
+          children: [
+            Icon(
+              Icons.history,
+              size: 36,
+              color: theme.colorScheme.onSurfaceVariant.withAlpha(100),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              loc.goalNoHistory,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(height: 8),
-              Text(
-                loc.goalNoHistory,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              loc.goalNoHistoryHint,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withAlpha(150),
               ),
-              const SizedBox(height: 2),
-              Text(
-                loc.goalNoHistoryHint,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant.withAlpha(150),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
@@ -565,54 +549,46 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
     final rate = (completedCount * 100 / _history.length).round();
     final streak = _streak;
 
-    return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
+    return AppSectionCard(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _StatusPill(
+                      label: loc.goalAchievementRate(rate),
+                      color: rate >= 50
+                          ? const Color(0xFF43A047)
+                          : theme.colorScheme.onSurfaceVariant,
+                      icon: Icons.percent_rounded,
+                    ),
+                    if (streak > 0)
                       _StatusPill(
-                        label: loc.goalAchievementRate(rate),
-                        color: rate >= 50
-                            ? const Color(0xFF43A047)
-                            : theme.colorScheme.onSurfaceVariant,
-                        icon: Icons.percent_rounded,
+                        label: loc.goalStreakPeriods(streak),
+                        color: Colors.deepOrange,
+                        icon: Icons.local_fire_department_rounded,
                       ),
-                      if (streak > 0)
-                        _StatusPill(
-                          label: loc.goalStreakPeriods(streak),
-                          color: Colors.deepOrange,
-                          icon: Icons.local_fire_department_rounded,
-                        ),
-                    ],
-                  ),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            for (var i = 0; i < _history.length; i++) ...[
-              if (i > 0)
-                Divider(
-                  height: 1,
-                  color: theme.colorScheme.outlineVariant.withAlpha(60),
-                ),
-              _historyTile(theme, _history[i], color, isPortuguese),
+              ),
             ],
+          ),
+          const SizedBox(height: 6),
+          for (var i = 0; i < _history.length; i++) ...[
+            if (i > 0)
+              Divider(
+                height: 1,
+                color: theme.colorScheme.outlineVariant.withAlpha(60),
+              ),
+            _historyTile(theme, _history[i], color, isPortuguese),
           ],
-        ),
+        ],
       ),
     );
   }

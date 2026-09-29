@@ -1,24 +1,5 @@
 import 'package:flutter/material.dart';
 
-class FoodSearchSectionHeader extends StatelessWidget {
-  final String text;
-  const FoodSearchSectionHeader({super.key, required this.text});
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 16, 8),
-      child: Text(
-        text,
-        style: theme.textTheme.labelMedium?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
 class FoodSearchHistoryHeader extends StatelessWidget {
   final String title;
   final String sortLabel;

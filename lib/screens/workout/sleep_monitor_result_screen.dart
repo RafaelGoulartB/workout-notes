@@ -239,7 +239,8 @@ class _NightHero extends StatelessWidget {
     final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
     final efficiency = session.sleepEfficiency;
-    return SleepCard(
+    return AppSoftCard(
+      padding: SleepUi.cardPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

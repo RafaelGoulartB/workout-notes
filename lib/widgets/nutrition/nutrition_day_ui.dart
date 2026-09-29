@@ -8,6 +8,7 @@ import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/screens/workout/periodization_home_screen.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Building blocks shared by the nutrition home and the day diary, so the
 /// summary card, meal cards and food rows look the same on both.
@@ -150,7 +151,7 @@ class NutritionSummaryCard extends StatelessWidget {
                   color: NutritionMacroColors.protein,
                 ),
               ),
-              const _StatDivider(),
+              const AppStatDivider(),
               Expanded(
                 child: _MacroStat(
                   label: loc.nutritionProgressCarbs,
@@ -159,7 +160,7 @@ class NutritionSummaryCard extends StatelessWidget {
                   color: NutritionMacroColors.carbs,
                 ),
               ),
-              const _StatDivider(),
+              const AppStatDivider(),
               Expanded(
                 child: _MacroStat(
                   label: loc.nutritionProgressFat,
@@ -246,18 +247,6 @@ class NutritionSummaryCard extends StatelessWidget {
         ? loc.nutritionGoalRemaining(nutritionNumber(remaining))
         : loc.nutritionGoalSurplus(nutritionNumber(-remaining));
   }
-}
-
-class _StatDivider extends StatelessWidget {
-  const _StatDivider();
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 1,
-    height: 36,
-    margin: const EdgeInsets.symmetric(horizontal: 6),
-    color: Theme.of(context).colorScheme.outlineVariant.withAlpha(70),
-  );
 }
 
 class _MacroStat extends StatelessWidget {
