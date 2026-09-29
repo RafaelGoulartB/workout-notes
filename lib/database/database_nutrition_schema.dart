@@ -182,9 +182,7 @@ abstract final class DatabaseNutritionSchema {
       'CREATE INDEX IF NOT EXISTS idx_nutrition_goals_active ON nutrition_goals(is_active)',
       'CREATE INDEX IF NOT EXISTS idx_saved_meal_items_meal ON saved_meal_items(saved_meal_id, order_index ASC)',
     ]) {
-      try {
-        await db.execute(statement);
-      } catch (_) {}
+      await db.execute(statement);
     }
   }
 }
