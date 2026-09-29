@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 
 import 'database_nutrition_schema.dart';
 import 'database_periodization_schema.dart';
+import 'database_medication_schema.dart';
 import 'database_run_extras_schema.dart';
 import 'database_run_plan_schema.dart';
 import 'database_run_route_schema.dart';
@@ -428,6 +429,7 @@ abstract final class DatabaseSchema {
     ''');
     await DatabaseRunRouteSchema.create(db);
     await DatabaseRunExtrasSchema.create(db);
+    await DatabaseMedicationSchema.create(db);
 
     // Nutrition module (v22). Foods, variants, servings, meal logs and
     // goals share a single helper so `_onCreate` and `_onUpgrade` use

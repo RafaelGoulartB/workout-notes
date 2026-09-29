@@ -12,7 +12,7 @@ import 'package:workout_notes/services/run_route_codec.dart';
 /// inserts the backup rows inside a single transaction so the database
 /// ends up in an exact copy of the exported state.
 class ExportImportRepository extends BaseRepository {
-  static const int currentBackupVersion = 18;
+  static const int currentBackupVersion = 19;
   static const int minimumSupportedBackupVersion = 2;
   static const String backupType = 'workout_notes_full_backup';
 
@@ -60,6 +60,8 @@ class ExportImportRepository extends BaseRepository {
     'run_plan_adaptations',
     'run_gear',
     'run_laps',
+    'medications',
+    'medication_doses',
     'settings',
   ];
 
@@ -71,6 +73,8 @@ class ExportImportRepository extends BaseRepository {
     'run_plan_adaptations': 17,
     'run_gear': 18,
     'run_laps': 18,
+    'medications': 19,
+    'medication_doses': 19,
   };
 
   /// Collections a backup of [version] is expected to carry.
@@ -145,6 +149,9 @@ class ExportImportRepository extends BaseRepository {
       // Shoes and manual laps (backup v18).
       'run_gear': await _queryIfExists(db, 'run_gear'),
       'run_laps': await _queryIfExists(db, 'run_laps'),
+      // Medication reminders and the dose log (backup v19).
+      'medications': await _queryIfExists(db, 'medications'),
+      'medication_doses': await _queryIfExists(db, 'medication_doses'),
       'settings': await db.query('app_settings'),
       // Platform preferences and portable file bytes are filled by
       // ExportService. Empty defaults keep this envelope valid for repository
@@ -260,6 +267,9 @@ class ExportImportRepository extends BaseRepository {
       if (await _tableExists(txn, 'traditional_alarms')) {
         await txn.delete('traditional_alarms');
       }
+      for (final table in ['medication_doses', 'medications']) {
+        if (await _tableExists(txn, table)) await txn.delete(table);
+      }
       await txn.delete('exercises');
       await txn.delete('exercise_categories');
       await txn.delete('app_settings');
@@ -364,6 +374,11 @@ class ExportImportRepository extends BaseRepository {
           'traditional_alarms',
           data['traditional_alarms'],
         );
+      }
+      for (final table in ['medications', 'medication_doses']) {
+        if (await _tableExists(txn, table)) {
+          totalRows += await _insertAll(txn, table, data[table]);
+        }
       }
       totalRows += await _insertAll(txn, 'app_settings', data['settings']);
       // Backups before v6 had no mission settings. Add the safe disabled
@@ -787,6 +802,9 @@ class ExportImportRepository extends BaseRepository {
       await txn.delete('sleep_entries');
       if (await _tableExists(txn, 'traditional_alarms')) {
         await txn.delete('traditional_alarms');
+      }
+      for (final table in ['medication_doses', 'medications']) {
+        if (await _tableExists(txn, table)) await txn.delete(table);
       }
     });
   }

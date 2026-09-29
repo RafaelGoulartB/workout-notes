@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 
+import '../database_medication_schema.dart';
 import '../database_nutrition_schema.dart';
 import '../database_run_extras_schema.dart';
 import '../database_run_plan_schema.dart';
@@ -600,6 +601,12 @@ abstract final class DatabaseWellnessMigrations {
         await db.execute(
           'ALTER TABLE workouts ADD COLUMN routine_day_id TEXT',
         );
+      } catch (_) {}
+    }
+    if (oldVersion < 55) {
+      // Medication reminders and the confirmed / skipped dose log.
+      try {
+        await DatabaseMedicationSchema.create(db);
       } catch (_) {}
     }
   }

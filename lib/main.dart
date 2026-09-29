@@ -10,6 +10,7 @@ import 'navigation/ai_coach_navigation.dart';
 import 'services/notification_service.dart';
 import 'services/sleep_monitor_service.dart';
 import 'services/traditional_alarm_service.dart';
+import 'services/medication_reminder_service.dart';
 import 'services/run_tracking_service.dart';
 import 'screens/main_shell.dart';
 import 'state/ai_chat_service.dart';
@@ -144,6 +145,9 @@ Future<void> _initializeDeferredServices() async {
   } catch (_) {}
   try {
     await TraditionalAlarmService.instance.initialize();
+  } catch (_) {}
+  try {
+    await MedicationReminderService.instance.initialize();
   } catch (_) {}
   try {
     await RunTrackingService.instance.initialize();
