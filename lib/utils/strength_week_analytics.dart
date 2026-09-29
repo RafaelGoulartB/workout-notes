@@ -201,11 +201,6 @@ class StrengthWeekAnalytics {
     return totals.volumeKg / previous.volumeKg - 1;
   }
 
-  double? get sessionsRatioVsPreviousPeriod {
-    if (!hasPreviousPeriod || previous.sessions <= 0) return null;
-    return totals.sessions / previous.sessions - 1;
-  }
-
   factory StrengthWeekAnalytics.fromWorkouts(
     List<StrengthWorkoutSummary> all, {
     required RunStatsPeriod period,

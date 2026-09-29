@@ -69,9 +69,6 @@ class SleepWakeEngine {
   static bool supports(SleepMonitorSession session) =>
       featureVersions.contains(session.algorithmVersion);
 
-  static bool supportsVersion(Object? algorithmVersion) =>
-      featureVersions.contains(algorithmVersion);
-
   /// [refine] applies the offline pass; `false` returns the causal labels
   /// exactly as the live cursor emitted them.
   SleepStageEngineResult run({

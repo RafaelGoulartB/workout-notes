@@ -135,8 +135,6 @@ class StrengthHistoryWorkout {
     this.recordCount = 0,
   });
 
-  DateTime get moment => startedAt ?? day;
-
   /// Routine day name, else routine name; null for a free workout.
   String? get title {
     final day = dayName?.trim();

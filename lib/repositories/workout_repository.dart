@@ -1000,15 +1000,6 @@ class WorkoutRepository extends BaseRepository {
     );
   }
 
-  Future<List<Map<String, dynamic>>> getLastWorkoutSets(
-    String exerciseId, {
-    String? excludeWorkoutId,
-  }) async => _lastWorkoutSets(
-    await db,
-    exerciseId,
-    excludeWorkoutId: excludeWorkoutId,
-  );
-
   Future<List<Map<String, dynamic>>> _lastWorkoutSets(
     DatabaseExecutor db,
     String exerciseId, {
