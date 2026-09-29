@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
@@ -8,7 +7,7 @@ import 'package:workout_notes/models/periodization_metrics.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
-import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
+import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 
 class PeriodizationCheckinScreen extends StatefulWidget {
   final PeriodizationPhase phase;
@@ -126,8 +125,12 @@ class _PeriodizationCheckinScreenState
       ),
       bottomNavigationBar: _loading
           ? null
-          : PeriodizationBottomBar(
-              primary: FilledButton.icon(
+          : SafeArea(
+              minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                ),
                 onPressed: _saving ? null : _save,
                 icon: _saving
                     ? const SizedBox.square(
@@ -143,70 +146,44 @@ class _PeriodizationCheckinScreenState
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               children: [
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Color(widget.phase.color).withAlpha(45),
-                        theme.colorScheme.surfaceContainerLow,
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: Color(widget.phase.color).withAlpha(55),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: Color(widget.phase.color).withAlpha(30),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Icon(
-                          Icons.fact_check_outlined,
-                          color: Color(widget.phase.color),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.phase.name,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w900,
-                              ),
+                Row(
+                  children: [
+                    PhaseAvatar.of(widget.phase, size: 48),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.phase.name,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w900,
                             ),
-                            const SizedBox(height: 3),
-                            Text(
-                              '${DateFormat.MMMd(Intl.defaultLocale).format(_weekStart)} – ${DateFormat.MMMd(Intl.defaultLocale).format(end)}',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            planningDateRange(_weekStart, end),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 18),
-                PeriodizationSectionHeader(
-                  title: loc.periodizationAutomaticSummary,
+                PlanningSectionLabel(
+                  loc.periodizationAutomaticSummary,
                   icon: Icons.auto_graph_rounded,
                 ),
                 _SummaryCard(metrics: _metrics!, target: _target),
                 const SizedBox(height: 18),
-                PeriodizationSectionHeader(
-                  title: loc.periodizationWeekReview,
+                PlanningSectionLabel(
+                  loc.periodizationWeekReview,
                   icon: Icons.favorite_outline_rounded,
                 ),
-                PeriodizationSurface(
+                PlanningCard(
                   child: Column(
                     children: [
                       _RatingRow(
@@ -233,8 +210,8 @@ class _PeriodizationCheckinScreenState
                   ),
                 ),
                 const SizedBox(height: 18),
-                PeriodizationSectionHeader(
-                  title: loc.periodizationPerformance,
+                PlanningSectionLabel(
+                  loc.periodizationPerformance,
                   icon: Icons.trending_up_rounded,
                 ),
                 SizedBox(
@@ -264,8 +241,8 @@ class _PeriodizationCheckinScreenState
                   ),
                 ),
                 const SizedBox(height: 22),
-                PeriodizationSectionHeader(
-                  title: loc.periodizationDecision,
+                PlanningSectionLabel(
+                  loc.periodizationDecision,
                   icon: Icons.alt_route_rounded,
                 ),
                 ...[
@@ -287,8 +264,10 @@ class _PeriodizationCheckinScreenState
                 ].map(
                   (item) => Padding(
                     padding: const EdgeInsets.only(bottom: 9),
-                    child: PeriodizationSurface(
-                      selected: _decision == item.$1,
+                    child: PlanningCard(
+                      borderColor: _decision == item.$1
+                          ? theme.colorScheme.primary
+                          : null,
                       onTap: () => setState(() => _decision = item.$1),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
@@ -354,7 +333,7 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    return PeriodizationSurface(
+    return PlanningCard(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
       child: Row(
         children: [

@@ -830,11 +830,17 @@ class _DayPlanGoalChip extends StatelessWidget {
     final theme = Theme.of(context);
     final phase = planInfo.phase!;
     final color = Color(phase.color);
-    final label = loc.nutritionGoalPlanBadge(
+    final badge = loc.nutritionGoalPlanBadge(
       phase.name,
       planInfo.weekNumber ?? 1,
       planInfo.totalWeeks ?? 1,
     );
+    // Phases with rest-day nutrition say which target today uses.
+    final label = switch (planInfo.trainingDay) {
+      true => '$badge · ${loc.planningTrainingDayShort}',
+      false => '$badge · ${loc.planningRestDayShort}',
+      null => badge,
+    };
     return Align(
       alignment: Alignment.centerLeft,
       child: Material(

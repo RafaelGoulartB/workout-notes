@@ -8,94 +8,73 @@ import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 
 import 'periodization_checkin_screen.dart';
-import 'periodization_phase_form_screen.dart';
+import 'periodization_phase_editor_screen.dart';
 
+/// Weekly review followed by what the decision implies: nothing (keep
+/// going), opening the phase editor (adjust) or ending the phase at the end
+/// of this week (the following phases move earlier).
 abstract final class PeriodizationCheckinFlow {
+  /// Returns true when anything was saved.
   static Future<bool> run({
     required BuildContext context,
     required PeriodizationPlan plan,
     required PeriodizationPhase phase,
+    DateTime? weekStart,
   }) async {
     final decision = await Navigator.push<PeriodizationDecision>(
       context,
       MaterialPageRoute(
-        builder: (_) => PeriodizationCheckinScreen(phase: phase),
+        builder: (_) =>
+            PeriodizationCheckinScreen(phase: phase, weekStart: weekStart),
       ),
     );
     if (decision == null || !context.mounted) return false;
+    final loc = AppLocalizations.of(context)!;
 
     switch (decision) {
       case PeriodizationDecision.maintain:
         final today = DateTime.now();
-        final weekStart = DateTime(
+        final monday = DateTime(
           today.year,
           today.month,
           today.day,
         ).subtract(Duration(days: today.weekday - DateTime.monday));
-        final nextReview = weekStart.add(const Duration(days: 7));
-        final date = DateFormat.MMMd(Intl.defaultLocale).format(nextReview);
+        final next = DateFormat.MMMd(
+          Intl.defaultLocale,
+        ).format(monday.add(const Duration(days: 7)));
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.periodizationNextReview(date),
-            ),
-          ),
+          SnackBar(content: Text(loc.periodizationNextReview(next))),
         );
-        return true;
       case PeriodizationDecision.adjust:
         await Navigator.push<bool>(
           context,
           MaterialPageRoute(
             builder: (_) =>
-                PeriodizationPhaseFormScreen(plan: plan, phase: phase),
+                PeriodizationPhaseEditorScreen(plan: plan, phase: phase),
           ),
         );
-        return true;
       case PeriodizationDecision.endPhase:
-        final action = await _confirmEarlyEnd(context);
-        if (action == null || !context.mounted) return true;
-        try {
-          await PeriodizationRepository().endPhaseEarly(
-            phase.id,
-            DateTime.now(),
-            shiftFollowingPhases: action,
-          );
-        } catch (error) {
-          if (!context.mounted) return true;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                AppLocalizations.of(context)!.periodizationSaveError('$error'),
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(loc.planningEndPhaseTitle),
+            content: Text(loc.planningEndPhaseBody),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(loc.commonCancel),
               ),
-            ),
-          );
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(loc.planningEndPhaseConfirm),
+              ),
+            ],
+          ),
+        );
+        if (confirmed == true) {
+          await PeriodizationRepository().endPhaseThisWeek(phase.id);
         }
-        return true;
     }
-  }
-
-  static Future<bool?> _confirmEarlyEnd(BuildContext context) {
-    final loc = AppLocalizations.of(context)!;
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(loc.periodizationEndPhaseConfirmTitle),
-        content: Text(loc.periodizationEndPhaseConfirmBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(loc.commonCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(loc.periodizationKeepFollowingDates),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(loc.periodizationShiftFollowing),
-          ),
-        ],
-      ),
-    );
+    return true;
   }
 }
