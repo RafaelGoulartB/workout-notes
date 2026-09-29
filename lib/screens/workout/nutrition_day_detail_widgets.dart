@@ -69,7 +69,7 @@ class _EmptyDayCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            RunIconBadge(Icons.restaurant_outlined),
+            AppIconBadge(Icons.restaurant_outlined),
             const SizedBox(height: 12),
             Text(
               loc.nutritionNoMealsTitle,
@@ -299,8 +299,8 @@ class _DailyStatisticsView extends StatelessWidget {
       children: [
         _MacrosCard(summary: summary, goal: goal),
         for (final (title, nutrients) in groups) ...[
-          RunSectionHeader(title),
-          RunSectionCard(
+          AppSectionHeader(title),
+          AppSectionCard(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               children: [
@@ -308,7 +308,7 @@ class _DailyStatisticsView extends StatelessWidget {
                   if (i > 0)
                     Divider(
                       height: 1,
-                      color: RunUi.divider(Theme.of(context).colorScheme),
+                      color: AppUi.divider(Theme.of(context).colorScheme),
                     ),
                   _NutrientStatRow(nutrient: nutrients[i]),
                 ],
@@ -338,13 +338,13 @@ class _MacrosCard extends StatelessWidget {
     final fatKcal = (values.fatG ?? 0) * 9;
     final totalKcal = proteinKcal + carbsKcal + fatKcal;
 
-    return RunSectionCard(
+    return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              RunIconBadge(Icons.donut_large_rounded, size: 34, iconSize: 18),
+              AppIconBadge(Icons.donut_large_rounded, size: 34, iconSize: 18),
               const SizedBox(width: 10),
               Text(
                 loc.nutritionMacrosTitle,
@@ -385,7 +385,7 @@ class _MacrosCard extends StatelessWidget {
           ),
           if (totalKcal > 0) ...[
             const SizedBox(height: 18),
-            Divider(height: 1, color: RunUi.divider(theme.colorScheme)),
+            Divider(height: 1, color: AppUi.divider(theme.colorScheme)),
             const SizedBox(height: 14),
             Text(
               loc.nutritionMacroSplitTitle,
@@ -437,7 +437,7 @@ class _MacrosCard extends StatelessWidget {
                   ),
                   (loc.nutritionProgressFat, fatKcal, NutritionMacroColors.fat),
                 ])
-                  RunLegendItem(
+                  AppLegendItem(
                     color: color,
                     label: '$label ${(kcal / totalKcal * 100).round()}%',
                   ),
@@ -604,7 +604,7 @@ class _NutrientStatRow extends StatelessWidget {
                       ),
                   ],
                 ),
-                style: const TextStyle(fontFeatures: RunUi.tabular),
+                style: const TextStyle(fontFeatures: AppUi.tabular),
               ),
             ],
           ),

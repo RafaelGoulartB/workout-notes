@@ -6,7 +6,7 @@ import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_template.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/services/run_plan_week_view.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Where a plan stands, in one honest card: following, not following,
 /// finished by date, fully completed or driven by a periodization phase.
@@ -217,7 +217,7 @@ class RunPlanStatusCard extends StatelessWidget {
         : DateFormat('EEE d/M', locale).format(view.date!);
     return InkWell(
       onTap: onOpenNext,
-      borderRadius: BorderRadius.circular(RunUi.tileRadius),
+      borderRadius: BorderRadius.circular(AppUi.tileRadius),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
@@ -339,7 +339,7 @@ class _Frame extends StatelessWidget {
             : tint == scheme.primary
             ? tint.withAlpha(16)
             : scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(RunUi.cardRadius),
+        borderRadius: BorderRadius.circular(AppUi.cardRadius),
         border: Border.all(
           color: tint == scheme.onSurfaceVariant
               ? scheme.outlineVariant.withAlpha(90)

@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Shared sizing, colours and tick helpers so every running chart looks and
 /// behaves alike.
@@ -301,7 +301,7 @@ class RunWeeklyDistanceChart extends StatelessWidget {
           const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerLeft,
-            child: RunLegendItem(
+            child: AppLegendItem(
               color: averageColor,
               label: averageLabel!,
               dashed: true,
@@ -517,9 +517,9 @@ class RunPaceTrendChart extends StatelessWidget {
           spacing: 16,
           runSpacing: 6,
           children: [
-            RunLegendItem(color: primary, label: loc.runStatsChartRunsLegend),
+            AppLegendItem(color: primary, label: loc.runStatsChartRunsLegend),
             if (fit != null)
-              RunLegendItem(
+              AppLegendItem(
                 color: trendColor,
                 label: loc.runStatsChartTrendLine,
                 dashed: true,
@@ -685,7 +685,7 @@ class RunWeeklyFrequencyChart extends StatelessWidget {
           const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerLeft,
-            child: RunLegendItem(
+            child: AppLegendItem(
               color: averageColor,
               label: averageLabel!,
               dashed: true,

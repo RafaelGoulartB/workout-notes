@@ -14,7 +14,7 @@ import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 import 'package:workout_notes/services/open_food_facts_gateway.dart';
 import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 import 'food_quantity_sheet.dart';
 import 'food_search_screen.dart';
@@ -617,7 +617,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: AnimatedBuilder(
               animation: _tabController,
-              builder: (context, _) => RunSegmentedTabs<int>(
+              builder: (context, _) => AppSegmentedTabs<int>(
                 values: const [0, 1],
                 selected: _tabController.index,
                 labelOf: (tab) => tab == 0

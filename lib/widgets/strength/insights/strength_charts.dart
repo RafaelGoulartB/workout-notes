@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
 import 'package:workout_notes/utils/strength_insights_format.dart';
 import 'package:workout_notes/widgets/run/run_progress_charts.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// One bar: bottom [label], [value] and the multi-line [tooltip].
 class StrengthBarPoint {
@@ -187,7 +187,7 @@ class StrengthBarChart extends StatelessWidget {
           const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerLeft,
-            child: RunLegendItem(
+            child: AppLegendItem(
               color: averageColor,
               label: averageLabel!,
               dashed: true,
@@ -430,9 +430,9 @@ class StrengthTrendChart extends StatelessWidget {
             runSpacing: 6,
             children: [
               if (pointsLabel != null)
-                RunLegendItem(color: lineColor, label: pointsLabel!),
+                AppLegendItem(color: lineColor, label: pointsLabel!),
               if (fit != null && trendLabel != null)
-                RunLegendItem(
+                AppLegendItem(
                   color: trendColor,
                   label: trendLabel!,
                   dashed: true,

@@ -9,7 +9,7 @@ import 'package:workout_notes/screens/workout/exercise_detail_tabs_screen.dart';
 import 'package:workout_notes/screens/workout/exercise_form_screen.dart';
 import 'package:workout_notes/utils/exercise_equipment.dart';
 import 'package:workout_notes/utils/strength_exercise_library.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/exercises/exercise_library_widgets.dart';
 
 /// Every exercise, dense and searchable. Grouped by muscle when "All" is
@@ -288,7 +288,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
   }
 
   /// The rows of one card (a muscle group, or the flat ranking) as a lazy
-  /// list drawn on the same bordered surface as `RunSectionCard`.
+  /// list drawn on the same bordered surface as `AppSectionCard`.
   Widget _rowsSliver(
     List<ExerciseLibraryEntry> entries, {
     required bool showCategory,
@@ -296,12 +296,12 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final dividerColor = colors.outlineVariant.withAlpha(70);
-    const radius = Radius.circular(RunUi.cardRadius);
+    const radius = Radius.circular(AppUi.cardRadius);
     return DecoratedSliver(
       decoration: BoxDecoration(
         color: theme.cardTheme.color ?? colors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(RunUi.cardRadius),
-        border: Border.all(color: RunUi.divider(colors)),
+        borderRadius: BorderRadius.circular(AppUi.cardRadius),
+        border: Border.all(color: AppUi.divider(colors)),
       ),
       sliver: SliverList.separated(
         itemCount: entries.length,

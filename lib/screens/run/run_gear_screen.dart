@@ -5,7 +5,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_gear.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Shoe list with mileage, wear bar and replacement hints.
 class RunGearScreen extends StatefulWidget {
@@ -133,14 +133,14 @@ class _RunGearScreenState extends State<RunGearScreen> {
               onAction: _edit,
             )
           : ListView(
-              padding: RunUi.screenPadding,
+              padding: AppUi.screenPadding,
               children: [
                 for (final usage in active) ...[
                   _GearCard(usage: usage, onTap: () => _actions(usage)),
                   const SizedBox(height: 10),
                 ],
                 if (retired.isNotEmpty) ...[
-                  RunSectionHeader(loc.runGearRetiredSection),
+                  AppSectionHeader(loc.runGearRetiredSection),
                   for (final usage in retired) ...[
                     _GearCard(usage: usage, onTap: () => _actions(usage)),
                     const SizedBox(height: 10),
@@ -176,7 +176,7 @@ class _GearCard extends StatelessWidget {
             Localizations.localeOf(context).toString(),
           ).format(usage.lastUsedAt!.toLocal());
 
-    return RunSectionCard(
+    return AppSectionCard(
       onTap: onTap,
       child: Opacity(
         opacity: gear.isRetired ? 0.6 : 1,
@@ -185,7 +185,7 @@ class _GearCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const RunIconBadge(Icons.directions_walk_rounded),
+                const AppIconBadge(Icons.directions_walk_rounded),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -215,9 +215,9 @@ class _GearCard extends StatelessWidget {
                   ),
                 ),
                 if (gear.isDefault)
-                  RunPill(label: loc.runGearDefaultBadge)
+                  AppPill(label: loc.runGearDefaultBadge)
                 else if (gear.isRetired)
-                  RunPill(
+                  AppPill(
                     label: loc.runGearRetiredBadge,
                     color: colors.onSurfaceVariant,
                   ),
@@ -227,7 +227,7 @@ class _GearCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                RunValueUnit(
+                AppValueUnit(
                   value: RunFormatters.distanceKm(usage.totalDistanceMeters),
                   unit: 'km',
                 ),

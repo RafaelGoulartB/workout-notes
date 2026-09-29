@@ -13,7 +13,7 @@ import 'package:workout_notes/utils/run_training_load_analytics.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/run/insights/run_insights_fitness_sections.dart';
 import 'package:workout_notes/widgets/run/insights/run_insights_year_sections.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Which group of analysis cards is showing.
 enum _InsightsTab { fitness, training, year }
@@ -169,7 +169,7 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
                 preferredSize: const Size.fromHeight(60),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: RunSegmentedTabs<_InsightsTab>(
+                  child: AppSegmentedTabs<_InsightsTab>(
                     values: _InsightsTab.values,
                     selected: _tab,
                     labelOf: (tab) => switch (tab) {
@@ -195,7 +195,7 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
               onRefresh: _loadAll,
               child: ListView(
                 key: PageStorageKey(_tab),
-                padding: RunUi.screenPadding.copyWith(top: 8, bottom: 40),
+                padding: AppUi.screenPadding.copyWith(top: 8, bottom: 40),
                 children: [
                   for (final (i, card) in _cards().indexed) ...[
                     if (i > 0) const SizedBox(height: 12),

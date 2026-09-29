@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// "Today's workout": the session the running plan scheduled for today, one
 /// tap away from being attached to this run.
@@ -22,7 +22,7 @@ class RunTodayWorkoutCard extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
     final colors = theme.colorScheme;
     final tint = RunPlanUi.kindColor(colors, workout.kind);
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
       color: tint.withAlpha(20),
       child: Column(
@@ -30,7 +30,7 @@ class RunTodayWorkoutCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              RunIconBadge(RunPlanUi.kindIcon(workout.kind), color: tint),
+              AppIconBadge(RunPlanUi.kindIcon(workout.kind), color: tint),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

@@ -5,7 +5,7 @@ import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/screens/workout/active_workout_screen.dart';
 import 'package:workout_notes/screens/workout/routine_day_editor_screen.dart';
 import 'package:workout_notes/utils/strength_routine_summary.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_day_card.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_muscle_widgets.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_sheets.dart';
@@ -196,12 +196,12 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
-                padding: RunUi.screenPadding.copyWith(top: 8),
+                padding: AppUi.screenPadding.copyWith(top: 8),
                 children: [
                   RoutineHero(routine: routine),
                   const SizedBox(height: 12),
                   RoutineWeeklyMusclesCard(muscles: routine.muscles),
-                  RunSectionHeader(
+                  AppSectionHeader(
                     loc.routineDaysSection,
                     padding: const EdgeInsets.fromLTRB(4, 20, 0, 10),
                   ),

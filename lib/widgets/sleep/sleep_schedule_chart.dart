@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
 
 /// Weekly bed → wake windows, one column per day. Time runs downward (evening
@@ -180,7 +180,7 @@ class SleepScheduleChart extends StatelessWidget {
                           _formatHour(-value),
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: colors.onSurfaceVariant,
-                            fontFeatures: RunUi.tabular,
+                            fontFeatures: AppUi.tabular,
                           ),
                         );
                       },
@@ -205,14 +205,14 @@ class SleepScheduleChart extends StatelessWidget {
           runSpacing: 6,
           alignment: WrapAlignment.center,
           children: [
-            RunLegendItem(
+            AppLegendItem(
               color: colors.tertiary,
               dashed: true,
               label: loc.sleepAverageBedtime(
                 SleepUi.clock((avgStart * 60).round()),
               ),
             ),
-            RunLegendItem(
+            AppLegendItem(
               color: colors.primary,
               dashed: true,
               label: loc.sleepAverageWake(SleepUi.clock((avgEnd * 60).round())),

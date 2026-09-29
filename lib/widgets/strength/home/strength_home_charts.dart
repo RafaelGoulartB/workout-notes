@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/strength_week_analytics.dart';
 import 'package:workout_notes/widgets/run/run_progress_charts.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Bottom label of a bucket: `d/M` for weeks, the month for month buckets.
 String strengthBucketLabel(StrengthTrendBucket bucket, String locale) =>
@@ -209,7 +209,7 @@ class StrengthBucketBarChart extends StatelessWidget {
           const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerLeft,
-            child: RunLegendItem(
+            child: AppLegendItem(
               color: averageColor,
               label: averageLabel!,
               dashed: true,

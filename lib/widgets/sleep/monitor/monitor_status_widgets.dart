@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class MissionStatusBanner extends StatelessWidget {
   const MissionStatusBanner({
@@ -152,7 +152,7 @@ class PermissionNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
       color: scheme.errorContainer.withAlpha(70),
       child: Column(
@@ -161,7 +161,7 @@ class PermissionNotice extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              RunIconBadge(Icons.alarm_off_rounded, color: scheme.error),
+              AppIconBadge(Icons.alarm_off_rounded, color: scheme.error),
               const SizedBox(width: 12),
               Expanded(child: Text(text, style: theme.textTheme.bodyMedium)),
             ],
@@ -191,7 +191,7 @@ class TipsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    return RunSectionCard(
+    return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -208,7 +208,7 @@ class TipsCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                RunIconBadge(tip.$1),
+                AppIconBadge(tip.$1),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(

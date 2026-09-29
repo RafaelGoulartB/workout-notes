@@ -27,7 +27,7 @@ import 'package:workout_notes/widgets/run/home/run_home_today_card.dart';
 import 'package:workout_notes/widgets/run/home/run_home_trends_card.dart';
 import 'package:workout_notes/widgets/run/home/run_home_week_card.dart';
 import 'package:workout_notes/widgets/run/run_pending_review_banner.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 enum _HomeMenu { plans, history, shoes, records, voice }
 
@@ -211,7 +211,7 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
                     onChanged: _reload,
                   ),
                   Padding(
-                    padding: RunUi.screenPadding,
+                    padding: AppUi.screenPadding,
                     child: _buildContent(loc),
                   ),
                 ],
@@ -254,11 +254,11 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
     final plan = snapshot?.plan;
     return [
       if (plan != null) ...[
-        RunSectionHeader(loc.runHomePlanTitle),
+        AppSectionHeader(loc.runHomePlanTitle),
         _planCard(plan, snapshot),
       ],
       const SizedBox(height: 22),
-      RunSectionCard(
+      AppSectionCard(
         child: Column(
           children: [
             const Icon(Icons.directions_run, size: 48),
@@ -308,33 +308,33 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
     final recent = _activities.take(5).toList();
 
     return [
-      RunSectionHeader(loc.runStatsSectionThisWeek),
+      AppSectionHeader(loc.runStatsSectionThisWeek),
       RunWeekCard(
         analytics: analytics,
         snapshot: snapshot,
         onEditGoal: _editWeeklyGoal,
       ),
       if (plan != null) ...[
-        RunSectionHeader(loc.runHomePlanTitle),
+        AppSectionHeader(loc.runHomePlanTitle),
         _planCard(plan, snapshot),
       ],
-      RunSectionHeader(loc.runStatsOverview),
+      AppSectionHeader(loc.runStatsOverview),
       RunPeriodChips(selected: _period, onChanged: _setPeriod),
       const SizedBox(height: 14),
       RunPeriodHero(analytics: analytics),
-      RunSectionHeader(loc.runStatsSectionTrends),
+      AppSectionHeader(loc.runStatsSectionTrends),
       RunTrendsCard(analytics: analytics),
       if (load != null) ...[
-        RunSectionHeader(loc.runHomeFitnessTitle),
+        AppSectionHeader(loc.runHomeFitnessTitle),
         RunFitnessCard(
           estimate: _fitness,
           load: load,
           onSeeAll: () => _push(const RunInsightsScreen()),
         ),
       ],
-      RunSectionHeader(
+      AppSectionHeader(
         loc.runHomeRecordsTitle,
-        trailing: RunHeaderAction(
+        trailing: AppHeaderAction(
           label: loc.runHomeRecordsSeeAll,
           onPressed: () => _push(const RunAchievementsScreen()),
         ),
@@ -344,9 +344,9 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
         board: _board,
         onOpenActivity: (id) => _push(RunDetailScreen(activityId: id)),
       ),
-      RunSectionHeader(
+      AppSectionHeader(
         loc.runStatsSectionRecent,
-        trailing: RunHeaderAction(
+        trailing: AppHeaderAction(
           label: loc.runStatsSeeAll,
           onPressed: () => _push(const RunHistoryScreen()),
         ),

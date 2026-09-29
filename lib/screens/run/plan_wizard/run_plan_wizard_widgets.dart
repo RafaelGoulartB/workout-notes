@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:workout_notes/services/run_plan_composer.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Whole kilometres for the coach copy ("peak 42 km").
 String wizardKm(double value) => RunFormatters.decimal(value, 0);
@@ -92,7 +92,7 @@ class RunPlanWizardGoalFeedback extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(RunUi.tileRadius),
+        borderRadius: BorderRadius.circular(AppUi.tileRadius),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,9 +135,9 @@ class RunPlanWizardOptionCard extends StatelessWidget {
       color: selected
           ? theme.colorScheme.primaryContainer
           : theme.colorScheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(RunUi.tileRadius),
+      borderRadius: BorderRadius.circular(AppUi.tileRadius),
       child: InkWell(
-        borderRadius: BorderRadius.circular(RunUi.tileRadius),
+        borderRadius: BorderRadius.circular(AppUi.tileRadius),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(16),

@@ -4,7 +4,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_stage_card.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
 
@@ -94,12 +94,12 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
         session.utcOffsetEndMinutes ?? session.utcOffsetStartMinutes;
     final comment = _entry?.comment;
     final metrics = <Widget>[
-      RunMetricBox(
+      AppMetricBox(
         icon: Icons.hotel_rounded,
         label: loc.sleepMonitorTimeInBed,
         value: SleepUi.duration(loc, session.timeInBedMinutes),
       ),
-      RunMetricBox(
+      AppMetricBox(
         icon: Icons.mic_none_rounded,
         label: loc.sleepMonitorTimeMonitored,
         value: SleepUi.duration(
@@ -108,7 +108,7 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
         ),
       ),
       if (session.sleepOnsetAt != null)
-        RunMetricBox(
+        AppMetricBox(
           icon: Icons.nightlight_outlined,
           label: loc.sleepOnsetTime,
           value: SleepUi.wallTime(
@@ -117,24 +117,24 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
           ),
         ),
       if (session.finalWakeAt != null)
-        RunMetricBox(
+        AppMetricBox(
           icon: Icons.wb_sunny_outlined,
           label: loc.sleepFinalWake,
           value: SleepUi.wallTime(session.finalWakeAt!, endOffset),
         ),
       if (session.sleepLatencyMinutes != null)
-        RunMetricBox(
+        AppMetricBox(
           icon: Icons.hourglass_bottom_rounded,
           label: loc.sleepLatency,
           value: SleepUi.duration(loc, session.sleepLatencyMinutes),
         ),
       if (session.awakeningCount != null)
-        RunMetricBox(
+        AppMetricBox(
           icon: Icons.visibility_outlined,
           label: loc.sleepAwakenings,
           value: '${session.awakeningCount}',
         ),
-      RunMetricBox(
+      AppMetricBox(
         icon: Icons.graphic_eq_rounded,
         label: loc.sleepMonitorNoiseEvents,
         value: '${session.noiseEventCount}',
@@ -154,12 +154,12 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
                 ' → ${SleepUi.wallTime(end, endOffset)}',
           ),
           const SizedBox(height: 12),
-          RunMetricGrid(children: metrics),
+          AppMetricGrid(children: metrics),
           const SizedBox(height: 12),
           SleepStageCard(session: session, showNightMetrics: false),
           if (comment != null && comment.isNotEmpty) ...[
             const SizedBox(height: 12),
-            RunSectionCard(
+            AppSectionCard(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

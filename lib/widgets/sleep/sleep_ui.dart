@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Formatting and colours shared by the sleep screens.
 abstract final class SleepUi {
@@ -105,7 +105,7 @@ class SleepDateBadge extends StatelessWidget {
       height: 44,
       decoration: BoxDecoration(
         color: colors.primary.withAlpha(24),
-        borderRadius: BorderRadius.circular(RunUi.tileRadius),
+        borderRadius: BorderRadius.circular(AppUi.tileRadius),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -115,7 +115,7 @@ class SleepDateBadge extends StatelessWidget {
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w800,
               height: 1.1,
-              fontFeatures: RunUi.tabular,
+              fontFeatures: AppUi.tabular,
             ),
           ),
           Text(
@@ -256,7 +256,7 @@ class SleepStat extends StatelessWidget {
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w800,
               height: 1.0,
-              fontFeatures: RunUi.tabular,
+              fontFeatures: AppUi.tabular,
             ),
           ),
         ),
@@ -333,7 +333,7 @@ class SleepBigDuration extends StatelessWidget {
       fontWeight: FontWeight.bold,
       fontSize: 38,
       height: 1.0,
-      fontFeatures: RunUi.tabular,
+      fontFeatures: AppUi.tabular,
     );
     final unit = theme.textTheme.titleSmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
@@ -398,7 +398,7 @@ class SleepBadge extends StatelessWidget {
               style: theme.textTheme.labelSmall?.copyWith(
                 color: tint,
                 fontWeight: FontWeight.w700,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
           ),

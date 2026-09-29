@@ -9,7 +9,7 @@ import 'package:workout_notes/utils/run_pace_analytics.dart';
 import 'package:workout_notes/utils/run_route_geometry.dart';
 import 'package:workout_notes/utils/run_route_pace_style.dart';
 import 'package:workout_notes/widgets/run/run_route_map.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// A short, accelerated playback of a completed run's GPS trail, with a
 /// scrub slider and a speed selector.
@@ -493,7 +493,7 @@ class _ReplayStat extends StatelessWidget {
             maxLines: 1,
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w800,
-              fontFeatures: RunUi.tabular,
+              fontFeatures: AppUi.tabular,
             ),
           ),
         ),
@@ -565,7 +565,7 @@ class _ReplayControls extends StatelessWidget {
             const SizedBox(height: 10),
             Semantics(
               label: loc.runReplaySpeed,
-              child: RunSegmentedTabs<int>(
+              child: AppSegmentedTabs<int>(
                 values: RunReplayScreen.speeds,
                 selected: speed,
                 labelOf: (value) => '$value×',

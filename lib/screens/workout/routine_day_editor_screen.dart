@@ -6,7 +6,7 @@ import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/screens/workout/exercise_detail_tabs_screen.dart';
 import 'package:workout_notes/utils/strength_routine_summary.dart';
 import 'package:workout_notes/widgets/exercise_picker_sheet.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_exercise_card.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_set_sheets.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_sheets.dart';
@@ -128,7 +128,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
           elevation: 8 * t,
           color: Colors.transparent,
           shadowColor: Colors.black.withAlpha(80),
-          borderRadius: BorderRadius.circular(RunUi.cardRadius),
+          borderRadius: BorderRadius.circular(AppUi.cardRadius),
           child: child,
         );
       },

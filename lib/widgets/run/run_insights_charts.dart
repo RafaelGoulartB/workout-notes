@@ -9,7 +9,7 @@ import 'package:workout_notes/utils/run_fitness_analytics.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_training_load_analytics.dart';
 import 'package:workout_notes/widgets/run/run_progress_charts.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Colour of a pace zone: a cool-to-warm ramp (blue → teal → amber →
 /// orange → red) so neighbouring zones stay distinguishable in stacked bars.
@@ -327,8 +327,8 @@ class RunLoadChart extends StatelessWidget {
           spacing: 16,
           runSpacing: 6,
           children: [
-            RunLegendItem(color: acuteColor, label: loc.runInsightsLoadAcute),
-            RunLegendItem(
+            AppLegendItem(color: acuteColor, label: loc.runInsightsLoadAcute),
+            AppLegendItem(
               color: chronicColor,
               label: loc.runInsightsLoadChronic,
             ),
@@ -771,8 +771,8 @@ class RunCumulativeChart extends StatelessWidget {
         Wrap(
           spacing: 16,
           children: [
-            RunLegendItem(color: currentColor, label: '$year'),
-            RunLegendItem(
+            AppLegendItem(color: currentColor, label: '$year'),
+            AppLegendItem(
               color: previousColor,
               label: '${year - 1}',
               dashed: true,

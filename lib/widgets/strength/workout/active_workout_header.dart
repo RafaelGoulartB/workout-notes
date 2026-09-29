@@ -7,7 +7,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/models/exercise_with_sets.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 enum ActiveWorkoutTimerPhase { idle, running, paused, finished }
 
@@ -57,7 +57,7 @@ class ActiveWorkoutHeader extends StatelessWidget {
     final clock = DateFormat('HH:mm');
     final muted = theme.textTheme.bodySmall?.copyWith(
       color: colors.onSurfaceVariant,
-      fontFeatures: RunUi.tabular,
+      fontFeatures: AppUi.tabular,
     );
 
     // Status under the clock: not started / started at / paused / range.
@@ -89,8 +89,8 @@ class ActiveWorkoutHeader extends StatelessWidget {
         color: colors.surfaceContainerLow,
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(RunUi.cardRadius),
-          side: BorderSide(color: RunUi.divider(colors)),
+          borderRadius: BorderRadius.circular(AppUi.cardRadius),
+          side: BorderSide(color: AppUi.divider(colors)),
         ),
         child: InkWell(
           onTap: hasComparison ? onToggleExpanded : null,
@@ -124,7 +124,7 @@ class ActiveWorkoutHeader extends StatelessWidget {
                               style: theme.textTheme.titleLarge?.copyWith(
                                 fontWeight: FontWeight.w800,
                                 height: 1.1,
-                                fontFeatures: RunUi.tabular,
+                                fontFeatures: AppUi.tabular,
                                 color: phase == ActiveWorkoutTimerPhase.idle
                                     ? colors.onSurfaceVariant
                                     : null,
@@ -271,7 +271,7 @@ class _SetsRing extends StatelessWidget {
                 total <= 0 ? '0' : label,
                 style: theme.textTheme.labelMedium?.copyWith(
                   fontWeight: FontWeight.w800,
-                  fontFeatures: RunUi.tabular,
+                  fontFeatures: AppUi.tabular,
                 ),
               ),
             ),
@@ -354,7 +354,7 @@ class _MuscleComparison extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Divider(height: 1, color: RunUi.divider(colors)),
+          Divider(height: 1, color: AppUi.divider(colors)),
           const SizedBox(height: 10),
           Text(
             loc.activeWorkoutByMuscleGroup,

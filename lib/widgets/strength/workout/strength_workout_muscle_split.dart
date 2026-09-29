@@ -3,7 +3,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/models/workout_stats.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Share of the workout volume (or sets, for bodyweight-only work) per muscle
 /// group as coloured bars.
@@ -26,7 +26,7 @@ class StrengthWorkoutMuscleSplit extends StatelessWidget {
       (m, c) => amount(c) > m ? amount(c) : m,
     );
 
-    return RunSectionCard(
+    return AppSectionCard(
       child: Column(
         children: [
           for (var i = 0; i < stats.categories.length; i++) ...[
@@ -92,7 +92,7 @@ class StrengthWorkoutMuscleSplit extends StatelessWidget {
               ' · ${(share * 100).round()}%',
               style: theme.textTheme.labelMedium?.copyWith(
                 color: colors.onSurfaceVariant,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
           ],

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// What happened (or is planned) on one day of the current week.
 class WorkoutDayMark {
@@ -59,7 +59,7 @@ class WorkoutWeekHero extends StatelessWidget {
     final strengthColor = colors.primary;
     final runColor = colors.tertiary;
 
-    return RunHeroCard(
+    return AppHeroCard(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -82,7 +82,7 @@ class WorkoutWeekHero extends StatelessWidget {
                   onTap: onOpenStrength,
                 ),
               ),
-              Container(width: 1, height: 52, color: RunUi.divider(colors)),
+              Container(width: 1, height: 52, color: AppUi.divider(colors)),
               Expanded(
                 child: _SportRing(
                   key: const Key('workout-home-ring-run'),
@@ -134,7 +134,7 @@ class WorkoutWeekHero extends StatelessWidget {
                 RunFormatters.durationHoursMinutes(activeSeconds),
                 style: theme.textTheme.labelMedium?.copyWith(
                   color: colors.onSurfaceVariant,
-                  fontFeatures: RunUi.tabular,
+                  fontFeatures: AppUi.tabular,
                 ),
               ),
               if (streakWeeks > 0) ...[
@@ -187,7 +187,7 @@ class _SportRing extends StatelessWidget {
     final colors = theme.colorScheme;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(RunUi.tileRadius),
+      borderRadius: BorderRadius.circular(AppUi.tileRadius),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         child: Row(
@@ -217,7 +217,7 @@ class _SportRing extends StatelessWidget {
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w800,
                         height: 1.05,
-                        fontFeatures: RunUi.tabular,
+                        fontFeatures: AppUi.tabular,
                       ),
                     ),
                   ),
@@ -441,13 +441,13 @@ class WorkoutTodayCard extends StatelessWidget {
     final colors = theme.colorScheme;
 
     if (items.isEmpty) {
-      return RunSectionCard(
+      return AppSectionCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                RunIconBadge(
+                AppIconBadge(
                   emptyIcon,
                   color: colors.secondary,
                   size: 44,
@@ -502,9 +502,9 @@ class WorkoutTodayCard extends StatelessWidget {
       );
     }
 
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: RunDividedList(
+      child: AppDividedList(
         children: [for (final item in items) _TodayRow(item: item)],
       ),
     );
@@ -529,7 +529,7 @@ class _TodayRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
         child: Row(
           children: [
-            RunIconBadge(item.icon, color: item.color, size: 44, iconSize: 22),
+            AppIconBadge(item.icon, color: item.color, size: 44, iconSize: 22),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -556,7 +556,7 @@ class _TodayRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             if (item.done)
-              RunPill(
+              AppPill(
                 icon: Icons.check_rounded,
                 color: item.color,
                 label: loc.workoutHomeTodayDone,
@@ -604,7 +604,7 @@ class WorkoutAreaTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    return RunSectionCard(
+    return AppSectionCard(
       key: tileKey,
       onTap: onTap,
       padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
@@ -613,7 +613,7 @@ class WorkoutAreaTile extends StatelessWidget {
         children: [
           Row(
             children: [
-              RunIconBadge(icon, color: color),
+              AppIconBadge(icon, color: color),
               const Spacer(),
               Icon(Icons.chevron_right_rounded, color: colors.onSurfaceVariant),
             ],
@@ -682,13 +682,13 @@ class WorkoutRecentList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final locale = Localizations.localeOf(context).toString();
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: RunDividedList(
+      child: AppDividedList(
         children: [
           for (final item in items)
-            RunListRow(
-              leading: RunIconBadge(item.icon, color: item.color, size: 40),
+            AppListRow(
+              leading: AppIconBadge(item.icon, color: item.color, size: 40),
               title: item.title,
               subtitle: [
                 toBeginningOfSentenceCase(

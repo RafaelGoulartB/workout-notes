@@ -15,7 +15,7 @@ import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/widgets/load_error_view.dart';
 import 'package:workout_notes/widgets/workout/active_session_banner.dart';
 import 'package:workout_notes/widgets/run/run_pending_review_banner.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
 import 'package:workout_notes/screens/workout/workout_home_controller.dart';
@@ -241,12 +241,12 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                           const SizedBox(height: 20),
                           _buildAreas(loc),
                         ] else ...[
-                          RunSectionHeader(loc.workoutHomeTodayTitle),
+                          AppSectionHeader(loc.workoutHomeTodayTitle),
                           _buildToday(loc),
-                          RunSectionHeader(loc.workoutHomeAreasTitle),
+                          AppSectionHeader(loc.workoutHomeAreasTitle),
                           _buildAreas(loc),
                           if (_recentItems(loc).isNotEmpty) ...[
-                            RunSectionHeader(loc.workoutHomeRecentTitle),
+                            AppSectionHeader(loc.workoutHomeRecentTitle),
                             WorkoutRecentList(items: _recentItems(loc)),
                           ],
                         ],

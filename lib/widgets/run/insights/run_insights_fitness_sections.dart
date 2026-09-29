@@ -7,7 +7,7 @@ import 'package:workout_notes/utils/run_training_load_analytics.dart';
 import 'package:workout_notes/widgets/run/home/run_home_fitness_card.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
 import 'package:workout_notes/widgets/run/run_insights_charts.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 // ===================== FITNESS =====================
 
@@ -34,7 +34,7 @@ class RunFitnessSection extends StatelessWidget {
     if (evolution.length >= 2) {
       final change = evolution.last.vdot - evolution.first.vdot;
       final sign = change >= 0 ? '+' : '-';
-      delta = RunPill.trend(
+      delta = AppPill.trend(
         context: context,
         positive: change >= 0,
         label: loc.runInsightsVdotSince(
@@ -67,7 +67,7 @@ class RunFitnessSection extends StatelessWidget {
                       style: theme.textTheme.displaySmall?.copyWith(
                         fontWeight: FontWeight.w800,
                         height: 1,
-                        fontFeatures: RunUi.tabular,
+                        fontFeatures: AppUi.tabular,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -130,7 +130,7 @@ class RunPredictorSection extends StatelessWidget {
       title: loc.runInsightsPredictorTitle,
       subtitle: loc.runInsightsPredictorSubtitle,
       info: loc.runInsightsPredictorNote,
-      child: RunMetricGrid(
+      child: AppMetricGrid(
         children: [
           for (final p in estimate.predictions) _PredictionTile(prediction: p),
         ],
@@ -153,7 +153,7 @@ class _PredictionTile extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       decoration: BoxDecoration(
         color: colors.surfaceContainerHighest.withAlpha(110),
-        borderRadius: BorderRadius.circular(RunUi.tileRadius),
+        borderRadius: BorderRadius.circular(AppUi.tileRadius),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -173,7 +173,7 @@ class _PredictionTile extends StatelessWidget {
               RunFormatters.duration(prediction.timeSeconds),
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.w800,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
           ),
@@ -181,7 +181,7 @@ class _PredictionTile extends StatelessWidget {
             RunFormatters.paceWithUnit(prediction.paceSecPerKm),
             style: theme.textTheme.bodySmall?.copyWith(
               color: colors.onSurfaceVariant,
-              fontFeatures: RunUi.tabular,
+              fontFeatures: AppUi.tabular,
             ),
           ),
         ],
@@ -250,7 +250,7 @@ class RunLoadSection extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: statusColor.withAlpha(28),
-              borderRadius: BorderRadius.circular(RunUi.tileRadius),
+              borderRadius: BorderRadius.circular(AppUi.tileRadius),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -360,7 +360,7 @@ class _RunIntensitySectionState extends State<RunIntensitySection> {
                       style: theme.textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                         height: 1,
-                        fontFeatures: RunUi.tabular,
+                        fontFeatures: AppUi.tabular,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -385,19 +385,19 @@ class _RunIntensitySectionState extends State<RunIntensitySection> {
                         spacing: 12,
                         runSpacing: 4,
                         children: [
-                          RunLegendItem(
+                          AppLegendItem(
                             color: runZoneColor(colors, RunZone.z2),
                             label:
                                 '${loc.runInsightsIntensityEasy} '
                                 '${(data.easyShare * 100).round()}%',
                           ),
-                          RunLegendItem(
+                          AppLegendItem(
                             color: runZoneColor(colors, RunZone.z3),
                             label:
                                 '${loc.runInsightsIntensityModerate} '
                                 '${(data.moderateShare * 100).round()}%',
                           ),
-                          RunLegendItem(
+                          AppLegendItem(
                             color: runZoneColor(colors, RunZone.z5),
                             label:
                                 '${loc.runInsightsIntensityHard} '
@@ -432,7 +432,7 @@ class _RunIntensitySectionState extends State<RunIntensitySection> {
                     ),
                   ],
                 ),
-                Divider(height: 28, color: RunUi.divider(colors)),
+                Divider(height: 28, color: AppUi.divider(colors)),
                 RunInsightsSubheading(loc.runInsightsZonesTitle),
                 for (final zone in RunZone.values)
                   _ZoneRow(
@@ -571,7 +571,7 @@ class _ZoneRow extends StatelessWidget {
                   '$range /km',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colors.onSurfaceVariant,
-                    fontFeatures: RunUi.tabular,
+                    fontFeatures: AppUi.tabular,
                   ),
                 ),
               ],
@@ -581,7 +581,7 @@ class _ZoneRow extends StatelessWidget {
             '${(share * 100).round()}%',
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w700,
-              fontFeatures: RunUi.tabular,
+              fontFeatures: AppUi.tabular,
             ),
           ),
         ],

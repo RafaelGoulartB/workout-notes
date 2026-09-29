@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_format.dart';
 
 /// Working sets per muscle group this week as horizontal bars in the group's
@@ -25,7 +25,7 @@ class StrengthMusclesCard extends StatelessWidget {
     final rows = muscles.where((m) => m.sets > 0).take(_maxRows).toList();
 
     if (rows.isEmpty) {
-      return RunSectionCard(
+      return AppSectionCard(
         onTap: onTap,
         child: Text(
           loc.strengthHomeMusclesEmpty,
@@ -39,7 +39,7 @@ class StrengthMusclesCard extends StatelessWidget {
     final maxSets = rows.map((m) => m.sets).reduce((a, b) => a > b ? a : b);
     final scale = (maxSets > _rangeMax ? maxSets : _rangeMax) * 1.1;
 
-    return RunSectionCard(
+    return AppSectionCard(
       onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -169,7 +169,7 @@ class _MuscleRow extends StatelessWidget {
             textAlign: TextAlign.end,
             style: theme.textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w800,
-              fontFeatures: RunUi.tabular,
+              fontFeatures: AppUi.tabular,
             ),
           ),
         ),

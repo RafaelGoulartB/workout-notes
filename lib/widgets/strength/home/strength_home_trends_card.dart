@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_week_analytics.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_charts.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_format.dart';
 
@@ -108,11 +108,11 @@ class _StrengthTrendsCardState extends State<StrengthTrendsCard> {
       _TrendTab.duration => _durationChart(loc, analytics),
     };
 
-    return RunSectionCard(
+    return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          RunSegmentedTabs<_TrendTab>(
+          AppSegmentedTabs<_TrendTab>(
             values: _TrendTab.values,
             selected: _tab,
             labelOf: (tab) => _tabLabel(loc, tab),

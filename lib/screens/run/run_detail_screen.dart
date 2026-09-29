@@ -25,7 +25,7 @@ import 'package:workout_notes/widgets/run/run_gear_row.dart';
 import 'package:workout_notes/widgets/run/run_route_map.dart';
 import 'package:workout_notes/widgets/run/run_share_card.dart';
 import 'package:workout_notes/widgets/run/run_splits_list.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 enum _MenuAction { exportGpx, delete }
 
@@ -331,7 +331,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
   Widget _buildMap(RunActivity activity, AppLocalizations loc) {
     final theme = Theme.of(context);
     return ClipRRect(
-      borderRadius: BorderRadius.circular(RunUi.cardRadius),
+      borderRadius: BorderRadius.circular(AppUi.cardRadius),
       child: SizedBox(
         height: 260,
         child: Stack(
@@ -487,7 +487,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
           ],
           if (activity.isRun && _medals.isNotEmpty) ...[
             const SizedBox(height: 12),
-            RunSectionCard(
+            AppSectionCard(
               child: RunActivityAchievementsBlock(placements: _medals),
             ),
           ],
@@ -501,11 +501,11 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
               selectedDistance: hasRoute ? _selectedDistance : null,
             ),
           if (activity.isRunning && _planSteps.isNotEmpty) ...[
-            RunSectionHeader(
+            AppSectionHeader(
               AppLocalizations.of(context)!.runDetailPlanComparison,
             ),
-            RunSectionCard(
-              child: RunDividedList(
+            AppSectionCard(
+              child: AppDividedList(
                 children: [
                   for (final step in _planSteps) RunActivityStepRow(step: step),
                 ],
@@ -513,8 +513,8 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
             ),
           ],
           if (activity.isRun && _analytics.hasSplits) ...[
-            RunSectionHeader(loc.runDetailSplitsSection),
-            RunSectionCard(
+            AppSectionHeader(loc.runDetailSplitsSection),
+            AppSectionCard(
               child: RunSplitsList(
                 splits: _analytics.splits,
                 averagePaceSecPerKm: avgPace,
@@ -523,11 +523,11 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
             ),
           ],
           if (_laps.isNotEmpty) ...[
-            RunSectionHeader(loc.runDetailLapsSection),
-            RunSectionCard(child: RunLapsList(laps: _laps)),
+            AppSectionHeader(loc.runDetailLapsSection),
+            AppSectionCard(child: RunLapsList(laps: _laps)),
           ],
           if (efforts.isNotEmpty) ...[
-            RunSectionHeader(loc.runDetailEffortsSection),
+            AppSectionHeader(loc.runDetailEffortsSection),
             RunBestEffortsCard(efforts: efforts, medals: _medals),
           ],
         ],

@@ -5,7 +5,7 @@ import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/utils/strength_insights_format.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_insights_data.dart';
 
 /// Best marks of every exercise grouped by muscle group, with a search box.
@@ -72,7 +72,7 @@ class _StrengthRecordsListState extends State<StrengthRecordsList> {
             prefixIcon: const Icon(Icons.search_rounded),
             isDense: true,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(RunUi.tileRadius),
+              borderRadius: BorderRadius.circular(AppUi.tileRadius),
             ),
           ),
           onChanged: (v) => setState(() => _query = v),
@@ -84,7 +84,7 @@ class _StrengthRecordsListState extends State<StrengthRecordsList> {
           ),
         for (final (category, name, rows) in groups) ...[
           if (category != null)
-            RunSectionHeader(
+            AppSectionHeader(
               name,
               padding: const EdgeInsets.fromLTRB(4, 18, 0, 8),
               trailing: Container(
@@ -99,9 +99,9 @@ class _StrengthRecordsListState extends State<StrengthRecordsList> {
             )
           else
             const SizedBox(height: 12),
-          RunSectionCard(
+          AppSectionCard(
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: RunDividedList(
+            child: AppDividedList(
               children: [
                 for (final r in rows)
                   _RecordRow(record: r, onTap: () => widget.onOpen(r)),
@@ -148,7 +148,7 @@ class _RecordRow extends StatelessWidget {
               value,
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w800,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
           ),
@@ -159,7 +159,7 @@ class _RecordRow extends StatelessWidget {
               caption,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colors.onSurfaceVariant,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
           ),

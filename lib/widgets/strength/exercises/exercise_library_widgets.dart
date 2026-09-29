@@ -4,7 +4,7 @@ import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/utils/exercise_equipment.dart';
 import 'package:workout_notes/utils/strength_exercise_library.dart';
 import 'package:workout_notes/utils/strength_routine_format.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Icon that hints at what an exercise records (weight, distance, time...).
 IconData exerciseTypeIcon(String? type) {
@@ -283,7 +283,7 @@ class ExerciseLibrarySectionHeader extends StatelessWidget {
             '$count',
             style: theme.textTheme.labelSmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
-              fontFeatures: RunUi.tabular,
+              fontFeatures: AppUi.tabular,
             ),
           ),
         ],
@@ -384,7 +384,7 @@ class ExerciseLibraryRow extends StatelessWidget {
                   '${StrengthRoutineFormat.kg(e1rm)} kg',
                   style: theme.textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.w800,
-                    fontFeatures: RunUi.tabular,
+                    fontFeatures: AppUi.tabular,
                   ),
                 ),
               ),

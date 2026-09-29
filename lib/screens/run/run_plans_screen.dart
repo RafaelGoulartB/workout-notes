@@ -8,7 +8,7 @@ import 'package:workout_notes/screens/run/plans/run_plan_creation_flow.dart';
 import 'package:workout_notes/screens/run/run_plan_detail_screen.dart';
 import 'package:workout_notes/services/run_plan_week_view.dart';
 import 'package:workout_notes/widgets/run/plans/run_plan_library_cards.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// The running counterpart of [RoutinesScreen]: a library of structured plans.
 /// The plan being followed is pinned on top with its next session; the rest
@@ -191,7 +191,7 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
-                padding: RunUi.screenPadding.copyWith(top: 8),
+                padding: AppUi.screenPadding.copyWith(top: 8),
                 children: [
                   Text(
                     loc.runPlansSubtitle,
@@ -200,7 +200,7 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
                     ),
                   ),
                   if (pinned.isNotEmpty) ...[
-                    RunSectionHeader(
+                    AppSectionHeader(
                       loc.runPlansFollowingSection,
                       padding: const EdgeInsets.fromLTRB(4, 16, 0, 8),
                     ),
@@ -223,7 +223,7 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
                   ],
                   if (others.isNotEmpty) ...[
                     if (pinned.isNotEmpty)
-                      RunSectionHeader(
+                      AppSectionHeader(
                         loc.runPlansOthersSection,
                         padding: const EdgeInsets.fromLTRB(4, 12, 0, 8),
                       )
@@ -232,7 +232,7 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
                     for (final plan in others) _libraryCard(plan, today),
                   ],
                   if (archived.isNotEmpty) ...[
-                    RunSectionHeader(
+                    AppSectionHeader(
                       loc.runPlansArchivedSection,
                       padding: const EdgeInsets.fromLTRB(4, 12, 0, 8),
                     ),

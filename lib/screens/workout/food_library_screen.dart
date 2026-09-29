@@ -6,7 +6,7 @@ import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 import 'food_label_photo_screen.dart';
 import 'manual_food_screen.dart';
@@ -289,7 +289,7 @@ class _FoodLibraryFilters extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: RunSegmentedTabs<_FoodLibraryFilter>(
+      child: AppSegmentedTabs<_FoodLibraryFilter>(
         values: _FoodLibraryFilter.values,
         selected: active,
         labelOf: (filter) => switch (filter) {

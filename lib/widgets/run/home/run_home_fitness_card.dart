@@ -3,7 +3,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/run_fitness_analytics.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_training_load_analytics.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Human label for a training-load status (short form used on the home).
 String runLoadStatusLabel(AppLocalizations loc, RunLoadStatus status) =>
@@ -54,7 +54,7 @@ class RunFitnessCard extends StatelessWidget {
     final colors = theme.colorScheme;
     final fitness = estimate;
 
-    return RunSectionCard(
+    return AppSectionCard(
       onTap: onSeeAll,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -62,7 +62,7 @@ class RunFitnessCard extends StatelessWidget {
           if (fitness == null)
             Row(
               children: [
-                const RunIconBadge(Icons.favorite_border_rounded),
+                const AppIconBadge(Icons.favorite_border_rounded),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -78,7 +78,7 @@ class RunFitnessCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                RunValueUnit(
+                AppValueUnit(
                   value: RunFormatters.decimal(fitness.vdot, 1),
                   valueStyle: theme.textTheme.displaySmall?.copyWith(
                     fontWeight: FontWeight.w800,
@@ -100,10 +100,10 @@ class RunFitnessCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            RunStatRow(
+            AppStatRow(
               children: [
                 for (final prediction in fitness.predictions)
-                  RunStatTile(
+                  AppStatTile(
                     label: runRaceDistanceLabel(loc, prediction.distanceMeters),
                     value: RunFormatters.duration(prediction.timeSeconds),
                   ),
@@ -111,7 +111,7 @@ class RunFitnessCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 14),
-          Divider(height: 1, color: RunUi.divider(colors)),
+          Divider(height: 1, color: AppUi.divider(colors)),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -123,7 +123,7 @@ class RunFitnessCard extends StatelessWidget {
                   ),
                 ),
               ),
-              RunPill(
+              AppPill(
                 label: runLoadStatusLabel(loc, load.status),
                 color: runLoadStatusColor(colors, load.status),
               ),
@@ -131,7 +131,7 @@ class RunFitnessCard extends StatelessWidget {
           ),
           Align(
             alignment: Alignment.centerRight,
-            child: RunHeaderAction(
+            child: AppHeaderAction(
               label: loc.runHomeFitnessSeeAll,
               onPressed: onSeeAll,
             ),

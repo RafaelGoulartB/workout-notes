@@ -5,7 +5,7 @@ import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/services/run_plan_week_view.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// One planned session inside the training week.
 ///
@@ -85,7 +85,7 @@ class RunPlanSessionCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  RunIconBadge(
+                  AppIconBadge(
                     RunPlanUi.kindIcon(workout.kind),
                     color: color,
                     size: 34,
@@ -182,7 +182,7 @@ class RunPlanSessionCard extends StatelessWidget {
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: scheme.tertiary,
                     fontWeight: FontWeight.w700,
-                    fontFeatures: RunUi.tabular,
+                    fontFeatures: AppUi.tabular,
                   ),
                 ),
               ],
@@ -222,17 +222,17 @@ class _StateBadge extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final pill = switch (state) {
       RunSessionState.planned => null,
-      RunSessionState.done => RunPill(
+      RunSessionState.done => AppPill(
         icon: Icons.check_circle_rounded,
         label: loc.runPlanSessionCompleted,
         color: scheme.tertiary,
       ),
-      RunSessionState.missed => RunPill(
+      RunSessionState.missed => AppPill(
         icon: Icons.error_outline_rounded,
         label: loc.runPlanDetailMissed,
         color: scheme.error,
       ),
-      RunSessionState.skipped => RunPill(
+      RunSessionState.skipped => AppPill(
         icon: Icons.skip_next_rounded,
         label: loc.runPlanSessionSkipped,
         color: scheme.onSurfaceVariant,

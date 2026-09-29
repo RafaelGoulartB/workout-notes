@@ -7,7 +7,7 @@ import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/run/run_achievements_section.dart';
 import 'package:workout_notes/widgets/run/run_medal_badge.dart';
 import 'package:workout_notes/widgets/run/run_theme_colors.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Title used when the run has none: the part of the day it happened in.
 String runDefaultTitle(AppLocalizations loc, RunActivity activity) {
@@ -57,7 +57,7 @@ class RunDetailHero extends StatelessWidget {
     final notes = activity.notes?.trim();
     final hasFeedback = activity.feelingRating != null || activity.rpe != null;
 
-    return RunHeroCard(
+    return AppHeroCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -89,7 +89,7 @@ class RunDetailHero extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          RunMetricGrid(children: _metrics(context, loc)),
+          AppMetricGrid(children: _metrics(context, loc)),
           if (hasFeedback) ...[
             const SizedBox(height: 12),
             RunFeedbackRow(
@@ -150,13 +150,13 @@ class RunDetailHero extends StatelessWidget {
     final calories = activity.calories;
     final speed = activity.averageSpeedKmh;
     return [
-      RunMetricBox(
+      AppMetricBox(
         icon: Icons.route_outlined,
         label: loc.runRecordDistance,
         value: RunFormatters.distanceKm(activity.distanceMeters),
         unit: 'km',
       ),
-      RunMetricBox(
+      AppMetricBox(
         icon: Icons.timer_outlined,
         label: loc.runDetailMovingTime,
         value: RunFormatters.duration(
@@ -171,21 +171,21 @@ class RunDetailHero extends StatelessWidget {
             : null,
       ),
       if (activity.isStationaryBike)
-        RunMetricBox(
+        AppMetricBox(
           icon: Icons.speed_rounded,
           label: loc.stationaryBikeAverageSpeed,
           value: RunFormatters.speedKmh(speed),
           unit: loc.stationaryBikeSpeedUnit,
         )
       else
-        RunMetricBox(
+        AppMetricBox(
           icon: Icons.speed_rounded,
           label: loc.runDetailAvgPace,
           value: RunFormatters.paceShort(avgPaceSecPerKm),
           unit: '/km',
         ),
       if (activity.isRun && gain != null)
-        RunMetricBox(
+        AppMetricBox(
           icon: Icons.terrain_rounded,
           label: loc.runDetailElevation,
           value: '+${gain.round()}',
@@ -193,14 +193,14 @@ class RunDetailHero extends StatelessWidget {
           caption: loss == null ? null : '−${loss.round()} m',
         ),
       if (calories != null && calories > 0)
-        RunMetricBox(
+        AppMetricBox(
           icon: Icons.local_fire_department_outlined,
           label: loc.runDetailCalories,
           value: '$calories',
           unit: 'kcal',
         ),
       if (activity.isRun && fastestKmPaceSecPerKm != null)
-        RunMetricBox(
+        AppMetricBox(
           icon: Icons.bolt_rounded,
           label: loc.runDetailFastestKm,
           value: RunFormatters.paceShort(fastestKmPaceSecPerKm),
@@ -289,7 +289,7 @@ class RunFeedbackRow extends StatelessWidget {
                     '$effort/10',
                     style: theme.textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w800,
-                      fontFeatures: RunUi.tabular,
+                      fontFeatures: AppUi.tabular,
                     ),
                   ),
                 ],
@@ -355,9 +355,9 @@ class RunBestEffortsCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: RunDividedList(
+      child: AppDividedList(
         children: [
           for (final effort in efforts)
             Padding(
@@ -378,7 +378,7 @@ class RunBestEffortsCard extends StatelessWidget {
                       '${RunFormatters.paceShort(effort.paceSecPerKm)} /km',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colors.onSurfaceVariant,
-                        fontFeatures: RunUi.tabular,
+                        fontFeatures: AppUi.tabular,
                       ),
                     ),
                   ),
@@ -387,7 +387,7 @@ class RunBestEffortsCard extends StatelessWidget {
                     RunFormatters.duration(effort.seconds),
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w800,
-                      fontFeatures: RunUi.tabular,
+                      fontFeatures: AppUi.tabular,
                     ),
                   ),
                 ],
@@ -430,7 +430,7 @@ class RunIndoorBanner extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(RunUi.heroRadius),
+        borderRadius: BorderRadius.circular(AppUi.heroRadius),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

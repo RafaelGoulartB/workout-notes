@@ -18,7 +18,7 @@ import 'package:workout_notes/widgets/run/record/run_record_session_card.dart';
 import 'package:workout_notes/widgets/run/record/run_record_splits.dart';
 import 'package:workout_notes/widgets/run/record/run_record_step_card.dart';
 import 'package:workout_notes/widgets/run/record/run_today_workout_card.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// The bottom sheet of the record screen. Before the start it configures the
 /// run (exercise, today's workout, goal, voice); while recording it shows the
@@ -178,7 +178,7 @@ class RunRecordSheet extends StatelessWidget {
       ],
       if (_indoor) ...[
         if (planWorkout != null) ...[
-          RunSectionCard(
+          AppSectionCard(
             padding: EdgeInsets.zero,
             child: RunRecordPlanTile(
               plan: planWorkout!,
@@ -237,13 +237,13 @@ class RunRecordSheet extends StatelessWidget {
 
     final expandedBody = <Widget>[
       if (active || state.laps.isNotEmpty) ...[
-        RunSectionHeader(
+        AppSectionHeader(
           loc.runLapTitle,
           padding: const EdgeInsets.fromLTRB(4, 16, 0, 8),
         ),
         RunLapsTable(laps: state.laps, currentLap: state.currentLap),
       ],
-      RunSectionHeader(
+      AppSectionHeader(
         loc.runRecordSplitsTitle,
         padding: const EdgeInsets.fromLTRB(4, 16, 0, 8),
       ),
@@ -327,7 +327,7 @@ class RunRecordSheet extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          RunPill(
+          AppPill(
             key: const ValueKey('run-paused-pill'),
             icon: Icons.pause_circle_outline_rounded,
             color: theme.colorScheme.tertiary,

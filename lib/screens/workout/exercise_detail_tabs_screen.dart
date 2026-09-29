@@ -7,7 +7,7 @@ import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/screens/workout/exercise_form_screen.dart';
 import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/exercise/exercise_charts_card.dart';
 import 'package:workout_notes/widgets/strength/exercise/exercise_detail_header.dart';
 import 'package:workout_notes/widgets/strength/exercise/exercise_history_list.dart';
@@ -174,7 +174,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen> {
             preferredSize: const Size.fromHeight(60),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: RunSegmentedTabs<_DetailTab>(
+              child: AppSegmentedTabs<_DetailTab>(
                 values: _DetailTab.values,
                 selected: _tab,
                 labelOf: (tab) => tab == _DetailTab.history
@@ -244,7 +244,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: RunUi.screenPadding.copyWith(top: 8, bottom: 40),
+        padding: AppUi.screenPadding.copyWith(top: 8, bottom: 40),
         children: [
           ExerciseDetailHeader(
             name: _displayName(loc),

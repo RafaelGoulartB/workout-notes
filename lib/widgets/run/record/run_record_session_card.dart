@@ -6,7 +6,7 @@ import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/run/record/run_record_option_tile.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// "This run": voice alerts, goal, the attached workout and the quick
 /// interval set. Before the start it is where the run is configured; while
@@ -160,11 +160,11 @@ class RunRecordSessionCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        RunSectionHeader(
+        AppSectionHeader(
           loc.runRecordOptionsTitle,
           padding: const EdgeInsets.fromLTRB(4, 0, 0, 6),
         ),
-        RunSectionCard(
+        AppSectionCard(
           padding: EdgeInsets.zero,
           color: theme.colorScheme.surfaceContainerHighest.withValues(
             alpha: 0.45,
@@ -177,7 +177,7 @@ class RunRecordSessionCard extends StatelessWidget {
                     height: 1,
                     indent: 12,
                     endIndent: 12,
-                    color: RunUi.divider(theme.colorScheme),
+                    color: AppUi.divider(theme.colorScheme),
                   ),
                 tiles[i],
               ],

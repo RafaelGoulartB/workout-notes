@@ -9,7 +9,7 @@ import 'package:workout_notes/widgets/goals/goal_card.dart';
 import 'package:workout_notes/widgets/goals/goal_form_sheet.dart';
 import 'package:workout_notes/utils/load_generation.dart';
 import 'package:workout_notes/widgets/load_error_view.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Goals card: one divided row per goal and an add row at the end.
 class GoalsSection extends StatefulWidget {
@@ -275,7 +275,7 @@ class _GoalsSectionState extends State<GoalsSection> {
 
     final list = _goals.isEmpty
         ? _buildEmpty(theme, loc)
-        : RunDividedList(
+        : AppDividedList(
             children: [
               for (final goal in _goals)
                 if (_progressByGoal[goal.id] case final progress?)
@@ -301,7 +301,7 @@ class _GoalsSectionState extends State<GoalsSection> {
           )
         : list;
     if (!widget.framed) return body;
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
       child: body,
     );
@@ -316,7 +316,7 @@ class _GoalsSectionState extends State<GoalsSection> {
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
         child: Row(
           children: [
-            const RunIconBadge(Icons.flag_outlined, size: 44, iconSize: 22),
+            const AppIconBadge(Icons.flag_outlined, size: 44, iconSize: 22),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -366,7 +366,7 @@ class _GoalUnavailableRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
       child: Row(
         children: [
-          const RunIconBadge(Icons.error_outline_rounded, size: 44, iconSize: 22),
+          const AppIconBadge(Icons.error_outline_rounded, size: 44, iconSize: 22),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

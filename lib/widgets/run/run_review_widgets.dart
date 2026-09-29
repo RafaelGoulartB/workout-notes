@@ -14,7 +14,7 @@ import 'package:workout_notes/widgets/run/run_medal_badge.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 import 'package:workout_notes/widgets/run/run_route_sketch.dart';
 import 'package:workout_notes/widgets/run/run_theme_colors.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Headline card of the post-run review: the distance, the route sketch and
 /// a row of the numbers that matter.
@@ -57,14 +57,14 @@ class RunReviewHero extends StatelessWidget {
     final calories = activity.calories;
     final gain = elevationGainMeters;
 
-    return RunHeroCard(
+    return AppHeroCard(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              RunIconBadge(
+              AppIconBadge(
                 activity.isStationaryBike
                     ? Icons.pedal_bike_rounded
                     : Icons.directions_run_rounded,
@@ -111,7 +111,7 @@ class RunReviewHero extends StatelessWidget {
                     FittedBox(
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
-                      child: RunValueUnit(
+                      child: AppValueUnit(
                         value: RunFormatters.distanceKm(distanceMeters),
                         unit: 'km',
                         valueStyle: theme.textTheme.displaySmall?.copyWith(
@@ -146,18 +146,18 @@ class RunReviewHero extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
             decoration: BoxDecoration(
               color: colors.surface.withAlpha(140),
-              borderRadius: BorderRadius.circular(RunUi.tileRadius + 4),
+              borderRadius: BorderRadius.circular(AppUi.tileRadius + 4),
             ),
-            child: RunStatRow(
+            child: AppStatRow(
               children: [
-                RunStatTile(
+                AppStatTile(
                   icon: Icons.timer_outlined,
                   color: colors.onSurfaceVariant,
                   label: loc.runReviewTime,
                   value: RunFormatters.duration(activity.durationSeconds),
                 ),
                 if (usesSpeed)
-                  RunStatTile(
+                  AppStatTile(
                     icon: Icons.speed_rounded,
                     color: colors.onSurfaceVariant,
                     label: loc.stationaryBikeAverageSpeed,
@@ -165,7 +165,7 @@ class RunReviewHero extends StatelessWidget {
                     unit: speedUnit,
                   )
                 else
-                  RunStatTile(
+                  AppStatTile(
                     icon: Icons.speed_rounded,
                     color: colors.onSurfaceVariant,
                     label: loc.runReviewPace,
@@ -173,7 +173,7 @@ class RunReviewHero extends StatelessWidget {
                     unit: '/km',
                   ),
                 if (gain != null)
-                  RunStatTile(
+                  AppStatTile(
                     icon: Icons.terrain_rounded,
                     color: colors.onSurfaceVariant,
                     label: loc.runDetailElevation,
@@ -181,7 +181,7 @@ class RunReviewHero extends StatelessWidget {
                     unit: 'm',
                   ),
                 if (calories != null && calories > 0)
-                  RunStatTile(
+                  AppStatTile(
                     icon: Icons.local_fire_department_outlined,
                     color: colors.onSurfaceVariant,
                     label: loc.runDetailCalories,
@@ -243,7 +243,7 @@ class RunReviewPlanCard extends StatelessWidget {
     final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
     final outline = RunPlanUi.stepsOutline(loc, workout);
-    return RunSectionCard(
+    return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -453,7 +453,7 @@ class _StepResultRow extends StatelessWidget {
             done,
             style: theme.textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w700,
-              fontFeatures: RunUi.tabular,
+              fontFeatures: AppUi.tabular,
             ),
           ),
           const SizedBox(width: 10),
@@ -461,7 +461,7 @@ class _StepResultRow extends StatelessWidget {
             RunFormatters.paceShort(step.actualPaceSecPerKm),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
-              fontFeatures: RunUi.tabular,
+              fontFeatures: AppUi.tabular,
             ),
           ),
         ],
@@ -543,7 +543,7 @@ class RunEffortSelector extends StatelessWidget {
     final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
     final selected = rpe?.round();
-    return RunSectionCard(
+    return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -691,7 +691,7 @@ class RunFeelingSelector extends StatelessWidget {
       loc.runReviewFeelingGreat,
     ];
     final value = rating ?? 0;
-    return RunSectionCard(
+    return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -752,7 +752,7 @@ class RunIndoorDistanceField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RunSectionCard(
+    return AppSectionCard(
       child: TextField(
         key: const ValueKey('stationary-bike-distance'),
         controller: controller,
@@ -796,7 +796,7 @@ class RunReviewMeaningCard extends StatelessWidget {
     final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
     if (loading) {
-      return const RunSectionCard(
+      return const AppSectionCard(
         child: Center(
           child: Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
@@ -878,7 +878,7 @@ class RunReviewMeaningCard extends StatelessWidget {
       );
     }
 
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

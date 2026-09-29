@@ -8,7 +8,7 @@ import 'package:workout_notes/utils/run_training_load_analytics.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
 import 'package:workout_notes/widgets/run/run_heatmap.dart';
 import 'package:workout_notes/widgets/run/run_insights_charts.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 // ===================== CONSISTENCY =====================
 
@@ -34,16 +34,16 @@ class RunConsistencySection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          RunMetricGrid(
+          AppMetricGrid(
             children: [
-              RunMetricBox(
+              AppMetricBox(
                 label: loc.runInsightsDayStreak,
                 value: '${consistency.currentDayStreak}',
                 caption: loc.runInsightsBest(
                   loc.runInsightsDaysValue(consistency.longestDayStreak),
                 ),
               ),
-              RunMetricBox(
+              AppMetricBox(
                 label: loc.runInsightsWeekStreak,
                 value: '${consistency.currentWeekStreak}',
                 caption: loc.runInsightsBest(
@@ -109,7 +109,7 @@ class _RunEffortSectionState extends State<RunEffortSection> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (hasRpe && hasFeeling) ...[
-                  RunSegmentedTabs<_EffortTab>(
+                  AppSegmentedTabs<_EffortTab>(
                     values: _EffortTab.values,
                     selected: tab,
                     labelOf: (t) => t == _EffortTab.rpe
@@ -265,7 +265,7 @@ class _RunVolumeSectionState extends State<RunVolumeSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          RunSegmentedTabs<_VolumeTab>(
+          AppSegmentedTabs<_VolumeTab>(
             values: _VolumeTab.values,
             selected: _tab,
             labelOf: (t) => t == _VolumeTab.monthly
@@ -337,13 +337,13 @@ class RunYearReviewSection extends StatelessWidget {
     final elevation = review.elevation;
     final highest = elevation.highest;
 
-    return RunHeroCard(
+    return AppHeroCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const RunIconBadge(Icons.auto_awesome_outlined),
+              const AppIconBadge(Icons.auto_awesome_outlined),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -356,7 +356,7 @@ class RunYearReviewSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          RunValueUnit(
+          AppValueUnit(
             value: RunFormatters.distanceKm(review.totalDistanceMeters),
             unit: 'km',
             valueStyle: theme.textTheme.displaySmall?.copyWith(
@@ -377,12 +377,12 @@ class RunYearReviewSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          RunMetricGrid(
+          AppMetricGrid(
             children: [
               if (longest != null)
                 GestureDetector(
                   onTap: () => onOpenRun(longest.id),
-                  child: RunMetricBox(
+                  child: AppMetricBox(
                     icon: Icons.straighten_rounded,
                     label: loc.runStatsLongestRun,
                     value: RunFormatters.distanceKm(longest.distanceMeters),
@@ -392,14 +392,14 @@ class RunYearReviewSection extends StatelessWidget {
               if (fastest != null)
                 GestureDetector(
                   onTap: () => onOpenRun(fastest.id),
-                  child: RunMetricBox(
+                  child: AppMetricBox(
                     icon: Icons.bolt_rounded,
                     label: loc.runInsightsReviewFastest5k,
                     value: RunFormatters.duration(fastest.bestEffort5kSec!),
                   ),
                 ),
               if (month != null)
-                RunMetricBox(
+                AppMetricBox(
                   icon: Icons.calendar_month_outlined,
                   label: loc.runInsightsReviewMonth,
                   value: cap(
@@ -412,7 +412,7 @@ class RunYearReviewSection extends StatelessWidget {
               if (elevation.hasData)
                 GestureDetector(
                   onTap: highest == null ? null : () => onOpenRun(highest.id),
-                  child: RunMetricBox(
+                  child: AppMetricBox(
                     icon: Icons.terrain_rounded,
                     label: loc.runInsightsReviewClimb,
                     value: '${elevation.totalGainMeters.round()}',
@@ -427,7 +427,7 @@ class RunYearReviewSection extends StatelessWidget {
                   ),
                 ),
               if (weekday != null || part != null)
-                RunMetricBox(
+                AppMetricBox(
                   icon: Icons.schedule_outlined,
                   label: loc.runInsightsReviewHabit,
                   value: weekday != null
@@ -543,7 +543,7 @@ class _ShoeRow extends StatelessWidget {
             color: usage.needsReplacement
                 ? colors.error
                 : colors.onSurfaceVariant,
-            fontFeatures: RunUi.tabular,
+            fontFeatures: AppUi.tabular,
           ),
         ),
       ],

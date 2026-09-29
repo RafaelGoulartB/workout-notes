@@ -12,7 +12,7 @@ import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/run/run_achievements_section.dart';
 import 'package:workout_notes/widgets/run/run_medal_badge.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Complete, all-time personal-record board for outdoor GPS runs.
 class RunAchievementsScreen extends StatefulWidget {
@@ -83,7 +83,7 @@ class _RunAchievementsScreenState extends State<RunAchievementsScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
                 children: [
                   _AchievementHero(board: _board),
-                  RunSectionHeader(loc.runAchievementsRecords),
+                  AppSectionHeader(loc.runAchievementsRecords),
                   for (
                     var index = 0;
                     index < _board.categories.length;
@@ -136,7 +136,7 @@ class _AchievementHero extends StatelessWidget {
         tier: placements.where((item) => item.tier == tier).length,
     };
 
-    return RunHeroCard(
+    return AppHeroCard(
       key: const Key('run-achievements-hero'),
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -144,7 +144,7 @@ class _AchievementHero extends StatelessWidget {
         children: [
           Row(
             children: [
-              RunIconBadge(Icons.emoji_events_rounded, size: 48, iconSize: 28),
+              AppIconBadge(Icons.emoji_events_rounded, size: 48, iconSize: 28),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -298,14 +298,14 @@ class _AchievementCategoryCard extends StatelessWidget {
     final locale = Localizations.localeOf(context).toString();
     final placements = category.placements;
 
-    return RunSectionCard(
+    return AppSectionCard(
       key: Key('run-achievement-${category.kind.name}'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              RunIconBadge(
+              AppIconBadge(
                 _iconFor(category.kind),
                 color: placements.isEmpty ? colors.onSurfaceVariant : null,
                 size: 40,
@@ -329,7 +329,7 @@ class _AchievementCategoryCard extends StatelessWidget {
                   style: theme.textTheme.titleMedium?.copyWith(
                     color: colors.primary,
                     fontWeight: FontWeight.w900,
-                    fontFeatures: RunUi.tabular,
+                    fontFeatures: AppUi.tabular,
                   ),
                 ),
             ],
@@ -340,7 +340,7 @@ class _AchievementCategoryCard extends StatelessWidget {
               padding: const EdgeInsets.all(13),
               decoration: BoxDecoration(
                 color: colors.surfaceContainerHighest.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(RunUi.tileRadius),
+                borderRadius: BorderRadius.circular(AppUi.tileRadius),
               ),
               child: Row(
                 children: [
@@ -366,10 +366,10 @@ class _AchievementCategoryCard extends StatelessWidget {
             ),
           ] else ...[
             const SizedBox(height: 8),
-            RunDividedList(
+            AppDividedList(
               children: [
                 for (final placement in placements)
-                  RunListRow(
+                  AppListRow(
                     leading: RunMedalDot(tier: placement.tier, size: 24),
                     title: placement.activity.title?.trim().isNotEmpty == true
                         ? placement.activity.title!.trim()

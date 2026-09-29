@@ -2,7 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Pace-over-distance area chart (faster pace at the top).
 ///
@@ -100,7 +100,7 @@ class RunPaceChart extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
                     height: 1.25,
-                    fontFeatures: RunUi.tabular,
+                    fontFeatures: AppUi.tabular,
                   ),
                 );
               }).toList(),
@@ -150,7 +150,7 @@ class RunPaceChart extends StatelessWidget {
                       RunFormatters.paceShort(pace),
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: muted,
-                        fontFeatures: RunUi.tabular,
+                        fontFeatures: AppUi.tabular,
                       ),
                     ),
                   );

@@ -9,7 +9,7 @@ import 'package:workout_notes/screens/run/plan_editor/run_plan_editor_sheets.dar
 import 'package:workout_notes/screens/run/plan_editor/run_plan_editor_summary.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Session editor — the running counterpart of [RoutineDayEditorScreen].
 /// A session is either a continuous run (just a target) or a structured one
@@ -349,7 +349,7 @@ class _RunPlanWorkoutEditorScreenState
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           RunPlanEditorSummary(workout: workout),
-          RunSectionHeader(
+          AppSectionHeader(
             loc.runWorkoutStepsTitle,
             padding: const EdgeInsets.fromLTRB(4, 20, 0, 8),
           ),

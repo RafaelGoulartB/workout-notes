@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Horizontal week picker. Every tile shows the planned volume as a ghost bar
 /// and the kilometres actually run as a filled bar on top of it, so the ramp,
@@ -51,18 +51,18 @@ class RunPlanWeekStrip extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        RunSectionHeader(
+        AppSectionHeader(
           loc.runPlanWeeklyVolumeTitle,
           padding: const EdgeInsets.fromLTRB(2, 0, 0, 8),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              RunLegendItem(
+              AppLegendItem(
                 color: scheme.primary,
                 label: loc.runPlanDetailLegendDone,
               ),
               const SizedBox(width: 12),
-              RunLegendItem(
+              AppLegendItem(
                 color: scheme.primary.withAlpha(70),
                 label: loc.runPlanDetailLegendPlanned,
               ),

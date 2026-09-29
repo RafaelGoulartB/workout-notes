@@ -6,7 +6,7 @@ import '../../repositories/workout_repository.dart';
 import '../../models/exercise_with_sets.dart';
 import '../../widgets/exercise_picker_sheet.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Screen for editing a completed (or in-progress) workout.
 ///
@@ -606,14 +606,14 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
   /// Date/time and feedback sections shown above the exercises.
   List<Widget> _buildTopSections(ThemeData theme, AppLocalizations loc) {
     return [
-      RunSectionHeader(
+      AppSectionHeader(
         loc.editWorkoutDateTime,
         padding: const EdgeInsets.fromLTRB(4, 12, 0, 10),
       ),
       _buildDateTimeCard(theme, loc),
-      RunSectionHeader(loc.editWorkoutFeedback),
+      AppSectionHeader(loc.editWorkoutFeedback),
       _buildFeedbackCard(theme, loc),
-      RunSectionHeader(loc.commonExercises),
+      AppSectionHeader(loc.commonExercises),
     ];
   }
 
@@ -633,7 +633,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
         ? RunFormatters.durationHoursMinutes(durSec)
         : '—';
 
-    return RunSectionCard(
+    return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -691,7 +691,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
                 durStr,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: colors.onSurfaceVariant,
-                  fontFeatures: RunUi.tabular,
+                  fontFeatures: AppUi.tabular,
                 ),
               ),
             ],
@@ -714,7 +714,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
 
   Widget _buildFeedbackCard(ThemeData theme, AppLocalizations loc) {
     final colors = theme.colorScheme;
-    return RunSectionCard(
+    return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -755,7 +755,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
                 vertical: 12,
               ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(RunUi.tileRadius),
+                borderRadius: BorderRadius.circular(AppUi.tileRadius),
                 borderSide: BorderSide.none,
               ),
             ),
@@ -829,7 +829,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
     return Padding(
       key: ValueKey(ex.entryId),
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: RunSectionCard(
+      child: AppSectionCard(
         padding: const EdgeInsets.fromLTRB(14, 12, 10, 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -920,7 +920,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
                   ),
                 ],
               ),
-              Divider(height: 8, color: RunUi.divider(colors)),
+              Divider(height: 8, color: AppUi.divider(colors)),
             ],
             ...ex.sets.asMap().entries.map((entry) {
               final i = entry.key;
@@ -968,7 +968,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
                             child: Text(
                               value,
                               style: theme.textTheme.bodyMedium?.copyWith(
-                                fontFeatures: RunUi.tabular,
+                                fontFeatures: AppUi.tabular,
                               ),
                             ),
                           ),
@@ -1018,13 +1018,13 @@ class _TimeField extends StatelessWidget {
     final colors = theme.colorScheme;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(RunUi.tileRadius),
+      borderRadius: BorderRadius.circular(AppUi.tileRadius),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: colors.surfaceContainerHighest.withAlpha(90),
-          borderRadius: BorderRadius.circular(RunUi.tileRadius),
+          borderRadius: BorderRadius.circular(AppUi.tileRadius),
         ),
         child: Row(
           children: [
@@ -1045,7 +1045,7 @@ class _TimeField extends StatelessWidget {
                     value,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w700,
-                      fontFeatures: RunUi.tabular,
+                      fontFeatures: AppUi.tabular,
                     ),
                   ),
                 ],

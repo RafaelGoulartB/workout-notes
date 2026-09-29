@@ -4,7 +4,7 @@ import 'package:workout_notes/repositories/exercise_repository.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_insights_data.dart';
 import 'package:workout_notes/widgets/strength/records/strength_recent_records.dart';
 import 'package:workout_notes/widgets/strength/records/strength_records_hero.dart';
@@ -116,14 +116,14 @@ class _StrengthRecordsScreenState extends State<StrengthRecordsScreen> {
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
-                padding: RunUi.screenPadding.copyWith(top: 8, bottom: 40),
+                padding: AppUi.screenPadding.copyWith(top: 8, bottom: 40),
                 children: [
                   StrengthRecordsHero(
                     exercises: _records.length,
                     thisMonth: _thisMonth,
                     thisYear: _thisYear,
                   ),
-                  RunSectionHeader(loc.strengthRecordsRecent),
+                  AppSectionHeader(loc.strengthRecordsRecent),
                   StrengthRecentRecords(
                     events: _events,
                     onOpen: (e) => _open(
@@ -131,7 +131,7 @@ class _StrengthRecordsScreenState extends State<StrengthRecordsScreen> {
                       exerciseRow: e.exerciseRow,
                     ),
                   ),
-                  RunSectionHeader(loc.strengthRecordsByExercise),
+                  AppSectionHeader(loc.strengthRecordsByExercise),
                   StrengthRecordsList(
                     records: _records,
                     categories: _categories,

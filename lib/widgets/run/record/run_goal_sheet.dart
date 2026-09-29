@@ -5,7 +5,7 @@ import 'package:workout_notes/models/run_session_goal.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_goal_input.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Edits the goal of the run about to start: a distance or time target (a
 /// preset or any custom value) and an optional pace goal with tolerance.
@@ -164,7 +164,7 @@ class _GoalSheetState extends State<_GoalSheet> {
                 ),
               ),
               const SizedBox(height: 12),
-              RunSegmentedTabs<_GoalKind>(
+              AppSegmentedTabs<_GoalKind>(
                 values: _GoalKind.values,
                 selected: _kind,
                 labelOf: (kind) => switch (kind) {
@@ -178,7 +178,7 @@ class _GoalSheetState extends State<_GoalSheet> {
                 }),
               ),
               if (_kind != _GoalKind.none) ...[
-                RunSectionHeader(
+                AppSectionHeader(
                   loc.runRecordGoalPresets,
                   padding: const EdgeInsets.fromLTRB(4, 16, 0, 8),
                 ),
@@ -229,7 +229,7 @@ class _GoalSheetState extends State<_GoalSheet> {
                   ),
                 ),
               ],
-              RunSectionHeader(
+              AppSectionHeader(
                 loc.runRecordGoalPace,
                 padding: const EdgeInsets.fromLTRB(4, 20, 0, 0),
               ),

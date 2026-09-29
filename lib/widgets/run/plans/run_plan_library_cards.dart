@@ -5,7 +5,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/services/run_plan_week_view.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Callbacks shared by every plan card of the library.
 class RunPlanCardActions {
@@ -84,7 +84,7 @@ class RunPlanLibraryCard extends StatelessWidget {
 
     return Opacity(
       opacity: plan.isArchived ? 0.6 : 1,
-      child: RunSectionCard(
+      child: AppSectionCard(
         onTap: actions.onOpen,
         padding: const EdgeInsets.fromLTRB(16, 14, 8, 12),
         child: Column(
@@ -150,7 +150,7 @@ class RunPlanLibraryCard extends StatelessWidget {
                   children: [
                     if (countdown != null)
                       Flexible(
-                        child: RunPill(
+                        child: AppPill(
                           icon: Icons.flag_outlined,
                           label: loc.runPlanRaceCountdown(countdown),
                         ),
@@ -186,7 +186,7 @@ class RunPlanLibraryCard extends StatelessWidget {
       );
     }
     if (linkedToPlanning) {
-      return RunPill(
+      return AppPill(
         icon: Icons.route_rounded,
         label: AppLocalizations.of(context)!.periodizationTitle.toUpperCase(),
       );
@@ -235,18 +235,18 @@ class RunPlanFollowedCard extends StatelessWidget {
         completionCount: plan.completionCount < 1 ? 1 : plan.completionCount,
       );
     } else if (finished) {
-      badge = RunPill(
+      badge = AppPill(
         icon: Icons.flag_circle_outlined,
         label: loc.runPlansEndedBadge,
         color: scheme.onSurfaceVariant,
       );
     } else if (linkedToPlanning) {
-      badge = RunPill(
+      badge = AppPill(
         icon: Icons.route_rounded,
         label: loc.periodizationTitle.toUpperCase(),
       );
     } else {
-      badge = RunPill(
+      badge = AppPill(
         icon: Icons.play_circle_outline,
         label: loc.runPlanActiveBadge,
       );
@@ -270,7 +270,7 @@ class RunPlanFollowedCard extends StatelessWidget {
       status = '';
     }
 
-    return RunSectionCard(
+    return AppSectionCard(
       onTap: actions.onOpen,
       color: scheme.primary.withAlpha(14),
       padding: const EdgeInsets.fromLTRB(16, 14, 8, 12),
@@ -355,7 +355,7 @@ class _NextSessionRow extends StatelessWidget {
         : DateFormat('EEE d/M', locale).format(view.date!);
     return Row(
       children: [
-        RunIconBadge(
+        AppIconBadge(
           RunPlanUi.kindIcon(view.workout.kind),
           color: RunPlanUi.kindColor(scheme, view.workout.kind),
         ),
@@ -402,7 +402,7 @@ class _CardHeader extends StatelessWidget {
     final scheme = theme.colorScheme;
     return Row(
       children: [
-        RunIconBadge(
+        AppIconBadge(
           Icons.route_outlined,
           color: scheme.secondary,
           size: 42,

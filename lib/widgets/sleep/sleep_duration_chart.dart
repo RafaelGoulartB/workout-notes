@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_schedule_chart.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
 
@@ -129,7 +129,7 @@ class SleepDurationChart extends StatelessWidget {
                           '${value.toInt()}h',
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: colors.onSurfaceVariant,
-                            fontFeatures: RunUi.tabular,
+                            fontFeatures: AppUi.tabular,
                           ),
                         );
                       },
@@ -154,12 +154,12 @@ class SleepDurationChart extends StatelessWidget {
           runSpacing: 6,
           alignment: WrapAlignment.center,
           children: [
-            RunLegendItem(color: colors.primary, label: loc.sleepChartRecorded),
-            RunLegendItem(
+            AppLegendItem(color: colors.primary, label: loc.sleepChartRecorded),
+            AppLegendItem(
               color: colors.tertiary,
               label: loc.sleepChartActualOrEstimated,
             ),
-            RunLegendItem(
+            AppLegendItem(
               color: colors.onSurfaceVariant,
               dashed: true,
               label:

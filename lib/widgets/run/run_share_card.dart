@@ -9,7 +9,7 @@ import 'package:workout_notes/widgets/run/run_achievements_section.dart';
 import 'package:workout_notes/widgets/run/run_detail_widgets.dart';
 import 'package:workout_notes/widgets/run/run_medal_badge.dart';
 import 'package:workout_notes/widgets/run/run_route_sketch.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Fixed-size (4:5) poster of a run for social sharing: route sketch,
 /// distance, time, pace, elevation, medals and the app name. Always dark so
@@ -142,7 +142,7 @@ class RunShareCard extends StatelessWidget {
                       fontWeight: FontWeight.w900,
                       height: 1,
                       letterSpacing: -1.5,
-                      fontFeatures: RunUi.tabular,
+                      fontFeatures: AppUi.tabular,
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -239,7 +239,7 @@ class _CardStat extends StatelessWidget {
                 color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
           ),
