@@ -869,16 +869,6 @@ class _Generator {
           'valid_from': _dateStr(phaseStart),
           'created_at': _iso(phaseStart),
         });
-        if (routineIds.isNotEmpty) {
-          await w.insert('phase_routine_links', {
-            'id': _uuid.v4(),
-            'phase_id': phaseId,
-            'routine_id': routineIds[p % routineIds.length],
-            'starts_on': _dateStr(phaseStart),
-            'ends_on': _dateStr(phaseEnd),
-            'created_at': _iso(phaseStart),
-          });
-        }
         for (var wk = 0; wk < 4; wk++) {
           final weekStart = phaseStart.add(Duration(days: wk * 7));
           if (weekStart.isAfter(endDate)) break;

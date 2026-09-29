@@ -774,8 +774,6 @@ class PeriodizationRepository extends BaseRepository {
   ///
   /// The routines come from the effective weekly target (`routine_ids` inside
   /// `training_json`) — each phase week may carry its own routine sequence.
-  /// Falls back to legacy `phase_routine_links` rows for phases created before
-  /// the weekly-routine model.
   Future<PeriodizationRoutineSuggestion?> getRoutineSuggestion(
     DateTime date,
   ) async {
@@ -844,7 +842,6 @@ class PeriodizationRepository extends BaseRepository {
       final nextDay = sequence[index];
       return PeriodizationRoutineSuggestion(
         phaseId: phase.id,
-        linkId: '',
         routineId: nextDay.routineId,
         routineName: nextDay.routineName,
         routineDayId: nextDay.dayId,
@@ -854,52 +851,7 @@ class PeriodizationRepository extends BaseRepository {
         completedWorkouts: completed,
       );
     }
-    // Legacy phases linked before the weekly-routine model.
-    final links = await database.rawQuery(
-      '''
-      SELECT link.*, routine.name AS routine_name
-      FROM phase_routine_links link
-      JOIN routines routine ON routine.id = link.routine_id
-      WHERE link.phase_id = ? AND link.starts_on <= ? AND link.ends_on >= ?
-      ORDER BY link.starts_on DESC
-      LIMIT 1
-      ''',
-      [phase.id, _date(day), _date(day)],
-    );
-    if (links.isEmpty) return null;
-    final link = links.first;
-    final routineDays = await database.query(
-      'routine_days',
-      where: 'routine_id = ?',
-      whereArgs: [link['routine_id']],
-      orderBy: 'order_index ASC',
-    );
-    if (routineDays.isEmpty) return null;
-    final completed =
-        Sqflite.firstIntValue(
-          await database.rawQuery(
-            '''
-            SELECT COUNT(*) FROM workouts
-            WHERE routine_id = ? AND end_time IS NOT NULL
-              AND date BETWEEN ? AND ?
-            ''',
-            [link['routine_id'], link['starts_on'], _date(day)],
-          ),
-        ) ??
-        0;
-    final index = completed % routineDays.length;
-    final nextDay = routineDays[index];
-    return PeriodizationRoutineSuggestion(
-      phaseId: phase.id,
-      linkId: link['id'] as String,
-      routineId: link['routine_id'] as String,
-      routineName: link['routine_name'] as String,
-      routineDayId: nextDay['id'] as String,
-      routineDayName: nextDay['name'] as String? ?? '',
-      routineDayIndex: index,
-      routineDayCount: routineDays.length,
-      completedWorkouts: completed,
-    );
+    return null;
   }
 
   /// Resolves the running session the plan expects on [date].

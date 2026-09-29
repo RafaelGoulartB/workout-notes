@@ -1,6 +1,5 @@
 class PeriodizationRoutineSuggestion {
   final String phaseId;
-  final String linkId;
   final String routineId;
   final String routineName;
   final String routineDayId;
@@ -11,7 +10,6 @@ class PeriodizationRoutineSuggestion {
 
   const PeriodizationRoutineSuggestion({
     required this.phaseId,
-    required this.linkId,
     required this.routineId,
     required this.routineName,
     required this.routineDayId,
