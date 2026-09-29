@@ -59,3 +59,10 @@ app.*.map.json
 /linux/
 /macos/
 /windows/
+
+# Android-only app: Flutter tooling may regenerate these
+/ios/
+/web/
+
+# Claude Code agent worktrees
+/.claude/worktrees/
