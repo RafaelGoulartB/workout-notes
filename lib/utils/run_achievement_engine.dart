@@ -1,21 +1,30 @@
 import 'package:workout_notes/models/run_achievement.dart';
 import 'package:workout_notes/models/run_activity.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 
 /// Pure all-time ranking of run personal records (top 3 per category).
+///
+/// Records come from outdoor GPS runs only ([RunActivity.isRun]): treadmill
+/// sessions count toward volume but never establish a distance, pace or
+/// effort record.
 abstract final class RunAchievementEngine {
   static const double minPaceDistanceMeters = 1000.0;
 
   static const List<RunAchievementKind> kindOrder = RunAchievementKind.values;
 
   static RunAchievementBoard build(List<RunActivity> activities) {
-    final completed = activities.where((a) => a.isCompleted).toList();
+    final completed = activities
+        .where((a) => a.isCompleted && a.isRun)
+        .toList();
     final categories = <RunAchievementCategory>[];
     final byActivity = <String, List<RunAchievementPlacement>>{};
 
     for (final kind in kindOrder) {
       final ranked = _rank(completed, kind);
       if (ranked.isEmpty) {
-        categories.add(RunAchievementCategory(kind: kind, placements: const []));
+        categories.add(
+          RunAchievementCategory(kind: kind, placements: const []),
+        );
         continue;
       }
 
@@ -60,8 +69,7 @@ abstract final class RunAchievementEngine {
   ) {
     final higherIsBetter = switch (kind) {
       RunAchievementKind.longestDistance ||
-      RunAchievementKind.longestDuration =>
-        true,
+      RunAchievementKind.longestDuration => true,
       _ => false,
     };
 
@@ -131,10 +139,7 @@ abstract final class RunAchievementEngine {
   static String formatValue(RunAchievementKind kind, double value) {
     switch (kind) {
       case RunAchievementKind.longestDistance:
-        final km = value / 1000.0;
-        if (km < 10) return '${km.toStringAsFixed(2)} km';
-        if (km < 100) return '${km.toStringAsFixed(1)} km';
-        return '${km.toStringAsFixed(0)} km';
+        return RunFormatters.distanceWithUnit(value);
       case RunAchievementKind.longestDuration:
       case RunAchievementKind.bestEffort1k:
       case RunAchievementKind.bestEffort3k:
@@ -142,27 +147,10 @@ abstract final class RunAchievementEngine {
       case RunAchievementKind.bestEffort10k:
       case RunAchievementKind.bestEffortHalf:
       case RunAchievementKind.bestEffortMarathon:
-        return _formatDuration(value.round());
+        return RunFormatters.duration(value.round());
       case RunAchievementKind.bestAvgPace:
       case RunAchievementKind.bestKmSplit:
-        return '${_formatPace(value)} /km';
+        return RunFormatters.paceWithUnit(value);
     }
-  }
-
-  static String _formatDuration(int totalSeconds) {
-    final hours = totalSeconds ~/ 3600;
-    final minutes = (totalSeconds % 3600) ~/ 60;
-    final seconds = totalSeconds % 60;
-    if (hours > 0) {
-      return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-    }
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
-
-  static String _formatPace(double secPerKm) {
-    final total = secPerKm.round().clamp(0, 99 * 60 + 59);
-    final minutes = total ~/ 60;
-    final seconds = total % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 }

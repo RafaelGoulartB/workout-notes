@@ -4,11 +4,9 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_achievement.dart';
 import 'package:workout_notes/utils/run_achievement_engine.dart';
 import 'package:workout_notes/widgets/run/run_medal_badge.dart';
+import 'package:workout_notes/widgets/run/run_ui.dart';
 
-String runAchievementKindLabel(
-  AppLocalizations loc,
-  RunAchievementKind kind,
-) {
+String runAchievementKindLabel(AppLocalizations loc, RunAchievementKind kind) {
   return switch (kind) {
     RunAchievementKind.longestDistance => loc.runAchievementLongestDistance,
     RunAchievementKind.longestDuration => loc.runAchievementLongestDuration,
@@ -116,10 +114,7 @@ class RunAchievementsSection extends StatelessWidget {
 class RunActivityAchievementsBlock extends StatelessWidget {
   final List<RunAchievementPlacement> placements;
 
-  const RunActivityAchievementsBlock({
-    super.key,
-    required this.placements,
-  });
+  const RunActivityAchievementsBlock({super.key, required this.placements});
 
   @override
   Widget build(BuildContext context) {
@@ -175,55 +170,20 @@ class _RecentAchievementTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
-    final colors = theme.colorScheme;
-    final date = DateFormat.yMMMd(locale).format(
-      placement.activity.startedAt.toLocal(),
-    );
+    final date = DateFormat.yMMMd(
+      locale,
+    ).format(placement.activity.startedAt.toLocal());
     final value = RunAchievementEngine.formatValue(
       placement.kind,
       placement.value,
     );
 
-    return InkWell(
+    return RunListRow(
+      leading: RunMedalDot(tier: placement.tier, size: 24),
+      title: runAchievementKindLabel(loc, placement.kind),
+      subtitle: '$value · $date',
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
-          children: [
-            RunMedalDot(tier: placement.tier, size: 24),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    runAchievementKindLabel(loc, placement.kind),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '$value · $date',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colors.onSurfaceVariant,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right_rounded, color: colors.onSurfaceVariant),
-          ],
-        ),
-      ),
     );
   }
 }

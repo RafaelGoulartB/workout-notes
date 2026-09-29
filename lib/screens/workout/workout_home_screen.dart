@@ -7,10 +7,12 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
+import 'package:workout_notes/services/run_today_service.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
 import 'package:workout_notes/services/stationary_bike_tracking_service.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
+import 'package:workout_notes/widgets/run/run_pending_review_banner.dart';
 import '../../navigation/ai_coach_navigation.dart';
 import '../../repositories/workout_repository.dart';
 import '../../repositories/analytics_repository.dart';
@@ -56,6 +58,9 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   double _monthCardioDistance = 0;
   int _monthCardioTime = 0;
   int _currentStreak = 0;
+
+  // Bumped on every reload so the unsaved-run banner re-reads its list.
+  int _pendingReviewRefresh = 0;
 
   // Elapsed time timer for active workout
   Timer? _elapsedTimer;
@@ -109,7 +114,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _pendingReviewRefresh++;
+    });
     try {
       final now = DateTime.now();
       final tomorrow = DateTime(now.year, now.month, now.day + 1);
@@ -198,9 +206,29 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   }
 
   Future<void> _startRun() async {
+    // A session planned for today (followed plan or planning phase) is opened
+    // ready to run; without one this is a plain free run.
+    // Resuming a run that is already recording never swaps its session.
+    RunPlannedSession? planned;
+    if (!_runTrackingService.state.isActive) {
+      try {
+        final snapshot = await RunTodayService().load();
+        if (snapshot.today.status == RunTodayStatus.planned) {
+          planned = snapshot.today.session;
+        }
+      } catch (_) {
+        planned = null;
+      }
+    }
+    if (!mounted) return;
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const RunRecordScreen()),
+      MaterialPageRoute(
+        builder: (_) => RunRecordScreen(
+          planWorkout: planned?.workout,
+          scheduledRun: planned?.scheduled,
+        ),
+      ),
     );
     _loadData();
   }
@@ -328,6 +356,12 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                     SliverToBoxAdapter(
                       child: _buildActiveRunBanner(theme, loc),
                     ),
+                  SliverToBoxAdapter(
+                    child: RunPendingReviewBanner(
+                      refreshToken: _pendingReviewRefresh,
+                      onChanged: _loadData,
+                    ),
+                  ),
                   if (_bikeTrackingService.state.isActive)
                     SliverToBoxAdapter(
                       child: _buildActiveBikeBanner(theme, loc),
@@ -692,12 +726,17 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                   _StatDivider(theme: theme),
                   Expanded(
                     child: _StatItem(
-                      label: loc.commonTotal,
+                      label: loc.runHomeAvgPace,
+                      // Seconds of moving time per km of the month, shown as
+                      // a pace (mm:ss) rather than a bare number of seconds.
                       value: _monthCardioDistance > 0 && _monthCardioTime > 0
-                          ? (_monthCardioTime / _monthCardioDistance)
-                                .toStringAsFixed(0)
+                          ? RunFormatters.pace(
+                              _monthCardioTime / _monthCardioDistance,
+                            )
                           : '--',
-                      unit: '/km',
+                      unit: _monthCardioDistance > 0 && _monthCardioTime > 0
+                          ? '/km'
+                          : null,
                       icon: Icons.speed,
                       color: Colors.brown,
                       theme: theme,

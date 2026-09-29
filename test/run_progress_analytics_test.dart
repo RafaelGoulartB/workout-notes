@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
 
@@ -9,13 +10,16 @@ RunActivity _run({
   required int movingTimeSeconds,
   double? avgPaceSecPerKm,
   int calories = 0,
+  CardioActivityType type = CardioActivityType.running,
 }) {
-  final pace = avgPaceSecPerKm ??
+  final pace =
+      avgPaceSecPerKm ??
       (distanceMeters >= 1
           ? movingTimeSeconds / (distanceMeters / 1000.0)
           : null);
   return RunActivity(
     id: id,
+    activityType: type,
     startedAt: startedAt,
     endedAt: startedAt.add(Duration(seconds: movingTimeSeconds)),
     durationSeconds: movingTimeSeconds,
@@ -359,5 +363,211 @@ void main() {
     );
 
     expect(stats.bestKmSplitSecPerKm, 280);
+  });
+
+  test('treadmill counts toward volume but not GPS-only metrics', () {
+    final gps = _run(
+      id: 'gps',
+      startedAt: DateTime(2026, 8, 18, 7),
+      distanceMeters: 5000,
+      movingTimeSeconds: 1600, // 5:20 /km
+    );
+    final treadmill = _run(
+      id: 'tm',
+      startedAt: DateTime(2026, 8, 19, 7),
+      distanceMeters: 8000,
+      movingTimeSeconds: 2000, // 4:10 /km, would win best pace
+      type: CardioActivityType.treadmill,
+    ).copyWith(bestSplitPaceSecPerKm: 200);
+
+    final stats = RunProgressAnalytics.fromActivities(
+      [gps, treadmill],
+      period: RunStatsPeriod.weeks4,
+      now: now,
+    );
+
+    expect(stats.runCount, 2);
+    expect(stats.totalDistanceMeters, 13000);
+    expect(stats.totalMovingTimeSeconds, 3600);
+    expect(stats.thisWeekRunCount, 2);
+    expect(stats.fastestRun?.id, 'gps');
+    expect(stats.bestPaceSecPerKm, closeTo(320, 0.01));
+    expect(stats.bestKmSplitSecPerKm, isNull);
+    expect(stats.bestKmSplitRun, isNull);
+    expect(stats.paceTrend.map((p) => p.distanceMeters), [5000]);
+  });
+
+  test('ignores non-running activities entirely', () {
+    final stats = RunProgressAnalytics.fromActivities(
+      [
+        _run(
+          id: 'bike',
+          startedAt: DateTime(2026, 8, 18, 7),
+          distanceMeters: 20000,
+          movingTimeSeconds: 3000,
+          type: CardioActivityType.stationaryBike,
+        ),
+      ],
+      period: RunStatsPeriod.weeks4,
+      now: now,
+    );
+    expect(stats.isEmpty, isTrue);
+  });
+
+  test('bestKmSplitRun points at the run holding the best split', () {
+    final fast = _run(
+      id: 'fast',
+      startedAt: DateTime(2026, 8, 18, 7),
+      distanceMeters: 5000,
+      movingTimeSeconds: 1500,
+    ).copyWith(bestSplitPaceSecPerKm: 280);
+    final slow = _run(
+      id: 'slow',
+      startedAt: DateTime(2026, 8, 19, 7),
+      distanceMeters: 5000,
+      movingTimeSeconds: 1600,
+    ).copyWith(bestSplitPaceSecPerKm: 310);
+    final stats = RunProgressAnalytics.fromActivities(
+      [slow, fast],
+      period: RunStatsPeriod.weeks4,
+      now: now,
+    );
+    expect(stats.bestKmSplitRun?.id, 'fast');
+  });
+
+  test('weekly averages share one basis and match the buckets', () {
+    // 4 runs over a 12-week window: 4 / 12 runs a week, 12 km / 12 weeks.
+    final activities = [
+      for (var i = 0; i < 4; i++)
+        _run(
+          id: 'r$i',
+          startedAt: DateTime(2026, 8, 18).subtract(Duration(days: 14 * i)),
+          distanceMeters: 3000,
+          movingTimeSeconds: 900,
+        ),
+    ];
+    final stats = RunProgressAnalytics.fromActivities(
+      activities,
+      period: RunStatsPeriod.weeks12,
+      now: now,
+    );
+    expect(stats.periodWeekCount, 12);
+    expect(stats.weeklyBuckets.length, stats.periodWeekCount);
+    expect(stats.avgRunsPerWeek, closeTo(4 / 12, 1e-9));
+    expect(stats.avgWeeklyDistanceMeters, closeTo(1000, 1e-9));
+    expect(
+      stats.weeklyBuckets.fold<double>(0, (a, b) => a + b.distanceMeters),
+      stats.totalDistanceMeters,
+    );
+  });
+
+  test('a run in the oldest week of the window is in totals and buckets', () {
+    // 12 weeks back from the week of 2026-08-17 starts on 2026-06-01.
+    final stats = RunProgressAnalytics.fromActivities(
+      [
+        _run(
+          id: 'edge',
+          startedAt: DateTime(2026, 6, 2, 7),
+          distanceMeters: 5000,
+          movingTimeSeconds: 1500,
+        ),
+      ],
+      period: RunStatsPeriod.weeks12,
+      now: now,
+    );
+    expect(stats.runCount, 1);
+    expect(stats.weeklyBuckets.first.distanceMeters, 5000);
+  });
+
+  test('all-time keeps every week and groups long ranges by month', () {
+    final stats = RunProgressAnalytics.fromActivities(
+      [
+        _run(
+          id: 'old',
+          startedAt: DateTime(2024, 3, 5, 7),
+          distanceMeters: 5000,
+          movingTimeSeconds: 1500,
+        ),
+        _run(
+          id: 'new',
+          startedAt: DateTime(2026, 8, 18, 7),
+          distanceMeters: 7000,
+          movingTimeSeconds: 2100,
+        ),
+      ],
+      period: RunStatsPeriod.all,
+      now: now,
+    );
+
+    // 2024-03-04 to 2026-08-17 is far more than the old 52-week cap.
+    expect(stats.weeklyBuckets.length, greaterThan(100));
+    expect(stats.periodWeekCount, stats.weeklyBuckets.length);
+    expect(
+      stats.weeklyBuckets.fold<double>(0, (a, b) => a + b.distanceMeters),
+      stats.totalDistanceMeters,
+    );
+    expect(stats.trendIsMonthly, isTrue);
+    expect(stats.trendBuckets.first.weekStart, DateTime(2024, 3));
+    expect(stats.trendBuckets.last.weekStart, DateTime(2026, 8));
+    expect(
+      stats.trendBuckets.fold<double>(0, (a, b) => a + b.distanceMeters),
+      12000,
+    );
+    expect(
+      stats.avgWeeklyDistanceMeters,
+      closeTo(12000 / stats.periodWeekCount, 1e-9),
+    );
+  });
+
+  test('week comparison is absent when neither week has a run', () {
+    final stats = RunProgressAnalytics.fromActivities(
+      [
+        _run(
+          id: 'old',
+          startedAt: DateTime(2026, 7, 1, 7),
+          distanceMeters: 5000,
+          movingTimeSeconds: 1500,
+        ),
+      ],
+      period: RunStatsPeriod.weeks12,
+      now: now,
+    );
+    expect(stats.thisWeekDistanceMeters, 0);
+    expect(stats.lastWeekDistanceMeters, 0);
+    expect(stats.hasWeekComparison, isFalse);
+  });
+
+  test('sums elevation gain and fits a pace trend line', () {
+    final activities = [
+      for (var i = 0; i < 4; i++)
+        RunActivity(
+          id: 'e$i',
+          startedAt: DateTime(2026, 8, 3 + i * 4, 7),
+          endedAt: null,
+          durationSeconds: 1500,
+          movingTimeSeconds: 1500,
+          distanceMeters: 5000,
+          // 6:00 improving by 10 s/km every 4 days.
+          avgPaceSecPerKm: 360.0 - i * 10,
+          maxPaceSecPerKm: null,
+          calories: null,
+          title: null,
+          notes: null,
+          status: 'completed',
+          polylineSummary: null,
+          createdAt: DateTime(2026, 8, 3),
+          updatedAt: DateTime(2026, 8, 3),
+          elevationGainMeters: 40,
+        ),
+    ];
+    final stats = RunProgressAnalytics.fromActivities(
+      activities,
+      period: RunStatsPeriod.weeks4,
+      now: now,
+    );
+    expect(stats.totalElevationGainMeters, 160);
+    final perMonth = stats.paceTrendPerMonthSec!;
+    // -10 s/km every 4 days is -75 s/km per 30 days.
+    expect(perMonth, closeTo(-75, 0.5));
   });
 }

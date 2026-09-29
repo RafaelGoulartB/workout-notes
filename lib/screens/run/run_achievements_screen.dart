@@ -5,11 +5,16 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_achievement.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
+import 'package:workout_notes/screens/run/run_record_screen.dart';
+import 'package:workout_notes/services/run_pace_calculator.dart';
 import 'package:workout_notes/utils/run_achievement_engine.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
+import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/run/run_achievements_section.dart';
 import 'package:workout_notes/widgets/run/run_medal_badge.dart';
+import 'package:workout_notes/widgets/run/run_ui.dart';
 
-/// Complete, all-time personal-record board for GPS runs.
+/// Complete, all-time personal-record board for outdoor GPS runs.
 class RunAchievementsScreen extends StatefulWidget {
   const RunAchievementsScreen({super.key});
 
@@ -30,7 +35,7 @@ class _RunAchievementsScreenState extends State<RunAchievementsScreen> {
 
   Future<void> _load() async {
     await _repository.backfillMissingEfforts(limit: 60);
-    final activities = await _repository.listActivities(limit: 500);
+    final activities = await _repository.listActivities(limit: null);
     if (!mounted) return;
     setState(() {
       _board = RunAchievementEngine.build(activities);
@@ -48,22 +53,37 @@ class _RunAchievementsScreenState extends State<RunAchievementsScreen> {
     if (mounted) await _load();
   }
 
+  Future<void> _startRun() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const RunRecordScreen()),
+    );
+    if (mounted) await _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
+    final hasRecords = _board.nonEmptyCategories.isNotEmpty;
     return Scaffold(
       appBar: AppBar(title: Text(loc.runAchievementsTitle)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
+          : !hasRecords
+          ? EmptyStatePlaceholder(
+              icon: Icons.emoji_events_outlined,
+              title: loc.runAchievementsEmptyTitle,
+              subtitle: loc.runAchievementsEmptySubtitle,
+              actionLabel: loc.runHistoryEmptyCta,
+              onAction: _startRun,
+            )
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
                 children: [
                   _AchievementHero(board: _board),
-                  const SizedBox(height: 28),
-                  _SectionLabel(text: loc.runAchievementsRecords),
-                  const SizedBox(height: 10),
+                  RunSectionHeader(loc.runAchievementsRecords),
                   for (
                     var index = 0;
                     index < _board.categories.length;
@@ -79,6 +99,14 @@ class _RunAchievementsScreenState extends State<RunAchievementsScreen> {
                     if (index < _board.categories.length - 1)
                       const SizedBox(height: 10),
                   ],
+                  const SizedBox(height: 16),
+                  Text(
+                    loc.runAchievementsGpsOnlyNote,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -108,39 +136,15 @@ class _AchievementHero extends StatelessWidget {
         tier: placements.where((item) => item.tier == tier).length,
     };
 
-    return Container(
+    return RunHeroCard(
       key: const Key('run-achievements-hero'),
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colors.primaryContainer.withValues(alpha: 0.72),
-            colors.surfaceContainerLow,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.5)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: colors.primary.withValues(alpha: 0.13),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Icon(
-                  Icons.emoji_events_rounded,
-                  color: colors.primary,
-                  size: 28,
-                ),
-              ),
+              RunIconBadge(Icons.emoji_events_rounded, size: 48, iconSize: 28),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -178,13 +182,15 @@ class _AchievementHero extends StatelessWidget {
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.only(left: 5, bottom: 3),
-                child: Text(
-                  loc.runAchievementsProgress(total),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colors.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
+              Flexible(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 5, bottom: 3),
+                  child: Text(
+                    loc.runAchievementsProgress(total),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -275,28 +281,6 @@ class _MedalCounter extends StatelessWidget {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  final String text;
-
-  const _SectionLabel({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: Text(
-        text,
-        style: theme.textTheme.labelSmall?.copyWith(
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1.5,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-}
-
 class _AchievementCategoryCard extends StatelessWidget {
   final RunAchievementCategory category;
   final ValueChanged<String> onOpenActivity;
@@ -311,179 +295,98 @@ class _AchievementCategoryCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
+    final locale = Localizations.localeOf(context).toString();
     final placements = category.placements;
 
-    return Card(
+    return RunSectionCard(
       key: Key('run-achievement-${category.kind.name}'),
-      margin: EdgeInsets.zero,
-      elevation: 0,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.5)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: colors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              RunIconBadge(
+                _iconFor(category.kind),
+                color: placements.isEmpty ? colors.onSurfaceVariant : null,
+                size: 40,
+                iconSize: 21,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  runAchievementKindLabel(loc, category.kind),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
                   ),
-                  child: Icon(
-                    _iconFor(category.kind),
-                    size: 21,
+                ),
+              ),
+              if (placements.isNotEmpty)
+                Text(
+                  RunAchievementEngine.formatValue(
+                    category.kind,
+                    placements.first.value,
+                  ),
+                  style: theme.textTheme.titleMedium?.copyWith(
                     color: colors.primary,
+                    fontWeight: FontWeight.w900,
+                    fontFeatures: RunUi.tabular,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    runAchievementKindLabel(loc, category.kind),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                if (placements.isNotEmpty)
-                  Text(
-                    RunAchievementEngine.formatValue(
-                      category.kind,
-                      placements.first.value,
-                    ),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: colors.primary,
-                      fontWeight: FontWeight.w900,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-              ],
-            ),
-            if (placements.isEmpty) ...[
-              const SizedBox(height: 14),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(13),
-                decoration: BoxDecoration(
-                  color: colors.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.lock_open_rounded,
+            ],
+          ),
+          if (placements.isEmpty) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(13),
+              decoration: BoxDecoration(
+                color: colors.surfaceContainerHighest.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(RunUi.tileRadius),
+              ),
+              child: Row(
+                children: [
+                  Tooltip(
+                    message: loc.runAchievementsLockedHint,
+                    child: Icon(
+                      Icons.lock_outline_rounded,
                       size: 18,
                       color: colors.onSurfaceVariant,
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _unlockHint(loc, category.kind),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _unlockHint(loc, category.kind),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ] else ...[
-              const SizedBox(height: 12),
-              Divider(
-                height: 1,
-                color: colors.outlineVariant.withValues(alpha: 0.45),
-              ),
-              for (var index = 0; index < placements.length; index++) ...[
-                if (index > 0)
-                  Divider(
-                    height: 1,
-                    indent: 36,
-                    color: colors.outlineVariant.withValues(alpha: 0.35),
-                  ),
-                _PlacementRow(
-                  placement: placements[index],
-                  onTap: () => onOpenActivity(placements[index].activity.id),
-                ),
-              ],
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PlacementRow extends StatelessWidget {
-  final RunAchievementPlacement placement;
-  final VoidCallback onTap;
-
-  const _PlacementRow({required this.placement, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final loc = AppLocalizations.of(context)!;
-    final locale = Localizations.localeOf(context).toString();
-    final activityTitle = placement.activity.title?.trim();
-    final title = activityTitle == null || activityTitle.isEmpty
-        ? loc.runDetailUntitled
-        : activityTitle;
-    final date = DateFormat.yMMMd(
-      locale,
-    ).format(placement.activity.startedAt.toLocal());
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 11),
-        child: Row(
-          children: [
-            RunMedalDot(tier: placement.tier, size: 24),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    date,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colors.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
             ),
-            Text(
-              RunAchievementEngine.formatValue(placement.kind, placement.value),
-              style: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w800,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-            const SizedBox(width: 2),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: colors.onSurfaceVariant,
-              size: 20,
+          ] else ...[
+            const SizedBox(height: 8),
+            RunDividedList(
+              children: [
+                for (final placement in placements)
+                  RunListRow(
+                    leading: RunMedalDot(tier: placement.tier, size: 24),
+                    title: placement.activity.title?.trim().isNotEmpty == true
+                        ? placement.activity.title!.trim()
+                        : loc.runDetailUntitled,
+                    subtitle: DateFormat.yMMMd(
+                      locale,
+                    ).format(placement.activity.startedAt.toLocal()),
+                    value: RunAchievementEngine.formatValue(
+                      placement.kind,
+                      placement.value,
+                    ),
+                    onTap: () => onOpenActivity(placement.activity.id),
+                  ),
+              ],
             ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -508,23 +411,36 @@ IconData _iconFor(RunAchievementKind kind) => switch (kind) {
   RunAchievementKind.bestEffortMarathon => Icons.emoji_events_outlined,
 };
 
+/// `5 km`, `21,1 km`: whole distances without decimals, the rest with one.
+String _effortDistanceLabel(double meters) {
+  final km = meters / 1000;
+  final whole = km == km.roundToDouble();
+  return '${RunFormatters.decimal(km, whole ? 0 : 1)} km';
+}
+
 String _unlockHint(AppLocalizations loc, RunAchievementKind kind) {
   return switch (kind) {
     RunAchievementKind.longestDistance => loc.runAchievementsUnlockDistance,
     RunAchievementKind.longestDuration => loc.runAchievementsUnlockDuration,
     RunAchievementKind.bestAvgPace => loc.runAchievementsUnlockPace,
     RunAchievementKind.bestKmSplit => loc.runAchievementsUnlockGpsKilometer,
-    RunAchievementKind.bestEffort1k => loc.runAchievementsUnlockEffort('1 km'),
-    RunAchievementKind.bestEffort3k => loc.runAchievementsUnlockEffort('3 km'),
-    RunAchievementKind.bestEffort5k => loc.runAchievementsUnlockEffort('5 km'),
+    RunAchievementKind.bestEffort1k => loc.runAchievementsUnlockEffort(
+      _effortDistanceLabel(1000),
+    ),
+    RunAchievementKind.bestEffort3k => loc.runAchievementsUnlockEffort(
+      _effortDistanceLabel(3000),
+    ),
+    RunAchievementKind.bestEffort5k => loc.runAchievementsUnlockEffort(
+      _effortDistanceLabel(RunPaceCalculator.fiveKMeters),
+    ),
     RunAchievementKind.bestEffort10k => loc.runAchievementsUnlockEffort(
-      '10 km',
+      _effortDistanceLabel(RunPaceCalculator.tenKMeters),
     ),
     RunAchievementKind.bestEffortHalf => loc.runAchievementsUnlockEffort(
-      '21,1 km',
+      _effortDistanceLabel(RunPaceCalculator.halfMeters),
     ),
     RunAchievementKind.bestEffortMarathon => loc.runAchievementsUnlockEffort(
-      '42,2 km',
+      _effortDistanceLabel(RunPaceCalculator.marathonMeters),
     ),
   };
 }

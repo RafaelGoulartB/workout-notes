@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
+import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_achievement.dart';
 import 'package:workout_notes/utils/run_achievement_engine.dart';
@@ -12,13 +14,16 @@ RunActivity _run({
   double? bestSplitPaceSecPerKm,
   int? bestEffort1kSec,
   int? bestEffort5kSec,
+  CardioActivityType type = CardioActivityType.running,
 }) {
-  final pace = avgPaceSecPerKm ??
+  final pace =
+      avgPaceSecPerKm ??
       (distanceMeters >= 1
           ? movingTimeSeconds / (distanceMeters / 1000.0)
           : null);
   return RunActivity(
     id: id,
+    activityType: type,
     startedAt: startedAt,
     endedAt: startedAt.add(Duration(seconds: movingTimeSeconds)),
     durationSeconds: movingTimeSeconds,
@@ -54,8 +59,9 @@ void main() {
       _run(id: 'd', startedAt: t3, distanceMeters: 9000),
     ]);
 
-    final distance = board.categories
-        .firstWhere((c) => c.kind == RunAchievementKind.longestDistance);
+    final distance = board.categories.firstWhere(
+      (c) => c.kind == RunAchievementKind.longestDistance,
+    );
     expect(distance.placements.map((p) => p.activity.id), ['b', 'c', 'd']);
     expect(distance.placements.map((p) => p.tier), [
       RunMedalTier.gold,
@@ -89,8 +95,9 @@ void main() {
       ),
     ]);
 
-    final pace = board.categories
-        .firstWhere((c) => c.kind == RunAchievementKind.bestAvgPace);
+    final pace = board.categories.firstWhere(
+      (c) => c.kind == RunAchievementKind.bestAvgPace,
+    );
     expect(pace.placements.map((p) => p.activity.id), ['fast', 'slow']);
   });
 
@@ -99,8 +106,9 @@ void main() {
       _run(id: 'later', startedAt: t1, distanceMeters: 10000),
       _run(id: 'earlier', startedAt: t0, distanceMeters: 10000),
     ]);
-    final distance = board.categories
-        .firstWhere((c) => c.kind == RunAchievementKind.longestDistance);
+    final distance = board.categories.firstWhere(
+      (c) => c.kind == RunAchievementKind.longestDistance,
+    );
     expect(distance.placements.first.activity.id, 'earlier');
     expect(distance.placements.first.tier, RunMedalTier.gold);
   });
@@ -129,7 +137,10 @@ void main() {
 
     final medals = board.forActivity('pr');
     expect(medals.length, greaterThanOrEqualTo(3));
-    expect(medals.any((m) => m.kind == RunAchievementKind.longestDistance), true);
+    expect(
+      medals.any((m) => m.kind == RunAchievementKind.longestDistance),
+      true,
+    );
     expect(medals.any((m) => m.kind == RunAchievementKind.bestEffort5k), true);
   });
 
@@ -147,10 +158,30 @@ void main() {
 
   test('recentAchievements returns newest medal runs first, capped', () {
     final board = RunAchievementEngine.build([
-      _run(id: 'old', startedAt: t0, distanceMeters: 12000, bestEffort5kSec: 1600),
-      _run(id: 'mid', startedAt: t1, distanceMeters: 8000, bestEffort5kSec: 1500),
-      _run(id: 'new', startedAt: t3, distanceMeters: 10000, bestEffort5kSec: 1400),
-      _run(id: 'also', startedAt: t2, distanceMeters: 9000, avgPaceSecPerKm: 280),
+      _run(
+        id: 'old',
+        startedAt: t0,
+        distanceMeters: 12000,
+        bestEffort5kSec: 1600,
+      ),
+      _run(
+        id: 'mid',
+        startedAt: t1,
+        distanceMeters: 8000,
+        bestEffort5kSec: 1500,
+      ),
+      _run(
+        id: 'new',
+        startedAt: t3,
+        distanceMeters: 10000,
+        bestEffort5kSec: 1400,
+      ),
+      _run(
+        id: 'also',
+        startedAt: t2,
+        distanceMeters: 9000,
+        avgPaceSecPerKm: 280,
+      ),
     ]);
 
     final recent = board.recentAchievements(limit: 5);
@@ -164,11 +195,58 @@ void main() {
     );
     for (var i = 1; i < recent.length; i++) {
       expect(
-        recent[i - 1].activity.startedAt
-                .compareTo(recent[i].activity.startedAt) >=
+        recent[i - 1].activity.startedAt.compareTo(
+              recent[i].activity.startedAt,
+            ) >=
             0,
         true,
       );
     }
+  });
+
+  test('treadmill runs never establish records', () {
+    final board = RunAchievementEngine.build([
+      _run(id: 'gps', startedAt: t0, distanceMeters: 5000),
+      _run(
+        id: 'treadmill',
+        startedAt: t1,
+        distanceMeters: 15000,
+        type: CardioActivityType.treadmill,
+      ),
+    ]);
+    final distance = board.categories.firstWhere(
+      (c) => c.kind == RunAchievementKind.longestDistance,
+    );
+    expect(distance.placements.map((p) => p.activity.id), ['gps']);
+    expect(board.forActivity('treadmill'), isEmpty);
+  });
+
+  test('formatValue follows the app locale', () {
+    final previous = Intl.defaultLocale;
+    addTearDown(() => Intl.defaultLocale = previous);
+
+    Intl.defaultLocale = 'en';
+    expect(
+      RunAchievementEngine.formatValue(
+        RunAchievementKind.longestDistance,
+        5000,
+      ),
+      '5.00 km',
+    );
+    expect(
+      RunAchievementEngine.formatValue(RunAchievementKind.bestAvgPace, 305),
+      '05:05 /km',
+    );
+    expect(
+      RunAchievementEngine.formatValue(RunAchievementKind.bestEffort5k, 1500),
+      '25:00',
+    );
+    expect(
+      RunAchievementEngine.formatValue(
+        RunAchievementKind.bestEffortHalf,
+        3 * 3600 + 5 * 60 + 9,
+      ),
+      '3:05:09',
+    );
   });
 }
