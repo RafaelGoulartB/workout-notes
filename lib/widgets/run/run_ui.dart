@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 /// Shared building blocks for the running screens so cards, headers, metric
 /// tiles and pills look the same everywhere.
@@ -728,6 +729,147 @@ class RunLegendItem extends StatelessWidget {
           style: theme.textTheme.labelSmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Soft headline surface shared with the nutrition "day summary" card: a
+/// subtle neutral diagonal gradient, no border and a 20 px radius.
+class RunSoftCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final VoidCallback? onTap;
+
+  const RunSoftCard({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.fromLTRB(18, 16, 16, 16),
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final body = Padding(padding: padding, child: child);
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(RunUi.heroRadius),
+      clipBehavior: Clip.antiAlias,
+      child: Ink(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              colors.surfaceContainerHighest.withAlpha(200),
+              colors.surfaceContainerLow,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(RunUi.heroRadius),
+        ),
+        child: onTap == null ? body : InkWell(onTap: onTap, child: body),
+      ),
+    );
+  }
+}
+
+/// "Today · Tue, Sep 29" title row of the hub "today" cards.
+class RunTodayHeader extends StatelessWidget {
+  final String title;
+
+  const RunTodayHeader({super.key, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final date = DateFormat.MMMEd(
+      Localizations.localeOf(context).toString(),
+    ).format(DateTime.now());
+    return Row(
+      children: [
+        Icon(Icons.today_rounded, size: 18, color: colors.primary),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            '· $date',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Bottom row of a "today" card: where the session comes from on the left
+/// and a compact start button on the right.
+class RunTodayFooter extends StatelessWidget {
+  final String? caption;
+  final IconData captionIcon;
+  final Key? actionKey;
+  final String actionLabel;
+  final VoidCallback onAction;
+
+  const RunTodayFooter({
+    super.key,
+    this.caption,
+    this.captionIcon = Icons.event_note_rounded,
+    this.actionKey,
+    required this.actionLabel,
+    required this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Row(
+      children: [
+        Expanded(
+          child: caption == null
+              ? const SizedBox.shrink()
+              : Row(
+                  children: [
+                    Icon(captionIcon, size: 15, color: colors.onSurfaceVariant),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        caption!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+        const SizedBox(width: 12),
+        FilledButton.icon(
+          key: actionKey,
+          onPressed: onAction,
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          icon: const Icon(Icons.play_arrow_rounded),
+          label: Text(actionLabel),
         ),
       ],
     );

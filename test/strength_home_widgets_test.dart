@@ -389,7 +389,7 @@ void main() {
 
       await _pumpHub(tester);
 
-      expect(find.text('Hoje'.toUpperCase()), findsOneWidget);
+      expect(find.text('Hoje'), findsOneWidget);
       // The day after Push A.
       expect(find.text('Legs A'), findsWidgets);
       expect(find.byKey(const Key('strength-today-start')), findsOneWidget);

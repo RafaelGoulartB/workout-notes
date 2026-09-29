@@ -197,7 +197,13 @@ void main() {
 
       expect(find.byKey(const Key('run-today-start')), findsOneWidget);
       expect(find.text('Tempo de hoje'), findsOneWidget);
-      expect(find.text('Iniciar este treino'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('run-today-start')),
+          matching: find.text('Iniciar'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('ESTA SEMANA'), findsOneWidget);
       expect(find.text('PLANO ATIVO'), findsOneWidget);
       expect(find.text('Plano 10 km'), findsOneWidget);

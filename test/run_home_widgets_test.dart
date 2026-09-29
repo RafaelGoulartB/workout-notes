@@ -98,7 +98,7 @@ void main() {
         ),
       );
 
-      expect(find.text('HOJE'), findsOneWidget);
+      expect(find.text('Hoje'), findsOneWidget);
       expect(find.text('Tempo 6 km'), findsOneWidget);
       expect(find.textContaining('Tempo'), findsWidgets);
       expect(find.textContaining('Do plano Plano 10 km'), findsOneWidget);

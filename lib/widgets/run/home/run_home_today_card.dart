@@ -30,24 +30,13 @@ class RunTodayCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final planned = info.status == RunTodayStatus.planned;
 
-    return RunSectionCard(
-      color: planned ? colors.primaryContainer.withValues(alpha: 0.35) : null,
+    return RunSoftCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            loc.runHomeTodayTitle.toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.5,
-              color: planned ? colors.primary : colors.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 10),
+          RunTodayHeader(title: loc.runHomeTodayTitle),
+          const SizedBox(height: 14),
           switch (info.status) {
             RunTodayStatus.planned => _Planned(
               info: info,
@@ -101,10 +90,10 @@ class _Planned extends StatelessWidget {
             RunIconBadge(
               RunPlanUi.kindIcon(workout.kind),
               color: tint,
-              size: 44,
-              iconSize: 24,
+              size: 48,
+              iconSize: 26,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -113,7 +102,7 @@ class _Planned extends StatelessWidget {
                     workout.name,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium?.copyWith(
+                    style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -132,21 +121,17 @@ class _Planned extends StatelessWidget {
             ),
           ],
         ),
-        if (session.planName != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            loc.runHomeTodayFromPlan(session.planName!),
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colors.onSurfaceVariant,
-            ),
-          ),
-        ],
         const SizedBox(height: 14),
-        FilledButton.icon(
-          key: const Key('run-today-start'),
-          onPressed: onStart,
-          icon: const Icon(Icons.play_arrow_rounded),
-          label: Text(loc.runHomeTodayStart),
+        Divider(height: 1, color: RunUi.divider(colors)),
+        const SizedBox(height: 12),
+        RunTodayFooter(
+          caption: session.planName == null
+              ? null
+              : loc.runHomeTodayFromPlan(session.planName!),
+          captionIcon: Icons.route_rounded,
+          actionKey: const Key('run-today-start'),
+          actionLabel: loc.strengthHomeTodayStart,
+          onAction: onStart,
         ),
       ],
     );

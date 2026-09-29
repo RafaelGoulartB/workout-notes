@@ -27,24 +27,13 @@ class StrengthTodayCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final planned = info.status == StrengthTodayStatus.planned;
 
-    return RunSectionCard(
-      color: planned ? colors.primaryContainer.withValues(alpha: 0.35) : null,
+    return RunSoftCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            loc.strengthHomeTodayTitle.toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.5,
-              color: planned ? colors.primary : colors.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 10),
+          RunTodayHeader(title: loc.strengthHomeTodayTitle),
+          const SizedBox(height: 14),
           switch (info.status) {
             StrengthTodayStatus.planned => StrengthDayDetails(
               day: info.day!,
@@ -113,8 +102,8 @@ class StrengthDayDetails extends StatelessWidget {
       children: [
         Row(
           children: [
-            const RunIconBadge(Icons.fitness_center, size: 44, iconSize: 24),
-            const SizedBox(width: 12),
+            const RunIconBadge(Icons.fitness_center, size: 48, iconSize: 26),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -123,7 +112,7 @@ class StrengthDayDetails extends StatelessWidget {
                     title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium?.copyWith(
+                    style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -142,7 +131,7 @@ class StrengthDayDetails extends StatelessWidget {
           ],
         ),
         if (day.categories.isNotEmpty) ...[
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 6,
             runSpacing: 6,
@@ -155,22 +144,23 @@ class StrengthDayDetails extends StatelessWidget {
             ],
           ),
         ],
-        if (caption != null) ...[
+        if (onAction != null && actionLabel != null) ...[
+          const SizedBox(height: 14),
+          Divider(height: 1, color: RunUi.divider(colors)),
+          const SizedBox(height: 12),
+          RunTodayFooter(
+            caption: caption,
+            actionKey: actionKey,
+            actionLabel: actionLabel!,
+            onAction: onAction!,
+          ),
+        ] else if (caption != null) ...[
           const SizedBox(height: 8),
           Text(
             caption!,
             style: theme.textTheme.bodySmall?.copyWith(
               color: colors.onSurfaceVariant,
             ),
-          ),
-        ],
-        if (onAction != null && actionLabel != null) ...[
-          const SizedBox(height: 14),
-          FilledButton.icon(
-            key: actionKey,
-            onPressed: onAction,
-            icon: const Icon(Icons.play_arrow_rounded),
-            label: Text(actionLabel!),
           ),
         ],
       ],
