@@ -1,5 +1,5 @@
 import 'package:workout_notes/models/run_track_point.dart';
-import 'package:workout_notes/utils/run_route_geometry.dart';
+import 'package:workout_notes/utils/run_pace_analytics.dart';
 
 /// One altitude reading along the run, keyed by cumulative distance.
 class RunElevationSample {
@@ -59,9 +59,11 @@ class RunElevationProfile {
   static RunElevationProfile fromTrackPoints(
     List<RunTrackPoint> points, {
     int maxSamples = maxChartSamples,
+    RunTrackProfile? profile,
   }) {
     if (points.length < 2) return empty;
-    final cumulative = RunRouteGeometry.cumulativeDistances(points);
+    final cumulative = (profile ?? RunTrackProfile.fromPoints(points))
+        .cumulativeMeters;
 
     final distances = <double>[];
     final altitudes = <double>[];

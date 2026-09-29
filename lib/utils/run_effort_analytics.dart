@@ -32,31 +32,20 @@ abstract final class RunEffortAnalytics {
   static const double effortHalfMeters = 21097.5;
   static const double effortMarathonMeters = 42195.0;
 
-  /// Builds effort metrics from ordered track points.
-  static RunEffortMetrics fromTrackPoints(List<RunTrackPoint> points) {
+  /// Builds effort metrics from ordered track points. Pass a [profile] already
+  /// computed for the same [points] to skip walking them again.
+  static RunEffortMetrics fromTrackPoints(
+    List<RunTrackPoint> points, {
+    RunTrackProfile? profile,
+  }) {
     if (points.length < 2) return RunEffortMetrics.empty;
 
-    final cumDist = <double>[0.0];
-    final times = <DateTime>[points.first.recordedAt];
+    final track = profile ?? RunTrackProfile.fromPoints(points);
+    final cumDist = track.cumulativeMeters;
+    final times = track.times;
 
-    for (var i = 1; i < points.length; i++) {
-      final prev = points[i - 1];
-      final cur = points[i];
-      final step = RunPaceAnalytics.haversineMeters(
-        lat1: prev.lat,
-        lng1: prev.lng,
-        lat2: cur.lat,
-        lng2: cur.lng,
-      );
-      final accepted =
-          step >= RunPaceAnalytics.minStepMeters ? step : 0.0;
-      cumDist.add(cumDist.last + accepted);
-      times.add(cur.recordedAt);
-    }
-
-    final pace = RunPaceAnalytics.fromTrackPoints(points);
     return RunEffortMetrics(
-      bestSplitPaceSecPerKm: pace.bestSplitPaceSecPerKm,
+      bestSplitPaceSecPerKm: RunPaceAnalytics.bestSplitPaceOf(track),
       bestEffort1kSec: bestEffortSeconds(
         cumDist: cumDist,
         times: times,

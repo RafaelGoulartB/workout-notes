@@ -16,25 +16,15 @@ class RunRouteGeometry {
   /// Ignore tiny GPS hops so stationary jitter does not inflate distance.
   static const double minStepMeters = RunPaceAnalytics.minStepMeters;
 
-  factory RunRouteGeometry.fromPoints(List<RunTrackPoint> points) {
+  factory RunRouteGeometry.fromPoints(
+    List<RunTrackPoint> points, {
+    RunTrackProfile? profile,
+  }) {
     if (points.isEmpty) return empty;
-    return RunRouteGeometry._(points, cumulativeDistances(points));
-  }
-
-  /// Same accumulation the pace chart and the splits use.
-  static List<double> cumulativeDistances(List<RunTrackPoint> points) {
-    if (points.isEmpty) return const [];
-    final result = <double>[0.0];
-    for (var i = 1; i < points.length; i++) {
-      final step = RunPaceAnalytics.haversineMeters(
-        lat1: points[i - 1].lat,
-        lng1: points[i - 1].lng,
-        lat2: points[i].lat,
-        lng2: points[i].lng,
-      );
-      result.add(result.last + (step >= minStepMeters ? step : 0.0));
-    }
-    return result;
+    return RunRouteGeometry._(
+      points,
+      (profile ?? RunTrackProfile.fromPoints(points)).cumulativeMeters,
+    );
   }
 
   bool get isEmpty => points.isEmpty;

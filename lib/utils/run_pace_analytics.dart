@@ -15,6 +15,45 @@ class RunPaceSample {
   });
 }
 
+/// Cumulative distance and timestamp at every GPS point, computed once and
+/// shared by the analytics that walk a track (pace curve, splits, best
+/// efforts, route geometry).
+class RunTrackProfile {
+  /// Cumulative metres at each point, starting at 0. Hops under
+  /// [RunPaceAnalytics.minStepMeters] count as standing still.
+  final List<double> cumulativeMeters;
+
+  /// Timestamp of each point; same length as [cumulativeMeters].
+  final List<DateTime> times;
+
+  const RunTrackProfile._(this.cumulativeMeters, this.times);
+
+  factory RunTrackProfile.fromPoints(List<RunTrackPoint> points) {
+    if (points.isEmpty) return const RunTrackProfile._([], []);
+    final cumulative = <double>[0.0];
+    final times = <DateTime>[points.first.recordedAt];
+    for (var i = 1; i < points.length; i++) {
+      final prev = points[i - 1];
+      final cur = points[i];
+      final step = RunPaceAnalytics.haversineMeters(
+        lat1: prev.lat,
+        lng1: prev.lng,
+        lat2: cur.lat,
+        lng2: cur.lng,
+      );
+      final accepted = step >= RunPaceAnalytics.minStepMeters ? step : 0.0;
+      cumulative.add(cumulative.last + accepted);
+      times.add(cur.recordedAt);
+    }
+    return RunTrackProfile._(cumulative, times);
+  }
+
+  int get length => cumulativeMeters.length;
+
+  double get totalMeters =>
+      cumulativeMeters.isEmpty ? 0 : cumulativeMeters.last;
+}
+
 /// Pace series + km splits derived from GPS track points.
 class RunPaceAnalytics {
   final List<RunPaceSample> samples;
@@ -71,11 +110,22 @@ class RunPaceAnalytics {
     return pace;
   }
 
-  /// Builds chart samples and km splits from ordered track points.
+  /// Pace of the fastest completed km split, without building the chart
+  /// samples. Cheap companion for callers that already hold a [profile].
+  static double? bestSplitPaceOf(RunTrackProfile profile) {
+    if (profile.length < 2) return null;
+    return _bestCompletedPace(
+      _buildSplits(cumDist: profile.cumulativeMeters, times: profile.times),
+    );
+  }
+
+  /// Builds chart samples and km splits from ordered track points. Pass a
+  /// [profile] already computed for the same [points] to skip that walk.
   static RunPaceAnalytics fromTrackPoints(
     List<RunTrackPoint> points, {
     double? activityAvgPaceSecPerKm,
     double windowMeters = defaultWindowMeters,
+    RunTrackProfile? profile,
   }) {
     if (points.length < 2) {
       return RunPaceAnalytics(
@@ -86,22 +136,9 @@ class RunPaceAnalytics {
       );
     }
 
-    final cumDist = <double>[0.0];
-    final times = <DateTime>[points.first.recordedAt];
-
-    for (var i = 1; i < points.length; i++) {
-      final prev = points[i - 1];
-      final cur = points[i];
-      final step = haversineMeters(
-        lat1: prev.lat,
-        lng1: prev.lng,
-        lat2: cur.lat,
-        lng2: cur.lng,
-      );
-      final accepted = step >= minStepMeters ? step : 0.0;
-      cumDist.add(cumDist.last + accepted);
-      times.add(cur.recordedAt);
-    }
+    final track = profile ?? RunTrackProfile.fromPoints(points);
+    final cumDist = track.cumulativeMeters;
+    final times = track.times;
 
     final totalDistance = cumDist.last;
     final samples = _buildSamples(
