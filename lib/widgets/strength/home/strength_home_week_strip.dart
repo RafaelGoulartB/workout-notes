@@ -4,6 +4,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:workout_notes/utils/strength_week_analytics.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_format.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Monday-to-Sunday strip of the current week. A trained day is a track
 /// filled in proportion to its working sets and tinted with the muscle group
@@ -33,7 +34,7 @@ class StrengthWeekStrip extends StatelessWidget {
     final weekdayFormat = DateFormat.E(
       Localizations.localeOf(context).toString(),
     );
-    final todayDate = DateTime(today.year, today.month, today.day);
+    final todayDate = dayOf(today);
 
     var maxSets = 0;
     for (final day in days) {

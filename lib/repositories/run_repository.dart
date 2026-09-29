@@ -14,6 +14,8 @@ import 'package:workout_notes/services/run_route_codec.dart';
 import 'package:workout_notes/utils/run_effort_analytics.dart';
 import 'package:workout_notes/utils/run_elevation_analytics.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 
 class RunRepository extends BaseRepository {
   static const _uuid = Uuid();
@@ -189,7 +191,7 @@ class RunRepository extends BaseRepository {
     final grouped = <String, List<RunActivity>>{};
     for (final row in rows) {
       final activity = RunActivity.fromMap(row);
-      final key = activity.startedAt.toIso8601String().substring(0, 10);
+      final key = dateKey(activity.startedAt);
       grouped.putIfAbsent(key, () => []).add(activity);
     }
     return grouped;
@@ -302,6 +304,7 @@ class RunRepository extends BaseRepository {
     final pace = RunPaceAnalytics.fromTrackPoints(
       points,
       activityAvgPaceSecPerKm: activity.avgPaceSecPerKm,
+      profile: decoded.profile,
     );
     final summary = _RouteSummary.fromPoints(points);
 
@@ -383,8 +386,12 @@ class RunRepository extends BaseRepository {
       } on FormatException {
         continue;
       }
-      final pace = RunPaceAnalytics.fromTrackPoints(points);
-      final efforts = RunEffortAnalytics.fromTrackPoints(points);
+      final profile = RunTrackProfile.fromPoints(points);
+      final pace = RunPaceAnalytics.fromTrackPoints(points, profile: profile);
+      final efforts = RunEffortAnalytics.fromTrackPoints(
+        points,
+        profile: profile,
+      );
       await _storeCompactRoute(
         executor,
         activityId: activityId,
@@ -654,7 +661,12 @@ class RunRepository extends BaseRepository {
     ).activity;
   }
 
-  ({RunActivity activity, List<RunTrackPoint> points}) _decodeNativeSpool(
+  ({
+    RunActivity activity,
+    List<RunTrackPoint> points,
+    RunTrackProfile profile,
+  })
+  _decodeNativeSpool(
     Map<String, dynamic> spool, {
     required String id,
     double bodyWeightKg = 70,
@@ -668,9 +680,16 @@ class RunRepository extends BaseRepository {
         .toList();
 
     final now = DateTime.now();
+    // Native spools carry UTC instants (`...Z`); everything stored or
+    // displayed by the app is local wall-clock time.
     final startedAt =
-        DateTime.tryParse(rawActivity['started_at'] as String? ?? '') ?? now;
-    final endedAt = DateTime.tryParse(rawActivity['ended_at'] as String? ?? '');
+        DateTime.tryParse(
+          rawActivity['started_at'] as String? ?? '',
+        )?.toLocal() ??
+        now;
+    final endedAt = DateTime.tryParse(
+      rawActivity['ended_at'] as String? ?? '',
+    )?.toLocal();
     final status = rawActivity['status'] as String? ?? 'completed';
     final activityType = CardioActivityType.fromDatabase(
       rawActivity['activity_type'],
@@ -721,14 +740,17 @@ class RunRepository extends BaseRepository {
           accuracy: (row['accuracy'] as num?)?.toDouble(),
           speed: (row['speed'] as num?)?.toDouble(),
           recordedAt:
-              DateTime.tryParse(row['recorded_at'] as String? ?? '') ??
+              DateTime.tryParse(
+                row['recorded_at'] as String? ?? '',
+              )?.toLocal() ??
               startedAt.add(Duration(seconds: i)),
         ),
       );
     }
 
+    final profile = RunTrackProfile.fromPoints(points);
     final efforts = activityType.usesGps
-        ? RunEffortAnalytics.fromTrackPoints(points)
+        ? RunEffortAnalytics.fromTrackPoints(points, profile: profile)
         : const RunEffortMetrics();
 
     final activity = RunActivity(
@@ -742,7 +764,8 @@ class RunRepository extends BaseRepository {
       // Treadmill runs get a pace once the distance typed on the review
       // screen is known; the bike never has one.
       avgPaceSecPerKm: activityType.isRunning
-          ? avgPace ?? _avgPace(distanceMeters, movingTimeSeconds)
+          ? avgPace ??
+                RunFormatters.paceOrNull(distanceMeters, movingTimeSeconds)
           : null,
       maxPaceSecPerKm: activityType.usesGps ? maxPace : null,
       calories: calories,
@@ -764,7 +787,7 @@ class RunRepository extends BaseRepository {
       effortsComputed: true,
     );
 
-    return (activity: activity, points: points);
+    return (activity: activity, points: points, profile: profile);
   }
 
   Future<double> _latestBodyWeightKg() async {
@@ -819,11 +842,6 @@ class RunRepository extends BaseRepository {
     // Running costs approximately 1 kcal per kg per kilometer.
     final km = distanceMeters / 1000.0;
     return (km * bodyWeightKg).round().clamp(0, 100000);
-  }
-
-  static double? _avgPace(double distanceMeters, int movingTimeSeconds) {
-    if (distanceMeters < 1 || movingTimeSeconds <= 0) return null;
-    return movingTimeSeconds / (distanceMeters / 1000.0);
   }
 
   static String? _buildPolylineSummary(List<Map<String, dynamic>> points) {

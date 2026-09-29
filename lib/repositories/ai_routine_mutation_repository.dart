@@ -71,7 +71,6 @@ class AiRoutineMutationRepository extends BaseRepository {
   /// changed since it was prepared); a resolved proposal is a no-op.
   Future<void> approveProposal(String id) async {
     final database = await db;
-    await _repairRoutineDayNotesColumn(database);
     await database.transaction((txn) async {
       final rows = await txn.query(
         'ai_routine_proposals',
@@ -136,12 +135,6 @@ class AiRoutineMutationRepository extends BaseRepository {
         whereArgs: [id],
       );
     });
-  }
-
-  Future<void> _repairRoutineDayNotesColumn(Database database) async {
-    final columns = await database.rawQuery('PRAGMA table_info(routine_days)');
-    if (columns.any((column) => column['name'] == 'notes')) return;
-    await database.execute('ALTER TABLE routine_days ADD COLUMN notes TEXT');
   }
 
   Future<String?> _missingExerciseId(

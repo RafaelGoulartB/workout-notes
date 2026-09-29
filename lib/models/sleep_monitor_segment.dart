@@ -75,9 +75,6 @@ class SleepMonitorSegment {
   /// bedside staging engine.
   bool get hasSpectralFeatures => spectralFlatness != null;
 
-  /// Whether actigraphy aggregates were captured for this recording.
-  bool get hasMotionFeatures => motionActiveSeconds != null;
-
   Map<String, dynamic> toMap() => {
     'id': id,
     'session_id': sessionId,

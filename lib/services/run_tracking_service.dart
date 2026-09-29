@@ -17,6 +17,7 @@ import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/services/run_native_tracking_backend.dart';
 import 'package:workout_notes/services/run_tracking_backend.dart';
 import 'package:workout_notes/utils/run_spool_recovery.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 class RunGpsFix {
   final double lat;
@@ -55,8 +56,8 @@ class RunTrackingService extends ChangeNotifier {
 
   static const methods = NativeRunTrackingBackend.methods;
 
-  final RunRepository _repository = RunRepository();
-  final RunPlanRepository _planRepository = RunPlanRepository();
+  final RunRepository _repository = DatabaseHelper.instance.runRepo;
+  final RunPlanRepository _planRepository = DatabaseHelper.instance.runPlanRepo;
   RunTrackingState _state = RunTrackingState.initial(
     supported: defaultTargetPlatform == TargetPlatform.android,
   );

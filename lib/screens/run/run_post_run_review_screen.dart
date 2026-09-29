@@ -7,7 +7,6 @@ import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
-import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_route_map_screen.dart';
@@ -23,6 +22,7 @@ import 'package:workout_notes/widgets/run/run_route_map.dart';
 import 'package:workout_notes/widgets/run/run_route_sketch.dart';
 import 'package:workout_notes/widgets/run/run_splits_list.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// What to do when the runner leaves the review with back / gesture.
 enum _LeaveChoice { save, discard, keepEditing }
@@ -44,8 +44,8 @@ class RunPostRunReviewScreen extends StatefulWidget {
 }
 
 class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
-  final _runRepository = RunRepository();
-  final _planRepository = RunPlanRepository();
+  final _runRepository = DatabaseHelper.instance.runRepo;
+  final _planRepository = DatabaseHelper.instance.runPlanRepo;
   final _trackingService = RunTrackingService.instance;
   final _selectedDistance = ValueNotifier<double?>(null);
   late final TextEditingController _titleController;
@@ -217,7 +217,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
     final plan = await _planRepository.getActivatedPlan(hydrate: false);
     if (plan == null) return null;
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = dayOf(now);
     final upcoming = await _planRepository.getScheduledRuns(
       today,
       today.add(const Duration(days: 28)),

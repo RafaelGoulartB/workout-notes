@@ -6,6 +6,7 @@ import 'package:workout_notes/services/ai_run_tool_service.dart';
 import 'package:workout_notes/services/ai_sleep_tool_service.dart';
 import 'package:workout_notes/services/ai_wellness_analytics_service.dart';
 import 'package:workout_notes/services/ai_workout_tool_service.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// A required argument was missing or blank. The registry turns this into an
 /// `invalid_args` [AiToolResult] so handlers can stay linear.
@@ -56,7 +57,7 @@ class AiToolArgs {
     if (text == null) return null;
     final date = DateTime.tryParse(text);
     if (date == null) return null;
-    return date.toIso8601String().substring(0, 10);
+    return dateKey(date);
   }
 
   /// Integer clamped to [minimum]..[maximum]; also reads `${key}_back`.

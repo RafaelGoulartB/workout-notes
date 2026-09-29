@@ -6,6 +6,7 @@ import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/services/run_plan_week_view.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Callbacks shared by every plan card of the library.
 class RunPlanCardActions {
@@ -40,7 +41,7 @@ int? _raceCountdown(DateTime? raceDate, DateTime today) {
     raceDate.year,
     raceDate.month,
     raceDate.day,
-  ).difference(DateTime(today.year, today.month, today.day)).inDays;
+  ).difference(dayOf(today)).inDays;
   return days < 0 ? null : days;
 }
 

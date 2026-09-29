@@ -1,5 +1,6 @@
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/utils/run_analytics_dates.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Calendar statistics: daily distance for the heatmap, monthly totals,
 /// consistency streaks, elevation and the year in review.
@@ -11,7 +12,7 @@ abstract final class RunCalendarStats {
   }) {
     final map = <DateTime, double>{};
     for (final a in activities.where(RunAnalyticsDates.completedRun)) {
-      final d = RunAnalyticsDates.day(a.startedAt.toLocal());
+      final d = dayOf(a.startedAt.toLocal());
       if (year != null && d.year != year) continue;
       map[d] = (map[d] ?? 0) + a.distanceMeters;
     }
@@ -24,7 +25,7 @@ abstract final class RunCalendarStats {
     int months = 12,
     DateTime? now,
   }) {
-    final today = RunAnalyticsDates.day(now ?? DateTime.now());
+    final today = dayOf(now ?? DateTime.now());
     final starts = [
       for (var i = months - 1; i >= 0; i--)
         DateTime(today.year, today.month - i),
@@ -59,7 +60,7 @@ abstract final class RunCalendarStats {
     int year, {
     DateTime? now,
   }) {
-    final today = RunAnalyticsDates.day(now ?? DateTime.now());
+    final today = dayOf(now ?? DateTime.now());
     final perMonth = List<double>.filled(12, 0);
     for (final a in activities.where(RunAnalyticsDates.completedRun)) {
       final d = a.startedAt.toLocal();
@@ -101,15 +102,15 @@ abstract final class RunCalendarStats {
     DateTime? now,
     int windowWeeks = 12,
   }) {
-    final today = RunAnalyticsDates.day(now ?? DateTime.now());
+    final today = dayOf(now ?? DateTime.now());
     final runs = activities.where(RunAnalyticsDates.completedRun).toList();
     final days = <DateTime>{
-      for (final a in runs) RunAnalyticsDates.day(a.startedAt.toLocal()),
+      for (final a in runs) dayOf(a.startedAt.toLocal()),
     };
     final weeks = <DateTime>{
-      for (final a in runs) RunAnalyticsDates.monday(a.startedAt.toLocal()),
+      for (final a in runs) mondayOf(a.startedAt.toLocal()),
     };
-    final thisWeek = RunAnalyticsDates.monday(today);
+    final thisWeek = mondayOf(today);
 
     // Day streaks: a day without a run yet today does not break the streak.
     var currentDays = 0;

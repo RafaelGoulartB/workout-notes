@@ -1,3 +1,5 @@
+import 'package:workout_notes/utils/date_utils.dart';
+
 /// How a running plan's weeks line up with a periodization phase's weeks.
 ///
 /// A phase is a run of 7-day weeks starting on the Monday of its start date.
@@ -20,8 +22,7 @@ class RunPlanWeekResolver {
 
   /// Monday of the week containing [date].
   DateTime weekStart(DateTime date) {
-    final day = DateTime(date.year, date.month, date.day);
-    return day.subtract(Duration(days: day.weekday - 1));
+    return mondayOf(date);
   }
 
   /// Zero-based phase week of [date]. Negative before the phase starts.

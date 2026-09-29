@@ -6,6 +6,7 @@ import 'package:workout_notes/utils/run_effort_analytics.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
 
 import 'test_data_context.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 
 class RunGenerationResult {
   final int runs;
@@ -144,7 +145,7 @@ class TestDataRunGenerator {
     final durationSeconds =
         (elapsedSeconds * (1.01 + context.random.nextDouble() * 0.02)).round();
     final avgPace = distanceMeters > 0
-        ? elapsedSeconds / (distanceMeters / 1000.0)
+        ? RunFormatters.paceSecondsPerKm(distanceMeters, elapsedSeconds)
         : null;
     final endedAt = startedAt.add(Duration(seconds: elapsedSeconds));
     final trackPoints = [

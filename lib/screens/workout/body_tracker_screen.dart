@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../repositories/body_measurement_repository.dart';
-import '../../repositories/settings_repository.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
 import 'package:workout_notes/screens/workout/body_stats_screen.dart';
@@ -15,6 +13,7 @@ import 'package:workout_notes/widgets/body_tracker/derived_stats_card.dart';
 import 'package:workout_notes/widgets/body_tracker/measurement_card.dart';
 import 'package:workout_notes/widgets/body_tracker_type_selector.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 class BodyTrackerScreen extends StatefulWidget {
   const BodyTrackerScreen({super.key});
@@ -24,8 +23,8 @@ class BodyTrackerScreen extends StatefulWidget {
 }
 
 class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
-  final _bodyRepo = BodyMeasurementRepository();
-  final _settingsRepo = SettingsRepository();
+  final _bodyRepo = DatabaseHelper.instance.bodyMeasurementRepo;
+  final _settingsRepo = DatabaseHelper.instance.settingsRepo;
 
   // ── State ──────────────────────────────────────────────────────────
   String _selectedType = 'weight';

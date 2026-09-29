@@ -4,7 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/app_localizations_en.dart';
 import 'package:workout_notes/l10n/app_localizations_pt.dart';
-import '../repositories/settings_repository.dart';
+import 'package:workout_notes/utils/duration_format.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Centralized notification service for timer notifications.
 ///
@@ -124,7 +125,7 @@ class NotificationService {
   }
 
   Future<void> _readSettings() async {
-    final settingsRepo = SettingsRepository();
+    final settingsRepo = DatabaseHelper.instance.settingsRepo;
     final settings = await settingsRepo.getAllSettings();
 
     _restEnabled = settings['notification_rest_timer_enabled'] != 'false';
@@ -329,11 +330,7 @@ class NotificationService {
 
   // Helpers
 
-  String _formatCountdown(int seconds) {
-    final min = seconds ~/ 60;
-    final sec = seconds % 60;
-    return '${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
-  }
+  String _formatCountdown(int seconds) => DurationFormat.mmss(seconds);
 
   @override
   String toString() => 'NotificationService(initialized: $_initialized)';

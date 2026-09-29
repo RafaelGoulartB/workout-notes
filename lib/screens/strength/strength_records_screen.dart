@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/repositories/exercise_repository.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
@@ -9,6 +8,7 @@ import 'package:workout_notes/widgets/strength/insights/strength_insights_data.d
 import 'package:workout_notes/widgets/strength/records/strength_recent_records.dart';
 import 'package:workout_notes/widgets/strength/records/strength_records_hero.dart';
 import 'package:workout_notes/widgets/strength/records/strength_records_list.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Personal records: headline counts, the latest bests as a timeline and the
 /// best e1RM / heaviest weight / best session volume of each exercise grouped
@@ -37,8 +37,8 @@ class _StrengthRecordsScreenState extends State<StrengthRecordsScreen> {
 
   Future<void> _load() async {
     try {
-      final sets = await StrengthRecordsRepository().loadSets();
-      final categories = await ExerciseRepository().getCategories();
+      final sets = await DatabaseHelper.instance.strengthRecordsRepo.loadSets();
+      final categories = await DatabaseHelper.instance.exerciseRepo.getCategories();
       if (!mounted) return;
       final records = StrengthRecordsCalculator.records(sets);
       // Oldest first from the calculator; the timeline wants newest first.

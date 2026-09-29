@@ -4,6 +4,7 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/services/sleep_goal_service.dart';
 import 'package:workout_notes/services/ai_tool_math.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Read-only sleep queries exposed to the AI Coach.
 ///
@@ -20,7 +21,7 @@ class AiSleepToolService {
 
   Future<Map<String, dynamic>> nightDetail({String? date}) async {
     final resolvedDate = AiToolMath.validatedIsoDate(
-      date ?? AiToolMath.isoDay(_now()),
+      date ?? dateKey(_now()),
     );
     final database = await db.database;
     final entries = await database.query(
@@ -125,10 +126,10 @@ class AiSleepToolService {
     days = days.clamp(1, 31);
     final database = await db.database;
     final end = AiToolMath.validatedIsoDate(
-      endDate ?? AiToolMath.isoDay(_now()),
+      endDate ?? dateKey(_now()),
     );
     final endDay = DateTime.parse(end);
-    final start = AiToolMath.isoDay(endDay.subtract(Duration(days: days - 1)));
+    final start = dateKey(endDay.subtract(Duration(days: days - 1)));
     final entries = await database.query(
       'sleep_entries',
       where: 'date BETWEEN ? AND ?',
@@ -149,7 +150,7 @@ class AiSleepToolService {
       'recordedNights': nights.length,
       'coveragePct': AiToolMath.round1(nights.length / days * 100),
       'nights': nights,
-      'previousEndDate': AiToolMath.isoDay(
+      'previousEndDate': dateKey(
         DateTime.parse(start).subtract(const Duration(days: 1)),
       ),
       'dataSemantics':
@@ -172,7 +173,7 @@ class AiSleepToolService {
     final goalMinutes = SleepGoalService.normalize(
       rawGoal ?? SleepGoalService.defaultGoalMinutes,
     );
-    final start30 = AiToolMath.isoDay(
+    final start30 = dateKey(
       _now().subtract(const Duration(days: 29)),
     );
 

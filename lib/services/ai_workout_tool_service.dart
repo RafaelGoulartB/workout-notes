@@ -2,6 +2,7 @@
 // exception to the repository-only rule); writes never happen in this file.
 import '../database/database_helper.dart';
 import 'package:workout_notes/services/ai_tool_math.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Read-only, AI-facing workout queries.
 ///
@@ -389,14 +390,14 @@ class AiWorkoutToolService {
     final history = await exerciseHistory(
       exerciseId,
       limit: 1000,
-      startDate: AiToolMath.isoDay(start),
-      endDate: AiToolMath.isoDay(end),
+      startDate: dateKey(start),
+      endDate: dateKey(end),
     );
     return {
       'exerciseId': exerciseId,
       'weeksBack': weeks,
-      'startDate': AiToolMath.isoDay(start),
-      'endDate': AiToolMath.isoDay(end),
+      'startDate': dateKey(start),
+      'endDate': dateKey(end),
       'dataPoints': history['history'],
       'sessionCount': history['sessionCount'],
     };
@@ -405,7 +406,7 @@ class AiWorkoutToolService {
   Future<Map<String, dynamic>> weeklyVolume({int weeks = 8}) async {
     final rawDb = await db.database;
     final today = DateTime.now();
-    final currentMonday = today.subtract(Duration(days: today.weekday - 1));
+    final currentMonday = mondayOf(today);
     final firstMonday = currentMonday.subtract(Duration(days: (weeks - 1) * 7));
     final rows = await rawDb.rawQuery(
       '''
@@ -420,13 +421,13 @@ class AiWorkoutToolService {
         AND s.is_complete = 1 AND s.is_warmup = 0
       ORDER BY w.date ASC
     ''',
-      [AiToolMath.isoDay(firstMonday), AiToolMath.isoDay(today)],
+      [dateKey(firstMonday), dateKey(today)],
     );
     final buckets = <String, Map<String, Map<String, dynamic>>>{};
     for (final row in rows) {
       final date = DateTime.parse(row['date'] as String);
-      final monday = date.subtract(Duration(days: date.weekday - 1));
-      final weekKey = AiToolMath.isoDay(monday);
+      final monday = mondayOf(date);
+      final weekKey = dateKey(monday);
       final categoryId = row['category_id'] as String;
       final category = buckets
           .putIfAbsent(weekKey, () => {})
@@ -459,10 +460,10 @@ class AiWorkoutToolService {
     for (var offset = weeks - 1; offset >= 0; offset--) {
       final start = currentMonday.subtract(Duration(days: offset * 7));
       output.add({
-        'startDate': AiToolMath.isoDay(start),
-        'endDate': AiToolMath.isoDay(start.add(const Duration(days: 6))),
+        'startDate': dateKey(start),
+        'endDate': dateKey(start.add(const Duration(days: 6))),
         'categories':
-            buckets[AiToolMath.isoDay(start)]?.values.toList() ?? const [],
+            buckets[dateKey(start)]?.values.toList() ?? const [],
       });
     }
     return {'weeksBack': weeks, 'weeks': output};
@@ -593,7 +594,7 @@ class AiWorkoutToolService {
         AND (COALESCE(s.distance, 0) > 0 OR COALESCE(s.time_seconds, 0) > 0)
       ORDER BY w.date ASC
     ''',
-      [AiToolMath.isoDay(start), AiToolMath.isoDay(end)],
+      [dateKey(start), dateKey(end)],
     );
     final modalities = <String, Map<String, dynamic>>{};
     final sessions = <Map<String, dynamic>>[];
@@ -648,8 +649,8 @@ class AiWorkoutToolService {
     }).toList();
     return {
       'weeksBack': weeks,
-      'startDate': AiToolMath.isoDay(start),
-      'endDate': AiToolMath.isoDay(end),
+      'startDate': dateKey(start),
+      'endDate': dateKey(end),
       'byModality': byModality,
       'sessions': sessions,
     };

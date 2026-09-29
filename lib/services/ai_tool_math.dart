@@ -1,13 +1,10 @@
 import 'dart:math' as math;
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Small pure helpers shared by the AI tool services, so every tool rounds,
 /// averages and formats dates the same way.
 abstract final class AiToolMath {
   static final RegExp _isoDatePattern = RegExp(r'^\d{4}-\d{2}-\d{2}$');
-
-  /// `yyyy-MM-dd` for [value].
-  static String isoDay(DateTime value) =>
-      value.toIso8601String().substring(0, 10);
 
   /// Returns [value] when it is a real `yyyy-MM-dd` calendar date; throws a
   /// [FormatException] otherwise (surfaced to the model as a tool error).
@@ -16,7 +13,7 @@ abstract final class AiToolMath {
       throw const FormatException('date must use YYYY-MM-DD');
     }
     final parsed = DateTime.tryParse(value);
-    if (parsed == null || isoDay(parsed) != value) {
+    if (parsed == null || dateKey(parsed) != value) {
       throw const FormatException('date is invalid');
     }
     return value;

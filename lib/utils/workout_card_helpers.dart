@@ -1,4 +1,5 @@
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 
 /// Returns a localized label for a workout set field.
 String workoutFieldLabel(AppLocalizations loc, String key) => switch (key) {
@@ -53,8 +54,7 @@ String formatFieldValue(Map<String, dynamic> set, String key) {
   if (key == 'time_seconds') {
     final v = (set['time_seconds'] as int?);
     if (v == null) return '-';
-    if (v >= 60) return '${v ~/ 60}:${(v % 60).toString().padLeft(2, '0')}';
-    return '${v}s';
+    return DurationFormat.minSecOrSeconds(v);
   }
   return '-';
 }

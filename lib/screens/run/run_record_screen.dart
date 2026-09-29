@@ -15,8 +15,6 @@ import 'package:workout_notes/models/run_session_goal.dart';
 import 'package:workout_notes/models/run_step_snapshot.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
-import 'package:workout_notes/repositories/body_measurement_repository.dart';
-import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/screens/run/run_post_run_review_screen.dart';
 import 'package:workout_notes/screens/run/run_voice_settings_screen.dart';
 import 'package:workout_notes/services/run_audio_gate_service.dart';
@@ -32,6 +30,7 @@ import 'package:workout_notes/widgets/run/record/run_record_map.dart';
 import 'package:workout_notes/widgets/run/record/run_record_sheet.dart';
 import 'package:workout_notes/widgets/run/record/run_record_top_bar.dart';
 import 'package:workout_notes/widgets/run/run_permission_onboarding_sheet.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 class RunRecordScreen extends StatefulWidget {
   /// Structured session to execute. When set, the step engine drives the cues
@@ -64,7 +63,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   final _indoorService = StationaryBikeTrackingService.instance;
   final _mapController = MapController();
   final _coach = RunSessionCoach();
-  final _planRepo = RunPlanRepository();
+  final _planRepo = DatabaseHelper.instance.runPlanRepo;
 
   bool _busy = false;
   bool _sheetExpanded = false;
@@ -148,7 +147,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     final fields = await RunDataFieldsStore.instance.load();
     var weight = 70.0;
     try {
-      weight = await BodyMeasurementRepository().getLatestWeightKg() ?? 70;
+      weight = await DatabaseHelper.instance.bodyMeasurementRepo.getLatestWeightKg() ?? 70;
     } catch (_) {
       // Optional table on partially migrated databases: keep the default.
     }

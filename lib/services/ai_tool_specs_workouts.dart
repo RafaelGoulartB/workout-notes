@@ -2,6 +2,7 @@
 // to the repository-only rule): they only shape data for the model.
 import 'package:workout_notes/models/ai_message_role.dart';
 import 'package:workout_notes/services/ai_tool_spec.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Strength-training tools: workouts, exercises, routines, body measurements.
 List<AiToolSpec> workoutToolSpecs(AiToolDeps d) => [
@@ -193,14 +194,11 @@ List<AiToolSpec> workoutToolSpecs(AiToolDeps d) => [
       final effectiveEnd = DateTime.tryParse(endDate ?? '') ?? DateTime.now();
       final effectiveStart =
           explicitStart ??
-          effectiveEnd
-              .subtract(Duration(days: days - 1))
-              .toIso8601String()
-              .substring(0, 10);
+          dateKey(effectiveEnd.subtract(Duration(days: days - 1)));
       return aiToolOk(
         await d.workouts.trainingSummary(
           startDate: effectiveStart,
-          endDate: endDate ?? effectiveEnd.toIso8601String().substring(0, 10),
+          endDate: endDate ?? dateKey(effectiveEnd),
         ),
       );
     },

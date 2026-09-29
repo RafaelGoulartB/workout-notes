@@ -13,14 +13,6 @@ class DailyNutritionSummary {
     this.hasIncompleteData = false,
   });
 
-  /// Calories left to reach the goal. Returns null when no calorie
-  /// goal is configured.
-  double? remainingCalories(double? goalCalories) {
-    if (goalCalories == null) return null;
-    final consumedCalories = consumed.calories ?? 0;
-    return goalCalories - consumedCalories;
-  }
-
   static const empty = DailyNutritionSummary(
     date: '',
     consumed: NutritionValues.empty,

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/goal.dart';
-import 'package:workout_notes/repositories/goal_repository.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Bottom sheet for creating or editing a user goal.
 /// Multi-step flow: scope → metric → period+target.
@@ -102,7 +102,7 @@ class _GoalFormSheetState extends State<GoalFormSheet> {
   Future<void> _loadSuggestion() async {
     setState(() => _isLoadingSuggestion = true);
     try {
-      final repo = GoalRepository();
+      final repo = DatabaseHelper.instance.goalRepo;
       // The unit toggle (km/mi) is irrelevant for the suggestion because the
       // user will re-enter their preferred unit.
       final s = await repo.suggestTarget(_scope, _metric, _period);

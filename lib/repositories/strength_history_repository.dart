@@ -10,6 +10,7 @@ import 'package:workout_notes/repositories/workout_repository.dart';
 import 'package:workout_notes/repositories/workout_sql.dart';
 import 'package:workout_notes/utils/sql_helpers.dart';
 import 'package:workout_notes/utils/strength_workout_records.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// How the exercise-name part of a search matches an `exercises` row
 /// (`id`, `name`, `locale_key`). Lets the UI search localized names.
@@ -64,7 +65,7 @@ class StrengthHistoryFilter {
       ),
       StrengthHistoryPeriod.thisYear => DateTime(now.year),
     };
-    return from?.toIso8601String().substring(0, 10);
+    return from == null ? null : dateKey(from);
   }
 }
 
@@ -133,8 +134,6 @@ class StrengthHistoryWorkout {
     required this.muscles,
     this.recordCount = 0,
   });
-
-  DateTime get moment => startedAt ?? day;
 
   /// Routine day name, else routine name; null for a free workout.
   String? get title {
@@ -263,7 +262,7 @@ class StrengthHistoryRepository extends BaseRepository {
     WorkoutRepository? workouts,
     StrengthRecordsRepository? records,
   }) : _workouts = workouts ?? DatabaseHelper.instance.workoutRepo,
-       _records = records ?? StrengthRecordsRepository();
+       _records = records ?? DatabaseHelper.instance.strengthRecordsRepo;
 
   static const _anaerobic =
       "IFNULL(c.energy_system, 'anaerobic') = 'anaerobic'";
@@ -401,7 +400,7 @@ class StrengthHistoryRepository extends BaseRepository {
     final comment = (r['comment'] as String?)?.trim();
     return StrengthHistoryWorkout(
       id: r['id'] as String,
-      day: DateTime(day.year, day.month, day.day),
+      day: dayOf(day),
       startedAt: start,
       durationSeconds: (r['duration_seconds'] as num?)?.toInt() ?? 0,
       feelingRating: (r['feeling_rating'] as num?)?.toInt() ?? 0,

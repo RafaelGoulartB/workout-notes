@@ -3,11 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
-import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 
 import 'periodization_plan_editor_screen.dart';
 import 'periodization_plan_screen.dart';
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Every plan — active first, then drafts, finished and archived — each
 /// with its roadmap. Tapping one opens it; the FAB creates a new plan.
@@ -20,7 +21,7 @@ class PeriodizationPlansScreen extends StatefulWidget {
 }
 
 class _PeriodizationPlansScreenState extends State<PeriodizationPlansScreen> {
-  final _repository = PeriodizationRepository();
+  final _repository = DatabaseHelper.instance.periodizationRepo;
   List<(PeriodizationPlan, List<PeriodizationPhase>)>? _plans;
 
   @override
@@ -65,7 +66,7 @@ class _PeriodizationPlansScreenState extends State<PeriodizationPlansScreen> {
     final scheme = theme.colorScheme;
     final plans = _plans;
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = dayOf(now);
     return Scaffold(
       appBar: AppBar(title: Text(loc.planningMyPlans)),
       floatingActionButton: FloatingActionButton.extended(

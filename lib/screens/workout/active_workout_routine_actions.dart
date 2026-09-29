@@ -84,7 +84,7 @@ mixin _ActiveWorkoutRoutineActions
 
   Future<Set<String>> _plannedRoutineIdsForToday() async {
     try {
-      final repository = PeriodizationRepository();
+      final repository = DatabaseHelper.instance.periodizationRepo;
       final phase = await repository.getEffectivePhase(DateTime.now());
       if (phase == null) return const {};
       final target = await repository.getEffectiveTarget(phase.id);

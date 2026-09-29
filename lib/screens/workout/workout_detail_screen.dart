@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/repositories/strength_history_repository.dart';
-import 'package:workout_notes/repositories/workout_repository.dart';
 import 'package:workout_notes/screens/workout/active_workout_screen.dart';
 import 'package:workout_notes/screens/workout/edit_workout_screen.dart';
 import 'package:workout_notes/screens/workout/exercise_detail_tabs_screen.dart';
@@ -14,6 +13,7 @@ import 'package:workout_notes/widgets/strength/workout/strength_workout_exercise
 import 'package:workout_notes/widgets/strength/workout/strength_workout_hero.dart';
 import 'package:workout_notes/widgets/strength/workout/strength_workout_muscle_split.dart';
 import 'package:workout_notes/widgets/strength/workout/strength_workout_records_card.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 class WorkoutDetailScreen extends StatefulWidget {
   final String workoutId;
@@ -26,8 +26,8 @@ class WorkoutDetailScreen extends StatefulWidget {
 enum _DetailAction { continueWorkout, editDate, copy, delete }
 
 class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
-  final _workoutRepo = WorkoutRepository();
-  final _historyRepo = StrengthHistoryRepository();
+  final _workoutRepo = DatabaseHelper.instance.workoutRepo;
+  final _historyRepo = DatabaseHelper.instance.strengthHistoryRepo;
   StrengthWorkoutDetail? _detail;
   bool _isLoading = true;
 

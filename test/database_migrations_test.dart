@@ -9,7 +9,7 @@ import 'package:workout_notes/services/run_route_codec.dart';
 import 'support/schema_snapshot.dart';
 import 'support/test_db.dart';
 
-const _latest = 56;
+const _latest = 57;
 const _now = '2026-08-01T08:00:00.000';
 
 /// Upgrade coverage for every step from the v37 migration floor to the current
@@ -615,6 +615,56 @@ void main() {
         expect(await database.query('run_activities'), hasLength(2));
       },
     );
+  });
+
+  group('v57', () {
+    test('rewrites UTC run timestamps as local wall-clock time', () async {
+      final database = await openAt(56);
+      const utcStart = '2026-05-10T00:30:00.000Z';
+      const utcEnd = '2026-05-10T01:15:00.000Z';
+      await database.insert('run_activities', {
+        'id': 'utc-run',
+        'started_at': utcStart,
+        'ended_at': utcEnd,
+        'created_at': '2026-05-10T01:16:00.000Z',
+        'updated_at': '2026-05-10T01:16:00.000Z',
+      });
+      await database.insert('run_activities', {
+        'id': 'local-run',
+        'started_at': '2026-05-11T07:00:00.000',
+        'ended_at': null,
+        'created_at': '2026-05-11T08:00:00.000',
+        'updated_at': '2026-05-11T08:00:00.000',
+      });
+
+      await DatabaseSchema.onUpgrade(database, 56, 57);
+
+      final utc = (await database.query(
+        'run_activities',
+        where: 'id = ?',
+        whereArgs: ['utc-run'],
+      )).single;
+      expect(
+        utc['started_at'],
+        DateTime.parse(utcStart).toLocal().toIso8601String(),
+      );
+      expect(
+        utc['ended_at'],
+        DateTime.parse(utcEnd).toLocal().toIso8601String(),
+      );
+      expect(utc['started_at'], isNot(endsWith('Z')));
+      expect(utc['created_at'], isNot(endsWith('Z')));
+      expect(utc['updated_at'], isNot(endsWith('Z')));
+
+      final local = (await database.query(
+        'run_activities',
+        where: 'id = ?',
+        whereArgs: ['local-run'],
+      )).single;
+      expect(local['started_at'], '2026-05-11T07:00:00.000');
+      expect(local['ended_at'], isNull);
+      expect(local['created_at'], '2026-05-11T08:00:00.000');
+    });
   });
 }
 

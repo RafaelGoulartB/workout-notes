@@ -9,11 +9,11 @@ import 'package:workout_notes/models/periodization_schedule.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/periodization/phase_seed.dart';
-import 'package:workout_notes/repositories/body_measurement_repository.dart';
-import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/widgets/periodization/plan_overview.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Creates or re-plans a plan: its name, the Monday it starts and the
 /// ordered list of phases, each lasting a number of weeks. Phases are laid
@@ -48,7 +48,7 @@ class _EditablePhase {
 
 class _PeriodizationPlanEditorScreenState
     extends State<PeriodizationPlanEditorScreen> {
-  final _repository = PeriodizationRepository();
+  final _repository = DatabaseHelper.instance.periodizationRepo;
   final _name = TextEditingController();
   late DateTime _start;
   final List<_EditablePhase> _phases = [];
@@ -81,15 +81,15 @@ class _PeriodizationPlanEditorScreenState
   }
 
   static DateTime _nextMonday(DateTime date) {
-    final day = DateTime(date.year, date.month, date.day);
+    final day = dayOf(date);
     if (day.weekday == DateTime.monday) return day;
     return day.add(Duration(days: 8 - day.weekday));
   }
 
   Future<void> _load() async {
     final results = await Future.wait<Object?>([
-      NutritionRepository().getActiveGoal(),
-      BodyMeasurementRepository().getLatestWeightKg(),
+      DatabaseHelper.instance.nutritionRepo.getActiveGoal(),
+      DatabaseHelper.instance.bodyMeasurementRepo.getLatestWeightKg(),
       _repository.getActivePlan(),
     ]);
     _tdee = (results[0] as NutritionGoal?)?.tdee;

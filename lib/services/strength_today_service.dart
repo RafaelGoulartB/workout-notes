@@ -2,6 +2,7 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:workout_notes/repositories/strength_repository.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// `app_settings` key of the weekly session goal the lifter set by hand.
 const String kStrengthWeeklyGoalSettingKey = 'strength_weekly_goal_sessions';
@@ -85,8 +86,6 @@ class StrengthHomeSnapshot {
 
 /// Pure decision logic, kept apart from the repositories for plain tests.
 abstract final class StrengthTodayResolver {
-  static DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
-
   /// The day after [lastDayId] in [days] (already ordered), wrapping around.
   /// Without a known last day, [fallbackIndex] (modulo the length) or the
   /// first day is used.
@@ -107,7 +106,7 @@ abstract final class StrengthTodayResolver {
   /// [strengthDays]; null when the list is empty.
   static DateTime? nextStrengthDate(DateTime today, List<int> strengthDays) {
     if (strengthDays.isEmpty) return null;
-    final day = _day(today);
+    final day = dayOf(today);
     for (var i = 1; i <= 7; i++) {
       final date = day.add(Duration(days: i));
       if (strengthDays.contains(date.weekday)) return date;
@@ -125,7 +124,7 @@ abstract final class StrengthTodayResolver {
   }) {
     if (doneToday) return StrengthTodayStatus.done;
     if (plannedStrengthDays.isNotEmpty &&
-        !plannedStrengthDays.contains(_day(today).weekday)) {
+        !plannedStrengthDays.contains(dayOf(today).weekday)) {
       return StrengthTodayStatus.rest;
     }
     return hasSuggestion
@@ -139,14 +138,14 @@ class StrengthTodayService {
   final StrengthRepository _repo;
 
   StrengthTodayService({StrengthRepository? repo})
-    : _repo = repo ?? StrengthRepository();
+    : _repo = repo ?? DatabaseHelper.instance.strengthRepo;
 
   Future<StrengthHomeSnapshot> load({
     DateTime? now,
     List<StrengthWorkoutSummary>? finished,
   }) async {
     final clock = now ?? DateTime.now();
-    final day = DateTime(clock.year, clock.month, clock.day);
+    final day = dayOf(clock);
     final helper = DatabaseHelper.instance;
 
     final todayWorkouts =

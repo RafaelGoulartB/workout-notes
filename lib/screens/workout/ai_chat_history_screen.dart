@@ -7,6 +7,7 @@ import '../../models/ai_chat_thread.dart';
 import '../../state/ai_chat_service.dart';
 import '../../widgets/ai/ai_history_thread_card.dart';
 import '../../widgets/settings/settings.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 class AiChatHistoryScreen extends StatefulWidget {
   const AiChatHistoryScreen({super.key});
@@ -376,8 +377,8 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
 
   int _ageInDays(DateTime value) {
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final date = DateTime(value.year, value.month, value.day);
+    final today = dayOf(now);
+    final date = dayOf(value);
     return today.difference(date).inDays.clamp(0, 999999);
   }
 

@@ -9,8 +9,6 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
 import 'package:workout_notes/models/sleep_night_summary.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
-import 'package:workout_notes/repositories/sleep_repository.dart';
-import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'package:workout_notes/services/sleep_goal_service.dart';
 
@@ -29,6 +27,9 @@ import 'sleep_monitor_result_screen.dart';
 import 'sleep_monitor_screen.dart';
 import 'traditional_alarms_screen.dart';
 import 'settings_screen.dart';
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/duration_format.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 class SleepTrackerScreen extends StatefulWidget {
   const SleepTrackerScreen({super.key});
@@ -41,8 +42,8 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   static const int _historyPageSize = 10;
   static const int _trendDays = 30;
 
-  final _repository = SleepRepository();
-  final _monitorRepository = SleepMonitorRepository();
+  final _repository = DatabaseHelper.instance.sleepRepo;
+  final _monitorRepository = DatabaseHelper.instance.sleepMonitorRepo;
   final _monitorService = SleepMonitorService.instance;
   final _sleepGoalService = SleepGoalService();
   List<SleepEntry> _entries = const [];
@@ -68,7 +69,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   @override
   void initState() {
     super.initState();
-    _weekEnd = _dateOnly(DateTime.now());
+    _weekEnd = dayOf(DateTime.now());
     _monitorService.addListener(_onMonitorChanged);
     _lastRecoveryCount = _monitorService.recoveredCount;
     _bootstrap();
@@ -123,7 +124,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     final token = _generation.begin();
     if (mounted && !_hasLoaded) setState(() => _isLoading = true);
     try {
-      final today = _dateOnly(DateTime.now());
+      final today = dayOf(DateTime.now());
       final results = await Future.wait<Object>([
         _repository.getEntries(limit: _historyPageSize + 1),
         _repository.getDashboardStats(referenceDate: _weekEnd),
@@ -369,7 +370,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     if (defaultTargetPlatform != TargetPlatform.android) return null;
     final isActive = _monitorService.isMonitoring;
     final loc = AppLocalizations.of(context)!;
-    final elapsed = _formatElapsed(_monitorService.state.elapsed);
+    final elapsed = DurationFormat.clock(_monitorService.state.elapsed);
     return FloatingActionButton.extended(
       heroTag: 'sleep-monitor-fab',
       onPressed: _openMonitor,
@@ -412,13 +413,6 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
       ),
   ];
 
-  static String _formatElapsed(Duration duration) {
-    final hours = duration.inHours.toString().padLeft(2, '0');
-    final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
-    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
-    return '$hours:$minutes:$seconds';
-  }
-
   Future<void> _openTraditionalAlarms() async {
     await Navigator.push(
       context,
@@ -436,12 +430,12 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   }
 
   bool get _canGoToNextWeek {
-    return _weekEnd.isBefore(_dateOnly(DateTime.now()));
+    return _weekEnd.isBefore(dayOf(DateTime.now()));
   }
 
   Future<void> _changeWeek(int direction) async {
     if (_isChangingWeek) return;
-    final today = _dateOnly(DateTime.now());
+    final today = dayOf(DateTime.now());
     var candidate = _weekEnd.add(Duration(days: direction * 7));
     if (candidate.isAfter(today)) candidate = today;
     if (candidate == _weekEnd) return;
@@ -667,6 +661,4 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     );
   }
 
-  static DateTime _dateOnly(DateTime value) =>
-      DateTime(value.year, value.month, value.day);
 }

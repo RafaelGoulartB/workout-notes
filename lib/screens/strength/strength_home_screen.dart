@@ -6,8 +6,6 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/goal.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
-import 'package:workout_notes/repositories/strength_repository.dart';
-import 'package:workout_notes/repositories/workout_repository.dart';
 import 'package:workout_notes/screens/strength/strength_history_screen.dart';
 import 'package:workout_notes/screens/strength/strength_insights_screen.dart';
 import 'package:workout_notes/screens/strength/strength_records_screen.dart';
@@ -32,6 +30,7 @@ import 'package:workout_notes/widgets/strength/home/strength_home_records_sectio
 import 'package:workout_notes/widgets/strength/home/strength_home_today_card.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_trends_card.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_week_card.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 enum _HomeMenu { routines, exercises, history, records, calendar }
 
@@ -46,9 +45,9 @@ class StrengthHomeScreen extends StatefulWidget {
 }
 
 class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
-  final _repo = StrengthRepository();
-  final _recordsRepo = StrengthRecordsRepository();
-  final _workoutRepo = WorkoutRepository();
+  final _repo = DatabaseHelper.instance.strengthRepo;
+  final _recordsRepo = DatabaseHelper.instance.strengthRecordsRepo;
+  final _workoutRepo = DatabaseHelper.instance.workoutRepo;
   final _todayService = StrengthTodayService();
 
   List<StrengthWorkoutSummary> _finished = const [];
@@ -71,8 +70,8 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
     setState(() => _loading = _analytics == null);
     try {
       final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final monday = StrengthWeekAnalytics.mondayOf(today);
+      final today = dayOf(now);
+      final monday = mondayOf(today);
       // Name older workouts after the routine day they trained (one-off).
       await StrengthRoutineDayInference.runOnce();
       final finished = await _repo.loadFinishedWorkouts();

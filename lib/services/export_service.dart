@@ -3,18 +3,18 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:csv/csv.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/app_localizations.dart';
 import '../l10n/l10n_exercises.dart';
-import '../repositories/workout_repository.dart';
 import '../repositories/export_import_repository.dart';
 import '../repositories/nutrition_repository.dart';
 import 'backup_media_service.dart';
 import 'package:workout_notes/services/backup_exception.dart';
+import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/utils/csv_writer.dart';
 
 typedef SaveFileCallback =
     Future<String?> Function({
@@ -49,7 +49,7 @@ class BackupFileInfo {
 }
 
 class ExportService {
-  final _workoutRepo = WorkoutRepository();
+  final _workoutRepo = DatabaseHelper.instance.workoutRepo;
   final ExportImportRepository _exportRepo;
   final SaveFileCallback _saveFile;
   final ShareFileCallback _shareFile;
@@ -64,7 +64,7 @@ class ExportService {
     BackupMediaService? backupMedia,
     Future<SharedPreferences> Function()? preferencesProvider,
     this.backupsDirectoryProvider,
-  }) : _exportRepo = exportRepo ?? ExportImportRepository(),
+  }) : _exportRepo = exportRepo ?? DatabaseHelper.instance.exportImportRepo,
        _saveFile = saveFile ?? _saveFileWithPicker,
        _shareFile = shareFile ?? _shareFileWithSheet,
        _backupMedia = backupMedia ?? BackupMediaService(),
@@ -432,7 +432,7 @@ class ExportService {
   // Nutrition CSV export
   // ===================================================================
 
-  final NutritionRepository _nutritionRepo = NutritionRepository();
+  final NutritionRepository _nutritionRepo = DatabaseHelper.instance.nutritionRepo;
 
   /// Writes the meal log history to a CSV file in the temp directory
   /// and returns the path.
@@ -512,7 +512,7 @@ class ExportService {
             : loc.exportNutritionFlagComplete,
       ]);
     }
-    final csvData = csv.encode(csvRows);
+    final csvData = encodeCsv(csvRows);
     final dir = await getTemporaryDirectory();
     final path =
         '${dir.path}/workout_notes_nutrition_${DateTime.now().millisecondsSinceEpoch}.csv';

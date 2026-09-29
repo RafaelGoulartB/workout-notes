@@ -1,4 +1,5 @@
 import 'package:workout_notes/models/run_plan_workout.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// A session as the week-balance check sees it.
 class RunBalanceSession {
@@ -16,7 +17,7 @@ class RunBalanceSession {
     required this.kind,
     required this.km,
     this.fixed = false,
-  }) : date = DateTime(date.year, date.month, date.day);
+  }) : date = dayOf(date);
 
   RunBalanceSession movedTo(DateTime day) =>
       RunBalanceSession(id: id, date: day, kind: kind, km: km, fixed: fixed);
@@ -111,7 +112,7 @@ abstract final class RunWeekBalance {
     DateTime? earliest,
   }) {
     final moving = week.firstWhere((s) => s.id == movingId);
-    final target = DateTime(to.year, to.month, to.day);
+    final target = dayOf(to);
     List<RunBalanceSession> placed(RunBalanceSession s, DateTime day) => [
       for (final other in week)
         if (other.id == s.id) other.movedTo(day) else other,
@@ -147,10 +148,10 @@ abstract final class RunWeekBalance {
     }
 
     // Nearest day in the same Monday–Sunday week that is clean.
-    final monday = target.subtract(Duration(days: target.weekday - 1));
+    final monday = mondayOf(target);
     final floor = earliest == null
         ? null
-        : DateTime(earliest.year, earliest.month, earliest.day);
+        : dayOf(earliest);
     DateTime? better;
     var bestGap = 99;
     for (var i = 0; i < 7; i++) {

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import 'base_repository.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Repository for body measurements CRUD and analytics operations.
 class BodyMeasurementRepository extends BaseRepository {
@@ -23,7 +24,7 @@ class BodyMeasurementRepository extends BaseRepository {
       'value': value,
       'secondary_value': secondaryValue,
       'unit': unit,
-      'date': (date ?? DateTime.now()).toIso8601String().substring(0, 10),
+      'date': dateKey(date ?? DateTime.now()),
       'comment': comment,
       'time_of_day': timeOfDay,
       'is_fasted': isFasted ? 1 : 0,
@@ -46,7 +47,7 @@ class BodyMeasurementRepository extends BaseRepository {
         'value': m['value'],
         'secondary_value': m['secondary_value'],
         'unit': m['unit'],
-        'date': m['date'] ?? DateTime.now().toIso8601String().substring(0, 10),
+        'date': m['date'] ?? dateKey(DateTime.now()),
         'comment': m['comment'],
         'time_of_day': m['time_of_day'],
         'is_fasted': (m['is_fasted'] as bool?) == true ? 1 : 0,
@@ -126,10 +127,7 @@ class BodyMeasurementRepository extends BaseRepository {
     int months = 6,
   }) async {
     final db = await this.db;
-    final start = DateTime.now()
-        .subtract(Duration(days: months * 30))
-        .toIso8601String()
-        .substring(0, 10);
+    final start = dateKey(DateTime.now().subtract(Duration(days: months * 30)));
     return db.rawQuery(
       '''
       SELECT w.date, w.value as weight,

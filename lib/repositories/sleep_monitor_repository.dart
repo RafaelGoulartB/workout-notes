@@ -9,6 +9,7 @@ import '../models/sleep_stage_summary.dart';
 import 'base_repository.dart';
 import '../services/sleep_stage_analysis_service.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// SQLite persistence and native-spool import for sleep monitoring.
 class SleepMonitorRepository extends BaseRepository {
@@ -341,7 +342,7 @@ class SleepEntryRepositoryAdapter {
     DatabaseExecutor database,
     DateTime date,
   ) async {
-    final value = date.toIso8601String().substring(0, 10);
+    final value = dateKey(date);
     final rows = await database.query(
       'sleep_entries',
       where: 'date = ?',

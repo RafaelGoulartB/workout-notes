@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'test_data_context.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 class WellnessGenerationResult {
   final int sleepNights;
@@ -44,7 +45,7 @@ class TestDataWellnessGenerator {
     for (var day = 0; day <= totalDays; day++) {
       if (context.random.nextDouble() < 0.06) continue;
       final wakeDate = context.start.add(Duration(days: day));
-      final date = context.date(wakeDate);
+      final date = dateKey(wakeDate);
       final existing = await context.database.query(
         'sleep_entries',
         columns: const ['id'],
@@ -231,7 +232,7 @@ class TestDataWellnessGenerator {
         if (meal.type == 'snacks' && context.random.nextDouble() < 0.28) {
           continue;
         }
-        final dateString = context.date(date);
+        final dateString = dateKey(date);
         final occupied = await context.database.query(
           'meal_logs',
           columns: const ['id'],

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import 'package:workout_notes/repositories/exercise_repository.dart';
 import 'package:workout_notes/utils/exercise_equipment.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// A bottom sheet that lets the user add/remove exercises to a workout or routine.
 /// Keeps open and calls [onExerciseAdded] / [onExerciseRemoved] in real-time.
@@ -25,7 +25,7 @@ class ExercisePickerSheet extends StatefulWidget {
 }
 
 class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
-  final _exerciseRepo = ExerciseRepository();
+  final _exerciseRepo = DatabaseHelper.instance.exerciseRepo;
   List<Map<String, dynamic>> _categories = [];
   final Map<String, List<Map<String, dynamic>>> _exercisesByCategory = {};
   String? _selectedCategoryId;

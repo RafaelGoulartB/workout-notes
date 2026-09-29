@@ -1,4 +1,5 @@
 import 'package:workout_notes/services/ai_tool_spec.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Goal tools.
 List<AiToolSpec> goalToolSpecs(AiToolDeps d) => [
@@ -85,8 +86,8 @@ List<AiToolSpec> goalToolSpecs(AiToolDeps d) => [
         'history': history
             .map(
               (r) => {
-                'start': r.start.toIso8601String().substring(0, 10),
-                'end': r.end.toIso8601String().substring(0, 10),
+                'start': dateKey(r.start),
+                'end': dateKey(r.end),
                 'value': r.value,
                 'targetValue': r.targetValue,
                 'wasCompleted': r.wasCompleted,

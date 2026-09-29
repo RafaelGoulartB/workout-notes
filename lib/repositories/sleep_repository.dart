@@ -54,7 +54,7 @@ class SleepRepository extends BaseRepository {
   Future<SleepDashboardStats> getDashboardStats({
     DateTime? referenceDate,
   }) async {
-    final end = _dateOnly(referenceDate ?? DateTime.now());
+    final end = dayOf(referenceDate ?? DateTime.now());
     final entries7 = await getEntries(
       from: end.subtract(const Duration(days: 6)),
       to: end,
@@ -183,6 +183,4 @@ class SleepRepository extends BaseRepository {
     return math.min(direct, 1440 - direct);
   }
 
-  static DateTime _dateOnly(DateTime value) =>
-      DateTime(value.year, value.month, value.day);
 }

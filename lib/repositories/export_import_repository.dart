@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:sqflite/sqflite.dart';
 import 'base_repository.dart';
+import 'package:workout_notes/database/migrations/database_migrations.dart';
 import 'package:workout_notes/services/run_route_codec.dart';
 
 /// Repository for data export and import operations.
@@ -286,6 +287,8 @@ class ExportImportRepository extends BaseRepository {
       ]) {
         totalRows += await _insertAll(txn, table, data[table]);
       }
+      // Backups made before v57 hold native runs as UTC (`...Z`) instants.
+      await DatabaseMigrations.normalizeRunTimestamps(txn);
       totalRows += await _insertRunRoutes(txn, data['run_route_data']);
       totalRows += await _insertAll(txn, 'run_splits', data['run_splits']);
       totalRows += await _insertAll(txn, 'run_laps', data['run_laps']);

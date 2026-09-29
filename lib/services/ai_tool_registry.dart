@@ -43,7 +43,7 @@ class AiToolRegistry {
     AiWorkoutToolService? workouts,
     AiRunToolService? runs,
   }) : db = db ?? DatabaseHelper.instance,
-       goalRepo = goalRepo ?? GoalRepository(),
+       goalRepo = goalRepo ?? DatabaseHelper.instance.goalRepo,
        wellness = wellness ?? AiWellnessAnalyticsService(db: db),
        nutrition = nutrition ?? AiNutritionToolService(db: db),
        sleep = sleep ?? AiSleepToolService(db: db),

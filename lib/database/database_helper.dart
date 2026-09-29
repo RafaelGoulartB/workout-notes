@@ -17,12 +17,17 @@ import '../repositories/periodization_repository.dart';
 import '../repositories/run_repository.dart';
 import '../repositories/run_plan_repository.dart';
 import '../repositories/run_gear_repository.dart';
+import '../repositories/strength_repository.dart';
+import '../repositories/strength_records_repository.dart';
+import '../repositories/strength_history_repository.dart';
+import '../repositories/run_insights_repository.dart';
+import '../repositories/medication_repository.dart';
 import '../repositories/ai_chat_repository.dart';
 import '../repositories/ai_routine_mutation_repository.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 56;
+  static const _dbVersion = 57;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -49,6 +54,13 @@ class DatabaseHelper {
   late final RunRepository runRepo = RunRepository();
   late final RunPlanRepository runPlanRepo = RunPlanRepository();
   late final RunGearRepository runGearRepo = RunGearRepository();
+  late final StrengthRepository strengthRepo = StrengthRepository();
+  late final StrengthRecordsRepository strengthRecordsRepo =
+      StrengthRecordsRepository();
+  late final StrengthHistoryRepository strengthHistoryRepo =
+      StrengthHistoryRepository();
+  late final RunInsightsRepository runInsightsRepo = RunInsightsRepository();
+  late final MedicationRepository medicationRepo = MedicationRepository();
   late final AiChatRepository aiChatRepo = AiChatRepository();
   late final AiRoutineMutationRepository aiRoutineMutationRepo =
       AiRoutineMutationRepository();

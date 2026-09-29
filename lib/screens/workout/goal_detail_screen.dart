@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/goal.dart';
-import 'package:workout_notes/repositories/goal_repository.dart';
 import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
 import 'package:workout_notes/widgets/goals/goal_contributing_workouts.dart';
 import 'package:workout_notes/widgets/goals/goal_form_sheet.dart';
@@ -40,7 +39,7 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
     setState(() => _isLoading = true);
     try {
       _isKm = await widget.db.settingsRepo.getIsDistanceKm();
-      final repo = GoalRepository();
+      final repo = DatabaseHelper.instance.goalRepo;
       final (current, history) =
           await repo.getProgressWithHistory(_goal, historyCount: 6);
       final contributors = await repo.getContributingWorkouts(_goal);

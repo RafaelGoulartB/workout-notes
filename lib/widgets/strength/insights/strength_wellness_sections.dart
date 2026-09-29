@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_insights_calculator.dart';
 import 'package:workout_notes/utils/strength_insights_format.dart';
@@ -160,7 +159,7 @@ class _StrengthBodyCardState extends State<StrengthBodyCard> {
 
   Future<void> _load() async {
     try {
-      final body = BodyMeasurementRepository();
+      final body = DatabaseHelper.instance.bodyMeasurementRepo;
       final results = await Future.wait([
         body.getBodyMeasurementsSummary(),
         body.getBodyCompositionTrend(),

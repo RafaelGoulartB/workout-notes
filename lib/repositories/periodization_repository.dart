@@ -1813,7 +1813,7 @@ class PeriodizationRepository extends BaseRepository {
   /// Exclusive upper bound for "started on or before [date]" on a
   /// `started_at` text column: the day after, as `yyyy-MM-dd`.
   static String _dayAfter(DateTime date) =>
-      dateKey(DateTime(date.year, date.month, date.day + 1));
+      dateKey(addDays(date, 1));
 }
 
 class PeriodizationValidationException implements Exception {

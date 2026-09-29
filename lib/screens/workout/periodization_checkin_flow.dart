@@ -5,10 +5,11 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_checkin.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
-import 'package:workout_notes/repositories/periodization_repository.dart';
 
 import 'periodization_checkin_screen.dart';
 import 'periodization_phase_editor_screen.dart';
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Weekly review followed by what the decision implies: nothing (keep
 /// going), opening the phase editor (adjust) or ending the phase at the end
@@ -33,12 +34,7 @@ abstract final class PeriodizationCheckinFlow {
 
     switch (decision) {
       case PeriodizationDecision.maintain:
-        final today = DateTime.now();
-        final monday = DateTime(
-          today.year,
-          today.month,
-          today.day,
-        ).subtract(Duration(days: today.weekday - DateTime.monday));
+        final monday = mondayOf(DateTime.now());
         final next = DateFormat.MMMd(
           Intl.defaultLocale,
         ).format(monday.add(const Duration(days: 7)));
@@ -72,7 +68,7 @@ abstract final class PeriodizationCheckinFlow {
           ),
         );
         if (confirmed == true) {
-          await PeriodizationRepository().endPhaseThisWeek(phase.id);
+          await DatabaseHelper.instance.periodizationRepo.endPhaseThisWeek(phase.id);
         }
     }
     return true;

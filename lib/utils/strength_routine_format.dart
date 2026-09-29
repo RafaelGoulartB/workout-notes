@@ -1,5 +1,6 @@
 import 'package:intl/intl.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 
 /// Locale-aware display helpers shared by the routine screens.
 abstract final class StrengthRoutineFormat {
@@ -19,9 +20,7 @@ abstract final class StrengthRoutineFormat {
 
   /// Rest as `m:ss` (`90` -> `1:30`), language independent.
   static String rest(int seconds) {
-    final minutes = seconds ~/ 60;
-    final rest = seconds % 60;
-    return '$minutes:${rest.toString().padLeft(2, '0')}';
+    return DurationFormat.minSec(seconds);
   }
 
   /// Short date such as `12 set` / `Sep 12`.

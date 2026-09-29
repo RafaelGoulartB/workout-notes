@@ -33,7 +33,6 @@ class AiChatMessage {
   bool get isUser => role == AiMessageRole.user;
   bool get isAssistant => role == AiMessageRole.assistant;
   bool get isTool => role == AiMessageRole.tool;
-  bool get isSystem => role == AiMessageRole.system;
 
   AiChatMessage copyWith({
     String? content,

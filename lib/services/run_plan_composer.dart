@@ -10,6 +10,7 @@ import 'package:workout_notes/services/run_plan_build_config.dart';
 import 'package:workout_notes/services/run_plan_outline.dart';
 import 'package:workout_notes/services/run_plan_text.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 export 'package:workout_notes/services/run_plan_build_config.dart';
 export 'package:workout_notes/services/run_plan_outline.dart';
@@ -318,10 +319,10 @@ abstract final class RunPlanComposer {
     // From Friday on, what is left of this week cannot hold a training
     // week, so week 1 is next week.
     final today = config.startDate ?? DateTime.now();
-    final start = weekStartOf(
+    final start = mondayOf(
       today,
     ).add(Duration(days: today.weekday >= DateTime.friday ? 7 : 0));
-    final raceWeek = weekStartOf(raceDate);
+    final raceWeek = mondayOf(raceDate);
     final weeksToRace = (raceWeek.difference(start).inDays / 7).round() + 1;
     if (weeksToRace >= templateWeeks) {
       // More runway than the plan needs: start later so race week lands on
@@ -355,12 +356,6 @@ abstract final class RunPlanComposer {
       raceWeekday: raceDate.weekday,
       raceTooSoon: weeksToRace < minWeeks,
     );
-  }
-
-  /// Monday of the week containing [date].
-  static DateTime weekStartOf(DateTime date) {
-    final day = DateTime(date.year, date.month, date.day);
-    return day.subtract(Duration(days: day.weekday - 1));
   }
 
   /// How long the longest training run must get for the race to be safe.

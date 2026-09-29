@@ -8,12 +8,10 @@ import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/services/run_week_balance.dart';
 import 'package:workout_notes/widgets/run/run_balance_dialog.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import '../../repositories/run_plan_repository.dart';
-import '../../repositories/run_repository.dart';
-import '../../repositories/workout_repository.dart';
-import '../../repositories/routine_repository.dart';
 import 'workout_detail_screen.dart';
 import 'future_workout_planner_screen.dart';
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -23,10 +21,10 @@ class CalendarScreen extends StatefulWidget {
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
-  final _workoutRepo = WorkoutRepository();
-  final _routineRepo = RoutineRepository();
-  final _runRepo = RunRepository();
-  final _runPlanRepo = RunPlanRepository();
+  final _workoutRepo = DatabaseHelper.instance.workoutRepo;
+  final _routineRepo = DatabaseHelper.instance.routineRepo;
+  final _runRepo = DatabaseHelper.instance.runRepo;
+  final _runPlanRepo = DatabaseHelper.instance.runPlanRepo;
   DateTime _selectedDate = DateTime.now();
   int _currentMonth = DateTime.now().month;
   int _currentYear = DateTime.now().year;
@@ -37,7 +35,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Map<String, List<ScheduledRun>> _plannedRunsByDate = {};
   bool _isLoading = true;
 
-  String get _selectedKey => _selectedDate.toIso8601String().substring(0, 10);
+  String get _selectedKey => dateKey(_selectedDate);
 
   List<RunActivity> get _selectedDayRuns =>
       _runsByDate[_selectedKey] ?? const [];
@@ -87,7 +85,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final scheduled = await _runPlanRepo.getScheduledRuns(monthStart, monthEnd);
     final plannedByDate = <String, List<ScheduledRun>>{};
     for (final run in scheduled) {
-      final key = run.date.toIso8601String().substring(0, 10);
+      final key = dateKey(run.date);
       plannedByDate.putIfAbsent(key, () => []).add(run);
     }
 
@@ -317,9 +315,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   subtitle: Text(durStr),
                                   trailing: const Icon(Icons.chevron_right),
                                   onTap: () async {
-                                    final today = DateTime.now()
-                                        .toIso8601String()
-                                        .substring(0, 10);
+                                    final today = dateKey(DateTime.now());
                                     final workoutDate =
                                         w['date'] as String? ?? '';
                                     final isFuture =
@@ -357,7 +353,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Future<void> _reschedule(ScheduledRun scheduled) async {
     final loc = AppLocalizations.of(context)!;
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = dayOf(now);
     final picked = await showDatePicker(
       context: context,
       initialDate: scheduled.date.isBefore(today) ? today : scheduled.date,
@@ -365,7 +361,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       lastDate: today.add(const Duration(days: 21)),
     );
     if (picked == null || !mounted) return;
-    final monday = picked.subtract(Duration(days: picked.weekday - 1));
+    final monday = mondayOf(picked);
     final rows = await _runPlanRepo.getScheduledRuns(
       monday,
       monday.add(const Duration(days: 6)),
@@ -585,8 +581,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final lastDay = DateTime(_currentYear, _currentMonth + 1, 0);
     final firstWeekday = firstDay.weekday % 7; // Sunday = 0
     final daysInMonth = lastDay.day;
-    final today = DateTime.now().toIso8601String().substring(0, 10);
-    final selectedStr = _selectedDate.toIso8601String().substring(0, 10);
+    final today = dateKey(DateTime.now());
+    final selectedStr = dateKey(_selectedDate);
 
     final cells = <Widget>[];
 

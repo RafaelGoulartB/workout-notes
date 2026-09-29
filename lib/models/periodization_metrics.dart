@@ -1,3 +1,5 @@
+import 'package:workout_notes/utils/date_utils.dart';
+
 class PeriodizationMetrics {
   final DateTime startDate;
   final DateTime endDate;
@@ -114,8 +116,8 @@ class PeriodizationMetrics {
       : (workoutCount / plannedWorkouts! * 100).clamp(0, 100);
 
   Map<String, dynamic> toSnapshot() => {
-    'start_date': _date(startDate),
-    'end_date': _date(endDate),
+    'start_date': dateKey(startDate),
+    'end_date': dateKey(endDate),
     'elapsed_days': elapsedDays,
     'workout_count': workoutCount,
     'completed_sets': completedSets,
@@ -160,9 +162,4 @@ class PeriodizationMetrics {
     'run_session_adherence_percent': runSessionAdherencePercent,
   };
 
-  static String _date(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
 }

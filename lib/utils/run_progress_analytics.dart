@@ -1,4 +1,5 @@
 import 'package:workout_notes/models/run_activity.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 enum RunStatsPeriod { weeks4, weeks12, year, all }
 
@@ -285,8 +286,8 @@ class RunProgressAnalytics {
     DateTime? now,
   }) {
     final clock = now ?? DateTime.now();
-    final localNow = DateTime(clock.year, clock.month, clock.day);
-    final thisWeekStart = _mondayOf(localNow);
+    final localNow = dayOf(clock);
+    final thisWeekStart = mondayOf(localNow);
 
     final completed = all
         .where((a) => a.status == 'completed' && a.isRunning)
@@ -306,15 +307,15 @@ class RunProgressAnalytics {
       weekCount = 1;
     } else {
       final first = completed
-          .map((a) => _dateOnly(a.startedAt.toLocal()))
+          .map((a) => dayOf(a.startedAt.toLocal()))
           .reduce((a, b) => a.isBefore(b) ? a : b);
-      windowStart = _mondayOf(first);
+      windowStart = mondayOf(first);
       weekCount = thisWeekStart.difference(windowStart).inDays ~/ 7 + 1;
     }
 
     final activities = completed.where((a) {
       if (windowStart == null) return true;
-      return !_dateOnly(a.startedAt.toLocal()).isBefore(windowStart);
+      return !dayOf(a.startedAt.toLocal()).isBefore(windowStart);
     }).toList()..sort((a, b) => a.startedAt.compareTo(b.startedAt));
 
     var totalDistance = 0.0;
@@ -372,7 +373,7 @@ class RunProgressAnalytics {
     final dayDistances = List<double>.filled(7, 0);
 
     for (final a in completed) {
-      final d = _dateOnly(a.startedAt.toLocal());
+      final d = dayOf(a.startedAt.toLocal());
       if (!d.isBefore(thisWeekStart) && d.isBefore(nextWeekStart)) {
         thisWeekDistance += a.distanceMeters;
         thisWeekRuns++;
@@ -423,7 +424,7 @@ class RunProgressAnalytics {
         ? windowStart
         : (activities.isEmpty
               ? null
-              : _dateOnly(activities.first.startedAt.toLocal()));
+              : dayOf(activities.first.startedAt.toLocal()));
 
     return RunProgressAnalytics(
       period: period,
@@ -463,13 +464,6 @@ class RunProgressAnalytics {
     );
   }
 
-  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
-
-  static DateTime _mondayOf(DateTime d) {
-    final day = _dateOnly(d);
-    return day.subtract(Duration(days: day.weekday - DateTime.monday));
-  }
-
   static RunWindowTotals _windowTotals(
     List<RunActivity> completed, {
     required DateTime start,
@@ -482,7 +476,7 @@ class RunProgressAnalytics {
     var paceWeightedSum = 0.0;
 
     for (final a in completed) {
-      final d = _dateOnly(a.startedAt.toLocal());
+      final d = dayOf(a.startedAt.toLocal());
       if (d.isBefore(start) || !d.isBefore(end)) continue;
       count++;
       distance += a.distanceMeters;
@@ -510,7 +504,7 @@ class RunProgressAnalytics {
   static int _weekStreak(List<RunActivity> completed, DateTime thisWeekStart) {
     if (completed.isEmpty) return 0;
     final weeksWithRuns = <DateTime>{
-      for (final a in completed) _mondayOf(a.startedAt.toLocal()),
+      for (final a in completed) mondayOf(a.startedAt.toLocal()),
     };
 
     var cursor = weeksWithRuns.contains(thisWeekStart)
@@ -542,7 +536,7 @@ class RunProgressAnalytics {
     final times = List<int>.filled(starts.length, 0);
 
     for (final a in activities) {
-      final idx = indexByStart[_mondayOf(a.startedAt.toLocal())];
+      final idx = indexByStart[mondayOf(a.startedAt.toLocal())];
       if (idx == null) continue;
       counts[idx]++;
       distances[idx] += a.distanceMeters;

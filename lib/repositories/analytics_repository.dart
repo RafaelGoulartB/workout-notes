@@ -1,6 +1,7 @@
 import 'package:workout_notes/repositories/base_repository.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/repositories/workout_sql.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Repository for exercise history, body-weight vs volume and the workout
 /// overview totals.
@@ -112,10 +113,7 @@ class AnalyticsRepository extends BaseRepository {
     int months = 6,
   }) async {
     final db = await this.db;
-    final start = DateTime.now()
-        .subtract(Duration(days: months * 30))
-        .toIso8601String()
-        .substring(0, 10);
+    final start = dateKey(DateTime.now().subtract(Duration(days: months * 30)));
     return db.rawQuery(
       '''
       SELECT bm.date, bm.value as weight, bm.unit,
@@ -145,8 +143,8 @@ class AnalyticsRepository extends BaseRepository {
   Future<int> _calculateStreak() async {
     final db = await this.db;
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final todayKey = today.toIso8601String().substring(0, 10);
+    final today = dayOf(now);
+    final todayKey = dateKey(today);
 
     final rows = await db.rawQuery(
       'SELECT DISTINCT date FROM workouts WHERE date <= ? '

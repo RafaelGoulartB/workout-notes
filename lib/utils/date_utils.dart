@@ -18,6 +18,12 @@ DateTime addDays(DateTime value, int days) =>
 DateTime mondayOf(DateTime value) =>
     DateTime(value.year, value.month, value.day - (value.weekday - 1));
 
+/// Midnight (local) of the Sunday starting the week that contains [value]
+/// (the nutrition / body-weight convention; `DateTime.sunday` is 7, so it wraps
+/// to 0).
+DateTime sundayOf(DateTime value) =>
+    DateTime(value.year, value.month, value.day - value.weekday % 7);
+
 /// `yyyy-MM-dd` of [value]'s calendar day, the format stored in `date`
 /// columns.
 String dateKey(DateTime value) {

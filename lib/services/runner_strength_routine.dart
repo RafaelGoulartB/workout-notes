@@ -1,6 +1,8 @@
 import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
 import 'package:workout_notes/repositories/workout_repository.dart';
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// The "Strength for runners" routine a running plan points at.
 ///
@@ -19,9 +21,9 @@ class RunnerStrengthRoutine {
     RoutineRepository? routines,
     SettingsRepository? settings,
     WorkoutRepository? workouts,
-  }) : _routines = routines ?? RoutineRepository(),
-       _settings = settings ?? SettingsRepository(),
-       _workouts = workouts ?? WorkoutRepository();
+  }) : _routines = routines ?? DatabaseHelper.instance.routineRepo,
+       _settings = settings ?? DatabaseHelper.instance.settingsRepo,
+       _workouts = workouts ?? DatabaseHelper.instance.workoutRepo;
 
   /// Seeded exercise id, reps (or seconds for holds) per set, sets.
   static const _dayA = [
@@ -111,12 +113,12 @@ class RunnerStrengthRoutine {
       columns: ['date'],
       where:
           'routine_id = ? AND end_time IS NOT NULL AND date >= ? AND date <= ?',
-      whereArgs: [routineId, _date(from), _date(to)],
+      whereArgs: [routineId, dateKey(from), dateKey(to)],
     );
     return {
       for (final row in rows)
         if (DateTime.tryParse(row['date'] as String? ?? '') case final d?)
-          DateTime(d.year, d.month, d.day),
+          dayOf(d),
     };
   }
 
@@ -132,6 +134,4 @@ class RunnerStrengthRoutine {
     return rows.isNotEmpty;
   }
 
-  static String _date(DateTime d) =>
-      DateTime(d.year, d.month, d.day).toIso8601String().substring(0, 10);
 }

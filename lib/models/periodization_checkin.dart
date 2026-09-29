@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:workout_notes/utils/date_utils.dart';
 
 enum PeriodizationDecision {
   maintain('maintain'),
@@ -46,7 +47,7 @@ class PeriodizationCheckin {
   Map<String, dynamic> toMap() => {
     'id': id,
     'phase_id': phaseId,
-    'week_start': _date(weekStart),
+    'week_start': dateKey(weekStart),
     'energy': energy,
     'hunger': hunger,
     'recovery': recovery,
@@ -80,9 +81,4 @@ class PeriodizationCheckin {
     return decoded is Map ? Map<String, dynamic>.from(decoded) : {};
   }
 
-  static String _date(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
 }

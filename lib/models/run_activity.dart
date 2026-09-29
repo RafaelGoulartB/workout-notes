@@ -112,9 +112,9 @@ class RunActivity {
     return RunActivity(
       id: map['id'] as String,
       activityType: CardioActivityType.fromDatabase(map['activity_type']),
-      startedAt: DateTime.parse(map['started_at'] as String),
+      startedAt: DateTime.parse(map['started_at'] as String).toLocal(),
       endedAt: map['ended_at'] != null
-          ? DateTime.parse(map['ended_at'] as String)
+          ? DateTime.parse(map['ended_at'] as String).toLocal()
           : null,
       durationSeconds: (map['duration_seconds'] as num?)?.toInt() ?? 0,
       movingTimeSeconds: (map['moving_time_seconds'] as num?)?.toInt() ?? 0,
@@ -128,8 +128,8 @@ class RunActivity {
       feelingRating: (map['feeling_rating'] as num?)?.toInt(),
       status: map['status'] as String? ?? 'completed',
       polylineSummary: map['polyline_summary'] as String?,
-      createdAt: DateTime.parse(map['created_at'] as String),
-      updatedAt: DateTime.parse(map['updated_at'] as String),
+      createdAt: DateTime.parse(map['created_at'] as String).toLocal(),
+      updatedAt: DateTime.parse(map['updated_at'] as String).toLocal(),
       bestSplitPaceSecPerKm: (map['best_split_pace_sec_per_km'] as num?)
           ?.toDouble(),
       bestEffort1kSec: (map['best_effort_1k_sec'] as num?)?.toInt(),
@@ -153,11 +153,15 @@ class RunActivity {
     );
   }
 
+  /// Timestamps are persisted as local wall-clock ISO strings without an
+  /// offset (like every other date in the app), so `yyyy-MM-dd` prefixes and
+  /// range predicates attribute a run to the day the user ran it. Native
+  /// spools carry UTC instants; they are converted here.
   Map<String, dynamic> toMap() => {
     'id': id,
     'activity_type': activityType.databaseValue,
-    'started_at': startedAt.toIso8601String(),
-    'ended_at': endedAt?.toIso8601String(),
+    'started_at': startedAt.toLocal().toIso8601String(),
+    'ended_at': endedAt?.toLocal().toIso8601String(),
     'duration_seconds': durationSeconds,
     'moving_time_seconds': movingTimeSeconds,
     'distance_meters': distanceMeters,
@@ -170,8 +174,8 @@ class RunActivity {
     'feeling_rating': feelingRating,
     'status': status,
     'polyline_summary': polylineSummary,
-    'created_at': createdAt.toIso8601String(),
-    'updated_at': updatedAt.toIso8601String(),
+    'created_at': createdAt.toLocal().toIso8601String(),
+    'updated_at': updatedAt.toLocal().toIso8601String(),
     'best_split_pace_sec_per_km': bestSplitPaceSecPerKm,
     'best_effort_1k_sec': bestEffort1kSec,
     'best_effort_3k_sec': bestEffort3kSec,
@@ -277,7 +281,7 @@ class CardioStamp {
 
   factory CardioStamp.fromMap(Map<String, dynamic> map) {
     return CardioStamp(
-      startedAt: DateTime.parse(map['started_at'] as String),
+      startedAt: DateTime.parse(map['started_at'] as String).toLocal(),
       activityType: CardioActivityType.fromDatabase(map['activity_type']),
       durationSeconds: (map['duration_seconds'] as num?)?.toInt() ?? 0,
       movingTimeSeconds: (map['moving_time_seconds'] as num?)?.toInt() ?? 0,

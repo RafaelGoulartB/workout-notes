@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/heat_levels.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// GitHub-style year calendar for strength training, same look as the running
 /// one: one square per day, shaded by the working sets done (quartiles of the
@@ -64,7 +65,7 @@ class _StrengthHeatmapState extends State<StrengthHeatmap> {
 
   void _computeGrid() {
     final jan1 = DateTime(widget.year);
-    _gridStart = jan1.subtract(Duration(days: jan1.weekday - 1));
+    _gridStart = mondayOf(jan1);
     final dec31 = DateTime(widget.year, 12, 31);
     final gridEnd = dec31.add(Duration(days: 7 - dec31.weekday));
     _weeks = (gridEnd.difference(_gridStart).inDays + 1) ~/ 7;
@@ -272,7 +273,7 @@ class _HeatmapPainter extends CustomPainter {
     const step = _StrengthHeatmapState._step;
     const top = _StrengthHeatmapState._monthLabelHeight;
     final radius = const Radius.circular(3);
-    final todayOnly = DateTime(today.year, today.month, today.day);
+    final todayOnly = dayOf(today);
     var lastLabelEnd = -100.0;
 
     // Month name above the column that holds the 1st of the month.

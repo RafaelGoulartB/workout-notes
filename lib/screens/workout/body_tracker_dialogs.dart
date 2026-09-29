@@ -6,6 +6,7 @@ import 'package:workout_notes/models/body_measurement_types.dart';
 import 'package:workout_notes/utils/body_tracker_utils.dart';
 import 'package:workout_notes/widgets/body_tracker_badges.dart';
 import 'package:workout_notes/widgets/body_tracker_selectors.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 // ═══════════════════════════════════════════════════════════════════════
 // ADD MEASUREMENT SHEET
@@ -653,9 +654,7 @@ Future<void> showQuickMeasureSheet(
                                         'type': t.id,
                                         'value': val,
                                         'unit': t.unit,
-                                        'date': date
-                                            .toIso8601String()
-                                            .substring(0, 10),
+                                        'date': dateKey(date),
                                         'comment': commentCtl.text.isNotEmpty
                                             ? commentCtl.text
                                             : null,

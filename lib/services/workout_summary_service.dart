@@ -7,6 +7,7 @@ import 'package:workout_notes/utils/strength_workout_format.dart';
 import 'package:workout_notes/utils/strength_workout_records.dart';
 import 'package:workout_notes/utils/workout_estimator.dart';
 import 'package:workout_notes/widgets/workout/finish_workout_sheet.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Builds the summary shown when finishing a workout: duration, volume, sets,
 /// cardio totals, estimated calories and the personal records the session
@@ -21,9 +22,9 @@ class WorkoutSummaryService {
     WorkoutRepository? workoutRepo,
     BodyMeasurementRepository? bodyRepo,
     StrengthRecordsRepository? recordsRepo,
-  }) : _workoutRepo = workoutRepo ?? WorkoutRepository(),
-       _bodyRepo = bodyRepo ?? BodyMeasurementRepository(),
-       _recordsRepo = recordsRepo ?? StrengthRecordsRepository();
+  }) : _workoutRepo = workoutRepo ?? DatabaseHelper.instance.workoutRepo,
+       _bodyRepo = bodyRepo ?? DatabaseHelper.instance.bodyMeasurementRepo,
+       _recordsRepo = recordsRepo ?? DatabaseHelper.instance.strengthRecordsRepo;
 
   /// Duration, volume, sets, distance/time and PRs of the running workout.
   ///

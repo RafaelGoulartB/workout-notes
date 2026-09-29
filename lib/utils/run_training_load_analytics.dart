@@ -1,6 +1,7 @@
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/utils/run_analytics_dates.dart';
 import 'package:workout_notes/utils/run_fitness_analytics.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Training load: session load with its acute:chronic ratio, time per pace
 /// zone, and the weekly effort/feeling trend.
@@ -39,12 +40,12 @@ abstract final class RunTrainingLoadAnalytics {
     int days = 84,
     RunZoneBounds? zones,
   }) {
-    final today = RunAnalyticsDates.day(now ?? DateTime.now());
+    final today = dayOf(now ?? DateTime.now());
     final runs = activities.where(RunAnalyticsDates.completedRun).toList();
     final loadByDay = <DateTime, double>{};
     final distanceByDay = <DateTime, double>{};
     for (final a in runs) {
-      final d = RunAnalyticsDates.day(a.startedAt.toLocal());
+      final d = dayOf(a.startedAt.toLocal());
       loadByDay[d] = (loadByDay[d] ?? 0) + sessionLoad(a, zones);
       distanceByDay[d] = (distanceByDay[d] ?? 0) + a.distanceMeters;
     }
@@ -109,7 +110,7 @@ abstract final class RunTrainingLoadAnalytics {
     int weeks = 12,
     DateTime? now,
   }) {
-    final thisWeek = RunAnalyticsDates.monday(now ?? DateTime.now());
+    final thisWeek = mondayOf(now ?? DateTime.now());
     final starts = [
       for (var i = weeks - 1; i >= 0; i--)
         thisWeek.subtract(Duration(days: 7 * i)),
@@ -118,7 +119,7 @@ abstract final class RunTrainingLoadAnalytics {
     final seconds = List.generate(weeks, (_) => List<double>.filled(5, 0));
 
     for (final a in activities.where(RunAnalyticsDates.completedRun)) {
-      final w = index[RunAnalyticsDates.monday(a.startedAt.toLocal())];
+      final w = index[mondayOf(a.startedAt.toLocal())];
       if (w == null) continue;
       final runSplits = splits[a.id];
       var counted = false;
@@ -157,7 +158,7 @@ abstract final class RunTrainingLoadAnalytics {
     int weeks = 12,
     DateTime? now,
   }) {
-    final thisWeek = RunAnalyticsDates.monday(now ?? DateTime.now());
+    final thisWeek = mondayOf(now ?? DateTime.now());
     final starts = [
       for (var i = weeks - 1; i >= 0; i--)
         thisWeek.subtract(Duration(days: 7 * i)),
@@ -168,7 +169,7 @@ abstract final class RunTrainingLoadAnalytics {
     final feelSum = List<double>.filled(weeks, 0);
     final feelCount = List<int>.filled(weeks, 0);
     for (final a in activities.where(RunAnalyticsDates.completedRun)) {
-      final i = index[RunAnalyticsDates.monday(a.startedAt.toLocal())];
+      final i = index[mondayOf(a.startedAt.toLocal())];
       if (i == null) continue;
       if (a.rpe != null && a.rpe! > 0) {
         rpeSum[i] += a.rpe!;

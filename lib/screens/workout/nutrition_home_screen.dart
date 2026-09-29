@@ -30,6 +30,8 @@ import 'nutrition_progress_screen.dart';
 import 'nutrition_settings_screen.dart';
 import 'settings_screen.dart';
 import 'saved_meals_screen.dart';
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Nutrition dashboard. Shows the day's totals at a glance, a tools
 /// grid (progress, saved meals, food library, settings) and a
@@ -45,7 +47,7 @@ class NutritionHomeScreen extends StatefulWidget {
 }
 
 class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
-  final NutritionRepository _repository = NutritionRepository();
+  final NutritionRepository _repository = DatabaseHelper.instance.nutritionRepo;
   final NutritionGateway _gateway = OpenFoodFactsGateway.instance;
   final ScrollController _scrollController = ScrollController();
 
@@ -68,7 +70,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedDate = _dateOnly(DateTime.now());
+    _selectedDate = dayOf(DateTime.now());
     _load();
   }
 
@@ -82,10 +84,10 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     if (!mounted) return;
     final generation = ++_loadGeneration;
     final selectedDate = _selectedDate;
-    final weekStart = _weekStart(selectedDate);
+    final weekStart = sundayOf(selectedDate);
     setState(() => _isLoading = true);
     try {
-      final date = _dateString(selectedDate);
+      final date = dateKey(selectedDate);
       final results = await Future.wait([
         _repository.getDailySummary(date),
         _repository.getActiveGoal(),
@@ -148,7 +150,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   }
 
   Future<void> _selectDate(DateTime date) async {
-    final normalized = _dateOnly(date);
+    final normalized = dayOf(date);
     if (_isSameDay(normalized, _selectedDate)) return;
     setState(() => _selectedDate = normalized);
     await _load();
@@ -249,7 +251,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
           repository: _repository,
           mealType: mealType,
           mealName: mealLabel,
-          date: _dateString(_selectedDate),
+          date: dateKey(_selectedDate),
         ),
       ),
     );
@@ -298,7 +300,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     NutritionQuantitySelection selection,
   ) async {
     final loc = AppLocalizations.of(context)!;
-    final date = _dateString(_selectedDate);
+    final date = dateKey(_selectedDate);
     // If the user came from a per-meal tap and the search screen
     // didn't bind a meal, fall back to the first configured type so
     // we always persist to a real section.
@@ -483,7 +485,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     return MealLogWithItems(
       log: MealLog(
         id: '',
-        date: _dateString(_selectedDate),
+        date: dateKey(_selectedDate),
         mealType: mealType,
         createdAt: DateTime.now(),
       ),
@@ -648,18 +650,6 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     );
   }
 
-  static String _dateString(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
-
-  static DateTime _dateOnly(DateTime value) =>
-      DateTime(value.year, value.month, value.day);
-
-  static DateTime _weekStart(DateTime value) =>
-      value.subtract(Duration(days: value.weekday % DateTime.daysPerWeek));
-
   static bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 }
@@ -684,7 +674,7 @@ class _NutritionWeekSelector extends StatelessWidget {
     final theme = Theme.of(context);
     final locale = Localizations.localeOf(context).toLanguageTag();
     final today = DateTime.now();
-    final weekStart = _weekStart(selectedDate);
+    final weekStart = sundayOf(selectedDate);
 
     return Container(
       padding: EdgeInsets.fromLTRB(12, 4, 12, 10 - (collapseProgress * 4)),
@@ -713,12 +703,12 @@ class _NutritionWeekSelector extends StatelessWidget {
                   today,
                 ),
                 calorieProgress: _calorieProgress(
-                  weeklyCalories[_dateString(
+                  weeklyCalories[dateKey(
                     weekStart.add(Duration(days: index)),
                   )],
                 ),
                 isOverCalorieGoal: _isOverCalorieGoal(
-                  weeklyCalories[_dateString(
+                  weeklyCalories[dateKey(
                     weekStart.add(Duration(days: index)),
                   )],
                 ),
@@ -740,15 +730,6 @@ class _NutritionWeekSelector extends StatelessWidget {
 
   bool _isOverCalorieGoal(double? calories) =>
       calorieGoal != null && calorieGoal! > 0 && (calories ?? 0) > calorieGoal!;
-
-  static String _dateString(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
-
-  static DateTime _weekStart(DateTime value) =>
-      value.subtract(Duration(days: value.weekday % DateTime.daysPerWeek));
 }
 
 class _NutritionWeekHeaderDelegate extends SliverPersistentHeaderDelegate {

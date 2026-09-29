@@ -5,7 +5,6 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_achievement.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_activity_filter.dart';
-import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/utils/run_achievement_engine.dart';
@@ -13,6 +12,7 @@ import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/run/history/run_history_filter_bar.dart';
 import 'package:workout_notes/widgets/run/history/run_history_row.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 class RunHistoryScreen extends StatefulWidget {
   const RunHistoryScreen({super.key});
@@ -39,7 +39,7 @@ class _ActivityEntry extends _Entry {
 class _RunHistoryScreenState extends State<RunHistoryScreen> {
   static const _pageSize = 30;
 
-  final _repo = RunRepository();
+  final _repo = DatabaseHelper.instance.runRepo;
   final _scroll = ScrollController();
   final _searchController = TextEditingController();
   Timer? _searchDebounce;

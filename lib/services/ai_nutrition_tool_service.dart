@@ -9,6 +9,7 @@ import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
 import 'package:workout_notes/services/ai_tool_math.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Read-only nutrition queries exposed to the AI Coach.
 ///
@@ -27,14 +28,14 @@ class AiNutritionToolService {
     PeriodizationRepository? periodizationRepository,
     DateTime Function()? now,
   }) : db = db ?? DatabaseHelper.instance,
-       nutritionRepository = nutritionRepository ?? NutritionRepository(),
+       nutritionRepository = nutritionRepository ?? DatabaseHelper.instance.nutritionRepo,
        periodizationRepository =
-           periodizationRepository ?? PeriodizationRepository(),
+           periodizationRepository ?? DatabaseHelper.instance.periodizationRepo,
        _now = now ?? DateTime.now;
 
   Future<Map<String, dynamic>> diaryDay({String? date}) async {
     final resolvedDate = AiToolMath.validatedIsoDate(
-      date ?? AiToolMath.isoDay(_now()),
+      date ?? dateKey(_now()),
     );
     final database = await db.database;
     final logs = await database.query(
@@ -88,10 +89,10 @@ class AiNutritionToolService {
     days = days.clamp(1, 31);
     final database = await db.database;
     final end = AiToolMath.validatedIsoDate(
-      endDate ?? AiToolMath.isoDay(_now()),
+      endDate ?? dateKey(_now()),
     );
     final endDay = DateTime.parse(end);
-    final start = AiToolMath.isoDay(endDay.subtract(Duration(days: days - 1)));
+    final start = dateKey(endDay.subtract(Duration(days: days - 1)));
     final rows = await database.rawQuery(
       '''
       SELECT ml.date, mli.*
@@ -131,8 +132,8 @@ class AiNutritionToolService {
   Future<Map<String, dynamic>> micronutrientSummary({int days = 30}) async {
     days = days.clamp(1, 90);
     final database = await db.database;
-    final end = AiToolMath.isoDay(_now());
-    final start = AiToolMath.isoDay(_now().subtract(Duration(days: days - 1)));
+    final end = dateKey(_now());
+    final start = dateKey(_now().subtract(Duration(days: days - 1)));
     final rows = await database.rawQuery(
       '''
       SELECT ml.date, mli.food_name_snapshot, mli.brand_snapshot,

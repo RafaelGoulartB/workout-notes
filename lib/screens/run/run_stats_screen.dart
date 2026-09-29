@@ -28,6 +28,7 @@ import 'package:workout_notes/widgets/run/home/run_home_trends_card.dart';
 import 'package:workout_notes/widgets/run/home/run_home_week_card.dart';
 import 'package:workout_notes/widgets/run/run_pending_review_banner.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 enum _HomeMenu { plans, history, shoes, records, voice }
 
@@ -42,7 +43,7 @@ class RunStatsScreen extends StatefulWidget {
 }
 
 class _RunStatsScreenState extends State<RunStatsScreen> {
-  final _repo = RunRepository();
+  final _repo = DatabaseHelper.instance.runRepo;
   final _todayService = RunTodayService();
 
   List<RunActivity> _activities = const [];

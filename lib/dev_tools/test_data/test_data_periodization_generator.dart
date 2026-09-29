@@ -6,6 +6,7 @@ import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 
 import 'test_data_context.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 class PeriodizationGenerationResult {
   final int plans;
@@ -31,7 +32,7 @@ class TestDataPeriodizationGenerator {
   TestDataPeriodizationGenerator(this.context);
 
   Future<PeriodizationGenerationResult> generate() async {
-    final today = _day(context.now);
+    final today = dayOf(context.now);
     final routineRows = await context.database.query(
       'routines',
       columns: ['id'],
@@ -397,7 +398,7 @@ class TestDataPeriodizationGenerator {
       final checkin = PeriodizationCheckin(
         id: context.id(
           'periodization_checkin',
-          '${phase.id}:${context.date(weekStart)}',
+          '${phase.id}:${dateKey(weekStart)}',
         ),
         phaseId: phase.id,
         weekStart: weekStart,
@@ -412,8 +413,8 @@ class TestDataPeriodizationGenerator {
             ? 'Fome aumentou no fim da semana; ajuste pequeno para sustentar o treino.'
             : _checkinNote(phase.templateKey, count),
         metricsSnapshot: {
-          'start_date': context.date(weekStart),
-          'end_date': context.date(weekStart.add(const Duration(days: 6))),
+          'start_date': dateKey(weekStart),
+          'end_date': dateKey(weekStart.add(const Duration(days: 6))),
           'elapsed_days': 7,
           'workout_count': workouts,
           'completed_sets': sets,
@@ -464,11 +465,8 @@ class TestDataPeriodizationGenerator {
     _ => 'Semana consistente e metas mantidas.',
   };
 
-  static DateTime _day(DateTime value) =>
-      DateTime(value.year, value.month, value.day);
-
   static DateTime _mondayOnOrAfter(DateTime value) {
-    final day = _day(value);
+    final day = dayOf(value);
     final daysUntilMonday = (DateTime.monday - day.weekday) % 7;
     return day.add(Duration(days: daysUntilMonday));
   }
