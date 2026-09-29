@@ -45,6 +45,47 @@ void main() {
     createdAt: DateTime(2026, 1, 1),
   );
 
+  test('run days and phase run volume use calendar-day ranges', () async {
+    final plan = await repository.createPlan(
+      name: 'Runs',
+      startDate: DateTime(2026, 1, 1),
+      endDate: DateTime(2026, 1, 31),
+    );
+    final phase = await addPhaseFixture(
+      repository,
+      planId: plan.id,
+      name: 'Base',
+      startDate: DateTime(2026, 1, 5),
+      endDate: DateTime(2026, 1, 5),
+      color: 1,
+      target: target(),
+    );
+    Future<void> run(String id, String startedAt) =>
+        database.insert('run_activities', {
+          'id': id,
+          'started_at': startedAt,
+          'distance_meters': 5000.0,
+          'moving_time_seconds': 1500,
+          'status': 'completed',
+          'created_at': startedAt,
+          'updated_at': startedAt,
+        });
+    await run('before-midnight', '2026-01-04T23:59:00.000');
+    await run('first-minute', '2026-01-05T00:01:00.000');
+    await run('last-minute', '2026-01-05T23:59:00.000');
+    await run('after-midnight', '2026-01-06T00:01:00.000');
+
+    final dates = await repository.getActivityDates(
+      DateTime(2026, 1, 5),
+      DateTime(2026, 1, 5),
+    );
+    final metrics = await repository.getPhaseMetrics(phase);
+
+    expect(dates.runs, {'2026-01-05'});
+    expect(metrics.runCount, 2);
+    expect(metrics.runDistanceMeters, 10000.0);
+  });
+
   test('creates an integrated active plan', () async {
     await database.insert('routines', {
       'id': 'routine-1',

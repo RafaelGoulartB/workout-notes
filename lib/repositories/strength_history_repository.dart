@@ -6,6 +6,7 @@ import 'package:workout_notes/models/workout_stats.dart';
 import 'package:workout_notes/repositories/base_repository.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/repositories/workout_repository.dart';
+import 'package:workout_notes/repositories/workout_sql.dart';
 import 'package:workout_notes/utils/strength_workout_records.dart';
 
 /// How the exercise-name part of a search matches an `exercises` row
@@ -264,7 +265,7 @@ class StrengthHistoryRepository extends BaseRepository {
 
   static const _anaerobic =
       "IFNULL(c.energy_system, 'anaerobic') = 'anaerobic'";
-  static const _workingSet = 's.is_complete = 1 AND IFNULL(s.is_warmup, 0) = 0';
+  static const _workingSet = WorkoutSql.workSet;
 
   static String _escapeLike(String value) => value
       .replaceAll(r'\', r'\\')

@@ -75,16 +75,19 @@ class _GoalsSectionState extends State<GoalsSection> {
       final goals = (await _goalRepo.getAll())
           .where((g) => widget.allowedScopes.contains(g.scope))
           .toList();
-      final progressEntries = await Future.wait(
-        goals.map((g) async {
-          try {
-            final p = await _goalRepo.getProgress(g);
-            return MapEntry(g.id, p);
-          } catch (_) {
-            return MapEntry(g.id, GoalProgress.empty(DateTime.now()));
-          }
-        }),
-      );
+      Map<String, GoalProgress> progressByGoal;
+      try {
+        progressByGoal = await _goalRepo.getProgressForGoals(goals);
+      } catch (_) {
+        progressByGoal = const {};
+      }
+      final progressEntries = [
+        for (final g in goals)
+          MapEntry(
+            g.id,
+            progressByGoal[g.id] ?? GoalProgress.empty(DateTime.now()),
+          ),
+      ];
       if (!mounted) return;
       setState(() {
         _goals = goals;
