@@ -5,6 +5,8 @@ import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import '../../repositories/workout_repository.dart';
 import '../../models/exercise_with_sets.dart';
 import '../../widgets/exercise_picker_sheet.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
+import 'package:workout_notes/widgets/run/run_ui.dart';
 
 /// Screen for editing a completed (or in-progress) workout.
 ///
@@ -344,7 +346,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(
               loc.commonDelete,
-              style: const TextStyle(color: Colors.red),
+              style: TextStyle(color: Theme.of(ctx).colorScheme.error),
             ),
           ),
         ],
@@ -415,7 +417,9 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('${exercise.localizedName(loc)} — #${setIndex + 1}'),
+        title: Text(
+          loc.editWorkoutSetTitle(exercise.localizedName(loc), setIndex + 1),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -568,14 +572,13 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
             ? const Center(child: CircularProgressIndicator())
             : Column(
                 children: [
-                  _buildDateTimeCard(theme, loc),
                   Expanded(
                     child: _exercises.isEmpty
-                        ? Column(
+                        ? ListView(
+                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                             children: [
-                              _buildFeedbackCard(theme, loc),
-                              const Divider(height: 1),
-                              Expanded(child: _buildEmptyState(theme, loc)),
+                              ..._buildTopSections(theme, loc),
+                              _buildEmptyState(theme, loc),
                             ],
                           )
                         : _buildExercisesList(theme, loc),
@@ -600,72 +603,55 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
     );
   }
 
+  /// Date/time and feedback sections shown above the exercises.
+  List<Widget> _buildTopSections(ThemeData theme, AppLocalizations loc) {
+    return [
+      RunSectionHeader(
+        loc.editWorkoutDateTime,
+        padding: const EdgeInsets.fromLTRB(4, 12, 0, 10),
+      ),
+      _buildDateTimeCard(theme, loc),
+      RunSectionHeader(loc.editWorkoutFeedback),
+      _buildFeedbackCard(theme, loc),
+      RunSectionHeader(loc.commonExercises),
+    ];
+  }
+
   Widget _buildDateTimeCard(ThemeData theme, AppLocalizations loc) {
-    final dateStr = DateFormat(
-      Intl.defaultLocale?.startsWith('pt') == true
-          ? "d 'de' MMMM 'de' yyyy"
-          : 'MMMM d, yyyy',
-      Intl.defaultLocale,
+    final colors = theme.colorScheme;
+    final dateStr = DateFormat.yMMMMd(
+      Localizations.localeOf(context).toString(),
     ).format(_workoutDate);
-    final timeStr = DateFormat('HH:mm', Intl.defaultLocale);
+    final timeStr = DateFormat(
+      'HH:mm',
+      Localizations.localeOf(context).toString(),
+    );
     final startStr = _startTime != null ? timeStr.format(_startTime!) : '—';
     final endStr = _endTime != null ? timeStr.format(_endTime!) : '—';
     final durSec = _durationSeconds;
-    final durStr = durSec > 0 ? '${durSec ~/ 60}min ${durSec % 60}s' : '—';
+    final durStr = durSec > 0
+        ? RunFormatters.durationHoursMinutes(durSec)
+        : '—';
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      color: theme.colorScheme.surfaceContainerLow,
+    return RunSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                Icons.calendar_today,
-                size: 16,
-                color: theme.colorScheme.primary,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                loc.editWorkoutDateTime,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          InkWell(
+          _TimeField(
+            icon: Icons.calendar_today_outlined,
+            iconColor: colors.primary,
+            label: loc.editWorkoutSelectDate,
+            value: dateStr,
             onTap: _pickDate,
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: theme.colorScheme.outlineVariant.withAlpha(100),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(dateStr, style: theme.textTheme.bodyLarge),
-                  ),
-                  Icon(Icons.edit, size: 16, color: theme.colorScheme.primary),
-                ],
-              ),
-            ),
+            theme: theme,
           ),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
                 child: _TimeField(
-                  icon: Icons.play_arrow,
-                  iconColor: Colors.green,
+                  icon: Icons.play_arrow_rounded,
+                  iconColor: colors.primary,
                   label: loc.editWorkoutStart,
                   value: startStr,
                   onTap: _pickStartDateTime,
@@ -675,8 +661,8 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: _TimeField(
-                  icon: Icons.stop,
-                  iconColor: Colors.red,
+                  icon: Icons.stop_rounded,
+                  iconColor: colors.error,
                   label: loc.editWorkoutEnd,
                   value: endStr,
                   onTap: _pickEndDateTime,
@@ -685,26 +671,27 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Row(
             children: [
               Icon(
                 Icons.timer_outlined,
                 size: 14,
-                color: theme.colorScheme.onSurfaceVariant,
+                color: colors.onSurfaceVariant,
               ),
               const SizedBox(width: 4),
               Text(
                 '${loc.editWorkoutDuration}: ',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                  color: colors.onSurfaceVariant,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               Text(
                 durStr,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                  color: colors.onSurfaceVariant,
+                  fontFeatures: RunUi.tabular,
                 ),
               ),
             ],
@@ -714,7 +701,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
             Text(
               loc.reorderHint,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.primary,
+                color: colors.primary,
                 fontStyle: FontStyle.italic,
                 fontSize: 11,
               ),
@@ -726,72 +713,33 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
   }
 
   Widget _buildFeedbackCard(ThemeData theme, AppLocalizations loc) {
-    final ratingColor = Colors.amber.shade700;
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(0, 12, 0, 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
-      ),
+    final colors = theme.colorScheme;
+    return RunSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            children: [
-              Icon(
-                Icons.auto_awesome_outlined,
-                size: 18,
-                color: theme.colorScheme.primary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                loc.editWorkoutFeedback,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: List.generate(5, (index) {
+              final isSelected = index < _feelingRating;
+              return IconButton(
+                tooltip: loc.editWorkoutRatingStar(index + 1),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                onPressed: () => setState(() {
+                  _feelingRating = isSelected && _feelingRating == index + 1
+                      ? 0
+                      : index + 1;
+                }),
+                icon: Icon(
+                  isSelected ? Icons.star_rounded : Icons.star_outline_rounded,
+                  size: 30,
+                  color: isSelected ? colors.tertiary : colors.outlineVariant,
                 ),
-              ),
-            ],
+              );
+            }),
           ),
-          const SizedBox(height: 12),
-          Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: List.generate(5, (index) {
-                final isSelected = index < _feelingRating;
-                return IconButton(
-                  tooltip: loc.editWorkoutRatingStar(index + 1),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 34,
-                    minHeight: 34,
-                  ),
-                  onPressed: () => setState(() {
-                    _feelingRating = isSelected && _feelingRating == index + 1
-                        ? 0
-                        : index + 1;
-                  }),
-                  icon: Icon(
-                    isSelected
-                        ? Icons.star_rounded
-                        : Icons.star_outline_rounded,
-                    size: 24,
-                    color: isSelected
-                        ? ratingColor
-                        : theme.colorScheme.onSurfaceVariant,
-                  ),
-                );
-              }),
-            ),
-          ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           TextField(
             controller: _commentController,
             maxLines: 3,
@@ -800,13 +748,16 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
               labelText: loc.editWorkoutNotes,
               hintText: loc.editWorkoutNotesHint,
               filled: true,
-              fillColor: theme.colorScheme.surface,
+              fillColor: colors.surfaceContainerHighest.withAlpha(90),
               alignLabelWithHint: true,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 14,
                 vertical: 12,
               ),
-              border: InputBorder.none,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(RunUi.tileRadius),
+                borderSide: BorderSide.none,
+              ),
             ),
           ),
         ],
@@ -815,40 +766,37 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
   }
 
   Widget _buildEmptyState(ThemeData theme, AppLocalizations loc) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.fitness_center_outlined,
-              size: 48,
-              color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Column(
+        children: [
+          Icon(
+            Icons.fitness_center_outlined,
+            size: 48,
+            color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            loc.activeWorkoutEmptyTitle,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(height: 16),
-            Text(
-              loc.activeWorkoutEmptyTitle,
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            loc.activeWorkoutEmptySubtitle,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(height: 8),
-            Text(
-              loc.activeWorkoutEmptySubtitle,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: _pickExercise,
-              icon: const Icon(Icons.add, size: 18),
-              label: Text(loc.editWorkoutAddExercise),
-            ),
-          ],
-        ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            onPressed: _pickExercise,
+            icon: const Icon(Icons.add, size: 18),
+            label: Text(loc.editWorkoutAddExercise),
+          ),
+        ],
       ),
     );
   }
@@ -856,9 +804,10 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
   Widget _buildExercisesList(ThemeData theme, AppLocalizations loc) {
     return ReorderableListView.builder(
       header: Column(
-        children: [_buildFeedbackCard(theme, loc), const Divider(height: 1)],
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: _buildTopSections(theme, loc),
       ),
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       itemCount: _exercises.length,
       buildDefaultDragHandles: false,
       proxyDecorator: _dragProxyDecorator,
@@ -876,16 +825,12 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
     ThemeData theme,
     AppLocalizations loc,
   ) {
-    return Card(
+    final colors = theme.colorScheme;
+    return Padding(
       key: ValueKey(ex.entryId),
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: RunSectionCard(
+        padding: const EdgeInsets.fromLTRB(14, 12, 10, 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -893,7 +838,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
               children: [
                 Container(
                   width: 4,
-                  height: 24,
+                  height: 36,
                   decoration: BoxDecoration(
                     color: ex.categoryColor,
                     borderRadius: BorderRadius.circular(2),
@@ -901,49 +846,38 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    ex.localizedName(loc),
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        ex.localizedName(loc),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        ex.localizedCategory(loc),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    ex.localizedCategory(loc),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontSize: 10,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                InkWell(
-                  borderRadius: BorderRadius.circular(20),
-                  onTap: () => _removeExercise(ex),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Icon(
-                      Icons.close,
-                      size: 18,
-                      color: theme.colorScheme.error,
-                    ),
-                  ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  tooltip: loc.activeWorkoutRemoveExercise,
+                  onPressed: () => _removeExercise(ex),
+                  icon: Icon(Icons.close, size: 18, color: colors.error),
                 ),
                 ReorderableDragStartListener(
                   index: index,
                   child: const Padding(
-                    padding: EdgeInsets.only(left: 4),
+                    padding: EdgeInsets.only(left: 2, right: 4),
                     child: Icon(Icons.drag_handle, size: 20),
                   ),
                 ),
@@ -955,20 +889,12 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
                 children: [
                   const SizedBox(width: 28),
                   Expanded(
-                    flex: 2,
-                    child: Text(
-                      loc.workoutDetailSetNumber,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  Expanded(
                     flex: 3,
                     child: Text(
                       loc.workoutDetailWeight,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -976,8 +902,9 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
                     flex: 3,
                     child: Text(
                       loc.commonReps,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -985,14 +912,15 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
                     flex: 3,
                     child: Text(
                       loc.workoutDetailRpe,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
                 ],
               ),
-              const Divider(height: 4),
+              Divider(height: 8, color: RunUi.divider(colors)),
             ],
             ...ex.sets.asMap().entries.map((entry) {
               final i = entry.key;
@@ -1012,60 +940,53 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: isWarmup
-                              ? Colors.orange.withAlpha(30)
-                              : theme.colorScheme.surfaceContainerHighest,
+                              ? colors.tertiary.withAlpha(30)
+                              : colors.surfaceContainerHighest,
                         ),
                         child: Text(
-                          isWarmup ? 'W' : '${i + 1}',
+                          isWarmup ? loc.workoutDetailWarmupShort : '${i + 1}',
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontWeight: FontWeight.w600,
-                            color: isWarmup ? Colors.orange : null,
+                            color: isWarmup ? colors.tertiary : null,
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Expanded(
-                      flex: 2,
-                      child: GestureDetector(
-                        onTap: () => _editSetDialog(ex, i),
-                        child: Text(
-                          (s['weight'] as num?)?.toStringAsFixed(1) ?? '-',
-                          style: theme.textTheme.bodyMedium,
+                    for (final value in [
+                      (s['weight'] as num?)?.toStringAsFixed(1) ?? '-',
+                      (s['reps'] as int?)?.toString() ?? '-',
+                      (s['rpe'] as num?)?.toStringAsFixed(1) ?? '-',
+                    ])
+                      Expanded(
+                        flex: 3,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _editSetDialog(ex, i),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Text(
+                              value,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontFeatures: RunUi.tabular,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: GestureDetector(
-                        onTap: () => _editSetDialog(ex, i),
-                        child: Text(
-                          (s['reps'] as int?)?.toString() ?? '-',
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: GestureDetector(
-                        onTap: () => _editSetDialog(ex, i),
-                        child: Text(
-                          (s['rpe'] as num?)?.toStringAsFixed(1) ?? '-',
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               );
             }),
-            const SizedBox(height: 4),
-            TextButton.icon(
-              onPressed: () => _addSet(ex),
-              icon: const Icon(Icons.add, size: 16),
-              label: Text(
-                loc.activeWorkoutAddSet,
-                style: theme.textTheme.bodySmall,
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => _addSet(ex),
+                icon: const Icon(Icons.add, size: 16),
+                label: Text(
+                  loc.activeWorkoutAddSet,
+                  style: theme.textTheme.bodySmall,
+                ),
               ),
             ),
           ],
@@ -1094,22 +1015,21 @@ class _TimeField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = theme.colorScheme;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(RunUi.tileRadius),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: theme.colorScheme.outlineVariant.withAlpha(100),
-          ),
+          color: colors.surfaceContainerHighest.withAlpha(90),
+          borderRadius: BorderRadius.circular(RunUi.tileRadius),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 16, color: iconColor),
-            const SizedBox(width: 6),
+            Icon(icon, size: 18, color: iconColor),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1117,21 +1037,21 @@ class _TimeField extends StatelessWidget {
                 children: [
                   Text(
                     label,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontSize: 10,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colors.onSurfaceVariant,
                     ),
                   ),
                   Text(
                     value,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: RunUi.tabular,
                     ),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.edit, size: 14, color: theme.colorScheme.primary),
+            Icon(Icons.edit_outlined, size: 16, color: colors.primary),
           ],
         ),
       ),

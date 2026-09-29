@@ -11,6 +11,14 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
   bool _isLoading = true;
   String? _workoutId;
 
+  /// True when this screen inserted the workout row itself (a new workout,
+  /// not one opened by id), so it may discard it if it stays blank.
+  bool _createdHere = false;
+
+  /// Exercises whose category is aerobic (not strength); they never count for
+  /// strength records.
+  Set<String> _cardioExerciseIds = {};
+
   // Timer tracking
   DateTime? _timerStart;
   DateTime? _timerEnd;
@@ -122,13 +130,36 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
     } else {
       await _createNewWorkout();
     }
+    if (!mounted) {
+      _discardBlankWorkout();
+      return;
+    }
     setState(() => _isLoading = false);
   }
 
   Future<void> _createNewWorkout() async {
+    // Older versions inserted a row for every "new workout" even when nothing
+    // was ever added; clear those leftovers before starting a fresh one.
+    await _workoutRepo.deleteAbandonedBlankWorkouts();
     final id = await _workoutRepo.createWorkout();
     _workoutId = id;
+    _createdHere = true;
     // start_time is NOT set until user clicks "Iniciar"
+  }
+
+  /// Drops the workout row when the screen closes with nothing in it (no
+  /// exercises, no notes, not finished), so leaving a blank workout does not
+  /// leave an orphan in the calendar or history. Workouts opened by id are
+  /// never touched.
+  void _discardBlankWorkout() {
+    final id = _workoutId;
+    if (id == null || !_createdHere || _exercises.isNotEmpty) return;
+    final hadTimer = _timerStart != null;
+    _workoutRepo.deleteIfBlank(id).then((deleted) {
+      if (deleted && hadTimer) {
+        NotificationService.instance.cancelWorkoutTimer();
+      }
+    });
   }
 
   Future<void> _loadExistingWorkout(String id) async {
@@ -208,9 +239,11 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
     }
     final id = await _workoutRepo.createWorkout(
       routineId: widget.routineId,
+      routineDayId: widget.routineDayId,
       exercises: exercises,
     );
     _workoutId = id;
+    _createdHere = true;
     await _loadExercises();
   }
 
@@ -218,7 +251,11 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
     if (_workoutId == null) return;
     final entries = await _workoutRepo.getWorkoutExercises(_workoutId!);
     final loadedExercises = <ExerciseWithSets>[];
+    final cardioIds = <String>{};
     for (final entry in entries) {
+      if (entry['category_energy'] == 'aerobic') {
+        cardioIds.add(entry['exercise_id'] as String);
+      }
       final sets = List<Map<String, dynamic>>.from(
         await _workoutRepo.getExerciseSets(entry['id'] as String),
       );
@@ -245,6 +282,7 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
       _workoutId!,
     );
     _exercises = loadedExercises;
+    _cardioExerciseIds = cardioIds;
     _exerciseVolumeComparisons = {
       for (final comparison in exerciseComparisons)
         comparison.exerciseId: comparison,
@@ -318,7 +356,7 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(
               AppLocalizations.of(context)!.activeWorkoutReset,
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: Theme.of(ctx).colorScheme.error),
             ),
           ),
         ],
@@ -724,7 +762,7 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(
               AppLocalizations.of(context)!.activeWorkoutRemove,
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: Theme.of(ctx).colorScheme.error),
             ),
           ),
         ],
@@ -850,15 +888,11 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
       bodyWeightKg: bodyWeightKg,
     );
 
-    // Collect strength and cardio stats per exercise
-    final Map<String, ExerciseBests> thisWorkoutBests = {};
+    // Collect cardio stats per exercise (strength records are computed by
+    // [_strengthPrs]).
     final Map<String, CardioBests> thisWorkoutCardio = {};
 
     for (final ex in _exercises) {
-      double maxWeight = 0;
-      int bestReps = 0;
-      double exerciseVolume = 0;
-      int exCompletedSets = 0;
       double exerciseDistance = 0;
       int exerciseTime = 0;
 
@@ -884,26 +918,9 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
             completedSets++;
             final weight = (s['weight'] as num?)?.toDouble() ?? 0;
             final reps = (s['reps'] as int?) ?? 0;
-            final setVolume = weight * reps;
-            exerciseVolume += setVolume;
-            totalVolume += setVolume;
-            if (weight > maxWeight) {
-              maxWeight = weight;
-              bestReps = reps;
-            }
-            exCompletedSets++;
+            totalVolume += weight * reps;
           }
         }
-      }
-
-      if (maxWeight > 0) {
-        thisWorkoutBests[ex.exerciseId] = ExerciseBests(
-          name: ex.localizedName(loc),
-          maxWeight: maxWeight,
-          bestReps: bestReps,
-          volume: exerciseVolume,
-          completedSets: exCompletedSets,
-        );
       }
 
       // Track cardio bests (longest distance, best pace)
@@ -920,53 +937,9 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
     if (_workoutId != null) {
       final db = await DatabaseHelper.instance.database;
 
-      // Strength PRs
-      for (final entry in thisWorkoutBests.entries) {
-        final exId = entry.key;
-        final current = entry.value;
-
-        final rows = await db.rawQuery(
-          '''
-          SELECT
-            COALESCE(MAX(s.weight), 0) as best_weight,
-            COALESCE(SUM(s.weight * s.reps), 0) as best_volume
-          FROM sets s
-          JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
-          WHERE ee.exercise_id = ? AND ee.workout_id != ?
-            AND s.is_warmup = 0 AND s.is_complete = 1
-        ''',
-          [exId, _workoutId],
-        );
-
-        if (rows.isNotEmpty) {
-          final bestWeight =
-              (rows.first['best_weight'] as num?)?.toDouble() ?? 0;
-          final bestVolume =
-              (rows.first['best_volume'] as num?)?.toDouble() ?? 0;
-
-          if (bestWeight > 0 && current.maxWeight >= bestWeight) {
-            prs.add(
-              PR(
-                exerciseName: current.name,
-                type: 'weight',
-                value:
-                    '${current.maxWeight.toStringAsFixed(1)}kg × ${current.bestReps}',
-                previous: '${bestWeight.toStringAsFixed(1)}kg',
-              ),
-            );
-          }
-          if (bestVolume > 0 && current.volume > bestVolume) {
-            prs.add(
-              PR(
-                exerciseName: current.name,
-                type: 'volume',
-                value: '${current.volume.toStringAsFixed(0)} kg',
-                previous: '${bestVolume.toStringAsFixed(0)} kg',
-              ),
-            );
-          }
-        }
-      }
+      // Strength records: compare this session's sets with every earlier
+      // finished workout (best e1RM, heaviest load, session volume).
+      prs.addAll(await _strengthPrs(loc));
 
       // Cardio PRs (best distance, best pace)
       for (final entry in thisWorkoutCardio.entries) {
@@ -990,7 +963,7 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
         if (rows.isNotEmpty) {
           final bestDist =
               (rows.first['best_distance'] as num?)?.toDouble() ?? 0;
-          if (bestDist > 0 && current.distance >= bestDist) {
+          if (bestDist > 0 && current.distance > bestDist) {
             prs.add(
               PR(
                 exerciseName: current.name,
@@ -1014,6 +987,83 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
       estimatedCalories: estimatedCalories,
       prs: prs,
     );
+  }
+
+  /// Records set by the running workout, computed with the same rules as the
+  /// records screen (completed, non-warm-up, weighted strength sets).
+  Future<List<PR>> _strengthPrs(AppLocalizations loc) async {
+    final workoutId = _workoutId;
+    if (workoutId == null) return const [];
+    final now = DateTime.now();
+    final session = <StrengthSetSample>[];
+    for (final ex in _exercises) {
+      if (_cardioExerciseIds.contains(ex.exerciseId)) continue;
+      for (final s in ex.sets) {
+        if ((s['is_warmup'] as int?) == 1 || (s['is_complete'] as int?) != 1) {
+          continue;
+        }
+        final weight = (s['weight'] as num?)?.toDouble() ?? 0;
+        final reps = (s['reps'] as num?)?.toInt() ?? 0;
+        if (weight <= 0 || reps <= 0) continue;
+        session.add(
+          StrengthSetSample(
+            workoutId: workoutId,
+            date: now,
+            exerciseId: ex.exerciseId,
+            exerciseName: ex.name,
+            exerciseLocaleKey: ex.localeKey,
+            categoryId: ex.categoryId ?? '',
+            weight: weight,
+            reps: reps,
+          ),
+        );
+      }
+    }
+    if (session.isEmpty) return const [];
+
+    final history = await StrengthRecordsRepository().loadSets();
+    final events = StrengthWorkoutRecords.sessionEvents(
+      history: history,
+      session: session,
+      workoutId: workoutId,
+    );
+    final volumes = StrengthWorkoutRecords.volumeRecords(
+      history: history,
+      session: session,
+      workoutId: workoutId,
+    );
+
+    final prs = <PR>[];
+    for (final ex in _exercises) {
+      final name = ex.localizedName(loc);
+      for (final e in events.where((e) => e.exerciseId == ex.exerciseId)) {
+        final set = StrengthWorkoutFormat.setLabel(e.weight, e.reps);
+        prs.add(
+          PR(
+            exerciseName: name,
+            type: e.kind == StrengthRecordKind.e1rm ? 'e1rm' : 'weight',
+            value: e.kind == StrengthRecordKind.e1rm
+                ? '${StrengthWorkoutFormat.weightKg(e.value)} ($set)'
+                : set,
+            previous: e.previous == null
+                ? ''
+                : StrengthWorkoutFormat.weightKg(e.previous!),
+          ),
+        );
+      }
+      final volume = volumes[ex.exerciseId];
+      if (volume != null) {
+        prs.add(
+          PR(
+            exerciseName: name,
+            type: 'volume',
+            value: StrengthWorkoutFormat.volume(volume.volume),
+            previous: StrengthWorkoutFormat.volume(volume.previous),
+          ),
+        );
+      }
+    }
+    return prs;
   }
 
   Future<void> _openRestTimer() async {

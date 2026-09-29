@@ -72,12 +72,12 @@ class _RestTimerScreenState extends State<RestTimerScreen> {
                   ),
                   border: Border.all(
                     color: isComplete
-                        ? Colors.green
+                        ? theme.colorScheme.primary
                         : isWarning
-                            ? Colors.orange
-                            : _timerService.isRunning
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.outlineVariant,
+                        ? theme.colorScheme.tertiary
+                        : _timerService.isRunning
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.outlineVariant,
                     width: 4,
                   ),
                 ),
@@ -94,10 +94,10 @@ class _RestTimerScreenState extends State<RestTimerScreen> {
                             theme.colorScheme.surfaceContainerHighest,
                         valueColor: AlwaysStoppedAnimation(
                           isComplete
-                              ? Colors.green
+                              ? theme.colorScheme.primary
                               : isWarning
-                                  ? Colors.orange
-                                  : theme.colorScheme.primary,
+                              ? theme.colorScheme.tertiary
+                              : theme.colorScheme.primary,
                         ),
                       ),
                     ),
@@ -110,10 +110,10 @@ class _RestTimerScreenState extends State<RestTimerScreen> {
                             fontWeight: FontWeight.bold,
                             fontSize: 64,
                             color: isComplete
-                                ? Colors.green
+                                ? theme.colorScheme.primary
                                 : isWarning
-                                    ? Colors.orange
-                                    : null,
+                                ? theme.colorScheme.tertiary
+                                : null,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -121,13 +121,10 @@ class _RestTimerScreenState extends State<RestTimerScreen> {
                           isComplete
                               ? AppLocalizations.of(context)!.restTimerComplete
                               : isPaused
-                                  ? AppLocalizations.of(context)!
-                                      .restTimerPaused
-                                  : _timerService.isRunning
-                                      ? AppLocalizations.of(context)!
-                                          .restTimerResting
-                                      : AppLocalizations.of(context)!
-                                          .restTimerReady,
+                              ? AppLocalizations.of(context)!.restTimerPaused
+                              : _timerService.isRunning
+                              ? AppLocalizations.of(context)!.restTimerResting
+                              : AppLocalizations.of(context)!.restTimerReady,
                           style: theme.textTheme.labelLarge?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                             letterSpacing: 2,
@@ -149,8 +146,8 @@ class _RestTimerScreenState extends State<RestTimerScreen> {
                     onTap: isComplete || (!_timerService.isRunning && !isActive)
                         ? null
                         : isPaused
-                            ? _timerService.resume
-                            : _timerService.pause,
+                        ? _timerService.resume
+                        : _timerService.pause,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -160,11 +157,11 @@ class _RestTimerScreenState extends State<RestTimerScreen> {
                               : Icons.pause_circle_filled,
                           size: 56,
                           color: isPaused
-                              ? Colors.green
+                              ? theme.colorScheme.primary
                               : (_timerService.isRunning
-                                  ? Colors.orange
-                                  : theme.colorScheme.onSurfaceVariant
-                                      .withAlpha(80)),
+                                    ? theme.colorScheme.tertiary
+                                    : theme.colorScheme.onSurfaceVariant
+                                          .withAlpha(80)),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -173,7 +170,7 @@ class _RestTimerScreenState extends State<RestTimerScreen> {
                               : AppLocalizations.of(context)!.restTimerPause,
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontWeight: FontWeight.w600,
-                            color: isPaused ? Colors.green : null,
+                            color: isPaused ? theme.colorScheme.primary : null,
                           ),
                         ),
                       ],

@@ -469,7 +469,7 @@ mixin _ActiveWorkoutRoutineActions
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(
               AppLocalizations.of(context)!.commonDelete,
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: Theme.of(ctx).colorScheme.error),
             ),
           ),
         ],

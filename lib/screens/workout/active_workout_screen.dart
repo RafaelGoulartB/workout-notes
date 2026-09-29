@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:uuid/uuid.dart';
@@ -19,6 +18,10 @@ import '../../widgets/workout/exercise_card.dart';
 import '../../widgets/workout/finish_workout_sheet.dart';
 import '../../models/exercise_with_sets.dart';
 import '../../utils/workout_estimator.dart';
+import 'package:workout_notes/repositories/strength_records_repository.dart';
+import 'package:workout_notes/utils/strength_workout_format.dart';
+import 'package:workout_notes/utils/strength_workout_records.dart';
+import 'package:workout_notes/widgets/strength/workout/active_workout_header.dart';
 import 'rest_timer_screen.dart';
 
 part 'active_workout_controller.dart';
@@ -53,6 +56,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
   void dispose() {
     _timerService.removeListener(_onTimerTick);
     _elapsedTimer?.cancel();
+    _discardBlankWorkout();
     super.dispose();
   }
 
@@ -76,8 +80,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
                   color:
                       _timerService.remainingSeconds <= 5 &&
                           _timerService.isRunning
-                      ? Colors.red.withAlpha(40)
-                      : Theme.of(context).colorScheme.primaryContainer,
+                      ? theme.colorScheme.error.withAlpha(40)
+                      : theme.colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Row(
@@ -89,8 +93,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
                       color:
                           _timerService.remainingSeconds <= 5 &&
                               _timerService.isRunning
-                          ? Colors.red
-                          : Theme.of(context).colorScheme.onPrimaryContainer,
+                          ? theme.colorScheme.error
+                          : theme.colorScheme.onPrimaryContainer,
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -101,8 +105,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
                         color:
                             _timerService.remainingSeconds <= 5 &&
                                 _timerService.isRunning
-                            ? Colors.red
-                            : Theme.of(context).colorScheme.onPrimaryContainer,
+                            ? theme.colorScheme.error
+                            : theme.colorScheme.onPrimaryContainer,
                       ),
                     ),
                   ],
@@ -266,24 +270,47 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
   Widget _buildWorkoutView(ThemeData theme) {
     int totalSets = 0;
     int completedSets = 0;
+    double volume = 0;
     for (final ex in _exercises) {
       for (final s in ex.sets) {
-        // Warmup sets are excluded from the progress counter.
+        // Warmup sets are excluded from the progress counter and volume.
         if ((s['is_warmup'] as int?) != 1) {
           totalSets++;
-          if ((s['is_complete'] as int?) == 1) completedSets++;
+          if ((s['is_complete'] as int?) == 1) {
+            completedSets++;
+            volume +=
+                ((s['weight'] as num?)?.toDouble() ?? 0) *
+                ((s['reps'] as num?)?.toInt() ?? 0);
+          }
         }
       }
     }
 
     return Column(
       children: [
-        // Timer Card (top)
-        _buildTimerCard(theme),
-
-        // Progress bar
-        if (totalSets > 0)
-          _buildWorkoutProgressSection(theme, completedSets, totalSets),
+        ActiveWorkoutHeader(
+          phase: _timerEnd != null
+              ? ActiveWorkoutTimerPhase.finished
+              : _isPaused
+              ? ActiveWorkoutTimerPhase.paused
+              : _timerStart != null
+              ? ActiveWorkoutTimerPhase.running
+              : ActiveWorkoutTimerPhase.idle,
+          elapsed: _elapsedStr,
+          startedAt: _timerStart,
+          endedAt: _timerEnd,
+          onStart: _startTimer,
+          onPause: _pauseTimer,
+          onResume: _resumeTimer,
+          completedSets: completedSets,
+          totalSets: totalSets,
+          volume: volume,
+          categories: _categoryVolumeComparisons,
+          expanded: _isVolumeSummaryExpanded,
+          onToggleExpanded: () => setState(() {
+            _isVolumeSummaryExpanded = !_isVolumeSummaryExpanded;
+          }),
+        ),
         Expanded(
           child: _exercises.isEmpty
               ? const SizedBox.shrink()
@@ -321,394 +348,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
                 ),
         ),
       ],
-    );
-  }
-
-  Widget _buildWorkoutProgressSection(
-    ThemeData theme,
-    int completedSets,
-    int totalSets,
-  ) {
-    final loc = AppLocalizations.of(context)!;
-    final hasVolumeData = _categoryVolumeComparisons.isNotEmpty;
-    final maxVolume = _categoryVolumeComparisons.fold<double>(0, (max, item) {
-      final itemMax = item.currentVolume > item.lastVolume
-          ? item.currentVolume
-          : item.lastVolume;
-      return itemMax > max ? itemMax : max;
-    });
-
-    return Material(
-      color: theme.colorScheme.surfaceContainerLow,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          InkWell(
-            onTap: hasVolumeData
-                ? () {
-                    setState(() {
-                      _isVolumeSummaryExpanded = !_isVolumeSummaryExpanded;
-                    });
-                  }
-                : null,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Text(
-                    loc.activeWorkoutSetsSummary(completedSets, totalSets),
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: completedSets / totalSets,
-                        minHeight: 6,
-                      ),
-                    ),
-                  ),
-                  if (hasVolumeData) ...[
-                    const SizedBox(width: 8),
-                    AnimatedRotation(
-                      turns: _isVolumeSummaryExpanded ? 0.5 : 0,
-                      duration: const Duration(milliseconds: 180),
-                      child: Icon(
-                        Icons.keyboard_arrow_down,
-                        size: 18,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          AnimatedCrossFade(
-            firstChild: const SizedBox.shrink(),
-            secondChild: hasVolumeData
-                ? Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Divider(
-                          height: 10,
-                          color: theme.colorScheme.outlineVariant.withAlpha(
-                            120,
-                          ),
-                        ),
-                        Text(
-                          loc.activeWorkoutByMuscleGroup,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        ..._categoryVolumeComparisons.map(
-                          (comparison) => _buildCategoryVolumeRow(
-                            theme,
-                            comparison,
-                            maxVolume,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : const SizedBox.shrink(),
-            crossFadeState: _isVolumeSummaryExpanded && hasVolumeData
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 180),
-            sizeCurve: Curves.easeOutCubic,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategoryVolumeRow(
-    ThemeData theme,
-    CategoryVolumeComparison comparison,
-    double maxVolume,
-  ) {
-    final loc = AppLocalizations.of(context)!;
-    final categoryName = comparison.categoryId.isNotEmpty
-        ? ExerciseLocaleHelper.categoryNameFromId(loc, comparison.categoryId)
-        : comparison.categoryName;
-    final deltaColor = _volumeDeltaColor(theme, comparison.delta);
-    final currentWidth = maxVolume > 0
-        ? (comparison.currentVolume / maxVolume).clamp(0.0, 1.0).toDouble()
-        : 0.0;
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: comparison.categoryColor,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  categoryName,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Text(
-                _formatVolumeDelta(comparison.delta, comparison.deltaPercent),
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: deltaColor,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: Stack(
-                    children: [
-                      Container(
-                        height: 6,
-                        color: theme.colorScheme.surfaceContainerHighest,
-                      ),
-                      FractionallySizedBox(
-                        widthFactor: currentWidth,
-                        child: Container(
-                          height: 6,
-                          color: comparison.categoryColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '${_formatVolume(comparison.currentVolume)} / '
-                '${_formatVolume(comparison.lastVolume)} kg',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatVolume(double volume) {
-    return NumberFormat.decimalPattern(
-      AppLocalizations.of(context)!.localeName,
-    ).format(volume.round());
-  }
-
-  String _formatVolumeDelta(double delta, double? deltaPercent) {
-    final prefix = delta > 0 ? '+' : '';
-    if (deltaPercent != null) {
-      return '$prefix${_formatVolume(delta)} kg '
-          '($prefix${deltaPercent.round()}%)';
-    }
-    return '$prefix${_formatVolume(delta)} kg';
-  }
-
-  Color _volumeDeltaColor(ThemeData theme, double delta) {
-    if (delta > 0) return theme.colorScheme.primary;
-    if (delta < 0) return theme.colorScheme.error;
-    return theme.colorScheme.onSurfaceVariant;
-  }
-
-  // ===================== TIMER CARD =====================
-  Widget _buildTimerCard(ThemeData theme) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primaryContainer.withAlpha(200),
-            theme.colorScheme.surfaceContainerHighest.withAlpha(180),
-          ],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            _timerEnd != null
-                ? Icons.check_circle
-                : _isPaused
-                ? Icons.pause_circle_outline
-                : _timerStart != null
-                ? Icons.timer_outlined
-                : Icons.play_circle_outline,
-            color: _timerEnd != null
-                ? Colors.green
-                : _isPaused
-                ? Colors.orange
-                : _timerStart != null
-                ? theme.colorScheme.primary
-                : theme.colorScheme.onSurfaceVariant,
-            size: 22,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_isPaused) ...[
-                  // Paused
-                  Text(
-                    _elapsedStr,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withAlpha(30),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          AppLocalizations.of(context)!.restTimerPaused,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.orange.shade700,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          '${AppLocalizations.of(context)!.activeWorkoutTimerStartLabel} ${DateFormat('HH:mm').format(_timerStart!)}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ] else if (_timerStart != null && _timerEnd == null) ...[
-                  // Running
-                  Text(
-                    _elapsedStr,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${AppLocalizations.of(context)!.activeWorkoutTimerStartLabel} ${DateFormat('HH:mm').format(_timerStart!)}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ] else if (_timerStart != null && _timerEnd != null) ...[
-                  // Finished
-                  Text(
-                    '${AppLocalizations.of(context)!.activeWorkoutTimerDuration} $_elapsedStr',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${DateFormat('HH:mm').format(_timerStart!)} → ${DateFormat('HH:mm').format(_timerEnd!)}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ] else ...[
-                  // Not started
-                  Text(
-                    AppLocalizations.of(context)!.activeWorkoutTimerTitle,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    AppLocalizations.of(
-                      context,
-                    )!.activeWorkoutStartTimerTooltip,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          if (_timerStart == null || (_timerStart != null && _timerEnd == null))
-            SizedBox(
-              height: 36,
-              child: FilledButton(
-                onPressed: _timerStart == null
-                    ? _startTimer
-                    : (_isPaused ? _resumeTimer : _pauseTimer),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  backgroundColor: _timerStart == null
-                      ? theme.colorScheme.primary
-                      : (_isPaused
-                            ? theme.colorScheme.primary
-                            : Colors.orange.withAlpha(200)),
-                  foregroundColor: _timerStart == null
-                      ? theme.colorScheme.onPrimary
-                      : Colors.white,
-                ),
-                child: Text(
-                  _timerStart == null
-                      ? AppLocalizations.of(context)!.activeWorkoutStart
-                      : (_isPaused
-                            ? AppLocalizations.of(context)!.restTimerResume
-                            : AppLocalizations.of(context)!.restTimerPause),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
     );
   }
 }
