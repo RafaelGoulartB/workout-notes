@@ -12,6 +12,7 @@ import 'package:workout_notes/services/sleep_mission_service.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'package:workout_notes/services/traditional_alarm_service.dart';
 import 'package:workout_notes/utils/sleep_alarm_time.dart';
+import 'package:workout_notes/widgets/run/run_ui.dart';
 
 import 'sleep_monitor_result_screen.dart';
 import 'sleep_settings_screen.dart';
@@ -303,19 +304,24 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
         onTap: _showModePicker,
       ),
       const SizedBox(height: 10),
-      _MonitoringOnlyCard(
-        title: loc.sleepMonitorPlacementTitle,
-        body: loc.sleepMonitorPlacementBody,
+      _TipsCard(
+        title: loc.sleepMonitorTipsTitle,
+        tips: [
+          (
+            Icons.phone_android_rounded,
+            loc.sleepMonitorPlacementTitle,
+            loc.sleepMonitorPlacementBody,
+          ),
+          if (_selectedMode.hasAlarm)
+            (
+              Icons.snooze_rounded,
+              loc.sleepMonitorSnoozesTitle,
+              !_globalSnoozeEnabled || _globalMaxSnoozes == 0
+                  ? loc.sleepMonitorSnoozesDisabled
+                  : loc.sleepMonitorSnoozesConfigured(_globalMaxSnoozes),
+            ),
+        ],
       ),
-      if (_selectedMode.hasAlarm) ...[
-        const SizedBox(height: 10),
-        _MonitoringOnlyCard(
-          title: loc.sleepMonitorSnoozesTitle,
-          body: !_globalSnoozeEnabled || _globalMaxSnoozes == 0
-              ? loc.sleepMonitorSnoozesDisabled
-              : loc.sleepMonitorSnoozesConfigured(_globalMaxSnoozes),
-        ),
-      ],
       if (!valid) ...[
         const SizedBox(height: 10),
         _WarningBanner(
@@ -1566,33 +1572,89 @@ class _PermissionNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(16),
-      ),
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return RunSectionCard(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+      color: scheme.errorContainer.withAlpha(70),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.alarm_off_rounded, color: scheme.onErrorContainer),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  text,
-                  style: TextStyle(color: scheme.onErrorContainer),
-                ),
-              ),
+              RunIconBadge(Icons.alarm_off_rounded, color: scheme.error),
+              const SizedBox(width: 12),
+              Expanded(child: Text(text, style: theme.textTheme.bodyMedium)),
             ],
           ),
+          const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerRight,
-            child: TextButton(onPressed: onPressed, child: Text(action)),
+            child: FilledButton.tonal(
+              onPressed: onPressed,
+              child: Text(action),
+            ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact list of bedtime tips (icon, title and one short paragraph each).
+class _TipsCard extends StatelessWidget {
+  final String title;
+  final List<(IconData, String, String)> tips;
+
+  const _TipsCard({required this.title, required this.tips});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return RunSectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title.toUpperCase(),
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+              color: colors.primary,
+            ),
+          ),
+          for (final tip in tips) ...[
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                RunIconBadge(tip.$1),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tip.$2,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        tip.$3,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

@@ -3760,5 +3760,21 @@
   "goalRowLeft": "faltam {value}",
   "goalRowDaysUnit": "dias",
   "goalEmptyRowSubtitle": "Defina um alvo semanal ou mensal",
-  "goalRowLeftDays": "{count, plural, =1{falta 1 dia} other{faltam {count} dias}}"
+  "goalRowLeftDays": "{count, plural, =1{falta 1 dia} other{faltam {count} dias}}",
+  "sleepLastNight": "Última noite",
+  "sleepOfGoal": "da meta",
+  "sleepGoalShortBy": "Faltaram {duration}",
+  "sleepStageDeepShort": "Profundo",
+  "sleepWeekTitle": "Semana",
+  "sleepWeekTabDuration": "Duração",
+  "sleepWeekTabSchedule": "Horários",
+  "sleepNightsShort": "Noites",
+  "sleepAverageBedtime": "Dormir em média {time}",
+  "sleepAverageWake": "Acordar em média {time}",
+  "sleepNightsOnGoal": "{count} de {total} na meta",
+  "sleepInBedShort": "Na cama",
+  "sleepEfficiencyShort": "eficiência",
+  "sleepNightOf": "Noite de {date}",
+  "sleepEstimatedAsleep": "Sono estimado",
+  "sleepMonitorTipsTitle": "Antes de dormir"
 }

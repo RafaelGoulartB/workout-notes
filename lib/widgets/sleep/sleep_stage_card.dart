@@ -7,17 +7,23 @@ import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/models/sleep_stage_epoch.dart';
 import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
+import 'package:workout_notes/widgets/run/run_ui.dart';
 
 class SleepStageCard extends StatefulWidget {
   final SleepMonitorSession session;
   final List<SleepStageEpoch> stages;
   final bool compact;
 
+  /// Onset, final wake, latency and awakenings under the breakdown. Hosts
+  /// that already show those numbers turn it off.
+  final bool showNightMetrics;
+
   const SleepStageCard({
     super.key,
     required this.session,
     required this.stages,
     this.compact = false,
+    this.showNightMetrics = true,
   });
 
   @override
@@ -43,82 +49,80 @@ class _SleepStageCardState extends State<SleepStageCard> {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.bedtime_rounded, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    SleepWakeEngine.supports(widget.session)
-                        ? loc.sleepWakeEstimateTitle
-                        : loc.sleepStagesTitle,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+    return RunSectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const RunIconBadge(Icons.bedtime_rounded),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  SleepWakeEngine.supports(widget.session)
+                      ? loc.sleepWakeEstimateTitle
+                      : loc.sleepStagesTitle,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                if (!SleepWakeEngine.supports(widget.session) &&
-                    (_hasStages || _hasStageAggregates) &&
-                    widget.session.stageConfidence != null)
-                  Chip(
-                    visualDensity: VisualDensity.compact,
-                    label: Text(
-                      '${(widget.session.stageConfidence! * 100).round()}%',
-                    ),
+              ),
+              if (!SleepWakeEngine.supports(widget.session) &&
+                  (_hasStages || _hasStageAggregates) &&
+                  widget.session.stageConfidence != null)
+                Tooltip(
+                  message: loc.sleepInferenceConfidence,
+                  child: RunPill(
+                    icon: Icons.verified_outlined,
+                    label:
+                        '${(widget.session.stageConfidence! * 100).round()}%',
                   ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            if (!_hasStages && !_hasStageAggregates)
-              _UnavailableState(session: widget.session)
-            else ...[
-              if (_hasStages) ...[
-                Semantics(
-                  label: loc.sleepStageTimelineSemantics,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) => GestureDetector(
-                      onTapDown: (details) =>
-                          _selectStage(details, constraints.maxWidth),
-                      child: SizedBox(
-                        height: widget.compact ? 70 : 112,
-                        width: double.infinity,
-                        child: CustomPaint(
-                          painter: _HypnogramPainter(
-                            stages: widget.stages,
-                            session: widget.session,
-                            selected: _selected,
-                            colorScheme: theme.colorScheme,
-                          ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (!_hasStages && !_hasStageAggregates)
+            _UnavailableState(session: widget.session)
+          else ...[
+            if (_hasStages) ...[
+              Semantics(
+                label: loc.sleepStageTimelineSemantics,
+                child: LayoutBuilder(
+                  builder: (context, constraints) => GestureDetector(
+                    onTapDown: (details) =>
+                        _selectStage(details, constraints.maxWidth),
+                    child: SizedBox(
+                      height: widget.compact ? 70 : 112,
+                      width: double.infinity,
+                      child: CustomPaint(
+                        painter: _HypnogramPainter(
+                          stages: widget.stages,
+                          session: widget.session,
+                          selected: _selected,
+                          colorScheme: theme.colorScheme,
                         ),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
-                _StageLegend(selected: _selected, session: widget.session),
-                const SizedBox(height: 14),
-              ],
-              _Breakdown(session: widget.session),
-              if (SleepWakeEngine.supports(widget.session)) ...[
-                const SizedBox(height: 12),
-                Text(loc.sleepBedsideEstimateBody),
-              ],
-              if (!widget.compact) ...[
-                const SizedBox(height: 14),
-                Divider(color: theme.colorScheme.outlineVariant),
-                const SizedBox(height: 10),
-                _NightMetrics(session: widget.session),
-              ],
+              ),
+              const SizedBox(height: 10),
+              _StageLegend(selected: _selected, session: widget.session),
+              const SizedBox(height: 14),
+            ],
+            _Breakdown(session: widget.session),
+            if (SleepWakeEngine.supports(widget.session)) ...[
+              const SizedBox(height: 12),
+              Text(loc.sleepBedsideEstimateBody),
+            ],
+            if (!widget.compact && widget.showNightMetrics) ...[
+              const SizedBox(height: 14),
+              Divider(color: theme.colorScheme.outlineVariant),
+              const SizedBox(height: 10),
+              _NightMetrics(session: widget.session),
             ],
           ],
-        ),
+        ],
       ),
     );
   }
@@ -152,33 +156,38 @@ class _UnavailableState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.info_outline_rounded),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  loc.sleepStageUnavailable,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          Icons.info_outline_rounded,
+          size: 18,
+          color: colors.onSurfaceVariant,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                loc.sleepStageUnavailable,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
-                const SizedBox(height: 4),
-                Text(_unavailableBody(loc, session.analysisStatus)),
-              ],
-            ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _unavailableBody(loc, session.analysisStatus),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
