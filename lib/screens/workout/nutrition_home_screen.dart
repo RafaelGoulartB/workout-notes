@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
@@ -433,33 +432,41 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     return [
       for (final type in _mealTypes)
         SliverToBoxAdapter(
-          child: NutritionMealCard(
-            title: type.displayName(loc),
-            emptyLabel: loc.nutritionHomeEmptyMeals,
-            meal: _mealFor(type.key),
-            onOpen: () => _openMealInDay(type.key),
-            onAdd: () => _addToMeal(type),
-            onEditItem: _editItem,
-          ).animate().fadeIn(duration: 220.ms, delay: 30.ms),
+          child: FadeSlideIn(
+            duration: const Duration(milliseconds: 220),
+            delay: const Duration(milliseconds: 30),
+            child: NutritionMealCard(
+              title: type.displayName(loc),
+              emptyLabel: loc.nutritionHomeEmptyMeals,
+              meal: _mealFor(type.key),
+              onOpen: () => _openMealInDay(type.key),
+              onAdd: () => _addToMeal(type),
+              onEditItem: _editItem,
+            ),
+          ),
         ),
       for (final meal in orphanMeals)
         SliverToBoxAdapter(
-          child: NutritionMealCard(
-            title: meal.log.displayName(loc),
-            emptyLabel: loc.nutritionHomeEmptyMeals,
-            meal: meal,
-            onOpen: () => _openMealInDay(meal.log.mealType),
-            onEditItem: _editItem,
-            onAdd: () => _addToMeal(
-              MealTypeDefinition(
-                id: meal.log.mealType,
-                key: meal.log.mealType,
-                name: meal.log.name,
-                orderIndex: 0,
-                createdAt: DateTime.now(),
+          child: FadeSlideIn(
+            duration: const Duration(milliseconds: 220),
+            delay: const Duration(milliseconds: 30),
+            child: NutritionMealCard(
+              title: meal.log.displayName(loc),
+              emptyLabel: loc.nutritionHomeEmptyMeals,
+              meal: meal,
+              onOpen: () => _openMealInDay(meal.log.mealType),
+              onEditItem: _editItem,
+              onAdd: () => _addToMeal(
+                MealTypeDefinition(
+                  id: meal.log.mealType,
+                  key: meal.log.mealType,
+                  name: meal.log.name,
+                  orderIndex: 0,
+                  createdAt: DateTime.now(),
+                ),
               ),
             ),
-          ).animate().fadeIn(duration: 220.ms, delay: 30.ms),
+          ),
         ),
     ];
   }
@@ -582,26 +589,30 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                           child: LoadErrorBanner(onRetry: _load),
                         ),
                       SliverToBoxAdapter(
-                        child:
-                            NutritionSummaryCard(
-                                  summary: _summary,
-                                  goal: _effective.goal,
-                                  planInfo: _effective,
-                                  onTap: () => _openDay(),
-                                  onConfigureGoal: _openSettings,
-                                )
-                                .animate()
-                                .fadeIn(duration: 300.ms, delay: 60.ms)
-                                .slideY(begin: 0.05),
+                        child: FadeSlideIn(
+                          delay: const Duration(milliseconds: 60),
+                          slideY: 0.05,
+                          child: NutritionSummaryCard(
+                            summary: _summary,
+                            goal: _effective.goal,
+                            planInfo: _effective,
+                            onTap: () => _openDay(),
+                            onConfigureGoal: _openSettings,
+                          ),
+                        ),
                       ),
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                         sliver: SliverToBoxAdapter(
-                          child: _NutritionToolsGrid(
-                            onProgress: _openProgress,
-                            onSavedMeals: _openSavedMeals,
-                            onFoods: _openFoodLibrary,
-                          ).animate().fadeIn(duration: 350.ms, delay: 120.ms),
+                          child: FadeSlideIn(
+                            duration: const Duration(milliseconds: 350),
+                            delay: const Duration(milliseconds: 120),
+                            child: _NutritionToolsGrid(
+                              onProgress: _openProgress,
+                              onSavedMeals: _openSavedMeals,
+                              onFoods: _openFoodLibrary,
+                            ),
+                          ),
                         ),
                       ),
                       SliverToBoxAdapter(

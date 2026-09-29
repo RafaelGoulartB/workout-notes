@@ -293,31 +293,35 @@ class _DailyStatisticsView extends StatelessWidget {
       ),
     ];
 
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-      children: [
-        _MacrosCard(summary: summary, goal: goal),
-        for (final (title, nutrients) in groups) ...[
-          AppSectionHeader(title),
-          AppSectionCard(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                for (var i = 0; i < nutrients.length; i++) ...[
-                  if (i > 0)
-                    Divider(
-                      height: 1,
-                      color: AppUi.divider(Theme.of(context).colorScheme),
-                    ),
-                  _NutrientStatRow(nutrient: nutrients[i]),
+    return FadeSlideIn(
+      duration: const Duration(milliseconds: 260),
+      delay: const Duration(milliseconds: 40),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+        children: [
+          _MacrosCard(summary: summary, goal: goal),
+          for (final (title, nutrients) in groups) ...[
+            AppSectionHeader(title),
+            AppSectionCard(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: [
+                  for (var i = 0; i < nutrients.length; i++) ...[
+                    if (i > 0)
+                      Divider(
+                        height: 1,
+                        color: AppUi.divider(Theme.of(context).colorScheme),
+                      ),
+                    _NutrientStatRow(nutrient: nutrients[i]),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
+          ],
         ],
-      ],
-    ).animate().fadeIn(duration: 260.ms, delay: 40.ms);
+      ),
+    );
   }
 }
 

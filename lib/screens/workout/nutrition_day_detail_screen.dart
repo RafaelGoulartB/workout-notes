@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
@@ -630,13 +629,16 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
                       physics: const AlwaysScrollableScrollPhysics(),
                       slivers: [
                         SliverToBoxAdapter(
-                          child: NutritionSummaryCard(
-                            summary: _summary,
-                            goal: _effective.goal,
-                            planInfo: _effective,
-                            onConfigureGoal: _openSettings,
-                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                          ).animate().fadeIn(duration: 220.ms),
+                          child: FadeSlideIn(
+                            duration: const Duration(milliseconds: 220),
+                            child: NutritionSummaryCard(
+                              summary: _summary,
+                              goal: _effective.goal,
+                              planInfo: _effective,
+                              onConfigureGoal: _openSettings,
+                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                            ),
+                          ),
                         ),
                         SliverToBoxAdapter(
                           child: NutritionSectionLabel(
@@ -745,21 +747,26 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
     }
     Widget card(MealLogWithItems meal, String title) {
       void add() => _addItem(meal.log.mealType, title);
-      return NutritionMealCard(
-        key: _mealSectionKey(meal.log.mealType),
-        keyPrefix: 'nutrition-diary',
-        title: title,
-        meal: meal,
-        detailed: true,
-        emptyLabel: loc.nutritionMealEmptyHint,
-        onOpen: meal.items.isEmpty ? add : null,
-        onAdd: add,
-        onEditItem: _editItem,
-        menu: _MealMenu(
-          onRepeat: () => _repeatMeal(meal),
-          onSaveAsMeal: () => _saveMealFromDay(meal),
+      return FadeSlideIn(
+        duration: const Duration(milliseconds: 250),
+        delay: const Duration(milliseconds: 40),
+        slideY: 0.02,
+        child: NutritionMealCard(
+          key: _mealSectionKey(meal.log.mealType),
+          keyPrefix: 'nutrition-diary',
+          title: title,
+          meal: meal,
+          detailed: true,
+          emptyLabel: loc.nutritionMealEmptyHint,
+          onOpen: meal.items.isEmpty ? add : null,
+          onAdd: add,
+          onEditItem: _editItem,
+          menu: _MealMenu(
+            onRepeat: () => _repeatMeal(meal),
+            onSaveAsMeal: () => _saveMealFromDay(meal),
+          ),
         ),
-      ).animate().fadeIn(duration: 250.ms, delay: 40.ms).slideY(begin: 0.02);
+      );
     }
 
     return [

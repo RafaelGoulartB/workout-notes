@@ -158,8 +158,7 @@ class AppStatRow extends StatelessWidget {
     return Row(
       children: [
         for (var i = 0; i < children.length; i++) ...[
-          if (i > 0)
-            AppStatDivider(height: 34, margin: 8, color: divider),
+          if (i > 0) AppStatDivider(height: 34, margin: 8, color: divider),
           Expanded(child: children[i]),
         ],
       ],

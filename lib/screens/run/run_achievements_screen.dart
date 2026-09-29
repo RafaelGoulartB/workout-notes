@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_achievement.dart';
@@ -89,13 +88,15 @@ class _RunAchievementsScreenState extends State<RunAchievementsScreen> {
                     index < _board.categories.length;
                     index++
                   ) ...[
-                    _AchievementCategoryCard(
-                          category: _board.categories[index],
-                          onOpenActivity: _openActivity,
-                        )
-                        .animate()
-                        .fadeIn(duration: 260.ms, delay: (index * 35).ms)
-                        .slideY(begin: 0.025),
+                    FadeSlideIn(
+                      duration: const Duration(milliseconds: 260),
+                      delay: Duration(milliseconds: index * 35),
+                      slideY: 0.025,
+                      child: _AchievementCategoryCard(
+                        category: _board.categories[index],
+                        onOpenActivity: _openActivity,
+                      ),
+                    ),
                     if (index < _board.categories.length - 1)
                       const SizedBox(height: 10),
                   ],

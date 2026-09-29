@@ -123,36 +123,50 @@ class WorkoutWeekHero extends StatelessWidget {
                 color: colors.onSurfaceVariant.withAlpha(90),
                 label: loc.workoutHomeLegendPlanned,
               ),
-              const Spacer(),
-              Icon(
-                Icons.timer_outlined,
-                size: 14,
-                color: colors.onSurfaceVariant,
-              ),
-              const SizedBox(width: 3),
-              Text(
-                RunFormatters.durationHoursMinutes(activeSeconds),
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: colors.onSurfaceVariant,
-                  fontFeatures: AppUi.tabular,
-                ),
-              ),
-              if (streakWeeks > 0) ...[
-                const SizedBox(width: 10),
-                const Icon(
-                  Icons.local_fire_department_rounded,
-                  size: 14,
-                  color: Colors.orange,
-                ),
-                const SizedBox(width: 2),
-                Text(
-                  '$streakWeeks ${loc.workoutHomeWeeksShort}',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: Colors.orange,
-                    fontWeight: FontWeight.w700,
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  // Shrinks instead of overflowing on narrow screens or with
+                  // large system fonts.
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.timer_outlined,
+                          size: 14,
+                          color: colors.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          RunFormatters.durationHoursMinutes(activeSeconds),
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: colors.onSurfaceVariant,
+                            fontFeatures: AppUi.tabular,
+                          ),
+                        ),
+                        if (streakWeeks > 0) ...[
+                          const SizedBox(width: 10),
+                          const Icon(
+                            Icons.local_fire_department_rounded,
+                            size: 14,
+                            color: Colors.orange,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            '$streakWeeks ${loc.workoutHomeWeeksShort}',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: Colors.orange,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
-              ],
+              ),
             ],
           ),
         ],

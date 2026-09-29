@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
@@ -197,13 +196,16 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
               itemCount: _meals.length,
               itemBuilder: (context, index) {
                 final meal = _meals[index];
-                return _SavedMealCard(
-                  meal: meal,
-                  onTap: () => _editMeal(meal),
-                  onLog: () => _logToday(meal),
-                  onDelete: () => _deleteMeal(meal),
-                  isLogging: _isLogging,
-                ).animate().fadeIn(duration: 250.ms);
+                return FadeSlideIn(
+                  duration: const Duration(milliseconds: 250),
+                  child: _SavedMealCard(
+                    meal: meal,
+                    onTap: () => _editMeal(meal),
+                    onLog: () => _logToday(meal),
+                    onDelete: () => _deleteMeal(meal),
+                    isLogging: _isLogging,
+                  ),
+                );
               },
             ),
       floatingActionButton: _isLogging

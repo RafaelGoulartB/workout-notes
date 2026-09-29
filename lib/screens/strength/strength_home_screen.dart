@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:workout_notes/services/strength_routine_day_inference.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
@@ -278,20 +277,24 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (snapshot != null)
-          StrengthTodayCard(
-            info: snapshot.today,
-            onStartDay: _startDay,
-            onBlankWorkout: _startBlank,
-            onOpenRoutines: () => _push(const RoutinesScreen()),
-            onOpenWorkout: (id) => _push(WorkoutDetailScreen(workoutId: id)),
-          ).animate().fadeIn(duration: 300.ms),
+          FadeSlideIn(
+            child: StrengthTodayCard(
+              info: snapshot.today,
+              onStartDay: _startDay,
+              onBlankWorkout: _startBlank,
+              onOpenRoutines: () => _push(const RoutinesScreen()),
+              onOpenWorkout: (id) => _push(WorkoutDetailScreen(workoutId: id)),
+            ),
+          ),
         // The unfinished workout sits right under today's card.
         if (_active.isNotEmpty) ...[
           if (snapshot != null) const SizedBox(height: 12),
-          StrengthActiveBanner(
-            workout: _active.first,
-            onTap: _continueActive,
-          ).animate().fadeIn(duration: 300.ms),
+          FadeSlideIn(
+            child: StrengthActiveBanner(
+              workout: _active.first,
+              onTap: _continueActive,
+            ),
+          ),
         ],
         if (!hasWorkouts) ...[
           const SizedBox(height: 22),

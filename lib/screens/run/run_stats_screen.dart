@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_achievement.dart';
 import 'package:workout_notes/models/run_activity.dart';
@@ -77,7 +76,10 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
       _board = RunAchievementEngine.build(rows);
       _snapshot = snapshot;
       _fitness = fitness;
-      _load = RunTrainingLoadAnalytics.trainingLoad(rows, zones: fitness?.zones);
+      _load = RunTrainingLoadAnalytics.trainingLoad(
+        rows,
+        zones: fitness?.zones,
+      );
       _analytics = RunProgressAnalytics.fromActivities(rows, period: _period);
       _bannerRefresh++;
       _loading = false;
@@ -230,16 +232,19 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (snapshot != null)
-          RunTodayCard(
-            info: snapshot.today,
-            onStartSession: () {
-              final session = snapshot.today.session;
-              if (session != null) _startSession(session);
-            },
-            onFreeRun: _startFreeRun,
-            onOpenPlans: () => _push(const RunPlansScreen()),
-            onOpenRun: (id) => _push(RunDetailScreen(activityId: id)),
-          ).animate().fadeIn(duration: 300.ms),
+          FadeSlideIn(
+            duration: const Duration(milliseconds: 300),
+            child: RunTodayCard(
+              info: snapshot.today,
+              onStartSession: () {
+                final session = snapshot.today.session;
+                if (session != null) _startSession(session);
+              },
+              onFreeRun: _startFreeRun,
+              onOpenPlans: () => _push(const RunPlansScreen()),
+              onOpenRun: (id) => _push(RunDetailScreen(activityId: id)),
+            ),
+          ),
         if (!hasRuns)
           ..._buildEmpty(loc, snapshot)
         else ...[
