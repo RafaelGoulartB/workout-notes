@@ -335,7 +335,7 @@ void main() {
       _phone(tester);
       await _pumpHub(tester);
       expect(find.text('Musculação'), findsWidgets);
-      expect(find.text('Treinar'), findsOneWidget);
+      expect(find.text('Novo treino'), findsOneWidget);
       expect(find.text('Nenhuma rotina ainda'), findsOneWidget);
       expect(find.text('Nenhum treino de musculação ainda'), findsOneWidget);
       expect(find.byKey(const Key('strength-empty-start')), findsOneWidget);

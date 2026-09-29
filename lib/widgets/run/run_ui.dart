@@ -778,8 +778,17 @@ class RunSoftCard extends StatelessWidget {
 /// "Today · Tue, Sep 29" title row of the hub "today" cards.
 class RunTodayHeader extends StatelessWidget {
   final String title;
+  final IconData icon;
 
-  const RunTodayHeader({super.key, required this.title});
+  /// Appends today's date; off where the screen already shows it.
+  final bool showDate;
+
+  const RunTodayHeader({
+    super.key,
+    required this.title,
+    this.icon = Icons.today_rounded,
+    this.showDate = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -790,7 +799,7 @@ class RunTodayHeader extends StatelessWidget {
     ).format(DateTime.now());
     return Row(
       children: [
-        Icon(Icons.today_rounded, size: 18, color: colors.primary),
+        Icon(icon, size: 18, color: colors.primary),
         const SizedBox(width: 8),
         Text(
           title,
@@ -799,16 +808,17 @@ class RunTodayHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            '· $date',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colors.onSurfaceVariant,
+        if (showDate)
+          Expanded(
+            child: Text(
+              '· $date',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -836,42 +846,47 @@ class RunTodayFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    return Row(
-      children: [
-        Expanded(
-          child: caption == null
-              ? const SizedBox.shrink()
-              : Row(
-                  children: [
-                    Icon(captionIcon, size: 15, color: colors.onSurfaceVariant),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        caption!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
+    final button = FilledButton.icon(
+      key: actionKey,
+      onPressed: onAction,
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+      icon: const Icon(Icons.play_arrow_rounded),
+      label: Text(actionLabel, maxLines: 1, overflow: TextOverflow.ellipsis),
+    );
+    if (caption == null) {
+      return Align(alignment: Alignment.centerRight, child: button);
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) => Row(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Icon(captionIcon, size: 15, color: colors.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    caption!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
                     ),
-                  ],
+                  ),
                 ),
-        ),
-        const SizedBox(width: 12),
-        FilledButton.icon(
-          key: actionKey,
-          onPressed: onAction,
-          style: FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
+              ],
             ),
           ),
-          icon: const Icon(Icons.play_arrow_rounded),
-          label: Text(actionLabel),
-        ),
-      ],
+          const SizedBox(width: 12),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: constraints.maxWidth * 0.6),
+            child: button,
+          ),
+        ],
+      ),
     );
   }
 }

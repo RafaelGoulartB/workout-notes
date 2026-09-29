@@ -3816,5 +3816,12 @@
   "medicationDelete": "Excluir",
   "medicationSave": "Salvar",
   "medicationSaveError": "Não foi possível salvar o remédio.",
-  "medicationTimesCount": "{count, plural, =1{1 vez ao dia} other{{count} vezes ao dia}}"
+  "medicationTimesCount": "{count, plural, =1{1 vez ao dia} other{{count} vezes ao dia}}",
+  "strengthHomeNewWorkout": "Novo treino",
+  "activeWorkoutSuggestionTitle": "Sugestão de hoje",
+  "activeWorkoutSuggestionUse": "Usar este treino",
+  "activeWorkoutSuggestionFacts": "{routine} · {count, plural, =1{1 exercício} other{{count} exercícios}}",
+  "activeWorkoutBuildSection": "Montar treino",
+  "activeWorkoutAddExerciseHint": "Escolha na biblioteca de exercícios",
+  "activeWorkoutImportRoutineHint": "Copie os exercícios de um dia de rotina"
 }

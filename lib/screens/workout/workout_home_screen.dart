@@ -250,7 +250,9 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       context,
       AiCoachNavigation.route(
         kind: AiCoachRouteKind.activeWorkout,
-        builder: (_) => const ActiveWorkoutScreen(),
+        builder: (_) => ActiveWorkoutScreen(
+          suggestedDay: _strengthSnapshot?.today.startDay,
+        ),
       ),
     );
     _loadData();

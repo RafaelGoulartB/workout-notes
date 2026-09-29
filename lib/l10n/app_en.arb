@@ -4005,5 +4005,13 @@
   "medicationSave": "Save",
   "medicationSaveError": "Could not save the medication.",
   "medicationTimesCount": "{count, plural, =1{1 time a day} other{{count} times a day}}",
-  "@medicationTimesCount": {"placeholders": {"count": {"type": "int"}}}
+  "@medicationTimesCount": {"placeholders": {"count": {"type": "int"}}},
+  "strengthHomeNewWorkout": "New workout",
+  "activeWorkoutSuggestionTitle": "Today's suggestion",
+  "activeWorkoutSuggestionUse": "Use this workout",
+  "activeWorkoutSuggestionFacts": "{routine} · {count, plural, =1{1 exercise} other{{count} exercises}}",
+  "@activeWorkoutSuggestionFacts": {"placeholders": {"routine": {"type": "String"}, "count": {"type": "int"}}},
+  "activeWorkoutBuildSection": "Build your workout",
+  "activeWorkoutAddExerciseHint": "Pick from the exercise library",
+  "activeWorkoutImportRoutineHint": "Copy the exercises of a routine day"
 }

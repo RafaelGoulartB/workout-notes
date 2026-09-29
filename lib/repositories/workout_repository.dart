@@ -1021,6 +1021,40 @@ class WorkoutRepository extends BaseRepository {
 
   /// Removes a workout only if it is still an untouched blank session: not
   /// finished, no exercises and no notes. Returns whether it was deleted.
+  /// Deletes a workout that was prefilled (from a routine) but never used:
+  /// not started, not finished, no set completed and no feedback. Leaving the
+  /// screen of such a draft must not keep it around as "in progress".
+  Future<bool> deleteUntouchedDraft(String id) async {
+    final db = await this.db;
+    return db.transaction((txn) async {
+      final rows = await txn.rawQuery(
+        '''
+        SELECT 1 FROM workouts w
+        WHERE w.id = ? AND w.end_time IS NULL AND w.start_time IS NULL
+          AND IFNULL(w.comment, '') = '' AND w.feeling_rating IS NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM sets s
+            JOIN exercise_entries ee ON ee.id = s.exercise_entry_id
+            WHERE ee.workout_id = w.id AND IFNULL(s.is_complete, 0) = 1)
+        ''',
+        [id],
+      );
+      if (rows.isEmpty) return false;
+      await txn.rawDelete(
+        'DELETE FROM sets WHERE exercise_entry_id IN '
+        '(SELECT id FROM exercise_entries WHERE workout_id = ?)',
+        [id],
+      );
+      await txn.delete(
+        'exercise_entries',
+        where: 'workout_id = ?',
+        whereArgs: [id],
+      );
+      await txn.delete('workouts', where: 'id = ?', whereArgs: [id]);
+      return true;
+    });
+  }
+
   Future<bool> deleteIfBlank(String id) async {
     final db = await this.db;
     final removed = await db.delete(

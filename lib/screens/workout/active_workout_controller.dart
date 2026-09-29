@@ -11,6 +11,10 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
   bool _isLoading = true;
   String? _workoutId;
 
+  /// The exercises came from a routine day (opened or picked here) and the
+  /// user has not started yet: closing then discards the untouched draft.
+  bool _routinePreview = false;
+
   /// True when this screen inserted the workout row itself (a new workout,
   /// not one opened by id), so it may discard it if it stays blank.
   bool _createdHere = false;
@@ -153,7 +157,15 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
   /// never touched.
   void _discardBlankWorkout() {
     final id = _workoutId;
-    if (id == null || !_createdHere || _exercises.isNotEmpty) return;
+    if (id == null || !_createdHere) return;
+    // A routine day opened here but never started (no timer, nothing
+    // completed) is only a preview: keep nothing behind, otherwise the next
+    // "new workout" would resume it.
+    if (_routinePreview && _timerStart == null) {
+      _workoutRepo.deleteUntouchedDraft(id);
+      return;
+    }
+    if (_exercises.isNotEmpty) return;
     final hadTimer = _timerStart != null;
     _workoutRepo.deleteIfBlank(id).then((deleted) {
       if (deleted && hadTimer) {
@@ -244,6 +256,7 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
     );
     _workoutId = id;
     _createdHere = true;
+    _routinePreview = true;
     await _loadExercises();
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:intl/intl.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
@@ -10,6 +11,8 @@ import 'package:workout_notes/widgets/strength/workout/active_workout_header.dar
 import 'package:workout_notes/widgets/workout/finish_workout_sheet.dart';
 
 import 'support/ai_test_db.dart';
+import 'support/strength_home_fixtures.dart'
+    show seedRoutine, seedRoutineExercise;
 import 'support/strength_workout_seed.dart';
 
 Widget _app(Widget home) => MaterialApp(
@@ -159,6 +162,7 @@ void main() {
     Future<void> openAndLeave(
       WidgetTester tester, {
       Future<void> Function()? whileOpen,
+      ActiveWorkoutScreen screen = const ActiveWorkoutScreen(),
     }) async {
       await tester.binding.setSurfaceSize(const Size(360, 800));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -174,9 +178,7 @@ void main() {
                   child: TextButton(
                     onPressed: () => Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => const ActiveWorkoutScreen(),
-                      ),
+                      MaterialPageRoute(builder: (_) => screen),
                     ),
                     child: const Text('open'),
                   ),
@@ -210,6 +212,102 @@ void main() {
         whileOpen: () async => duringVisit = await workoutCount(),
       );
       expect(duringVisit, 1);
+      expect(await tester.runAsync(workoutCount), 0);
+    });
+
+    Future<void> seedPushDay() async {
+      await seedRoutine(
+        db,
+        id: 'draft-routine',
+        name: 'PPL',
+        days: [(id: 'draft-day', name: 'Push')],
+      );
+      await seedRoutineExercise(
+        db,
+        id: 'draft-bench',
+        dayId: 'draft-day',
+        exerciseId: 'bench',
+      );
+    }
+
+    testWidgets('an untouched routine preview is discarded on leave', (
+      tester,
+    ) async {
+      await tester.runAsync(seedPushDay);
+      var duringVisit = -1;
+      await openAndLeave(
+        tester,
+        screen: const ActiveWorkoutScreen(
+          routineId: 'draft-routine',
+          routineDayId: 'draft-day',
+        ),
+        whileOpen: () async => duringVisit = await workoutCount(),
+      );
+      expect(duringVisit, 1);
+      expect(await tester.runAsync(workoutCount), 0);
+    });
+
+    testWidgets('a routine workout with a completed set is kept', (
+      tester,
+    ) async {
+      await tester.runAsync(seedPushDay);
+      await openAndLeave(
+        tester,
+        screen: const ActiveWorkoutScreen(
+          routineId: 'draft-routine',
+          routineDayId: 'draft-day',
+        ),
+        whileOpen: () async => db.rawUpdate(
+          'UPDATE sets SET is_complete = 1 WHERE id = '
+          '(SELECT id FROM sets LIMIT 1)',
+        ),
+      );
+      expect(await tester.runAsync(workoutCount), 1);
+    });
+
+    testWidgets('a new workout starts empty and only suggests the day', (
+      tester,
+    ) async {
+      await tester.runAsync(seedPushDay);
+      var entriesBefore = -1;
+      var entriesAfter = -1;
+      Future<int> entryCount() async =>
+          (await db.rawQuery(
+                'SELECT COUNT(*) AS n FROM exercise_entries',
+              )).first['n']
+              as int;
+      await openAndLeave(
+        tester,
+        screen: const ActiveWorkoutScreen(
+          suggestedDay: StrengthRoutineDayInfo(
+            routineId: 'draft-routine',
+            routineName: 'PPL',
+            routineDayId: 'draft-day',
+            dayName: 'Push',
+            exerciseCount: 1,
+            categories: [],
+            estimatedSeconds: 0,
+          ),
+        ),
+        whileOpen: () async {
+          entriesBefore = await entryCount();
+          await tester.pump();
+          expect(
+            find.byKey(const Key('active-workout-suggestion')),
+            findsOneWidget,
+          );
+          await tester.tap(
+            find.byKey(const Key('active-workout-use-suggestion')),
+          );
+          await tester.pump();
+          await Future<void>.delayed(const Duration(milliseconds: 300));
+          await tester.pump();
+          entriesAfter = await entryCount();
+        },
+      );
+      expect(entriesBefore, 0);
+      expect(entriesAfter, 1);
+      // Picked but never started: still only a preview.
       expect(await tester.runAsync(workoutCount), 0);
     });
 

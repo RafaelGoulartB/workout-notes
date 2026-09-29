@@ -18,6 +18,10 @@ import '../../widgets/workout/exercise_card.dart';
 import '../../widgets/workout/finish_workout_sheet.dart';
 import '../../models/exercise_with_sets.dart';
 import '../../utils/workout_estimator.dart';
+import 'package:intl/intl.dart';
+import 'package:workout_notes/models/strength_workout_summary.dart';
+import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/strength/home/strength_home_today_card.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
 import 'package:workout_notes/utils/strength_workout_records.dart';
@@ -32,11 +36,16 @@ class ActiveWorkoutScreen extends StatefulWidget {
   final String? routineId;
   final String? routineDayId;
 
+  /// Today's routine day, offered on the empty screen of a new workout; the
+  /// workout only takes its exercises when the user picks it.
+  final StrengthRoutineDayInfo? suggestedDay;
+
   const ActiveWorkoutScreen({
     super.key,
     this.workoutId,
     this.routineId,
     this.routineDayId,
+    this.suggestedDay,
   });
 
   @override
@@ -64,206 +73,300 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        actions: [
-          if (_timerService.isActive)
-            GestureDetector(
-              onTap: _openRestTimer,
-              child: Container(
-                margin: const EdgeInsets.only(right: 4),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color:
-                      _timerService.remainingSeconds <= 5 &&
-                          _timerService.isRunning
-                      ? theme.colorScheme.error.withAlpha(40)
-                      : theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _timerService.isPaused ? Icons.pause : Icons.timer,
-                      size: 18,
-                      color:
-                          _timerService.remainingSeconds <= 5 &&
-                              _timerService.isRunning
-                          ? theme.colorScheme.error
-                          : theme.colorScheme.onPrimaryContainer,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      _timerService.shortTime,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+    // An untouched routine preview is dropped before the route closes, so
+    // the screen underneath never sees it as a workout in progress.
+    final preview = _routinePreview && _createdHere && _timerStart == null;
+    return PopScope(
+      canPop: !preview,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final id = _workoutId;
+        if (id != null) {
+          await _workoutRepo.deleteUntouchedDraft(id);
+          _workoutId = null;
+        }
+        if (context.mounted) Navigator.of(context).pop();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          actions: [
+            if (_timerService.isActive)
+              GestureDetector(
+                onTap: _openRestTimer,
+                child: Container(
+                  margin: const EdgeInsets.only(right: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color:
+                        _timerService.remainingSeconds <= 5 &&
+                            _timerService.isRunning
+                        ? theme.colorScheme.error.withAlpha(40)
+                        : theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _timerService.isPaused ? Icons.pause : Icons.timer,
+                        size: 18,
                         color:
                             _timerService.remainingSeconds <= 5 &&
                                 _timerService.isRunning
                             ? theme.colorScheme.error
                             : theme.colorScheme.onPrimaryContainer,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      Text(
+                        _timerService.shortTime,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color:
+                              _timerService.remainingSeconds <= 5 &&
+                                  _timerService.isRunning
+                              ? theme.colorScheme.error
+                              : theme.colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+              )
+            else
+              IconButton(
+                icon: const Icon(Icons.timer_outlined),
+                onPressed: _openRestTimer,
+                tooltip: AppLocalizations.of(
+                  context,
+                )!.activeWorkoutRestTimerTooltip,
               ),
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.timer_outlined),
-              onPressed: _openRestTimer,
-              tooltip: AppLocalizations.of(
-                context,
-              )!.activeWorkoutRestTimerTooltip,
-            ),
-          if (_isPaused)
-            IconButton(
-              icon: const Icon(Icons.play_arrow),
-              onPressed: _resumeTimer,
-              tooltip: AppLocalizations.of(context)!.restTimerResume,
-            )
-          else if (_timerStart != null && _timerEnd == null)
-            IconButton(
-              icon: const Icon(Icons.pause),
-              onPressed: _pauseTimer,
-              tooltip: AppLocalizations.of(context)!.restTimerPause,
-            ),
-          if (_exercises.isNotEmpty)
-            IconButton.filledTonal(
-              icon: const Icon(Icons.check_circle_outline),
-              onPressed: _finishWorkout,
-              tooltip: AppLocalizations.of(context)!.activeWorkoutFinishWorkout,
-            ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            tooltip: AppLocalizations.of(context)!.commonMoreOptions,
-            onSelected: (value) {
-              switch (value) {
-                case 'import_routine':
-                  _importFromRoutine();
-                  break;
-                case 'reset_timer':
-                  _resetTimer();
-                  break;
-                case 'delete_workout':
-                  _deleteWorkout();
-                  break;
-              }
-            },
-            itemBuilder: (ctx) => [
-              PopupMenuItem<String>(
-                value: 'import_routine',
-                child: Row(
-                  children: [
-                    const Icon(Icons.repeat_outlined, size: 20),
-                    const SizedBox(width: 12),
-                    Text(
-                      AppLocalizations.of(context)!.activeWorkoutImportRoutine,
-                    ),
-                  ],
-                ),
+            if (_isPaused)
+              IconButton(
+                icon: const Icon(Icons.play_arrow),
+                onPressed: _resumeTimer,
+                tooltip: AppLocalizations.of(context)!.restTimerResume,
+              )
+            else if (_timerStart != null && _timerEnd == null)
+              IconButton(
+                icon: const Icon(Icons.pause),
+                onPressed: _pauseTimer,
+                tooltip: AppLocalizations.of(context)!.restTimerPause,
               ),
-              if (_timerStart != null)
+            if (_exercises.isNotEmpty)
+              IconButton.filledTonal(
+                icon: const Icon(Icons.check_circle_outline),
+                onPressed: _finishWorkout,
+                tooltip: AppLocalizations.of(
+                  context,
+                )!.activeWorkoutFinishWorkout,
+              ),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              tooltip: AppLocalizations.of(context)!.commonMoreOptions,
+              onSelected: (value) {
+                switch (value) {
+                  case 'import_routine':
+                    _importFromRoutine();
+                    break;
+                  case 'reset_timer':
+                    _resetTimer();
+                    break;
+                  case 'delete_workout':
+                    _deleteWorkout();
+                    break;
+                }
+              },
+              itemBuilder: (ctx) => [
                 PopupMenuItem<String>(
-                  value: 'reset_timer',
+                  value: 'import_routine',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.repeat_outlined, size: 20),
+                      const SizedBox(width: 12),
+                      Text(
+                        AppLocalizations.of(
+                          context,
+                        )!.activeWorkoutImportRoutine,
+                      ),
+                    ],
+                  ),
+                ),
+                if (_timerStart != null)
+                  PopupMenuItem<String>(
+                    value: 'reset_timer',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.restart_alt,
+                          size: 20,
+                          color: theme.colorScheme.error,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          AppLocalizations.of(context)!.activeWorkoutReset,
+                          style: TextStyle(color: theme.colorScheme.error),
+                        ),
+                      ],
+                    ),
+                  ),
+                PopupMenuDivider(),
+                PopupMenuItem<String>(
+                  value: 'delete_workout',
                   child: Row(
                     children: [
                       Icon(
-                        Icons.restart_alt,
+                        Icons.delete_outline,
                         size: 20,
                         color: theme.colorScheme.error,
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        AppLocalizations.of(context)!.activeWorkoutReset,
+                        AppLocalizations.of(context)!.workoutHomeDeleteWorkout,
                         style: TextStyle(color: theme.colorScheme.error),
                       ),
                     ],
                   ),
                 ),
-              PopupMenuDivider(),
-              PopupMenuItem<String>(
-                value: 'delete_workout',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.delete_outline,
-                      size: 20,
-                      color: theme.colorScheme.error,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      AppLocalizations.of(context)!.workoutHomeDeleteWorkout,
-                      style: TextStyle(color: theme.colorScheme.error),
-                    ),
-                  ],
+              ],
+            ),
+          ],
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _exercises.isEmpty && _timerStart == null
+            ? _buildEmptyState(theme)
+            : _buildWorkoutView(theme),
+        floatingActionButton: _exercises.isEmpty && _timerStart == null
+            ? null
+            : FloatingActionButton.extended(
+                onPressed: _pickExercise,
+                icon: const Icon(Icons.add),
+                label: Text(
+                  AppLocalizations.of(context)!.activeWorkoutAddExercise,
                 ),
               ),
-            ],
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _exercises.isEmpty && _timerStart == null
-          ? _buildEmptyState(theme)
-          : _buildWorkoutView(theme),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _pickExercise,
-        icon: const Icon(Icons.add),
-        label: Text(AppLocalizations.of(context)!.activeWorkoutAddExercise),
       ),
     );
   }
 
+  Future<void> _useSuggestedDay(StrengthRoutineDayInfo day) async {
+    final workoutId = _workoutId;
+    if (workoutId == null) return;
+    await _workoutRepo.importRoutineDayToWorkout(workoutId, day.routineDayId);
+    _routinePreview = _createdHere;
+    await _loadExercises();
+    if (mounted) setState(() {});
+  }
+
+  /// Empty new workout: a title, today's routine day as a suggestion (same
+  /// card as the hub's "Today") and the ways to add exercises.
   Widget _buildEmptyState(ThemeData theme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.fitness_center,
-              size: 80,
-              color: theme.colorScheme.primary.withAlpha(80),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              AppLocalizations.of(context)!.activeWorkoutEmptyTitle,
-              style: theme.textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              AppLocalizations.of(context)!.activeWorkoutEmptySubtitle,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: _pickExercise,
-              icon: const Icon(Icons.add),
-              label: Text(
-                AppLocalizations.of(context)!.activeWorkoutAddExercise,
-              ),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _importFromRoutine,
-              icon: const Icon(Icons.repeat),
-              label: Text(
-                AppLocalizations.of(context)!.activeWorkoutImportRoutine,
-              ),
-            ),
-          ],
+    final loc = AppLocalizations.of(context)!;
+    final colors = theme.colorScheme;
+    final suggestion = widget.suggestedDay;
+    final date = DateFormat.MMMMEEEEd(
+      Localizations.localeOf(context).toString(),
+    ).format(DateTime.now());
+
+    return ListView(
+      padding: RunUi.screenPadding.copyWith(top: 4),
+      children: [
+        Text(
+          loc.strengthHomeNewWorkout,
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
         ),
-      ),
+        const SizedBox(height: 2),
+        Text(
+          toBeginningOfSentenceCase(date),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: colors.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 18),
+        if (suggestion != null)
+          RunSoftCard(
+            key: const Key('active-workout-suggestion'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                RunTodayHeader(
+                  title: loc.activeWorkoutSuggestionTitle,
+                  icon: Icons.lightbulb_outline_rounded,
+                  showDate: false,
+                ),
+                const SizedBox(height: 14),
+                StrengthDayDetails(
+                  day: suggestion,
+                  actionKey: const Key('active-workout-use-suggestion'),
+                  actionLabel: loc.activeWorkoutSuggestionUse,
+                  onAction: () => _useSuggestedDay(suggestion),
+                ),
+              ],
+            ),
+          )
+        else
+          RunSectionCard(
+            child: Row(
+              children: [
+                const RunIconBadge(
+                  Icons.fitness_center,
+                  size: 44,
+                  iconSize: 22,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        loc.activeWorkoutEmptyTitle,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        loc.activeWorkoutEmptySubtitle,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        RunSectionHeader(loc.activeWorkoutBuildSection),
+        RunSectionCard(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+          child: RunDividedList(
+            children: [
+              RunListRow(
+                key: const Key('active-workout-add-exercise'),
+                leading: const RunIconBadge(Icons.add_rounded),
+                title: loc.activeWorkoutAddExercise,
+                subtitle: loc.activeWorkoutAddExerciseHint,
+                onTap: _pickExercise,
+              ),
+              RunListRow(
+                leading: RunIconBadge(
+                  Icons.repeat_rounded,
+                  color: colors.secondary,
+                ),
+                title: loc.activeWorkoutImportRoutine,
+                subtitle: loc.activeWorkoutImportRoutineHint,
+                onTap: _importFromRoutine,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

@@ -123,6 +123,7 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
     String? workoutId,
     String? routineId,
     String? routineDayId,
+    StrengthRoutineDayInfo? suggestedDay,
   }) async {
     await Navigator.push(
       context,
@@ -132,6 +133,7 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
           workoutId: workoutId,
           routineId: routineId,
           routineDayId: routineDayId,
+          suggestedDay: suggestedDay,
         ),
       ),
     );
@@ -148,19 +150,21 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
     );
   }
 
-  Future<void> _startBlank() {
-    if (_active.isNotEmpty) return _continueActive();
-    return _openWorkoutScreen();
+  /// A new workout starts empty (today's routine day is only offered as a
+  /// suggestion). A session already under way is resumed instead; an old
+  /// untouched routine preview is dropped rather than resumed.
+  Future<void> _startBlank() async {
+    for (final workout in _active) {
+      if (workout['start_time'] != null) return _continueActive(workout);
+      await _workoutRepo.deleteUntouchedDraft(workout['id'] as String);
+    }
+    return _openWorkoutScreen(suggestedDay: _snapshot?.today.startDay);
   }
 
-  Future<void> _continueActive() =>
-      _openWorkoutScreen(workoutId: _active.first['id'] as String?);
-
-  /// The FAB: today's suggested day, else the next one, else a blank workout.
-  Future<void> _train() {
-    final day = _snapshot?.today.startDay;
-    return day == null ? _startBlank() : _startDay(day);
-  }
+  Future<void> _continueActive([Map<String, dynamic>? workout]) =>
+      _openWorkoutScreen(
+        workoutId: (workout ?? _active.first)['id'] as String?,
+      );
 
   Future<void> _editWeeklyGoal() async {
     final edit = await showStrengthWeeklyGoalDialog(
@@ -250,9 +254,9 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         key: const Key('strength-home-fab'),
-        onPressed: _train,
-        icon: const Icon(Icons.fitness_center),
-        label: Text(loc.strengthHomeTrain),
+        onPressed: _startBlank,
+        icon: const Icon(Icons.add_rounded),
+        label: Text(loc.strengthHomeNewWorkout),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
