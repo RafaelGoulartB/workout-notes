@@ -7,6 +7,7 @@ import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 
 /// Shared labels, colours and formatters for the running-plan screens.
 /// Keeping them in one place stops the plan editor, the calendar and the record
@@ -99,7 +100,7 @@ abstract final class RunPlanUi {
     if (meters <= 0) return '—';
     if (meters < 1000) return '${meters.round()} m';
     final km = meters / 1000;
-    return '${km.toStringAsFixed(km >= 10 ? 0 : 1).replaceAll('.', ',')} km';
+    return '${RunFormatters.decimal(km, km >= 10 ? 0 : 1)} km';
   }
 
   static String durationLabel(int seconds) {
@@ -287,7 +288,7 @@ abstract final class RunPlanUi {
   /// that already carry their own `km` suffix.
   static String kmValue(double meters) {
     final km = meters / 1000;
-    return km.toStringAsFixed(km >= 100 ? 0 : 1).replaceAll('.', ',');
+    return RunFormatters.decimal(km, km >= 100 ? 0 : 1);
   }
 
   /// Rough duration of a step, used only to give the profile bar and the

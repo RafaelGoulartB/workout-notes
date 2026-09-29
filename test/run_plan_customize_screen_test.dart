@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/database/database_periodization_schema.dart';
+import 'package:workout_notes/database/database_run_plan_schema.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/run_plan.dart';
+import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/screens/run/run_plan_customize_screen.dart';
 import 'package:workout_notes/services/run_plan_history.dart';
 import 'package:workout_notes/services/run_plan_templates.dart';
@@ -245,4 +251,278 @@ void main() {
     await tester.pump();
     expect(find.textContaining('Meta realista'), findsOneWidget);
   });
+
+  group('closing the wizard', () {
+    Future<void> openWizard(WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(_host(onResult: (_) {}));
+      await tester.tap(find.text('Abrir'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('closes straight away when nothing was touched', (
+      tester,
+    ) async {
+      await openWizard(tester);
+      expect(find.byType(RunPlanCustomizeScreen), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Descartar este plano?'), findsNothing);
+      expect(find.byType(RunPlanCustomizeScreen), findsNothing);
+    });
+
+    testWidgets('asks before discarding once the athlete changed something', (
+      tester,
+    ) async {
+      await openWizard(tester);
+      await tester.tap(find.widgetWithText(ChoiceChip, '3 dias / semana'));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.text('Descartar este plano?'), findsOneWidget);
+
+      await tester.tap(find.text('Continuar editando'));
+      await tester.pumpAndSettle();
+      expect(find.text('Descartar este plano?'), findsNothing);
+      expect(find.byType(RunPlanCustomizeScreen), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Descartar'));
+      await tester.pumpAndSettle();
+      expect(find.byType(RunPlanCustomizeScreen), findsNothing);
+    });
+
+    testWidgets('system back asks too after moving past the first step', (
+      tester,
+    ) async {
+      await openWizard(tester);
+      await tester.tap(_nextButton);
+      await tester.pump();
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('Descartar este plano?'), findsOneWidget);
+      expect(find.byType(RunPlanCustomizeScreen), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Descartar'));
+      await tester.pumpAndSettle();
+      expect(find.byType(RunPlanCustomizeScreen), findsNothing);
+    });
+  });
+
+  group('creating a plan', () {
+    late Database database;
+    late RunPlanRepository repo;
+
+    setUpAll(() {
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+    });
+
+    setUp(() async {
+      database = await databaseFactory.openDatabase(
+        inMemoryDatabasePath,
+        options: OpenDatabaseOptions(
+          version: 45,
+          onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
+          onCreate: (db, version) async {
+            await db.execute(
+              'CREATE TABLE run_activities (id TEXT PRIMARY KEY, started_at TEXT NOT NULL, '
+              'status TEXT NOT NULL DEFAULT \'completed\', created_at TEXT NOT NULL, '
+              'updated_at TEXT NOT NULL, plan_workout_id TEXT)',
+            );
+            await DatabasePeriodizationSchema.create(db);
+            await DatabaseRunPlanSchema.create(db);
+          },
+        ),
+      );
+      DatabaseHelper.overrideDatabase = database;
+      repo = RunPlanRepository();
+    });
+
+    tearDown(() async {
+      DatabaseHelper.overrideDatabase = null;
+      await database.close();
+    });
+
+    /// Runs real-async work from inside a `testWidgets` body (see
+    /// run_plans_widget_test.dart for why).
+    Future<T> real<T>(WidgetTester tester, Future<T> Function() body) async {
+      late T result;
+      await tester.runAsync(() async => result = await body());
+      return result;
+    }
+
+    /// Lets the DB-backed work finish on the real event loop, until [done]
+    /// (default: the wizard closed) or the time budget runs out.
+    Future<void> settle(WidgetTester tester, {bool Function()? done}) async {
+      final finished =
+          done ?? () => find.byType(RunPlanCustomizeScreen).evaluate().isEmpty;
+      for (var i = 0; i < 300 && !finished(); i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    Future<RunPlan?> runWizard(
+      WidgetTester tester, {
+      String? name,
+      bool declineSwitch = false,
+    }) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      RunPlan? result;
+      await tester.pumpWidget(
+        _host(
+          onResult: (plan) => result = plan,
+          template: RunPlanTemplates.keepFit,
+        ),
+      );
+      await tester.tap(find.text('Abrir'));
+      await tester.pumpAndSettle();
+      for (var i = 0; i < 3; i++) {
+        await tester.tap(_nextButton);
+        await tester.pump();
+      }
+      if (name != null) {
+        await tester.enterText(
+          find.widgetWithText(TextField, 'Nome do plano'),
+          name,
+        );
+        await tester.pump();
+      }
+      await tester.tap(find.widgetWithText(FilledButton, 'Criar plano'));
+      await tester.pump();
+      if (declineSwitch) {
+        await settle(
+          tester,
+          done: () => find.text('Trocar o plano ativo?').evaluate().isNotEmpty,
+        );
+        expect(find.text('Trocar o plano ativo?'), findsOneWidget);
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.byType(TextButton),
+          ),
+        );
+      }
+      await settle(tester);
+      return result;
+    }
+
+    testWidgets('names the plan after the template until edited', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(_app(template: RunPlanTemplates.keepFit));
+      for (var i = 0; i < 3; i++) {
+        await tester.tap(_nextButton);
+        await tester.pump();
+      }
+      final field = tester.widget<TextField>(
+        find.widgetWithText(TextField, 'Nome do plano'),
+      );
+      expect(field.controller?.text, RunPlanTemplates.keepFit.title(true));
+    });
+
+    testWidgets('the typed name and an active plan come out of creation', (
+      tester,
+    ) async {
+      final plan = await runWizard(tester, name: '  Meu 10 km  ');
+
+      expect(plan, isNotNull);
+      expect(plan!.name, 'Meu 10 km');
+      final stored = await real(tester, () => repo.getPlan(plan.id));
+      expect(stored?.name, 'Meu 10 km');
+      expect(stored?.isActivated, isTrue);
+      expect(find.byType(RunPlanCustomizeScreen), findsNothing);
+      expect(find.textContaining('Plano ativado'), findsOneWidget);
+    });
+
+    testWidgets('a blank name falls back to the template title', (
+      tester,
+    ) async {
+      final plan = await runWizard(tester, name: '   ');
+
+      expect(plan?.name, RunPlanTemplates.keepFit.title(true));
+    });
+
+    testWidgets('undo stops following the plan but keeps it', (tester) async {
+      final plan = await runWizard(tester);
+      expect(plan, isNotNull);
+      expect(
+        (await real(tester, () => repo.getPlan(plan!.id)))?.isActivated,
+        isTrue,
+      );
+
+      await tester.tap(find.text('Desfazer'));
+      await settle(tester, done: () => true);
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 300)),
+      );
+
+      final stored = await real(tester, () => repo.getPlan(plan!.id));
+      expect(stored, isNotNull);
+      expect(stored!.isActivated, isFalse);
+    });
+
+    testWidgets('never replaces another active plan without asking', (
+      tester,
+    ) async {
+      final other = await real(tester, () async {
+        final plan = await repo.createPlan(name: 'Plano atual');
+        await repo.activatePlan(plan.id);
+        return plan;
+      });
+
+      final plan = await runWizard(tester, declineSwitch: true);
+
+      expect(plan, isNotNull);
+      final created = await real(tester, () => repo.getPlan(plan!.id));
+      final previous = await real(tester, () => repo.getPlan(other.id));
+      expect(created?.isActivated, isFalse);
+      expect(previous?.isActivated, isTrue);
+      expect(find.text('Plano criado'), findsOneWidget);
+    });
+  });
 }
+
+/// Opens the wizard from a button so pops and results can be observed.
+Widget _host({
+  required void Function(RunPlan?) onResult,
+  RunPlanTemplate? template,
+}) => MaterialApp(
+  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  supportedLocales: AppLocalizations.supportedLocales,
+  locale: const Locale('pt'),
+  home: Builder(
+    builder: (context) => Scaffold(
+      body: Center(
+        child: FilledButton(
+          onPressed: () async {
+            final plan = await Navigator.push<RunPlan>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => RunPlanCustomizeScreen(
+                  template: template ?? RunPlanTemplates.tenK,
+                  history: const RunPlanHistoryInsights(),
+                ),
+              ),
+            );
+            onResult(plan);
+          },
+          child: const Text('Abrir'),
+        ),
+      ),
+    ),
+  ),
+);

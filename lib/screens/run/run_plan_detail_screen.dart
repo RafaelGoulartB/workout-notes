@@ -3,43 +3,58 @@ import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
+import 'package:workout_notes/models/run_plan_ledger.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
+import 'package:workout_notes/screens/run/plan_detail/run_plan_detail_sheets.dart';
+import 'package:workout_notes/screens/run/plans/run_plan_activation.dart';
+import 'package:workout_notes/screens/run/plans/run_plan_creation_flow.dart';
+import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_plan_customize_screen.dart';
 import 'package:workout_notes/screens/run/run_plan_workout_editor_screen.dart';
 import 'package:workout_notes/screens/workout/active_workout_screen.dart';
-import 'package:workout_notes/services/run_pace_calculator.dart';
 import 'package:workout_notes/services/run_plan_adaptation.dart';
 import 'package:workout_notes/services/run_plan_coach.dart';
+import 'package:workout_notes/services/run_plan_draft.dart';
 import 'package:workout_notes/services/run_plan_templates.dart';
+import 'package:workout_notes/services/run_plan_week_view.dart';
 import 'package:workout_notes/services/run_strength_planner.dart';
 import 'package:workout_notes/services/run_week_balance.dart';
 import 'package:workout_notes/services/runner_strength_routine.dart';
+import 'package:workout_notes/widgets/run/plan_detail/run_plan_adaptation_card.dart';
+import 'package:workout_notes/widgets/run/plan_detail/run_plan_day_row.dart';
+import 'package:workout_notes/widgets/run/plan_detail/run_plan_identity.dart';
+import 'package:workout_notes/widgets/run/plan_detail/run_plan_session_card.dart';
+import 'package:workout_notes/widgets/run/plan_detail/run_plan_status_card.dart';
+import 'package:workout_notes/widgets/run/plan_detail/run_plan_strength_chip.dart';
+import 'package:workout_notes/widgets/run/plan_detail/run_plan_week_header.dart';
+import 'package:workout_notes/widgets/run/plan_detail/run_plan_week_strip.dart';
 import 'package:workout_notes/widgets/run/run_balance_dialog.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 
-/// Plan detail: identity header, week picker and the training week laid out by
-/// weekday. A running week is read by day ("longão no domingo"), so the week is
-/// drawn as seven rows instead of an undifferentiated list of sessions.
+/// Plan detail: identity header, status, week picker and the training week
+/// laid out by weekday. A running week is read by day ("longão no domingo"),
+/// so the week is drawn as seven rows instead of an undifferentiated list.
 class RunPlanDetailScreen extends StatefulWidget {
   final String planId;
 
-  const RunPlanDetailScreen({super.key, required this.planId});
+  /// Clock override for tests.
+  final DateTime? today;
+
+  const RunPlanDetailScreen({super.key, required this.planId, this.today});
 
   @override
   State<RunPlanDetailScreen> createState() => _RunPlanDetailScreenState();
 }
 
 class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
-  static const _weekTileWidth = 58.0;
-
   final _repo = RunPlanRepository();
   final _weekStrip = ScrollController();
   RunPlan? _plan;
   Set<int> _scheduledWeeks = const {};
   RunPlanProgress _progress = const RunPlanProgress();
-  Map<String, ScheduledRunStatus> _workoutStatuses = const {};
+  Map<String, RunPlanLedgerEntry> _ledger = const {};
 
   /// Driven by a periodization phase: the phase owns the week mapping, so this
   /// screen reports it instead of offering its own activation.
@@ -52,6 +67,8 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
   List<RunPlanAdaptationRecord> _adaptations = const [];
   Set<DateTime> _strengthDone = const {};
   bool _applying = false;
+
+  DateTime get _today => RunPlanWeekView.day(widget.today ?? DateTime.now());
 
   @override
   void initState() {
@@ -74,7 +91,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     }
     final scheduled = await _repo.getScheduledWeeks(plan.id);
     final progress = await _repo.getPlanProgress(plan.id);
-    final workoutStatuses = await _repo.getPlanWorkoutStatuses(plan.id);
+    final ledger = await _repo.getPlanLedger(plan.id);
     final linked = await _repo.isLinkedToPeriodization(plan.id);
     final adaptations = await _repo.listAdaptations(plan.id);
     RunPlanAdaptationProposal? proposal;
@@ -85,7 +102,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
       proposal = linked ? null : await RunPlanCoach().review(plan);
       final anchor = plan.activatedAt;
       if (anchor != null && _includesStrength(plan)) {
-        final start = _weekMonday(anchor);
+        final start = RunPlanWeekView.monday(anchor);
         strengthDone = await RunnerStrengthRoutine().completedDays(
           start,
           start.add(Duration(days: 7 * plan.weeks)),
@@ -98,14 +115,14 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
       _plan = plan;
       _scheduledWeeks = scheduled;
       _progress = progress;
-      _workoutStatuses = workoutStatuses;
+      _ledger = ledger;
       _linkedToPlanning = linked;
       _adaptations = adaptations;
       _proposal = proposal;
       _strengthDone = strengthDone;
       if (firstLoad) {
         // Open on the week being run, not week 1.
-        _week = plan.activeWeekIndexOn(DateTime.now()) ?? _week;
+        _week = plan.activeWeekIndexOn(_today) ?? _week;
       }
       _week = _week.clamp(0, plan.weeks - 1);
       _loading = false;
@@ -115,10 +132,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
   static bool _includesStrength(RunPlan plan) =>
       plan.config?['includeStrength'] == true;
 
-  static DateTime _weekMonday(DateTime date) {
-    final day = DateTime(date.year, date.month, date.day);
-    return day.subtract(Duration(days: day.weekday - 1));
-  }
+  // --- plan level actions ----------------------------------------------------
 
   Future<void> _applyProposal() async {
     final plan = _plan, proposal = _proposal;
@@ -148,6 +162,16 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     await _load();
   }
 
+  /// Replaces this screen with the detail of a freshly created plan.
+  void _replaceWith(RunPlan created) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RunPlanDetailScreen(planId: created.id),
+      ),
+    );
+  }
+
   /// Opens the wizard for [template]; a plan created there replaces this
   /// screen.
   Future<void> _startTemplate(RunPlanTemplate template) async {
@@ -158,12 +182,14 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
       ),
     );
     if (created == null || !mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => RunPlanDetailScreen(planId: created.id),
-      ),
-    );
+    _replaceWith(created);
+  }
+
+  /// "Choose next plan": the same template picker as the library.
+  Future<void> _chooseNextPlan() async {
+    final created = await startNewRunPlan(context, _repo);
+    if (created == null || !mounted) return;
+    _replaceWith(created);
   }
 
   Future<void> _closeFinishedPlan() async {
@@ -192,45 +218,14 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
   /// Follows this plan from today, or stops following it. Only one plan is
   /// followed at a time, so this replaces any previous one.
   Future<void> _toggleFollow() async {
-    final loc = AppLocalizations.of(context)!;
     final plan = _plan;
     if (plan == null) return;
     if (plan.isActivated) {
-      await _repo.deactivatePlan(plan.id);
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(loc.runPlanDeactivatedMessage)));
-    } else {
-      final current = await _repo.getActivatedPlan(hydrate: false);
-      if (!mounted) return;
-      if (current != null && current.id != plan.id) {
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(loc.runPlanReplaceActiveTitle),
-            content: Text(loc.runPlanReplaceActiveBody(current.name)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: Text(loc.runPlanActivate),
-              ),
-            ],
-          ),
-        );
-        if (confirmed != true || !mounted) return;
-      }
-      final created = await _repo.activatePlan(plan.id);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.runPlanActivatedMessage(created))),
-      );
+      await unfollowRunPlan(context, _repo, plan);
+    } else if (!await followRunPlan(context, _repo, plan)) {
+      return;
     }
-    await _load();
+    if (mounted) await _load();
   }
 
   Future<void> _resetProgress() async {
@@ -264,18 +259,38 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     await _load();
   }
 
+  Future<void> _editHeader() async {
+    final plan = _plan;
+    if (plan == null) return;
+    final result = await showRunPlanEditSheet(context, plan);
+    if (result == null) return;
+    await _repo.updatePlan(
+      plan.id,
+      name: result.name,
+      notes: result.notes,
+      goalKind: result.goal,
+      raceDate: result.raceDate,
+      weeks: result.weeks,
+    );
+    if (mounted) _load();
+  }
+
+  // --- week ------------------------------------------------------------------
+
   void _selectWeek(int week) {
     setState(() => _week = week);
     _revealWeek(week);
   }
 
-  /// Keeps the selected tile on screen — a 16-week plan scrolls far enough that
+  /// Keeps the selected tile on screen: a 16-week plan scrolls far enough that
   /// the selection would otherwise sit outside the viewport.
   void _revealWeek(int week) {
     if (!_weekStrip.hasClients) return;
     final viewport = _weekStrip.position.viewportDimension;
     final target =
-        (week * _weekTileWidth) - (viewport / 2) + _weekTileWidth / 2;
+        (week * RunPlanWeekStrip.tileWidth) -
+        (viewport / 2) +
+        RunPlanWeekStrip.tileWidth / 2;
     _weekStrip.animateTo(
       target.clamp(0.0, _weekStrip.position.maxScrollExtent),
       duration: const Duration(milliseconds: 250),
@@ -283,175 +298,67 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     );
   }
 
-  Future<void> _editHeader() async {
+  Future<void> _copyWeek() async {
+    final plan = _plan;
+    if (plan == null || plan.weeks < 2) return;
+    final loc = AppLocalizations.of(context)!;
+    final targets = await showRunPlanCopyWeekSheet(
+      context,
+      plan,
+      sourceWeek: _week,
+    );
+    if (targets == null || !mounted) return;
+    final applied = await _repo.copyWeek(
+      plan.id,
+      sourceWeek: _week,
+      targetWeeks: targets,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(loc.runPlanCopyWeekApplied(applied))),
+    );
+    _load();
+  }
+
+  Future<void> _scheduleWeek() async {
     final plan = _plan;
     if (plan == null) return;
     final loc = AppLocalizations.of(context)!;
-    final nameCtl = TextEditingController(text: plan.name);
-    final notesCtl = TextEditingController(text: plan.notes ?? '');
-    final weeksCtl = TextEditingController(text: plan.weeks.toString());
-    var goal = plan.goalKind;
-    var raceDate = plan.raceDate;
-
-    final saved = await showModalBottomSheet<bool>(
+    final now = DateTime.now();
+    final picked = await showDatePicker(
       context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  loc.runPlanEditTitle,
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: nameCtl,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(
-                    labelText: loc.runPlanName,
-                    hintText: loc.runPlanNameHint,
-                    border: const OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<RunPlanGoalKind>(
-                  initialValue: goal,
-                  decoration: InputDecoration(
-                    labelText: loc.runPlanGoalKind,
-                    border: const OutlineInputBorder(),
-                  ),
-                  items: [
-                    for (final kind in RunPlanGoalKind.values)
-                      DropdownMenuItem(
-                        value: kind,
-                        child: Text(RunPlanUi.goalLabel(loc, kind)),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) setSheetState(() => goal = value);
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: weeksCtl,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: loc.runPlanWeeks,
-                    border: const OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.flag_outlined),
-                  title: Text(loc.runPlanRaceDate),
-                  subtitle: Text(
-                    raceDate == null
-                        ? loc.runPlanRaceDateNone
-                        : DateFormat(
-                            'd MMM y',
-                            Intl.defaultLocale,
-                          ).format(raceDate!),
-                  ),
-                  trailing: raceDate == null
-                      ? const Icon(Icons.event_outlined)
-                      : IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () => setSheetState(() => raceDate = null),
-                        ),
-                  onTap: () async {
-                    final now = DateTime.now();
-                    final picked = await showDatePicker(
-                      context: ctx,
-                      initialDate: raceDate ?? now,
-                      firstDate: DateTime(now.year - 1),
-                      lastDate: DateTime(now.year + 5),
-                    );
-                    if (picked != null) setSheetState(() => raceDate = picked);
-                  },
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: notesCtl,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText: loc.runPlanNotes,
-                    border: const OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: Text(loc.commonSave),
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
-          ),
-        ),
-      ),
+      helpText: loc.runPlanScheduleWeek,
+      // The plan week starts on a Monday, so default to the coming Monday.
+      initialDate: now.add(Duration(days: (8 - now.weekday) % 7)),
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 5),
     );
-    if (saved != true) return;
-
-    final weeks = int.tryParse(weeksCtl.text.trim());
-    // Shrinking the horizon drops sessions, so confirm before losing them.
-    if (weeks != null && weeks < plan.weeks) {
-      final dropped = plan.workouts
-          .where((workout) => workout.weekIndex >= weeks)
-          .length;
-      if (dropped > 0 && mounted) {
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(loc.commonConfirmDelete),
-            content: Text(loc.commonActionCannotBeUndone),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: Text(loc.commonCancel),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: Text(loc.commonSave),
-              ),
-            ],
-          ),
-        );
-        if (confirmed != true) return;
-      }
-    }
-
-    await _repo.updatePlan(
-      plan.id,
-      name: nameCtl.text.trim().isEmpty ? null : nameCtl.text.trim(),
-      notes: notesCtl.text.trim(),
-      goalKind: goal,
-      raceDate: raceDate,
-      weeks: weeks,
+    if (picked == null || !mounted) return;
+    final createdIds = await _repo.materializeWeek(
+      planId: plan.id,
+      weekIndex: _week,
+      weekStart: picked,
     );
-    if (mounted) _load();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(loc.runPlanScheduleWeekDone(createdIds.length))),
+    );
+    _load();
   }
 
+  // --- sessions --------------------------------------------------------------
+
+  /// Creates the session only to hand it to the editor and deletes it again
+  /// when the editor is left without filling anything in, so backing out
+  /// never leaves an "Easy" session behind.
   Future<void> _addSession({int? dayOfWeek}) async {
     final plan = _plan;
     if (plan == null) return;
-    final loc = AppLocalizations.of(context)!;
+    final defaultName = AppLocalizations.of(context)!.runWorkoutKindEasy;
     final created = await _repo.addWorkout(
       planId: plan.id,
       weekIndex: _week,
-      name: loc.runWorkoutKindEasy,
+      name: defaultName,
       dayOfWeek: dayOfWeek,
     );
     if (!mounted) return;
@@ -461,6 +368,11 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
         builder: (_) => RunPlanWorkoutEditorScreen(workoutId: created.id),
       ),
     );
+    final current = await _repo.getWorkout(created.id);
+    if (current != null &&
+        RunPlanDraft.isUntouched(current, defaultName: defaultName)) {
+      await _repo.deleteWorkout(created.id);
+    }
     if (mounted) _load();
   }
 
@@ -470,6 +382,21 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
       MaterialPageRoute(
         builder: (_) => RunPlanWorkoutEditorScreen(workoutId: workout.id),
       ),
+    );
+    if (mounted) _load();
+  }
+
+  Future<void> _startSession(RunPlanSessionView view) async {
+    await startRunPlanSession(context, _repo, view);
+    if (mounted) _load();
+  }
+
+  Future<void> _openRun(RunPlanSessionView view) async {
+    final id = view.ledger?.runActivityId;
+    if (id == null) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => RunDetailScreen(activityId: id)),
     );
     if (mounted) _load();
   }
@@ -515,42 +442,10 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     final plan = _plan;
     if (plan == null || plan.weeks < 2) return;
     final loc = AppLocalizations.of(context)!;
-    final target = await showModalBottomSheet<int>(
-      context: context,
-      showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text(
-                loc.runPlanMoveWeekTitle,
-                style: Theme.of(ctx).textTheme.titleMedium,
-              ),
-            ),
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
-                children: [
-                  for (var week = 0; week < plan.weeks; week++)
-                    if (week != workout.weekIndex)
-                      ListTile(
-                        title: Text(loc.runPlanWeekLabel(week + 1)),
-                        subtitle: Text(
-                          loc.runPlanWeekSummary(
-                            RunPlanUi.kmValue(plan.weeklyDistanceMeters(week)),
-                            plan.workoutsForWeek(week).length,
-                          ),
-                        ),
-                        onTap: () => Navigator.pop(ctx, week),
-                      ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+    final target = await showRunPlanMoveWeekSheet(
+      context,
+      plan,
+      fromWeek: workout.weekIndex,
     );
     if (target == null) return;
     await _repo.updateWorkout(workout.id, weekIndex: target);
@@ -578,7 +473,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
             kind: w.kind,
             km: w.plannedDistanceMeters / 1000,
             fixed:
-                (_workoutStatuses[w.id] ?? ScheduledRunStatus.planned) !=
+                (_ledger[w.id]?.status ?? ScheduledRunStatus.planned) !=
                 ScheduledRunStatus.planned,
           ),
     ];
@@ -635,107 +530,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     });
   }
 
-  Future<void> _copyWeek() async {
-    final plan = _plan;
-    if (plan == null || plan.weeks < 2) return;
-    final loc = AppLocalizations.of(context)!;
-    final selected = <int>{};
-    final confirmed = await showModalBottomSheet<bool>(
-      context: context,
-      showDragHandle: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                child: Text(
-                  loc.runPlanCopyWeekTitle(_week + 1),
-                  style: Theme.of(ctx).textTheme.titleMedium,
-                ),
-              ),
-              Flexible(
-                child: ListView(
-                  shrinkWrap: true,
-                  children: [
-                    for (var i = 0; i < plan.weeks; i++)
-                      if (i != _week)
-                        CheckboxListTile(
-                          value: selected.contains(i),
-                          title: Text(loc.runPlanWeekLabel(i + 1)),
-                          subtitle: Text(
-                            loc.runPlanWeekSummary(
-                              RunPlanUi.kmValue(plan.weeklyDistanceMeters(i)),
-                              plan.workoutsForWeek(i).length,
-                            ),
-                          ),
-                          onChanged: (checked) => setSheetState(() {
-                            if (checked == true) {
-                              selected.add(i);
-                            } else {
-                              selected.remove(i);
-                            }
-                          }),
-                        ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: selected.isEmpty
-                        ? null
-                        : () => Navigator.pop(ctx, true),
-                    child: Text(loc.runPlanCopyWeek),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (confirmed != true || selected.isEmpty) return;
-    final applied = await _repo.copyWeek(
-      plan.id,
-      sourceWeek: _week,
-      targetWeeks: selected,
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(loc.runPlanCopyWeekApplied(applied))),
-    );
-    _load();
-  }
-
-  Future<void> _scheduleWeek() async {
-    final plan = _plan;
-    if (plan == null) return;
-    final loc = AppLocalizations.of(context)!;
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      helpText: loc.runPlanScheduleWeek,
-      // The plan week starts on a Monday, so default to the coming Monday.
-      initialDate: now.add(Duration(days: (8 - now.weekday) % 7)),
-      firstDate: DateTime(now.year - 1),
-      lastDate: DateTime(now.year + 5),
-    );
-    if (picked == null || !mounted) return;
-    final createdIds = await _repo.materializeWeek(
-      planId: plan.id,
-      weekIndex: _week,
-      weekStart: picked,
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(loc.runPlanScheduleWeekDone(createdIds.length))),
-    );
-    _load();
-  }
+  // --- build -----------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -747,6 +542,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final today = _today;
     return Scaffold(
       appBar: AppBar(
         title: Text(plan.name),
@@ -767,134 +563,105 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+          // Bottom room so the extended FAB never covers the last row.
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
           children: [
-            _buildHeaderCard(theme, loc, plan),
+            RunPlanIdentity(plan: plan, today: today),
+            const SizedBox(height: 14),
+            _buildStatus(plan, today),
+            if (_adaptations.where((a) => a.applied).firstOrNull
+                case final last?) ...[
+              const SizedBox(height: 8),
+              _buildAdaptationHistory(theme, loc, last),
+            ],
             const SizedBox(height: 16),
             if (plan.weeks > 1) ...[
-              _buildWeekPicker(theme, loc, plan),
+              _buildWeekStrip(plan, today),
               const SizedBox(height: 16),
             ],
-            _buildWeekHeader(theme, loc, plan),
+            RunPlanWeekHeader(
+              plan: plan,
+              week: _week,
+              weekStart: RunPlanWeekView.weekStart(plan, _week, today),
+              isCurrent: plan.activeWeekIndexOn(today) == _week,
+              scheduled: _scheduledWeeks.contains(_week),
+              doneMeters: RunPlanWeekView.doneMeters(plan, _week, _ledger),
+              onSchedule: _scheduleWeek,
+              onCopy: plan.weeks > 1 ? _copyWeek : null,
+            ),
             const SizedBox(height: 12),
-            ..._buildWeekDays(theme, loc, plan),
+            ..._buildWeekDays(theme, loc, plan, today),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeaderCard(ThemeData theme, AppLocalizations loc, RunPlan plan) {
+  Widget _buildStatus(RunPlan plan, DateTime today) {
+    final finished = plan.isFinishedOn(today) || _progress.isComplete;
+    final next = _linkedToPlanning
+        ? null
+        : RunPlanWeekView.nextSession(plan, _ledger, today);
+    final card = RunPlanStatusCard(
+      plan: plan,
+      progress: _progress,
+      viaPlanning: _linkedToPlanning,
+      today: today,
+      next: next,
+      onOpenNext: next == null
+          ? null
+          : () => _selectWeek(next.workout.weekIndex),
+      onToggle: _linkedToPlanning ? null : _toggleFollow,
+      onReset: (_progress.hasProgress || finished) && !_linkedToPlanning
+          ? _resetProgress
+          : null,
+      onChooseNext: finished ? _chooseNextPlan : null,
+      onClose: finished && plan.isActivated ? _closeFinishedPlan : null,
+      nextTemplates: finished
+          ? RunPlanTemplates.nextSteps(plan.templateKey, plan.goalKind)
+          : const [],
+      onStartTemplate: _startTemplate,
+    );
+    if (finished || _proposal == null) return card;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        card,
+        const SizedBox(height: 12),
+        RunPlanAdaptationCard(
+          plan: plan,
+          proposal: _proposal!,
+          busy: _applying,
+          onApply: _applyProposal,
+          onKeep: _dismissProposal,
+          onReturnPlan: () => _startTemplate(RunPlanTemplates.returnToRunning),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAdaptationHistory(
+    ThemeData theme,
+    AppLocalizations loc,
+    RunPlanAdaptationRecord last,
+  ) {
     final scheme = theme.colorScheme;
-    final countdown = _raceCountdown(plan.raceDate);
-    // Deliberately not a card: for most plans this is one line of identity, and
-    // a box around it only pushed the training week further down.
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.flag_outlined, size: 16, color: scheme.primary),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  '${RunPlanUi.goalLabel(loc, plan.goalKind)} · '
-                  '${loc.runPlanWeeksValue(plan.weeks)}',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
+    return Row(
+      children: [
+        Icon(Icons.tune_rounded, size: 14, color: scheme.onSurfaceVariant),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            loc.runPlanAdaptHistory(
+              DateFormat('d MMM', Intl.defaultLocale).format(last.createdAt),
+              _adaptationLabel(loc, last),
+            ),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
           ),
-          if (plan.raceDate != null) ...[
-            const SizedBox(height: 6),
-            Text(
-              countdown == null
-                  ? DateFormat(
-                      'd MMM y',
-                      Intl.defaultLocale,
-                    ).format(plan.raceDate!)
-                  : '${DateFormat('d MMM', Intl.defaultLocale).format(plan.raceDate!)}'
-                        ' · ${loc.runPlanRaceCountdown(countdown)}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-          if (plan.notes != null && plan.notes!.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
-              plan.notes!,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-          const SizedBox(height: 14),
-          _FollowCard(
-            plan: plan,
-            progress: _progress,
-            viaPlanning: _linkedToPlanning,
-            onToggle: _linkedToPlanning ? null : _toggleFollow,
-            onReset: _progress.hasProgress && !_linkedToPlanning
-                ? _resetProgress
-                : null,
-          ),
-          if (plan.isFinishedOn(DateTime.now()) || _progress.isComplete) ...[
-            const SizedBox(height: 12),
-            _FinishedCard(
-              plan: plan,
-              progress: _progress,
-              next: RunPlanTemplates.nextSteps(plan.templateKey, plan.goalKind),
-              onStart: _startTemplate,
-              onClose: plan.isActivated ? _closeFinishedPlan : null,
-            ),
-          ] else if (_proposal != null) ...[
-            const SizedBox(height: 12),
-            _AdaptationCard(
-              plan: plan,
-              proposal: _proposal!,
-              busy: _applying,
-              onApply: _applyProposal,
-              onKeep: _dismissProposal,
-              onReturnPlan: () =>
-                  _startTemplate(RunPlanTemplates.returnToRunning),
-            ),
-          ],
-          if (_adaptations.where((a) => a.applied).firstOrNull
-              case final last?) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(
-                  Icons.tune_rounded,
-                  size: 14,
-                  color: scheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    loc.runPlanAdaptHistory(
-                      DateFormat(
-                        'd MMM',
-                        Intl.defaultLocale,
-                      ).format(last.createdAt),
-                      _adaptationLabel(loc, last),
-                    ),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -908,173 +675,89 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     _ => loc.runPlanAdaptKindPace,
   };
 
-  /// Horizontal week picker. Each tile carries that week's volume as a bar, so
-  /// the ramp and the taper are visible while picking.
-  Widget _buildWeekPicker(ThemeData theme, AppLocalizations loc, RunPlan plan) {
-    final volumes = [
+  Widget _buildWeekStrip(RunPlan plan, DateTime today) {
+    final completed = <int>{
       for (var week = 0; week < plan.weeks; week++)
-        plan.weeklyDistanceMeters(week),
-    ];
-    final peak = volumes.fold<double>(
-      0,
-      (max, value) => value > max ? value : max,
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          loc.runPlanWeeklyVolumeTitle.toUpperCase(),
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.1,
-          ),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 96,
-          child: ListView.builder(
-            controller: _weekStrip,
-            scrollDirection: Axis.horizontal,
-            itemCount: plan.weeks,
-            itemExtent: _weekTileWidth,
-            itemBuilder: (context, week) => _WeekTile(
-              week: week,
-              volume: volumes[week],
-              peak: peak,
-              selected: week == _week,
-              scheduled: _scheduledWeeks.contains(week),
-              completed: plan
-                  .workoutsForWeek(week)
-                  .every(
-                    (workout) =>
-                        _workoutStatuses[workout.id] ==
-                        ScheduledRunStatus.completed,
-                  ),
-              onTap: () => _selectWeek(week),
-            ),
-          ),
-        ),
+        if (plan.workoutsForWeek(week).isNotEmpty &&
+            plan
+                .workoutsForWeek(week)
+                .every((w) => _ledger[w.id]?.isCompleted == true))
+          week,
+    };
+    return RunPlanWeekStrip(
+      plan: plan,
+      controller: _weekStrip,
+      selectedWeek: _week,
+      currentWeek: plan.activeWeekIndexOn(today),
+      scheduledWeeks: _scheduledWeeks,
+      doneMeters: [
+        for (var week = 0; week < plan.weeks; week++)
+          RunPlanWeekView.doneMeters(plan, week, _ledger),
       ],
+      completedWeeks: completed,
+      onSelect: _selectWeek,
     );
   }
 
-  Widget _buildWeekHeader(ThemeData theme, AppLocalizations loc, RunPlan plan) {
-    final sessions = plan.workoutsForWeek(_week);
-    final longRun = plan.longRunForWeek(_week);
-    final quality = plan.qualitySessionsForWeek(_week);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                loc.runPlanWeekLabel(_week + 1),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-            if (_scheduledWeeks.contains(_week))
-              Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: _Badge(
-                  icon: Icons.event_available,
-                  label: loc.runPlanWeekScheduled,
-                ),
-              ),
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_horiz),
-              onSelected: (value) => switch (value) {
-                'copy' => _copyWeek(),
-                'schedule' => _scheduleWeek(),
-                _ => null,
-              },
-              itemBuilder: (ctx) => [
-                if (plan.weeks > 1)
-                  PopupMenuItem(
-                    value: 'copy',
-                    child: Text(loc.runPlanCopyWeek),
-                  ),
-                PopupMenuItem(
-                  value: 'schedule',
-                  child: Text(loc.runPlanScheduleWeek),
-                ),
-              ],
-            ),
-          ],
-        ),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            _Badge(
-              icon: Icons.straighten,
-              label: loc.runPlanWeekSummary(
-                RunPlanUi.kmValue(plan.weeklyDistanceMeters(_week)),
-                sessions.length,
-              ),
-            ),
-            if (longRun != null)
-              _Badge(
-                icon: Icons.timeline,
-                label:
-                    '${loc.runPlanLongRun} '
-                    '${RunPlanUi.distanceLabel(longRun.plannedDistanceMeters)}',
-              ),
-            if (quality > 0)
-              _Badge(
-                icon: Icons.bolt,
-                label: loc.runPlanQualityCount(quality),
-                highlight: true,
-              ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.tonalIcon(
-            onPressed: sessions.isEmpty ? null : _scheduleWeek,
-            icon: const Icon(Icons.event_available_outlined, size: 18),
-            label: Text(loc.runPlanScheduleWeek),
-          ),
-        ),
-      ],
+  Widget _sessionCard(
+    RunPlanSessionView view, {
+    required bool preview,
+    required RunPlanSessionView? next,
+    required bool canMove,
+  }) {
+    final isNext =
+        next != null &&
+        next.workout.id == view.workout.id &&
+        next.date == view.date;
+    return RunPlanSessionCard(
+      key: preview ? null : ValueKey('run-plan-session-${view.workout.id}'),
+      view: view,
+      onTap: preview ? () {} : () => _openSession(view.workout),
+      onEdit: preview ? () {} : () => _openSession(view.workout),
+      onDuplicate: preview ? () {} : () => _duplicateSession(view.workout),
+      onMove: canMove && !preview ? () => _moveSession(view.workout) : null,
+      onDelete: preview ? () {} : () => _deleteSession(view.workout),
+      onStart: isNext && !preview ? () => _startSession(view) : null,
+      onOpenRun: view.ledger?.runActivityId == null || preview
+          ? null
+          : () => _openRun(view),
     );
   }
 
-  /// One row per weekday, so the week reads like a training week. Sessions with
-  /// no fixed day are appended at the end under a neutral marker.
+  /// One row per weekday, so the week reads like a training week. Sessions
+  /// with no fixed day are appended at the end under a neutral marker.
   List<Widget> _buildWeekDays(
     ThemeData theme,
     AppLocalizations loc,
     RunPlan plan,
+    DateTime today,
   ) {
-    final sessions = plan.workoutsForWeek(_week);
-    if (sessions.isEmpty) return [_buildEmptyWeek(theme, loc)];
+    final views = RunPlanWeekView.sessionsForWeek(plan, _week, _ledger, today);
+    if (views.isEmpty) return [_buildEmptyWeek(theme, loc)];
 
-    final today = DateTime.now().weekday;
+    final next = _linkedToPlanning
+        ? null
+        : RunPlanWeekView.nextSession(plan, _ledger, today);
     final strengthDays = _includesStrength(plan)
         ? RunStrengthPlanner.daysForPlanWeek(plan, _week)
         : const <int>[];
-    final anchor = plan.activatedAt;
+    final canMove = plan.weeks > 1;
+    Widget cardFor(RunPlanSessionView view, {required bool preview}) =>
+        _sessionCard(view, preview: preview, next: next, canMove: canMove);
+
     final rows = <Widget>[];
     for (var day = 1; day <= 7; day++) {
-      final ofDay = sessions
-          .where((workout) => workout.dayOfWeek == day)
-          .toList();
+      final ofDay = [
+        for (final view in views)
+          if (view.workout.dayOfWeek == day) view,
+      ];
       final strengthIndex = strengthDays.indexOf(day);
-      final date = anchor == null
-          ? null
-          : _weekMonday(anchor).add(Duration(days: 7 * _week + day - 1));
+      final date = RunPlanWeekView.dateFor(plan, _week, day, today);
       rows.add(
-        _DayRow(
+        RunPlanDayRow(
           strength: strengthIndex < 0
               ? null
-              : _StrengthChip(
+              : RunPlanStrengthChip(
                   label: strengthIndex.isEven
                       ? loc.runPlanStrengthA
                       : loc.runPlanStrengthB,
@@ -1083,34 +766,29 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
                 ),
           dayOfWeek: day,
           label: RunPlanUi.weekdayLabel(loc, day),
-          isToday: day == today,
+          date: date,
+          isToday: date != null && date == today,
           sessions: ofDay,
+          cardBuilder: cardFor,
           onAdd: () => _addSession(dayOfWeek: day),
-          onOpen: _openSession,
-          onDuplicate: _duplicateSession,
-          onMove: plan.weeks > 1 ? _moveSession : null,
-          onDelete: _deleteSession,
           onMoveToDay: _moveSessionToDay,
-          statuses: _workoutStatuses,
         ),
       );
     }
-    final floating = sessions
-        .where((workout) => workout.dayOfWeek == null)
-        .toList();
+    final floating = [
+      for (final view in views)
+        if (view.workout.dayOfWeek == null) view,
+    ];
     if (floating.isNotEmpty) {
       rows.add(
-        _DayRow(
+        RunPlanDayRow(
           dayOfWeek: null,
           label: '—',
+          date: null,
           isToday: false,
           sessions: floating,
-          onOpen: _openSession,
-          onDuplicate: _duplicateSession,
-          onMove: plan.weeks > 1 ? _moveSession : null,
-          onDelete: _deleteSession,
+          cardBuilder: cardFor,
           onMoveToDay: _moveSessionToDay,
-          statuses: _workoutStatuses,
         ),
       );
     }
@@ -1145,1046 +823,4 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
       ],
     ),
   );
-
-  static int? _raceCountdown(DateTime? raceDate) {
-    if (raceDate == null) return null;
-    final now = DateTime.now();
-    final days = DateTime(
-      raceDate.year,
-      raceDate.month,
-      raceDate.day,
-    ).difference(DateTime(now.year, now.month, now.day)).inDays;
-    return days < 0 ? null : days;
-  }
-}
-
-class _WeekTile extends StatelessWidget {
-  final int week;
-  final double volume;
-  final double peak;
-  final bool selected;
-  final bool scheduled;
-  final bool completed;
-  final VoidCallback onTap;
-
-  const _WeekTile({
-    required this.week,
-    required this.volume,
-    required this.peak,
-    required this.selected,
-    required this.scheduled,
-    required this.completed,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    // Never a fixed bar height: the text around it grows with the system font
-    // scale, and the bar is the part that can afford to shrink.
-    final fill = peak <= 0 ? 0.04 : (volume / peak).clamp(0.04, 1.0);
-
-    return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: Material(
-        color: selected
-            ? scheme.primaryContainer
-            : scheme.surfaceContainerHighest.withAlpha(70),
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-            child: Column(
-              children: [
-                Text(
-                  volume <= 0 ? '—' : RunPlanUi.kmValue(volume),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: selected
-                        ? scheme.onPrimaryContainer
-                        : scheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Expanded(
-                  child: FractionallySizedBox(
-                    alignment: Alignment.bottomCenter,
-                    heightFactor: fill,
-                    widthFactor: null,
-                    child: Container(
-                      width: 16,
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? scheme.primary
-                            : scheme.primary.withAlpha(90),
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(3),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '${week + 1}',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: selected
-                            ? scheme.onPrimaryContainer
-                            : scheme.onSurface,
-                      ),
-                    ),
-                    if (completed) ...[
-                      const SizedBox(width: 3),
-                      Icon(
-                        Icons.check_circle_rounded,
-                        size: 12,
-                        color: scheme.tertiary,
-                      ),
-                    ] else if (scheduled) ...[
-                      const SizedBox(width: 3),
-                      Icon(Icons.circle, size: 5, color: scheme.tertiary),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A weekday and whatever is planned on it — or an explicit rest marker, which
-/// is information too: a week with four rest days is a light week.
-class _DayRow extends StatelessWidget {
-  final int? dayOfWeek;
-  final String label;
-  final bool isToday;
-  final List<RunPlanWorkout> sessions;
-  final VoidCallback? onAdd;
-  final ValueChanged<RunPlanWorkout> onOpen;
-  final ValueChanged<RunPlanWorkout> onDuplicate;
-  final ValueChanged<RunPlanWorkout>? onMove;
-  final ValueChanged<RunPlanWorkout> onDelete;
-  final void Function(RunPlanWorkout workout, int dayOfWeek) onMoveToDay;
-  final Map<String, ScheduledRunStatus> statuses;
-
-  /// Runner strength suggested for this day, if any.
-  final Widget? strength;
-
-  const _DayRow({
-    this.strength,
-    required this.dayOfWeek,
-    required this.label,
-    required this.isToday,
-    required this.sessions,
-    required this.onOpen,
-    required this.onDuplicate,
-    required this.onDelete,
-    required this.onMoveToDay,
-    required this.statuses,
-    this.onAdd,
-    this.onMove,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 38,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Text(
-                label.replaceAll('.', '').toUpperCase(),
-                style: theme.textTheme.labelSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: isToday ? scheme.primary : scheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: DragTarget<RunPlanWorkout>(
-              key: dayOfWeek == null
-                  ? null
-                  : ValueKey('run-plan-day-$dayOfWeek'),
-              onWillAcceptWithDetails: (details) =>
-                  dayOfWeek != null && details.data.dayOfWeek != dayOfWeek,
-              onAcceptWithDetails: (details) {
-                final targetDay = dayOfWeek;
-                if (targetDay != null) {
-                  onMoveToDay(details.data, targetDay);
-                }
-              },
-              builder: (context, candidates, rejected) {
-                final isTarget = candidates.isNotEmpty;
-                return AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  padding: isTarget ? const EdgeInsets.all(3) : EdgeInsets.zero,
-                  decoration: BoxDecoration(
-                    color: isTarget
-                        ? scheme.primaryContainer.withAlpha(90)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(14),
-                    border: isTarget
-                        ? Border.all(color: scheme.primary, width: 1.5)
-                        : null,
-                  ),
-                  child: sessions.isEmpty && strength != null
-                      ? strength!
-                      : sessions.isEmpty
-                      ? _RestRow(onAdd: onAdd)
-                      : Column(
-                          children: [
-                            for (final session in sessions)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: LongPressDraggable<RunPlanWorkout>(
-                                  data: session,
-                                  hapticFeedbackOnStart: true,
-                                  feedback: Material(
-                                    color: Colors.transparent,
-                                    elevation: 8,
-                                    borderRadius: BorderRadius.circular(14),
-                                    child: SizedBox(
-                                      width:
-                                          (MediaQuery.sizeOf(context).width -
-                                                  96)
-                                              .clamp(220.0, 360.0)
-                                              .toDouble(),
-                                      child: _SessionCard(
-                                        workout: session,
-                                        status: statuses[session.id],
-                                        onTap: () {},
-                                        onDuplicate: () {},
-                                        onDelete: () {},
-                                      ),
-                                    ),
-                                  ),
-                                  childWhenDragging: Opacity(
-                                    opacity: 0.25,
-                                    child: _buildSessionCard(session),
-                                  ),
-                                  child: _buildSessionCard(session),
-                                ),
-                              ),
-                            ?strength,
-                          ],
-                        ),
-                );
-              },
-            ),
-          ),
-          if (isToday)
-            Padding(
-              padding: const EdgeInsets.only(left: 4, top: 12),
-              child: Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: scheme.primary,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            )
-          else
-            const SizedBox(width: 10),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSessionCard(RunPlanWorkout session) => _SessionCard(
-    key: ValueKey('run-plan-session-${session.id}'),
-    workout: session,
-    status: statuses[session.id],
-    onTap: () => onOpen(session),
-    onDuplicate: () => onDuplicate(session),
-    onMove: onMove == null ? null : () => onMove!(session),
-    onDelete: () => onDelete(session),
-  );
-}
-
-class _RestRow extends StatelessWidget {
-  final VoidCallback? onAdd;
-
-  const _RestRow({this.onAdd});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final loc = AppLocalizations.of(context)!;
-    return InkWell(
-      onTap: onAdd,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        height: 38,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: theme.colorScheme.outlineVariant.withAlpha(70),
-          ),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                loc.runPlanRestDay,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant.withAlpha(150),
-                ),
-              ),
-            ),
-            if (onAdd != null)
-              Icon(
-                Icons.add,
-                size: 16,
-                color: theme.colorScheme.onSurfaceVariant.withAlpha(150),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Badge extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool highlight;
-
-  const _Badge({
-    required this.icon,
-    required this.label,
-    this.highlight = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = highlight
-        ? theme.colorScheme.primary
-        : theme.colorScheme.onSurfaceVariant;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withAlpha(24),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SessionCard extends StatelessWidget {
-  final RunPlanWorkout workout;
-  final ScheduledRunStatus? status;
-  final VoidCallback onTap;
-  final VoidCallback onDuplicate;
-  final VoidCallback? onMove;
-  final VoidCallback onDelete;
-
-  const _SessionCard({
-    super.key,
-    required this.workout,
-    required this.status,
-    required this.onTap,
-    required this.onDuplicate,
-    required this.onDelete,
-    this.onMove,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final loc = AppLocalizations.of(context)!;
-    final scheme = theme.colorScheme;
-    final color = RunPlanUi.kindColor(scheme, workout.kind);
-    final outline = RunPlanUi.stepsOutline(loc, workout);
-    final estimate = RunPlanUi.estimatedTotalSeconds(workout);
-    final completed = status == ScheduledRunStatus.completed;
-    final skipped = status == ScheduledRunStatus.skipped;
-    final statusColor = completed ? scheme.tertiary : scheme.onSurfaceVariant;
-
-    return Material(
-      color: completed
-          ? scheme.tertiaryContainer.withAlpha(70)
-          : scheme.surfaceContainerHighest.withAlpha(70),
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 4, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: color.withAlpha(34),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      RunPlanUi.kindIcon(workout.kind),
-                      color: color,
-                      size: 18,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          workout.name,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            decoration: completed
-                                ? TextDecoration.lineThrough
-                                : null,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          [
-                            RunPlanUi.kindLabel(loc, workout.kind),
-                            RunPlanUi.sessionSummary(loc, workout),
-                            if (estimate > 0)
-                              '~${RunPlanUi.durationRoughLabel(estimate)}',
-                          ].where((part) => part.isNotEmpty).join(' · '),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (completed || skipped)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 2),
-                      child: _Badge(
-                        icon: completed
-                            ? Icons.check_circle_rounded
-                            : Icons.skip_next_rounded,
-                        label: completed
-                            ? loc.runPlanSessionCompleted
-                            : loc.runPlanSessionSkipped,
-                        highlight: completed,
-                      ),
-                    ),
-                  PopupMenuButton<String>(
-                    icon: Icon(
-                      Icons.more_vert,
-                      size: 18,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                    padding: EdgeInsets.zero,
-                    onSelected: (value) => switch (value) {
-                      'duplicate' => onDuplicate(),
-                      'move' => onMove?.call(),
-                      'delete' => onDelete(),
-                      _ => null,
-                    },
-                    itemBuilder: (ctx) => [
-                      PopupMenuItem(
-                        value: 'duplicate',
-                        child: Text(loc.runPlanSessionDuplicate),
-                      ),
-                      if (onMove != null)
-                        PopupMenuItem(
-                          value: 'move',
-                          child: Text(loc.runPlanSessionMove),
-                        ),
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Text(loc.runWorkoutDelete),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: RunWorkoutProfileBar(workout: workout, height: 8),
-              ),
-              if (completed) ...[
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Icon(Icons.verified_rounded, size: 14, color: statusColor),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: Text(
-                        loc.runPlanSessionCompletedHint,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: statusColor,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              if (outline.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Text(
-                    outline,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Follow state of the plan: whether it is driving "which run is due today",
-/// how far along it is, and the action to start or stop following it.
-///
-/// [onToggle] is null when a periodization phase owns the plan's weeks — the
-/// card then only reports that, since a second anchor would contradict it.
-class _FollowCard extends StatelessWidget {
-  final RunPlan plan;
-  final RunPlanProgress progress;
-  final bool viaPlanning;
-  final VoidCallback? onToggle;
-  final VoidCallback? onReset;
-
-  const _FollowCard({
-    required this.plan,
-    required this.progress,
-    required this.viaPlanning,
-    required this.onToggle,
-    required this.onReset,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final following = plan.isActivated || viaPlanning;
-    final complete = progress.isComplete;
-    final week = plan.activeWeekIndexOn(DateTime.now());
-    final accent = complete
-        ? scheme.tertiary
-        : following
-        ? scheme.primary
-        : scheme.onSurfaceVariant;
-
-    final String status;
-    if (complete) {
-      status = loc.runPlanCompletedHelp;
-    } else if (viaPlanning) {
-      status = loc.runPlanActiveViaHelp;
-    } else if (week != null) {
-      status = loc.runPlanCurrentWeek(week + 1, plan.weeks);
-    } else if (plan.isActivated && plan.activatedAt!.isAfter(DateTime.now())) {
-      // Anchored to a race date further out than the plan is long.
-      status = loc.runPlanStartsOn(
-        MaterialLocalizations.of(context).formatMediumDate(plan.activatedAt!),
-      );
-    } else {
-      status = loc.runPlanActivateHint;
-    }
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: complete
-            ? scheme.tertiaryContainer.withAlpha(80)
-            : following
-            ? scheme.primary.withAlpha(16)
-            : scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: complete
-              ? scheme.tertiary.withAlpha(100)
-              : following
-              ? scheme.primary.withAlpha(90)
-              : scheme.outlineVariant.withAlpha(90),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(
-                complete
-                    ? Icons.workspace_premium_rounded
-                    : viaPlanning
-                    ? Icons.route_rounded
-                    : (following
-                          ? Icons.play_circle_outline
-                          : Icons.flag_outlined),
-                size: 18,
-                color: accent,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                // The heading is the state; the button is the action. Saying
-                // "Seguir este plano" in both read like a duplicate.
-                child: Text(
-                  viaPlanning
-                      ? loc.runPlanActiveVia
-                      : complete
-                      ? loc.runPlanCompletedBadge
-                      : (following
-                            ? loc.runPlanActiveBadge
-                            : progress.hasProgress
-                            ? loc.runPlanPausedBadge
-                            : loc.runPlanNotFollowing),
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: accent,
-                  ),
-                ),
-              ),
-              if (onReset != null)
-                TextButton.icon(
-                  onPressed: onReset,
-                  icon: const Icon(Icons.restart_alt_rounded, size: 17),
-                  label: Text(loc.runPlanResetShort),
-                ),
-              if (onToggle != null && !complete)
-                following
-                    ? TextButton(
-                        onPressed: onToggle,
-                        child: Text(loc.runPlanUnfollowShort),
-                      )
-                    : FilledButton.tonalIcon(
-                        onPressed: onToggle,
-                        icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                        label: Text(loc.runPlanFollowShort),
-                      ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            status,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
-          if (progress.totalSessions > 0) ...[
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: LinearProgressIndicator(
-                      value: progress.fraction,
-                      minHeight: 6,
-                      color: scheme.primary,
-                      backgroundColor: scheme.primary.withAlpha(30),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  loc.runPlanProgressValue(
-                    progress.completedSessions,
-                    progress.totalSessions,
-                  ),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// The weekly review's suggestion: what happened, what changes, and the
-/// choice to apply it or keep the plan as it is.
-class _AdaptationCard extends StatelessWidget {
-  final RunPlan plan;
-  final RunPlanAdaptationProposal proposal;
-  final bool busy;
-  final VoidCallback onApply;
-  final VoidCallback onKeep;
-  final VoidCallback onReturnPlan;
-
-  const _AdaptationCard({
-    required this.plan,
-    required this.proposal,
-    required this.busy,
-    required this.onApply,
-    required this.onKeep,
-    required this.onReturnPlan,
-  });
-
-  static String _km(double km) => km < 0.05
-      ? '0'
-      : km >= 10
-      ? km.toStringAsFixed(0)
-      : RunPlanUi.kmValue(km * 1000);
-
-  @override
-  Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final last = proposal.lastWeek;
-    final title = switch (proposal.adjustment) {
-      RunPlanAdjustment.hold
-          when last?.fatigued == true && last?.outcome == RunWeekOutcome.full =>
-        loc.runPlanAdaptTitleFatigue,
-      RunPlanAdjustment.hold => loc.runPlanAdaptTitleHold,
-      RunPlanAdjustment.stepBack => loc.runPlanAdaptTitleStepBack,
-      RunPlanAdjustment.rebuild => loc.runPlanAdaptTitleRebuild(
-        proposal.missedWeeks,
-      ),
-      RunPlanAdjustment.none => loc.runPlanAdaptTitlePace,
-    };
-    final lines = <String>[];
-    if (last != null && proposal.adjustment != RunPlanAdjustment.none) {
-      lines.add(
-        loc.runPlanAdaptLastWeek(
-          _km(last.doneKm),
-          _km(last.plannedKm),
-          (last.adherence * 100).round(),
-          last.doneSessions,
-          last.plannedSessions,
-        ),
-      );
-      if (last.easyRpe != null && last.easyRpe! >= 6.5) {
-        lines.add(loc.runPlanAdaptEasyRpe(last.easyRpe!.toStringAsFixed(1)));
-      }
-      if (last.maxedOutRuns >= 2) {
-        lines.add(loc.runPlanAdaptMaxedOut(last.maxedOutRuns));
-      }
-    }
-    final baseline = proposal.baselineKm;
-    final before = proposal.fromWeek < plan.weeks
-        ? plan.weeklyDistanceMeters(proposal.fromWeek) / 1000
-        : 0.0;
-    if (baseline != null && before > 0 && (before - baseline).abs() >= 1) {
-      lines.add(loc.runPlanAdaptVolume(_km(baseline), _km(before)));
-    }
-    final configured = plan.config != null && plan.templateKey != null;
-    if (configured && proposal.adjustment != RunPlanAdjustment.none) {
-      if (plan.raceDate != null) {
-        lines.add(
-          loc.runPlanAdaptRaceKept(
-            DateFormat('d MMM', Intl.defaultLocale).format(plan.raceDate!),
-          ),
-        );
-      } else if (proposal.remainingWeeks != null) {
-        final extra = proposal.fromWeek + proposal.remainingWeeks! - plan.weeks;
-        if (extra > 0) lines.add(loc.runPlanAdaptExtends(extra));
-      }
-    }
-    if (proposal.changesPace && configured) {
-      final before = RunPaceCalculator.fromVdot(proposal.expectedVdot!);
-      final after = RunPaceCalculator.fromVdot(proposal.newVdot!);
-      final direction = proposal.pacesUp
-          ? loc.runPlanAdaptFitter
-          : loc.runPlanAdaptSlower;
-      final a = RunPlanUi.paceLabel(before.intervalSecPerKm);
-      final b = RunPlanUi.paceLabel(after.intervalSecPerKm);
-      lines.add(switch (proposal.paceSource) {
-        RunFitnessSource.test ||
-        RunFitnessSource.race => loc.runPlanAdaptPaceTest(direction, a, b),
-        RunFitnessSource.bestEffort => loc.runPlanAdaptPaceEffort(
-          direction,
-          a,
-          b,
-        ),
-        _ => loc.runPlanAdaptPaceWorkouts(direction, a, b),
-      });
-    }
-    if (!configured) lines.add(loc.runPlanAdaptNoConfig);
-    if (proposal.suggestReturnPlan) lines.add(loc.runPlanAdaptReturnHint);
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-      decoration: BoxDecoration(
-        color: scheme.secondaryContainer.withAlpha(120),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: scheme.secondary.withAlpha(90)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.tune_rounded, size: 18, color: scheme.secondary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          for (final line in lines)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(line, style: theme.textTheme.bodySmall),
-            ),
-          const SizedBox(height: 4),
-          Wrap(
-            alignment: WrapAlignment.end,
-            spacing: 8,
-            runSpacing: 4,
-            children: [
-              if (proposal.suggestReturnPlan)
-                OutlinedButton(
-                  onPressed: busy ? null : onReturnPlan,
-                  child: Text(loc.runPlanAdaptOpenReturn),
-                ),
-              TextButton(
-                onPressed: busy ? null : onKeep,
-                child: Text(loc.runPlanAdaptKeep),
-              ),
-              FilledButton(
-                onPressed: busy ? null : onApply,
-                child: busy
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(loc.runPlanAdaptApply),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// A plan that ran its course: how it went, how to recover, what is next.
-class _FinishedCard extends StatelessWidget {
-  final RunPlan plan;
-  final RunPlanProgress progress;
-  final List<RunPlanTemplate> next;
-  final ValueChanged<RunPlanTemplate> onStart;
-  final VoidCallback? onClose;
-
-  const _FinishedCard({
-    required this.plan,
-    required this.progress,
-    required this.next,
-    required this.onStart,
-    required this.onClose,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final isPt = Localizations.localeOf(context).languageCode == 'pt';
-    final raced = plan.workouts.any((w) => w.kind == RunWorkoutKind.race);
-    // A fully completed plan is already celebrated by the follow card; this
-    // card then only points at what comes next.
-    final complete = progress.isComplete;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-      decoration: BoxDecoration(
-        color: scheme.tertiaryContainer.withAlpha(90),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: scheme.tertiary.withAlpha(90)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.flag_circle_outlined,
-                size: 18,
-                color: scheme.tertiary,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  complete ? loc.runPlanFinishedNext : loc.runPlanFinishedTitle,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              if (onClose != null)
-                TextButton(
-                  onPressed: onClose,
-                  child: Text(loc.runPlanFinishedClose),
-                ),
-            ],
-          ),
-          if (!complete)
-            Text(
-              loc.runPlanFinishedSummary(
-                progress.completedSessions,
-                progress.totalSessions,
-              ),
-              style: theme.textTheme.bodySmall,
-            ),
-          if (raced) ...[
-            const SizedBox(height: 4),
-            Text(loc.runPlanFinishedRecovery, style: theme.textTheme.bodySmall),
-          ],
-          if (next.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            if (!complete) ...[
-              Text(
-                loc.runPlanFinishedNext.toUpperCase(),
-                style: theme.textTheme.labelSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1,
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 6),
-            ],
-            for (final template in next)
-              Card(
-                margin: const EdgeInsets.only(bottom: 6),
-                child: ListTile(
-                  dense: true,
-                  title: Text(template.title(isPt)),
-                  subtitle: Text(template.prerequisite(isPt)),
-                  trailing: const Icon(Icons.arrow_forward),
-                  onTap: () => onStart(template),
-                ),
-              ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// Runner strength suggested on a day: start it, or see it done.
-class _StrengthChip extends StatelessWidget {
-  final String label;
-  final bool done;
-  final VoidCallback onStart;
-
-  const _StrengthChip({
-    required this.label,
-    required this.done,
-    required this.onStart,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: scheme.surfaceContainerHighest.withAlpha(90),
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: done ? null : onStart,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.fitness_center_rounded,
-                  size: 18,
-                  color: scheme.secondary,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    loc.runPlanStrengthRow(label),
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                ),
-                if (done)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.check_circle,
-                        size: 16,
-                        color: scheme.tertiary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        loc.runPlanStrengthDone,
-                        style: theme.textTheme.labelMedium,
-                      ),
-                    ],
-                  )
-                else
-                  Text(
-                    loc.runPlanStrengthStart,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: scheme.primary,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

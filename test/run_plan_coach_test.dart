@@ -314,7 +314,9 @@ void main() {
       final plan = await real(tester, () => followFiveK(weeksAgo: 14));
       await pumpPlan(tester, plan.id);
 
-      expect(find.text('Plano concluído'), findsOneWidget);
+      // Ended by date, not fully done: an honest status, never "Seguindo".
+      expect(find.text('O plano terminou'), findsOneWidget);
+      expect(find.text('SEGUINDO'), findsNothing);
       expect(find.text('Próximo passo'.toUpperCase()), findsOneWidget);
       expect(find.text('Dos 5 aos 10 km'), findsOneWidget);
       expect(find.textContaining('Semana 1 de'), findsNothing);

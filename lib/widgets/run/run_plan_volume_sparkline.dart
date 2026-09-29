@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/services/run_plan_composer.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 
 /// Compact week-by-week volume bars coloured by periodisation phase.
 class RunPlanVolumeSparkline extends StatelessWidget {
@@ -47,7 +48,7 @@ class RunPlanVolumeSparkline extends StatelessWidget {
                     child: Tooltip(
                       message:
                           '${loc.runPlanWeeksValue(i + 1)} · '
-                          '${weeks[i].weekKm.toStringAsFixed(0)} km · '
+                          '${RunFormatters.decimal(weeks[i].weekKm, 0)} km · '
                           '${phaseLabel(loc, weeks[i].phase)}',
                       child: Align(
                         alignment: Alignment.bottomCenter,

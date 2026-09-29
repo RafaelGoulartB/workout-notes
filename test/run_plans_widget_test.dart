@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:workout_notes/database/database_helper.dart';
@@ -61,7 +62,11 @@ void main() {
   setUpAll(() {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
+    // Decimals follow the app locale, which main.dart sets in production.
+    Intl.defaultLocale = 'pt_BR';
   });
+
+  tearDownAll(() => Intl.defaultLocale = null);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(
@@ -73,7 +78,8 @@ void main() {
           await db.execute(
             'CREATE TABLE run_activities (id TEXT PRIMARY KEY, started_at TEXT NOT NULL, '
             'status TEXT NOT NULL DEFAULT \'completed\', created_at TEXT NOT NULL, '
-            'updated_at TEXT NOT NULL, plan_workout_id TEXT)',
+            'updated_at TEXT NOT NULL, plan_workout_id TEXT, '
+            'distance_meters REAL NOT NULL DEFAULT 0, avg_pace_sec_per_km REAL)',
           );
           await DatabasePeriodizationSchema.create(db);
           await DatabaseRunPlanSchema.create(db);
@@ -352,8 +358,9 @@ void main() {
 
       await pumpScreen(tester, RunPlanDetailScreen(planId: planId));
 
+      // One badge says it: no strike-through and no second "done" label.
       expect(find.text('Concluído'), findsOneWidget);
-      expect(find.text('Treino concluído neste plano'), findsOneWidget);
+      expect(find.text('Treino concluído neste plano'), findsNothing);
       expect(find.text('Resetar'), findsOneWidget);
       expect(find.text('Parar'), findsOneWidget);
     });
@@ -393,6 +400,245 @@ void main() {
       expect(find.text('PLANO CONCLUÍDO'), findsOneWidget);
       expect(find.textContaining('concluiu todos os treinos'), findsOneWidget);
       expect(find.text('Seguir'), findsNothing);
+    });
+  });
+
+  group('followed plans', () {
+    Future<RunPlan> seedWeek({
+      required String name,
+      required DateTime monday,
+      int weeks = 2,
+      List<int> days = const [1, 3, 6],
+    }) async {
+      final plan = await repo.createPlan(name: name, weeks: weeks);
+      for (final day in days) {
+        await repo.addWorkout(
+          planId: plan.id,
+          weekIndex: 0,
+          name: 'Treino $day',
+          dayOfWeek: day,
+          targetDistanceMeters: 5000,
+        );
+      }
+      await database.update(
+        'run_plans',
+        {
+          'activated_at':
+              '${monday.year}-${monday.month.toString().padLeft(2, '0')}-'
+              '${monday.day.toString().padLeft(2, '0')}',
+        },
+        where: 'id = ?',
+        whereArgs: [plan.id],
+      );
+      for (var week = 0; week < weeks; week++) {
+        await repo.materializeWeek(
+          planId: plan.id,
+          weekIndex: week,
+          weekStart: DateTime(monday.year, monday.month, monday.day + 7 * week),
+        );
+      }
+      return plan;
+    }
+
+    testWidgets('detail shows real dates, today and one badge per session', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(430, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      // 2026-09-28 is a Monday; "today" is the Wednesday.
+      final plan = await real(
+        tester,
+        () => seedWeek(name: 'Base', monday: DateTime(2026, 9, 28)),
+      );
+
+      await pumpScreen(
+        tester,
+        RunPlanDetailScreen(planId: plan.id, today: DateTime(2026, 9, 30)),
+      );
+
+      expect(find.text('28/09'), findsOneWidget);
+      expect(find.text('30/09'), findsOneWidget);
+      expect(find.text('HOJE'), findsOneWidget);
+      // Monday passed without a run: missed. Nothing else carries a badge.
+      expect(find.text('Perdido'), findsOneWidget);
+      expect(find.text('Concluído'), findsNothing);
+      // Only today's session starts directly.
+      expect(find.text('Iniciar'), findsOneWidget);
+      // A followed plan is already scheduled: the badge, never the button.
+      expect(find.text('Agendada'), findsWidgets);
+      expect(find.text('Agendar esta semana'), findsNothing);
+      // Continuous sessions do not draw a meaningless profile bar.
+      expect(find.byType(RunWorkoutProfileBar), findsNothing);
+    });
+
+    testWidgets('an unfollowed plan offers to schedule and has no dates', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(430, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final planId = await real(tester, () async {
+        final plan = await repo.createPlan(name: 'Modelo', weeks: 2);
+        await repo.addWorkout(
+          planId: plan.id,
+          weekIndex: 0,
+          name: 'Treino',
+          dayOfWeek: 2,
+        );
+        return plan.id;
+      });
+
+      await pumpScreen(
+        tester,
+        RunPlanDetailScreen(planId: planId, today: DateTime(2026, 9, 30)),
+      );
+
+      expect(find.text('Agendar esta semana'), findsOneWidget);
+      expect(find.text('Agendada'), findsNothing);
+      expect(find.text('HOJE'), findsNothing);
+      expect(find.text('Iniciar'), findsNothing);
+      expect(find.text('Não está seguindo este plano'), findsOneWidget);
+    });
+
+    testWidgets('a plan that ended by date is not "following" or "done"', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(430, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final plan = await real(
+        tester,
+        () => seedWeek(name: 'Antigo', monday: DateTime(2026, 6, 1)),
+      );
+
+      await pumpScreen(
+        tester,
+        RunPlanDetailScreen(planId: plan.id, today: DateTime(2026, 9, 30)),
+      );
+
+      expect(find.text('O plano terminou'), findsOneWidget);
+      expect(find.text('0 de 3 treinos (0%)'), findsOneWidget);
+      expect(find.text('Recomeçar a partir de hoje'), findsOneWidget);
+      expect(find.text('Escolher próximo plano'), findsOneWidget);
+      expect(find.text('Encerrar plano'), findsOneWidget);
+      expect(find.text('SEGUINDO'), findsNothing);
+      expect(find.text('PLANO CONCLUÍDO'), findsNothing);
+      expect(find.text('Parar'), findsNothing);
+    });
+
+    testWidgets('a done session shows one badge and the run it points at', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(430, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final plan = await real(tester, () async {
+        final plan = await seedWeek(
+          name: 'Base',
+          monday: DateTime(2026, 9, 28),
+        );
+        final first = (await repo.getPlan(plan.id))!.workoutsForWeek(0).first;
+        await database.insert('run_activities', {
+          'id': 'act-done',
+          'started_at': DateTime(2026, 9, 28, 7).toIso8601String(),
+          'status': 'completed',
+          'created_at': '2026-09-28T07:00:00',
+          'updated_at': '2026-09-28T07:00:00',
+          'distance_meters': 5210.0,
+          'avg_pace_sec_per_km': 330.0,
+        });
+        await repo.markPlanWorkoutCompleted(
+          planWorkoutId: first.id,
+          date: DateTime(2026, 9, 28),
+          runActivityId: 'act-done',
+        );
+        return plan;
+      });
+
+      await pumpScreen(
+        tester,
+        RunPlanDetailScreen(planId: plan.id, today: DateTime(2026, 9, 30)),
+      );
+
+      expect(find.text('Concluído'), findsOneWidget);
+      expect(find.text('Perdido'), findsNothing);
+      expect(find.textContaining('5,21 km'), findsOneWidget);
+      // Planned (ghost) versus done (filled) km in the header.
+      expect(find.textContaining('km feitos'), findsOneWidget);
+    });
+
+    testWidgets('backing out of "Add session" leaves nothing behind', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(430, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final planId = await real(tester, () async {
+        final plan = await repo.createPlan(name: 'Vazio', weeks: 1);
+        return plan.id;
+      });
+
+      await pumpScreen(tester, RunPlanDetailScreen(planId: planId));
+      await tapAndLoad(tester, find.text('Adicionar treino').first);
+      // The editor is open on a fresh session; leave without editing.
+      await tester.runAsync(() async {
+        await tester.pump(const Duration(milliseconds: 600));
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        await tester.pump(const Duration(milliseconds: 600));
+        expect(find.byType(RunPlanWorkoutEditorScreen), findsOneWidget);
+        await tester.tap(find.byType(BackButton));
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        await tester.pump();
+      });
+
+      final plan = await real(tester, () => repo.getPlan(planId));
+      expect(plan!.workouts, isEmpty);
+    });
+
+    testWidgets('library pins the followed plan on top with a Start button', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(430, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final now = DateTime.now();
+      final monday = DateTime(now.year, now.month, now.day - (now.weekday - 1));
+      await real(tester, () async {
+        // Updated last, so the plain library order would put it on top.
+        await seedWeek(
+          name: 'Plano seguido',
+          monday: monday,
+          weeks: 4,
+          days: [now.weekday],
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+        await repo.createPlan(name: 'Plano guardado', weeks: 4);
+      });
+
+      await pumpScreen(tester, const RunPlansScreen());
+
+      expect(find.text('SEGUINDO AGORA'), findsOneWidget);
+      expect(find.text('SEUS PLANOS'), findsOneWidget);
+      final followed = tester.getTopLeft(find.text('Plano seguido')).dy;
+      final other = tester.getTopLeft(find.text('Plano guardado')).dy;
+      expect(followed, lessThan(other));
+      expect(find.text('Iniciar'), findsOneWidget);
+      expect(find.text('Seguir'), findsOneWidget);
+      expect(find.text('Semana 1 de 4'), findsOneWidget);
+    });
+
+    testWidgets('an ended plan in the library says so instead of "following"', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(430, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await real(
+        tester,
+        () => seedWeek(name: 'Antigo', monday: DateTime(2025, 1, 6)),
+      );
+
+      await pumpScreen(tester, const RunPlansScreen());
+
+      expect(find.text('TERMINOU'), findsOneWidget);
+      expect(find.text('SEGUINDO'), findsNothing);
+      // The badge plus the progress bar carry the status; no repeated line.
+      expect(find.text('0 de 3 treinos'), findsOneWidget);
+      expect(find.text('Iniciar'), findsNothing);
     });
   });
 
