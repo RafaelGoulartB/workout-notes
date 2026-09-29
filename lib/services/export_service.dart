@@ -3,7 +3,6 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:csv/csv.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -15,6 +14,7 @@ import '../repositories/nutrition_repository.dart';
 import 'backup_media_service.dart';
 import 'package:workout_notes/services/backup_exception.dart';
 import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/utils/csv_writer.dart';
 
 typedef SaveFileCallback =
     Future<String?> Function({
@@ -512,7 +512,7 @@ class ExportService {
             : loc.exportNutritionFlagComplete,
       ]);
     }
-    final csvData = csv.encode(csvRows);
+    final csvData = encodeCsv(csvRows);
     final dir = await getTemporaryDirectory();
     final path =
         '${dir.path}/workout_notes_nutrition_${DateTime.now().millisecondsSinceEpoch}.csv';
