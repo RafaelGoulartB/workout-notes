@@ -344,6 +344,32 @@ void main() {
     ]);
   });
 
+  test('accepts a version 16 backup without plan adaptations', () async {
+    final backup = _validBackup()..['version'] = 16;
+    backup.remove('run_plan_adaptations');
+    (backup['record_counts'] as Map<String, dynamic>).remove(
+      'run_plan_adaptations',
+    );
+
+    final count = await service.restoreFromBytes(_bytes(backup));
+
+    expect(count, 1);
+    expect(await database.query('app_settings'), [
+      {'key': 'restored', 'value': 'yes'},
+    ]);
+  });
+
+  test(
+    'rejects a current backup without plan adaptations without changing data',
+    () async {
+      final backup = _validBackup()..remove('run_plan_adaptations');
+
+      await expectInvalidAndUnchanged(
+        () => service.restoreFromBytes(_bytes(backup)),
+      );
+    },
+  );
+
   test('accepts a version 4 session without alarm time', () async {
     final backup = _validBackup()..['version'] = 4;
     backup['sleep_monitor_sessions'] = [

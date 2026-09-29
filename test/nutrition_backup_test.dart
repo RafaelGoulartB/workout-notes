@@ -404,27 +404,18 @@ void main() {
     });
     final backup = <String, dynamic>{
       'version': 5,
+      // Missing the NOT NULL `name`, so the insert aborts the transaction.
       'foods': [
         {
           'id': 'bad',
           'source': 'manual',
           'external_id': 'bad',
-          'name': 'Bad',
           'search_name': 'bad',
           'fetched_at': now,
         },
       ],
-      'food_variants': [
-        {
-          'id': 'bad_v',
-          'food_id': 'different-parent',
-          'reference_amount': 100,
-          'reference_unit': 'g',
-          'is_estimated': 0,
-        },
-      ],
     };
-    expect(
+    await expectLater(
       () => ExportImportRepository(
         databaseProvider: () async => database,
       ).restoreFromBackup(backup),

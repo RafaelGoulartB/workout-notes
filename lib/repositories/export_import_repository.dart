@@ -12,7 +12,7 @@ import 'package:workout_notes/services/run_route_codec.dart';
 /// inserts the backup rows inside a single transaction so the database
 /// ends up in an exact copy of the exported state.
 class ExportImportRepository extends BaseRepository {
-  static const int currentBackupVersion = 16;
+  static const int currentBackupVersion = 17;
   static const int minimumSupportedBackupVersion = 2;
   static const String backupType = 'workout_notes_full_backup';
 
@@ -60,6 +60,20 @@ class ExportImportRepository extends BaseRepository {
     'run_plan_adaptations',
     'settings',
   ];
+
+  /// Backup version that first exported each collection added after the
+  /// strict v15 manifest. Older backups legitimately lack these keys.
+  static const Map<String, int> _collectionIntroducedIn = {
+    'run_route_data': 16,
+    'run_splits': 16,
+    'run_plan_adaptations': 17,
+  };
+
+  /// Collections a backup of [version] is expected to carry.
+  static List<String> collectionKeysForVersion(int version) =>
+      currentCollectionKeys
+          .where((key) => (_collectionIntroducedIn[key] ?? 0) <= version)
+          .toList(growable: false);
 
   final Future<Database> Function()? _databaseProvider;
 
@@ -123,10 +137,7 @@ class ExportImportRepository extends BaseRepository {
       'run_workout_steps': await _queryIfExists(db, 'run_workout_steps'),
       'scheduled_runs': await _queryIfExists(db, 'scheduled_runs'),
       'run_activity_steps': await _queryIfExists(db, 'run_activity_steps'),
-      'run_plan_adaptations': await _queryIfExists(
-        db,
-        'run_plan_adaptations',
-      ),
+      'run_plan_adaptations': await _queryIfExists(db, 'run_plan_adaptations'),
       'settings': await db.query('app_settings'),
       // Platform preferences and portable file bytes are filled by
       // ExportService. Empty defaults keep this envelope valid for repository
@@ -171,6 +182,10 @@ class ExportImportRepository extends BaseRepository {
     int totalRows = 0;
 
     await db.transaction((txn) async {
+      // Checked at commit instead of per insert, after dangling references
+      // left by older app versions are resolved (see _resolveDanglingRefs).
+      await txn.execute('PRAGMA defer_foreign_keys = ON');
+
       // 1. Clear all tables (order matters because of FKs)
       for (final table in [
         'ai_routine_proposals',
@@ -347,9 +362,54 @@ class ExportImportRepository extends BaseRepository {
       if (sessionColumns.contains('monitor_mode')) {
         totalRows += await _insertMissingSleepSettings(txn);
       }
+      totalRows -= await _resolveDanglingRefs(txn);
     });
 
     return totalRows;
+  }
+
+  /// Older app versions could leave child rows whose parent was already gone
+  /// (e.g. exercise entries of a deleted workout). The UI never reached them,
+  /// but with foreign keys enforced they would abort the whole restore. Each
+  /// dangling reference is resolved as its key's ON DELETE action would have:
+  /// SET NULL keys are cleared, every other orphan row is deleted.
+  ///
+  /// Returns the number of rows deleted.
+  static Future<int> _resolveDanglingRefs(Transaction txn) async {
+    var deleted = 0;
+    // Deleting an orphan can orphan its own children (entry -> sets) when
+    // cascades are off, so repeat until the check is clean. Anything left
+    // after the cap fails the commit as a regular FK violation.
+    for (var pass = 0; pass < 8; pass++) {
+      final violations = await txn.rawQuery('PRAGMA foreign_key_check');
+      if (violations.isEmpty) break;
+      final keysByTable = <String, Set<Object?>>{};
+      for (final row in violations) {
+        keysByTable
+            .putIfAbsent(row['table'] as String, () => {})
+            .add(row['fkid']);
+      }
+      for (final MapEntry(key: table, value: keyIds) in keysByTable.entries) {
+        // Identifiers come from SQLite's own catalog, never from the backup.
+        final keys = await txn.rawQuery('PRAGMA foreign_key_list("$table")');
+        for (final key in keys.where((k) => keyIds.contains(k['id']))) {
+          final from = key['from'];
+          final orphan =
+              '"$from" IS NOT NULL AND "$from" NOT IN '
+              '(SELECT "${key['to']}" FROM "${key['table']}")';
+          if (key['on_delete'] == 'SET NULL') {
+            await txn.rawUpdate(
+              'UPDATE "$table" SET "$from" = NULL WHERE $orphan',
+            );
+          } else {
+            deleted += await txn.rawDelete(
+              'DELETE FROM "$table" WHERE $orphan',
+            );
+          }
+        }
+      }
+    }
+    return deleted;
   }
 
   /// Validates the envelope and all row collections before any data is
@@ -371,12 +431,7 @@ class ExportImportRepository extends BaseRepository {
       if (counts is! Map) {
         throw const FormatException('Backup record counts are missing.');
       }
-      final requiredKeys = version >= 16
-          ? currentCollectionKeys
-          : currentCollectionKeys
-                .where((key) => key != 'run_route_data' && key != 'run_splits')
-                .toList(growable: false);
-      for (final key in requiredKeys) {
+      for (final key in collectionKeysForVersion(version)) {
         final rows = data[key];
         if (rows is! List) {
           throw FormatException('Backup collection "$key" is missing.');
@@ -387,12 +442,7 @@ class ExportImportRepository extends BaseRepository {
       }
     }
 
-    final validatedKeys = version >= 16
-        ? currentCollectionKeys
-        : currentCollectionKeys.where(
-            (key) => key != 'run_route_data' && key != 'run_splits',
-          );
-    for (final key in validatedKeys) {
+    for (final key in collectionKeysForVersion(version)) {
       final rows = data[key];
       if (rows == null) continue;
       if (rows is! List || rows.any((row) => row is! Map)) {

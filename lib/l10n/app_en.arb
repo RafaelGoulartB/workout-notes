@@ -1607,7 +1607,7 @@
   "nutritionSavedMealNoMealTypes": "Configure the meals in the nutrition settings first.",
   "nutritionSavedMealLogToday": "Log today",
   "nutritionSavedMealNothingLogged": "No items could be logged — some foods were deleted.",
-  "nutritionSavedMealPartialLogged": "{added} items logged, {skipped} skipped (food deleted)",
+  "nutritionSavedMealPartialLogged": "{added} items logged, {skipped} skipped (food deleted or portion size unknown)",
   "@nutritionSavedMealPartialLogged": {
     "placeholders": {
       "added": { "type": "int" },

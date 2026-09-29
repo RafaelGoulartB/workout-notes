@@ -1589,7 +1589,7 @@
   "nutritionSavedMealNoMealTypes": "Configure as refeições nos ajustes de nutrição primeiro.",
   "nutritionSavedMealLogToday": "Registrar hoje",
   "nutritionSavedMealNothingLogged": "Nenhum item pôde ser registrado — alguns alimentos foram apagados.",
-  "nutritionSavedMealPartialLogged": "{added} itens registrados, {skipped} ignorados (alimento apagado)",
+  "nutritionSavedMealPartialLogged": "{added} itens registrados, {skipped} ignorados (alimento apagado ou porção sem equivalência)",
   "@nutritionSavedMealPartialLogged": {
     "placeholders": {
       "added": { "type": "int" },
