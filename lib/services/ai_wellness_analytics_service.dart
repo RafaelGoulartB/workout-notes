@@ -397,7 +397,7 @@ class AiWellnessAnalyticsService {
             ELSE ra.duration_seconds END AS cardio_moving_seconds,
           0.0 AS volume_kg, 0 AS completed_sets
         FROM run_activities ra
-        WHERE ra.status = 'completed' AND substr(ra.started_at, 1, 10) >= ?
+        WHERE ra.status = 'completed' AND ra.started_at >= ?
       ) daily
       GROUP BY date ORDER BY date ASC
       ''',
