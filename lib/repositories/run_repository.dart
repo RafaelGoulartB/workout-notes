@@ -2,39 +2,71 @@ import 'dart:typed_data';
 
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_activity.dart';
+import 'package:workout_notes/models/run_activity_filter.dart';
+import 'package:workout_notes/models/run_lap.dart';
 import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/repositories/base_repository.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/services/run_route_codec.dart';
 import 'package:workout_notes/utils/run_effort_analytics.dart';
+import 'package:workout_notes/utils/run_elevation_analytics.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
 
 class RunRepository extends BaseRepository {
   static const _uuid = Uuid();
 
+  /// Completed activities, newest first.
+  ///
+  /// [activityTypes] (when given) overrides [activityType]; pass
+  /// [runningTypes] for outdoor + treadmill runs. [limit] `null` loads all.
   Future<List<RunActivity>> listActivities({
-    int limit = 50,
+    int? limit = 50,
     int offset = 0,
     CardioActivityType? activityType = CardioActivityType.running,
+    Iterable<CardioActivityType>? activityTypes,
+    DateTime? startedFrom,
+    DateTime? startedBefore,
   }) async {
     final database = await db;
+    final types =
+        activityTypes?.toList() ??
+        (activityType == null ? null : [activityType]);
+    final where = <String>['status = ?'];
+    final args = <Object?>['completed'];
+    if (types != null && types.isNotEmpty) {
+      where.add(
+        'activity_type IN (${List.filled(types.length, '?').join(', ')})',
+      );
+      args.addAll(types.map((t) => t.databaseValue));
+    }
+    if (startedFrom != null) {
+      where.add('started_at >= ?');
+      args.add(startedFrom.toIso8601String());
+    }
+    if (startedBefore != null) {
+      where.add('started_at < ?');
+      args.add(startedBefore.toIso8601String());
+    }
     final rows = await database.query(
       'run_activities',
-      where: activityType == null
-          ? 'status = ?'
-          : 'status = ? AND activity_type = ?',
-      whereArgs: activityType == null
-          ? ['completed']
-          : ['completed', activityType.databaseValue],
+      where: where.join(' AND '),
+      whereArgs: args,
       orderBy: 'started_at DESC',
       limit: limit,
-      offset: offset,
+      offset: limit == null ? null : offset,
     );
     return rows.map(RunActivity.fromMap).toList();
   }
+
+  /// Outdoor GPS runs plus treadmill runs.
+  static const List<CardioActivityType> runningTypes = [
+    CardioActivityType.running,
+    CardioActivityType.treadmill,
+  ];
 
   Future<RunActivity?> getActivity(String id) async {
     final database = await db;
@@ -341,9 +373,19 @@ class RunRepository extends BaseRepository {
     );
     final summary = _RouteSummary.fromPoints(points);
 
+    final laps = _decodeNativeLaps(spool);
     final database = await db;
     await database.transaction((txn) async {
       await txn.insert('run_activities', activity.toMap());
+      if (laps.isNotEmpty) {
+        // Manual laps ride in the same transaction: either the activity and
+        // its laps are imported together or neither is (idempotent retry).
+        await DatabaseHelper.instance.runGearRepo.replaceLaps(
+          activity.id,
+          laps,
+          executor: txn,
+        );
+      }
       if (encoded != null) {
         await _storeCompactRoute(
           txn,
@@ -360,6 +402,22 @@ class RunRepository extends BaseRepository {
     });
 
     return activity;
+  }
+
+  /// Manual laps carried by the native spool (`activity.laps`), in order.
+  static List<RunLap> _decodeNativeLaps(Map<String, dynamic> spool) {
+    final rawActivity = spool['activity'];
+    if (rawActivity is! Map) return const [];
+    final raw = rawActivity['laps'];
+    if (raw is! List) return const [];
+    final laps = <RunLap>[];
+    for (final row in raw.whereType<Map>()) {
+      final lap = RunLap.fromMap(Map<String, dynamic>.from(row));
+      if (lap.index <= 0) continue;
+      laps.add(lap);
+    }
+    laps.sort((a, b) => a.index.compareTo(b.index));
+    return laps;
   }
 
   /// Converts a bounded number of legacy point-row activities. Each activity
@@ -709,7 +767,7 @@ class RunRepository extends BaseRepository {
       );
     }
 
-    final efforts = activityType == CardioActivityType.running
+    final efforts = activityType.usesGps
         ? RunEffortAnalytics.fromTrackPoints(points)
         : const RunEffortMetrics();
 
@@ -721,12 +779,12 @@ class RunRepository extends BaseRepository {
       durationSeconds: durationSeconds,
       movingTimeSeconds: movingTimeSeconds,
       distanceMeters: distanceMeters,
-      avgPaceSecPerKm: activityType == CardioActivityType.running
+      // Treadmill runs get a pace once the distance typed on the review
+      // screen is known; the bike never has one.
+      avgPaceSecPerKm: activityType.isRunning
           ? avgPace ?? _avgPace(distanceMeters, movingTimeSeconds)
           : null,
-      maxPaceSecPerKm: activityType == CardioActivityType.running
-          ? maxPace
-          : null,
+      maxPaceSecPerKm: activityType.usesGps ? maxPace : null,
       calories: calories,
       title: title,
       notes: notes,
@@ -760,12 +818,35 @@ class RunRepository extends BaseRepository {
     }
   }
 
+  /// Calorie estimate for a live or finished session (same rules the import
+  /// uses), so the record screen and the saved activity agree.
+  static int estimateCalories({
+    required CardioActivityType activityType,
+    required double distanceMeters,
+    required int movingSeconds,
+    double bodyWeightKg = 70,
+  }) => _estimateCalories(
+    activityType: activityType,
+    distanceMeters: distanceMeters,
+    durationSeconds: movingSeconds,
+    bodyWeightKg: bodyWeightKg,
+  );
+
   static int _estimateCalories({
     required CardioActivityType activityType,
     required double distanceMeters,
     required int durationSeconds,
     required double bodyWeightKg,
   }) {
+    if (activityType == CardioActivityType.treadmill && distanceMeters < 100) {
+      // No usable distance (typed on review, may be skipped): running at a
+      // moderate ~9 MET by time until the distance is known.
+      final minutes = durationSeconds / 60.0;
+      return (9.0 * 3.5 * bodyWeightKg / 200 * minutes).round().clamp(
+        0,
+        100000,
+      );
+    }
     if (activityType == CardioActivityType.stationaryBike) {
       // Moderate stationary cycling is approximately 7 MET. This is an
       // estimate until heart-rate or machine power data is available.
@@ -798,6 +879,203 @@ class RunRepository extends BaseRepository {
     }
     return buffer.isEmpty ? null : buffer.toString();
   }
+
+  // --- History queries -----------------------------------------------------
+
+  static (String, List<Object?>) _filterClause(RunActivityFilter filter) {
+    final where = <String>["status = 'completed'"];
+    final args = <Object?>[];
+    final types = filter.types;
+    if (types != null && types.isNotEmpty) {
+      where.add(
+        'activity_type IN (${List.filled(types.length, '?').join(', ')})',
+      );
+      args.addAll(types.map((t) => t.databaseValue));
+    }
+    if (filter.startedFrom != null) {
+      where.add('started_at >= ?');
+      args.add(filter.startedFrom!.toIso8601String());
+    }
+    if (filter.startedBefore != null) {
+      where.add('started_at < ?');
+      args.add(filter.startedBefore!.toIso8601String());
+    }
+    if (filter.minDistanceMeters != null) {
+      where.add('distance_meters >= ?');
+      args.add(filter.minDistanceMeters);
+    }
+    if (filter.maxDistanceMeters != null) {
+      where.add('distance_meters < ?');
+      args.add(filter.maxDistanceMeters);
+    }
+    if (filter.onlyPlanWorkouts) {
+      where.add("plan_workout_id IS NOT NULL AND plan_workout_id != ''");
+    }
+    final query = filter.query.trim();
+    if (query.isNotEmpty) {
+      final escaped = query
+          .replaceAll(r'\', r'\\')
+          .replaceAll('%', r'\%')
+          .replaceAll('_', r'\_');
+      where.add("(title LIKE ? ESCAPE '\\' OR notes LIKE ? ESCAPE '\\')");
+      args
+        ..add('%$escaped%')
+        ..add('%$escaped%');
+    }
+    return (where.join(' AND '), args);
+  }
+
+  /// A page of completed activities matching [filter], newest first.
+  Future<List<RunActivity>> searchActivities(
+    RunActivityFilter filter, {
+    int limit = 40,
+    int offset = 0,
+  }) async {
+    final database = await db;
+    final (where, args) = _filterClause(filter);
+    final rows = await database.query(
+      'run_activities',
+      where: where,
+      whereArgs: args,
+      orderBy: 'started_at DESC',
+      limit: limit,
+      offset: offset,
+    );
+    return rows.map(RunActivity.fromMap).toList();
+  }
+
+  /// Count / distance / moving time of everything matching [filter].
+  Future<RunActivityTotals> summarizeActivities(
+    RunActivityFilter filter,
+  ) async {
+    final database = await db;
+    final (where, args) = _filterClause(filter);
+    final rows = await database.rawQuery('''
+      SELECT COUNT(*) AS run_count,
+        COALESCE(SUM(distance_meters), 0) AS distance,
+        COALESCE(SUM(moving_time_seconds), 0) AS moving
+      FROM run_activities WHERE $where
+      ''', args);
+    return _totalsFromRow(rows.first);
+  }
+
+  /// Totals per local calendar month (`yyyy-MM`) of everything matching
+  /// [filter].
+  Future<Map<String, RunActivityTotals>> monthlyTotals(
+    RunActivityFilter filter,
+  ) async {
+    final database = await db;
+    final (where, args) = _filterClause(filter);
+    final rows = await database.rawQuery('''
+      SELECT substr(started_at, 1, 7) AS month, COUNT(*) AS run_count,
+        COALESCE(SUM(distance_meters), 0) AS distance,
+        COALESCE(SUM(moving_time_seconds), 0) AS moving
+      FROM run_activities WHERE $where
+      GROUP BY month
+      ''', args);
+    return {
+      for (final row in rows) (row['month'] as String): _totalsFromRow(row),
+    };
+  }
+
+  static RunActivityTotals _totalsFromRow(Map<String, Object?> row) =>
+      RunActivityTotals(
+        count: (row['run_count'] as num?)?.toInt() ?? 0,
+        distanceMeters: (row['distance'] as num?)?.toDouble() ?? 0,
+        movingTimeSeconds: (row['moving'] as num?)?.toInt() ?? 0,
+      );
+
+  /// Every completed GPS run with only the columns the record ranking needs
+  /// (no route summary), so medals can be computed over the whole history
+  /// without loading heavy rows.
+  Future<List<RunActivity>> listActivitiesForRanking({
+    CardioActivityType activityType = CardioActivityType.running,
+  }) async {
+    final database = await db;
+    final rows = await database.query(
+      'run_activities',
+      columns: const [
+        'id',
+        'activity_type',
+        'started_at',
+        'ended_at',
+        'created_at',
+        'updated_at',
+        'status',
+        'duration_seconds',
+        'moving_time_seconds',
+        'distance_meters',
+        'avg_pace_sec_per_km',
+        'best_split_pace_sec_per_km',
+        'best_effort_1k_sec',
+        'best_effort_3k_sec',
+        'best_effort_5k_sec',
+        'best_effort_10k_sec',
+        'best_effort_half_sec',
+        'best_effort_marathon_sec',
+      ],
+      where: 'status = ? AND activity_type = ?',
+      whereArgs: ['completed', activityType.databaseValue],
+      orderBy: 'started_at DESC',
+    );
+    return rows.map(RunActivity.fromMap).toList();
+  }
+
+  static const _elevationBackfillKey = 'run_elevation_smoothed_v1';
+
+  /// One-off recompute of stored elevation gain/loss with the smoothed
+  /// profile. Runs recorded before it summed raw GPS jitter. Returns how many
+  /// activities were updated (0 once done).
+  Future<int> backfillSmoothedElevation() async {
+    final database = await db;
+    try {
+      final done = await database.query(
+        'app_settings',
+        where: 'key = ?',
+        whereArgs: [_elevationBackfillKey],
+        limit: 1,
+      );
+      if (done.isNotEmpty) return 0;
+    } catch (_) {
+      return 0;
+    }
+    // Lightweight schemas (tests, partial restores) may lack the route tables.
+    if (!await _tableExists(database, 'run_track_points')) return 0;
+    final rows = await database.query(
+      'run_activities',
+      columns: ['id'],
+      where: "status = 'completed' AND activity_type = ?",
+      whereArgs: [CardioActivityType.running.databaseValue],
+    );
+    var updated = 0;
+    for (final row in rows) {
+      final id = row['id'] as String;
+      final List<RunTrackPoint> points;
+      try {
+        points = await getTrackPoints(id);
+      } catch (_) {
+        continue;
+      }
+      if (points.length < 2) continue;
+      final profile = RunElevationProfile.fromTrackPoints(points);
+      if (!profile.hasData) continue;
+      await database.update(
+        'run_activities',
+        {
+          'elevation_gain_meters': profile.gainMeters,
+          'elevation_loss_meters': profile.lossMeters,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      updated++;
+    }
+    await database.insert('app_settings', {
+      'key': _elevationBackfillKey,
+      'value': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    return updated;
+  }
 }
 
 class _RouteSummary {
@@ -822,14 +1100,12 @@ class _RouteSummary {
         .map((point) => point.altitude)
         .whereType<double>()
         .toList();
-    var gain = 0.0;
-    var loss = 0.0;
-    for (var index = 1; index < altitudes.length; index++) {
-      final delta = altitudes[index] - altitudes[index - 1];
-      // Ignore sub-metre sensor noise while retaining meaningful terrain.
-      if (delta >= 1) gain += delta;
-      if (delta <= -1) loss += -delta;
-    }
+    // Raw GPS altitude jitters several metres on flat ground; summing every
+    // delta turns a flat park loop into "50 m of climbing". Use the same
+    // smoothed, hysteresis-based profile the detail chart draws.
+    final profile = RunElevationProfile.fromTrackPoints(points);
+    final gain = profile.gainMeters;
+    final loss = profile.lossMeters;
     final accuracies = points
         .map((point) => point.accuracy)
         .whereType<double>()

@@ -3,6 +3,7 @@ import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
 
 void main() {
+  _smoothingTests();
   group('RunPaceAnalytics.haversineMeters', () {
     test('known short northward distance ≈ 111 m', () {
       final meters = RunPaceAnalytics.haversineMeters(
@@ -44,10 +45,7 @@ void main() {
       expect(analytics.hasChart, isTrue);
       expect(analytics.samples.length, greaterThan(5));
       expect(analytics.samples.first.distanceMeters, greaterThan(40));
-      expect(
-        analytics.samples.last.distanceMeters,
-        closeTo(1500, 40),
-      );
+      expect(analytics.samples.last.distanceMeters, closeTo(1500, 40));
 
       // Distances are non-decreasing.
       for (var i = 1; i < analytics.samples.length; i++) {
@@ -69,12 +67,63 @@ void main() {
       expect(analytics.avgPaceSecPerKm, 360);
     });
 
+    test('a stop does not create a slow canyon in the pace curve', () {
+      final start = DateTime.utc(2026, 8, 18, 12);
+      // 1 km at 6:00 /km, 90 s standing still, then 1 km at 6:00 /km.
+      final first = _straightPath(
+        start: start,
+        meters: 1000,
+        paceSecPerKm: 360,
+        stepMeters: 10,
+      );
+      final restart = first.last.recordedAt.add(const Duration(seconds: 90));
+      final second = _straightPath(
+        start: restart,
+        meters: 1000,
+        paceSecPerKm: 360,
+        stepMeters: 10,
+      );
+      const metersPerDeg = 111195.0;
+      final points = [
+        ...first,
+        // Stationary jitter-free samples while stopped.
+        for (var i = 1; i <= 9; i++)
+          _point(
+            first.last.lat,
+            0,
+            1000 + i,
+            first.last.recordedAt.add(Duration(seconds: i * 10)),
+          ),
+        for (var i = 0; i < second.length; i++)
+          _point(
+            first.last.lat + second[i].lat,
+            0,
+            2000 + i,
+            second[i].recordedAt,
+          ),
+      ];
+      expect(first.last.lat * metersPerDeg, closeTo(1000, 1));
+
+      final analytics = RunPaceAnalytics.fromTrackPoints(points);
+      final slowest = analytics.samples
+          .map((s) => s.paceSecPerKm)
+          .reduce((a, b) => a > b ? a : b);
+      expect(slowest, lessThan(420));
+      final fastest = analytics.samples
+          .map((s) => s.paceSecPerKm)
+          .reduce((a, b) => a < b ? a : b);
+      expect(fastest, greaterThan(300));
+    });
+
     test('paceSecPerKm helper rejects tiny distance', () {
       expect(RunPaceAnalytics.paceSecPerKm(0.5, 10), isNull);
       expect(RunPaceAnalytics.paceSecPerKm(1000, 360), 360);
     });
   });
 }
+
+RunPaceSample _sample(double meters, double pace) =>
+    RunPaceSample(distanceMeters: meters, paceSecPerKm: pace);
 
 RunTrackPoint _point(double lat, double lng, int seq, DateTime at) {
   return RunTrackPoint(
@@ -119,4 +168,52 @@ List<RunTrackPoint> _straightPath({
     );
   }
   return points;
+}
+
+void _smoothingTests() {
+  group('RunPaceAnalytics.smoothSamples', () {
+    test('a single spike is flattened by the rolling median', () {
+      final samples = [
+        for (var i = 0; i < 9; i++) _sample(i * 100.0, i == 4 ? 720.0 : 360.0),
+      ];
+      final smoothed = RunPaceAnalytics.smoothSamples(samples);
+      expect(smoothed, hasLength(samples.length));
+      expect(smoothed[4].paceSecPerKm, closeTo(360, 1));
+      expect(smoothed[4].distanceMeters, 400);
+    });
+
+    test('removeOutliers drops values far from the median', () {
+      final samples = [
+        for (var i = 0; i < 10; i++) _sample(i * 100.0, 360),
+        _sample(1000, 1500),
+        _sample(1100, 60),
+      ];
+      final kept = RunPaceAnalytics.removeOutliers(samples);
+      expect(kept, hasLength(10));
+    });
+  });
+
+  group('RunPaceAxis', () {
+    test('picks nice ticks and ignores the extreme tail', () {
+      final samples = [
+        for (var i = 0; i < 100; i++) _sample(i * 50.0, 330 + (i % 10) * 4.0),
+        _sample(5000, 900), // one glitch out of 101 samples
+      ];
+      final axis = RunPaceAxis.compute(samples, averagePace: 350);
+      expect(axis.maxPace, lessThan(600));
+      expect(axis.interval, anyOf(15, 30, 60));
+      expect(axis.minPace % axis.interval, 0);
+      expect(axis.maxPace % axis.interval, 0);
+      expect(axis.minPace, lessThanOrEqualTo(330));
+      expect(axis.maxPace, greaterThanOrEqualTo(366));
+      expect(axis.ticks.first, axis.minPace);
+      expect(axis.ticks.last, axis.maxPace);
+    });
+
+    test('falls back to the average when there are no samples', () {
+      final axis = RunPaceAxis.compute(const [], averagePace: 360);
+      expect(axis.minPace, lessThan(360));
+      expect(axis.maxPace, greaterThan(360));
+    });
+  });
 }

@@ -124,7 +124,8 @@ Future<Database> installAiTestDb({bool includeRoutineDayNotes = true}) async {
               raw_point_count INTEGER,
               stored_point_count INTEGER,
               route_quality TEXT,
-              route_codec_version INTEGER
+              route_codec_version INTEGER,
+              gear_id TEXT
           )
         ''');
         await db.execute('''

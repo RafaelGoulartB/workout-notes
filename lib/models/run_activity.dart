@@ -34,6 +34,23 @@ class RunActivity {
   /// 1 once GPS effort metrics have been computed (even if all null).
   final bool effortsComputed;
 
+  /// Route elevation summary (v51). Null for indoor sessions or routes
+  /// without usable altitude.
+  final double? elevationGainMeters;
+  final double? elevationLossMeters;
+  final double? minimumAltitudeMeters;
+  final double? maximumAltitudeMeters;
+
+  /// Mean horizontal GPS accuracy and route quality label (v51).
+  final double? gpsAccuracyMeanMeters;
+  final String? routeQuality;
+
+  /// Running-plan session this activity completed, if any.
+  final String? planWorkoutId;
+
+  /// Shoe / gear used for this activity (`run_gear.id`, v53).
+  final String? gearId;
+
   const RunActivity({
     required this.id,
     this.activityType = CardioActivityType.running,
@@ -61,11 +78,27 @@ class RunActivity {
     this.bestEffortHalfSec,
     this.bestEffortMarathonSec,
     this.effortsComputed = false,
+    this.elevationGainMeters,
+    this.elevationLossMeters,
+    this.minimumAltitudeMeters,
+    this.maximumAltitudeMeters,
+    this.gpsAccuracyMeanMeters,
+    this.routeQuality,
+    this.planWorkoutId,
+    this.gearId,
   });
 
   bool get isCompleted => status == 'completed';
 
+  /// Outdoor GPS run: the only type with routes, splits and best efforts.
   bool get isRun => activityType == CardioActivityType.running;
+
+  /// Outdoor or treadmill run: counts toward running volume and plans.
+  bool get isRunning => activityType.isRunning;
+
+  bool get isIndoor => activityType.isIndoor;
+
+  bool get isTreadmill => activityType == CardioActivityType.treadmill;
 
   bool get isStationaryBike =>
       activityType == CardioActivityType.stationaryBike;
@@ -106,6 +139,17 @@ class RunActivity {
       bestEffortHalfSec: (map['best_effort_half_sec'] as num?)?.toInt(),
       bestEffortMarathonSec: (map['best_effort_marathon_sec'] as num?)?.toInt(),
       effortsComputed: (map['efforts_computed'] as num?)?.toInt() == 1,
+      elevationGainMeters: (map['elevation_gain_meters'] as num?)?.toDouble(),
+      elevationLossMeters: (map['elevation_loss_meters'] as num?)?.toDouble(),
+      minimumAltitudeMeters: (map['minimum_altitude_meters'] as num?)
+          ?.toDouble(),
+      maximumAltitudeMeters: (map['maximum_altitude_meters'] as num?)
+          ?.toDouble(),
+      gpsAccuracyMeanMeters: (map['gps_accuracy_mean_meters'] as num?)
+          ?.toDouble(),
+      routeQuality: map['route_quality'] as String?,
+      planWorkoutId: map['plan_workout_id'] as String?,
+      gearId: map['gear_id'] as String?,
     );
   }
 
@@ -136,6 +180,18 @@ class RunActivity {
     'best_effort_half_sec': bestEffortHalfSec,
     'best_effort_marathon_sec': bestEffortMarathonSec,
     'efforts_computed': effortsComputed ? 1 : 0,
+    // Optional columns written by later steps of the import; only emitted when
+    // known so an insert never clobbers them with null.
+    if (elevationGainMeters != null)
+      'elevation_gain_meters': elevationGainMeters,
+    if (elevationLossMeters != null)
+      'elevation_loss_meters': elevationLossMeters,
+    if (minimumAltitudeMeters != null)
+      'minimum_altitude_meters': minimumAltitudeMeters,
+    if (maximumAltitudeMeters != null)
+      'maximum_altitude_meters': maximumAltitudeMeters,
+    if (planWorkoutId != null) 'plan_workout_id': planWorkoutId,
+    if (gearId != null) 'gear_id': gearId,
   };
 
   RunActivity copyWith({
@@ -152,6 +208,8 @@ class RunActivity {
     int? bestEffortHalfSec,
     int? bestEffortMarathonSec,
     bool? effortsComputed,
+    String? gearId,
+    bool clearGear = false,
   }) {
     return RunActivity(
       id: id,
@@ -182,6 +240,14 @@ class RunActivity {
       bestEffortMarathonSec:
           bestEffortMarathonSec ?? this.bestEffortMarathonSec,
       effortsComputed: effortsComputed ?? this.effortsComputed,
+      elevationGainMeters: elevationGainMeters,
+      elevationLossMeters: elevationLossMeters,
+      minimumAltitudeMeters: minimumAltitudeMeters,
+      maximumAltitudeMeters: maximumAltitudeMeters,
+      gpsAccuracyMeanMeters: gpsAccuracyMeanMeters,
+      routeQuality: routeQuality,
+      planWorkoutId: planWorkoutId,
+      gearId: clearGear ? null : (gearId ?? this.gearId),
     );
   }
 }

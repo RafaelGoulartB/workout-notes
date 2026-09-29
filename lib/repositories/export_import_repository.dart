@@ -12,7 +12,7 @@ import 'package:workout_notes/services/run_route_codec.dart';
 /// inserts the backup rows inside a single transaction so the database
 /// ends up in an exact copy of the exported state.
 class ExportImportRepository extends BaseRepository {
-  static const int currentBackupVersion = 17;
+  static const int currentBackupVersion = 18;
   static const int minimumSupportedBackupVersion = 2;
   static const String backupType = 'workout_notes_full_backup';
 
@@ -58,6 +58,8 @@ class ExportImportRepository extends BaseRepository {
     'scheduled_runs',
     'run_activity_steps',
     'run_plan_adaptations',
+    'run_gear',
+    'run_laps',
     'settings',
   ];
 
@@ -67,6 +69,8 @@ class ExportImportRepository extends BaseRepository {
     'run_route_data': 16,
     'run_splits': 16,
     'run_plan_adaptations': 17,
+    'run_gear': 18,
+    'run_laps': 18,
   };
 
   /// Collections a backup of [version] is expected to carry.
@@ -138,6 +142,9 @@ class ExportImportRepository extends BaseRepository {
       'scheduled_runs': await _queryIfExists(db, 'scheduled_runs'),
       'run_activity_steps': await _queryIfExists(db, 'run_activity_steps'),
       'run_plan_adaptations': await _queryIfExists(db, 'run_plan_adaptations'),
+      // Shoes and manual laps (backup v18).
+      'run_gear': await _queryIfExists(db, 'run_gear'),
+      'run_laps': await _queryIfExists(db, 'run_laps'),
       'settings': await db.query('app_settings'),
       // Platform preferences and portable file bytes are filled by
       // ExportService. Empty defaults keep this envelope valid for repository
@@ -205,10 +212,12 @@ class ExportImportRepository extends BaseRepository {
         'run_plan_workouts',
         'run_plan_adaptations',
         'run_plans',
+        'run_laps',
         'run_splits',
         'run_route_data',
         'run_track_points',
         'run_activities',
+        'run_gear',
       ]) {
         if (await _tableExists(txn, table)) {
           await txn.delete(table);
@@ -288,6 +297,7 @@ class ExportImportRepository extends BaseRepository {
         'phase_routine_links',
         'periodization_checkins',
         // Parents before children, mirroring the clear order above.
+        'run_gear',
         'run_activities',
         'run_track_points',
       ]) {
@@ -300,6 +310,9 @@ class ExportImportRepository extends BaseRepository {
       }
       if (await _tableExists(txn, 'run_splits')) {
         totalRows += await _insertAll(txn, 'run_splits', data['run_splits']);
+      }
+      if (await _tableExists(txn, 'run_laps')) {
+        totalRows += await _insertAll(txn, 'run_laps', data['run_laps']);
       }
       for (final table in [
         'run_plans',
@@ -747,10 +760,12 @@ class ExportImportRepository extends BaseRepository {
         'run_plan_workouts',
         'run_plan_adaptations',
         'run_plans',
+        'run_laps',
         'run_splits',
         'run_route_data',
         'run_track_points',
         'run_activities',
+        'run_gear',
       ]) {
         if (await _tableExists(txn, table)) {
           await txn.delete(table);

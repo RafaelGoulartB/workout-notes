@@ -16,6 +16,7 @@ import '../repositories/traditional_alarm_repository.dart';
 import '../repositories/periodization_repository.dart';
 import '../repositories/run_repository.dart';
 import '../repositories/run_plan_repository.dart';
+import '../repositories/run_gear_repository.dart';
 import '../models/sleep_entry.dart';
 import '../models/sleep_monitor_segment.dart';
 import '../models/sleep_monitor_session.dart';
@@ -31,7 +32,7 @@ import '../utils/nutrition_conversion.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 52;
+  static const _dbVersion = 53;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -57,6 +58,7 @@ class DatabaseHelper {
       PeriodizationRepository();
   late final RunRepository runRepo = RunRepository();
   late final RunPlanRepository runPlanRepo = RunPlanRepository();
+  late final RunGearRepository runGearRepo = RunGearRepository();
 
   DatabaseHelper._();
 

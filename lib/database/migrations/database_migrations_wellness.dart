@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../database_nutrition_schema.dart';
+import '../database_run_extras_schema.dart';
 import '../database_run_plan_schema.dart';
 import '../database_run_route_schema.dart';
 import '../database_seed.dart';
@@ -581,6 +582,15 @@ abstract final class DatabaseWellnessMigrations {
       }
       try {
         await DatabaseRunPlanSchema.createAdaptations(db);
+      } catch (_) {}
+    }
+    if (oldVersion < 53) {
+      // Running gear (shoe mileage) and manual laps recorded during a run.
+      try {
+        await db.execute('ALTER TABLE run_activities ADD COLUMN gear_id TEXT');
+      } catch (_) {}
+      try {
+        await DatabaseRunExtrasSchema.create(db);
       } catch (_) {}
     }
   }
