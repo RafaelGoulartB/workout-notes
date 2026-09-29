@@ -111,10 +111,14 @@ class _AiRoutineProposalCardState extends State<AiRoutineProposalCard> {
                       ],
                     ),
                   ),
-                  _StatusChip(
+                  AppPill(
                     label: _statusLabel(l10n, proposal.status),
-                    color: colors.$1,
-                    foreground: colors.$2,
+                    background: colors.$1,
+                    color: colors.$2,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 5,
+                    ),
                   ),
                 ],
               ),
@@ -130,20 +134,17 @@ class _AiRoutineProposalCardState extends State<AiRoutineProposalCard> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _MetricChip(
+                  AppMetricChip(
                     icon: Icons.calendar_view_week_rounded,
-                    value: '${after['days'] ?? 0}',
-                    label: l10n.commonDays,
+                    text: '${after['days'] ?? 0} ${l10n.commonDays}',
                   ),
-                  _MetricChip(
+                  AppMetricChip(
                     icon: Icons.fitness_center_rounded,
-                    value: '${after['exercises'] ?? 0}',
-                    label: l10n.commonExercises,
+                    text: '${after['exercises'] ?? 0} ${l10n.commonExercises}',
                   ),
-                  _MetricChip(
+                  AppMetricChip(
                     icon: Icons.repeat_rounded,
-                    value: '${after['sets'] ?? 0}',
-                    label: l10n.commonSets,
+                    text: '${after['sets'] ?? 0} ${l10n.commonSets}',
                   ),
                 ],
               ),
@@ -291,59 +292,6 @@ class _AiRoutineProposalCardState extends State<AiRoutineProposalCard> {
         AiRoutineProposalStatus.failed =>
           proposal.errorMessage ?? l.aiChatErrorGeneric,
       };
-}
-
-class _StatusChip extends StatelessWidget {
-  final String label;
-  final Color color;
-  final Color foreground;
-  const _StatusChip({
-    required this.label,
-    required this.color,
-    required this.foreground,
-  });
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-    decoration: BoxDecoration(
-      color: color,
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: Text(
-      label,
-      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-        color: foreground,
-        fontWeight: FontWeight.w700,
-      ),
-    ),
-  );
-}
-
-class _MetricChip extends StatelessWidget {
-  final IconData icon;
-  final String value;
-  final String label;
-  const _MetricChip({
-    required this.icon,
-    required this.value,
-    required this.label,
-  });
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 15),
-        const SizedBox(width: 4),
-        Text('$value $label', style: Theme.of(context).textTheme.labelMedium),
-      ],
-    ),
-  );
 }
 
 class _Details extends StatelessWidget {

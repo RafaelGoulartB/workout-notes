@@ -9,6 +9,7 @@ import 'package:workout_notes/models/nutrition/meal_log_item.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/utils/nutrition_conversion.dart';
+import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
 
 /// Helper to present the quantity modal for [food]. Returns the
 /// user's selection or null when dismissed.
@@ -966,7 +967,7 @@ class _PreviewSection extends StatelessWidget {
                 child: _MacroPill(
                   label: loc.nutritionProgressProtein,
                   value: _formatMacro(preview!.proteinG),
-                  color: _proteinMacroColor,
+                  color: NutritionMacroColors.protein,
                 ),
               ),
               const SizedBox(width: 8),
@@ -974,7 +975,7 @@ class _PreviewSection extends StatelessWidget {
                 child: _MacroPill(
                   label: loc.nutritionProgressCarbs,
                   value: _formatMacro(preview!.carbsG),
-                  color: _carbMacroColor,
+                  color: NutritionMacroColors.carbs,
                 ),
               ),
               const SizedBox(width: 8),
@@ -982,7 +983,7 @@ class _PreviewSection extends StatelessWidget {
                 child: _MacroPill(
                   label: loc.nutritionProgressFat,
                   value: _formatMacro(preview!.fatG),
-                  color: _fatMacroColor,
+                  color: NutritionMacroColors.fat,
                 ),
               ),
             ],
@@ -1034,9 +1035,6 @@ class _PreviewSection extends StatelessWidget {
   }
 }
 
-const Color _carbMacroColor = Color(0xFF20A39E);
-const Color _proteinMacroColor = Color(0xFFF29E38);
-const Color _fatMacroColor = Color(0xFF8E44AD);
 
 class _FatDetailChip extends StatelessWidget {
   final String label;

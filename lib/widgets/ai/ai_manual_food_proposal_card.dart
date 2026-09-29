@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/nutrition/ai_manual_food_proposal.dart';
 import '../../models/nutrition/nutrition_values.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class AiManualFoodProposalCard extends StatefulWidget {
   final AiManualFoodProposal proposal;
@@ -103,7 +104,7 @@ class _AiManualFoodProposalCardState extends State<AiManualFoodProposalCard> {
                       ],
                     ),
                   ),
-                  _StatusChip(
+                  AppPill(
                     label: switch (proposal.status) {
                       AiManualFoodProposalStatus.awaitingApproval =>
                         l10n.aiFoodProposalAwaiting,
@@ -113,6 +114,10 @@ class _AiManualFoodProposalCardState extends State<AiManualFoodProposalCard> {
                         l10n.aiFoodProposalRejected,
                     },
                     color: statusColor,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 5,
+                    ),
                   ),
                 ],
               ),
@@ -145,21 +150,21 @@ class _AiManualFoodProposalCardState extends State<AiManualFoodProposalCard> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _MetricChip(
-                    label: l10n.nutritionProgressCalories,
-                    value: _value(draft.values.calories, 'kcal'),
+                  AppMetricChip(
+                    text:
+                        '${l10n.nutritionProgressCalories}: ${_value(draft.values.calories, 'kcal')}',
                   ),
-                  _MetricChip(
-                    label: l10n.nutritionProgressProtein,
-                    value: _value(draft.values.proteinG, 'g'),
+                  AppMetricChip(
+                    text:
+                        '${l10n.nutritionProgressProtein}: ${_value(draft.values.proteinG, 'g')}',
                   ),
-                  _MetricChip(
-                    label: l10n.nutritionProgressCarbs,
-                    value: _value(draft.values.carbsG, 'g'),
+                  AppMetricChip(
+                    text:
+                        '${l10n.nutritionProgressCarbs}: ${_value(draft.values.carbsG, 'g')}',
                   ),
-                  _MetricChip(
-                    label: l10n.nutritionProgressFat,
-                    value: _value(draft.values.fatG, 'g'),
+                  AppMetricChip(
+                    text:
+                        '${l10n.nutritionProgressFat}: ${_value(draft.values.fatG, 'g')}',
                   ),
                 ],
               ),
@@ -256,7 +261,7 @@ class _Details extends StatelessWidget {
               runSpacing: 8,
               children: [
                 for (final nutrient in nutrients)
-                  _MetricChip(label: nutrient.$1, value: nutrient.$2),
+                  AppMetricChip(text: '${nutrient.$1}: ${nutrient.$2}'),
               ],
             ),
           ],
@@ -325,49 +330,6 @@ class _Details extends StatelessWidget {
     if (values.vitaminB12Ug != null)
       (l10n.nutritionProgressVitaminB12, _value(values.vitaminB12Ug, 'µg')),
   ];
-}
-
-class _MetricChip extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _MetricChip({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text('$label: $value', style: theme.textTheme.labelMedium),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  final String label;
-  final Color color;
-
-  const _StatusChip({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-    decoration: BoxDecoration(
-      color: color.withAlpha(28),
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: Text(
-      label,
-      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-        color: color,
-        fontWeight: FontWeight.w700,
-      ),
-    ),
-  );
 }
 
 String _value(double? value, String unit) =>

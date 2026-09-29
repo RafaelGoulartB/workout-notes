@@ -146,20 +146,114 @@ class AppStatDivider extends StatelessWidget {
   }
 }
 
-/// Row of [AppStatTile]s separated by thin vertical dividers.
+/// Row of equally wide stats separated by thin vertical dividers.
 class AppStatRow extends StatelessWidget {
   final List<Widget> children;
 
-  const AppStatRow({super.key, required this.children});
+  /// Divider between the stats; the soft 34 px one by default.
+  final Widget? divider;
+
+  const AppStatRow({super.key, required this.children, this.divider});
 
   @override
   Widget build(BuildContext context) {
-    final divider = AppUi.divider(Theme.of(context).colorScheme);
+    final separator =
+        divider ??
+        AppStatDivider(
+          height: 34,
+          margin: 8,
+          color: AppUi.divider(Theme.of(context).colorScheme),
+        );
     return Row(
       children: [
         for (var i = 0; i < children.length; i++) ...[
-          if (i > 0) AppStatDivider(height: 34, margin: 8, color: divider),
+          if (i > 0) separator,
           Expanded(child: children[i]),
+        ],
+      ],
+    );
+  }
+}
+
+/// Left-aligned stat: a value with an optional smaller [unit], its label and
+/// an optional thin progress bar (macros, sleep efficiency...). Meant to sit
+/// in an [AppStatRow].
+class AppProgressStat extends StatelessWidget {
+  final String value;
+  final String? unit;
+  final String label;
+
+  /// 0..1 fill of the bar under the label; no bar when null.
+  final double? progress;
+  final Color? color;
+
+  const AppProgressStat({
+    super.key,
+    required this.value,
+    this.unit,
+    required this.label,
+    this.progress,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final tint = color ?? colors.primary;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                value,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  height: 1.0,
+                  fontFeatures: AppUi.tabular,
+                ),
+              ),
+              if (unit != null) ...[
+                const SizedBox(width: 2),
+                Text(
+                  unit!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: colors.onSurfaceVariant,
+          ),
+        ),
+        if (progress != null) ...[
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: progress!.clamp(0.0, 1.0),
+              minHeight: 3,
+              backgroundColor: tint.withAlpha(35),
+              color: tint,
+            ),
+          ),
         ],
       ],
     );

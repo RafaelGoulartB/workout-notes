@@ -127,9 +127,10 @@ class SleepLastNightCard extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 16),
-            SleepStatRow(
+            AppStatRow(
+              divider: const AppStatDivider(),
               children: [
-                SleepStat(
+                AppProgressStat(
                   value: entry.efficiency == null
                       ? '--'
                       : '${entry.efficiency!.round()}%',
@@ -139,7 +140,7 @@ class SleepLastNightCard extends StatelessWidget {
                       : entry.efficiency! / 100,
                   color: SleepUi.efficiencyColor(colors, entry.efficiency),
                 ),
-                SleepStat(
+                AppProgressStat(
                   value: SleepUi.duration(loc, entry.timeInBedMinutes),
                   label: loc.sleepMetricTimeInBed,
                   progress: entry.timeInBedMinutes == null
@@ -147,7 +148,7 @@ class SleepLastNightCard extends StatelessWidget {
                       : entry.timeInBedMinutes! / goalMinutes,
                   color: colors.secondary,
                 ),
-                SleepStat(
+                AppProgressStat(
                   value: SleepUi.duration(loc, goalMinutes),
                   label: loc.sleepGoalTarget,
                   progress: ratio,

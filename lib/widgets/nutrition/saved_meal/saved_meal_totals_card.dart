@@ -97,30 +97,23 @@ class SavedMealTotalsCard extends StatelessWidget {
           else ...[
             SavedMealCaloriesRow(calories: totals!.calories ?? 0),
             const SizedBox(height: 14),
-            Row(
+            AppStatRow(
+              divider: const AppStatDivider(),
               children: [
-                Expanded(
-                  child: SavedMealMacroColumn(
-                    label: loc.nutritionProgressProtein,
-                    grams: totals!.proteinG ?? 0,
-                    color: NutritionMacroColors.protein,
-                  ),
+                _macro(
+                  loc.nutritionProgressProtein,
+                  totals!.proteinG ?? 0,
+                  NutritionMacroColors.protein,
                 ),
-                const AppStatDivider(),
-                Expanded(
-                  child: SavedMealMacroColumn(
-                    label: loc.nutritionProgressCarbs,
-                    grams: totals!.carbsG ?? 0,
-                    color: NutritionMacroColors.carbs,
-                  ),
+                _macro(
+                  loc.nutritionProgressCarbs,
+                  totals!.carbsG ?? 0,
+                  NutritionMacroColors.carbs,
                 ),
-                const AppStatDivider(),
-                Expanded(
-                  child: SavedMealMacroColumn(
-                    label: loc.nutritionProgressFat,
-                    grams: totals!.fatG ?? 0,
-                    color: NutritionMacroColors.fat,
-                  ),
+                _macro(
+                  loc.nutritionProgressFat,
+                  totals!.fatG ?? 0,
+                  NutritionMacroColors.fat,
                 ),
               ],
             ),
@@ -181,75 +174,6 @@ class SavedMealCaloriesRow extends StatelessWidget {
   }
 }
 
-class SavedMealMacroColumn extends StatelessWidget {
-  final String label;
-  final double grams;
-  final Color color;
-
-  const SavedMealMacroColumn({
-    super.key,
-    required this.label,
-    required this.grams,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              _formatGrams(grams),
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                height: 1.0,
-              ),
-            ),
-            const SizedBox(width: 2),
-            Text(
-              'g',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            value: grams > 0 ? 1.0 : 0.0,
-            minHeight: 3,
-            backgroundColor: color.withAlpha(35),
-            color: color,
-          ),
-        ),
-      ],
-    );
-  }
-
-  static String _formatGrams(double value) {
-    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
-    return value.toStringAsFixed(1);
-  }
-}
-
 class SavedMealPerPortionRow extends StatelessWidget {
   final NutritionValues totals;
   final double portions;
@@ -295,3 +219,11 @@ class SavedMealPerPortionRow extends StatelessWidget {
     return value.toStringAsFixed(1);
   }
 }
+
+Widget _macro(String label, double grams, Color color) => AppProgressStat(
+  value: nutritionNumber(grams),
+  unit: 'g',
+  label: label,
+  progress: grams > 0 ? 1 : 0,
+  color: color,
+);

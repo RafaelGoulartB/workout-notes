@@ -5,6 +5,7 @@ import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/widgets/nutrition/progress/progress_shared.dart';
 import 'package:workout_notes/models/nutrition/nutrition_progress.dart';
 import 'package:workout_notes/widgets/nutrition/progress/average_nutrients_card.dart';
+import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
 
 class MacroBalanceCard extends StatelessWidget {
   final MacroSummary? summary;
@@ -59,7 +60,7 @@ class MacroBalanceCard extends StatelessWidget {
                   percent: proteinPct,
                   grams: data.proteinG,
                   goalG: goal?.proteinG,
-                  color: const Color(0xFFF29E38),
+                  color: NutritionMacroColors.protein,
                 ),
                 const SizedBox(height: 10),
                 MacroLegendRow(
@@ -67,7 +68,7 @@ class MacroBalanceCard extends StatelessWidget {
                   percent: carbsPct,
                   grams: data.carbsG,
                   goalG: goal?.carbsG,
-                  color: const Color(0xFF20A39E),
+                  color: NutritionMacroColors.carbs,
                 ),
                 const SizedBox(height: 10),
                 MacroLegendRow(
@@ -75,7 +76,7 @@ class MacroBalanceCard extends StatelessWidget {
                   percent: fatPct,
                   grams: data.fatG,
                   goalG: goal?.fatG,
-                  color: const Color(0xFF8E44AD),
+                  color: NutritionMacroColors.fat,
                 ),
               ],
             ),
@@ -107,19 +108,19 @@ class MacroDonut extends StatelessWidget {
       sections: [
         PieChartSectionData(
           value: proteinPct,
-          color: const Color(0xFFF29E38),
+          color: NutritionMacroColors.protein,
           radius: 22,
           showTitle: false,
         ),
         PieChartSectionData(
           value: carbsPct,
-          color: const Color(0xFF20A39E),
+          color: NutritionMacroColors.carbs,
           radius: 22,
           showTitle: false,
         ),
         PieChartSectionData(
           value: fatPct,
-          color: const Color(0xFF8E44AD),
+          color: NutritionMacroColors.fat,
           radius: 22,
           showTitle: false,
         ),
