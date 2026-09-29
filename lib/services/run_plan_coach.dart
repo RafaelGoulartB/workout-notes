@@ -12,6 +12,7 @@ import 'package:workout_notes/services/run_plan_adaptation.dart';
 import 'package:workout_notes/services/run_plan_composer.dart';
 import 'package:workout_notes/services/run_plan_templates.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Weekly review of the plan being followed: turns what was actually run
 /// into a [RunPlanAdaptationProposal], and applies it by re-planning the rest
@@ -28,8 +29,8 @@ class RunPlanCoach {
   final RunRepository _runs;
 
   RunPlanCoach({RunPlanRepository? plans, RunRepository? runs})
-    : _plans = plans ?? RunPlanRepository(),
-      _runs = runs ?? RunRepository();
+    : _plans = plans ?? DatabaseHelper.instance.runPlanRepo,
+      _runs = runs ?? DatabaseHelper.instance.runRepo;
 
   /// The suggestion for [plan]'s current week, or null when there is nothing
   /// to change, it was already answered, or the plan is not running.

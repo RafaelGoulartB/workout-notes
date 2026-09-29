@@ -9,6 +9,7 @@ import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 import 'periodization_phase_screen.dart';
 import 'periodization_plan_editor_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// A plan that is not necessarily the active one: its roadmap and phases,
 /// plus activating, editing, finishing, archiving and deleting it.
@@ -23,7 +24,7 @@ class PeriodizationPlanScreen extends StatefulWidget {
 }
 
 class _PeriodizationPlanScreenState extends State<PeriodizationPlanScreen> {
-  final _repository = PeriodizationRepository();
+  final _repository = DatabaseHelper.instance.periodizationRepo;
   PlanOverviewData? _data;
 
   DateTime get _today {

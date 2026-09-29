@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/repositories/periodization_repository.dart';
-import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/screens/workout/active_workout_screen.dart';
 import 'package:workout_notes/screens/workout/routine_day_editor_screen.dart';
 import 'package:workout_notes/screens/workout/routine_form_screen.dart';
@@ -9,6 +7,7 @@ import 'package:workout_notes/utils/strength_routine_summary.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_list_cards.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_sheets.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 export 'package:workout_notes/screens/workout/routine_form_screen.dart';
 
@@ -22,7 +21,7 @@ class RoutinesScreen extends StatefulWidget {
 }
 
 class _RoutinesScreenState extends State<RoutinesScreen> {
-  final _repo = RoutineRepository();
+  final _repo = DatabaseHelper.instance.routineRepo;
   List<RoutineSummary> _routines = const [];
   String? _activeId;
   RoutineInUseReason _reason = RoutineInUseReason.recent;
@@ -40,7 +39,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
     String? plannedRoutineId;
     String? plannedDayId;
     try {
-      final suggestion = await PeriodizationRepository().getRoutineSuggestion(
+      final suggestion = await DatabaseHelper.instance.periodizationRepo.getRoutineSuggestion(
         DateTime.now(),
       );
       plannedRoutineId = suggestion?.routineId;

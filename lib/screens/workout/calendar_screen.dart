@@ -8,13 +8,10 @@ import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/services/run_week_balance.dart';
 import 'package:workout_notes/widgets/run/run_balance_dialog.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import '../../repositories/run_plan_repository.dart';
-import '../../repositories/run_repository.dart';
-import '../../repositories/workout_repository.dart';
-import '../../repositories/routine_repository.dart';
 import 'workout_detail_screen.dart';
 import 'future_workout_planner_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -24,10 +21,10 @@ class CalendarScreen extends StatefulWidget {
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
-  final _workoutRepo = WorkoutRepository();
-  final _routineRepo = RoutineRepository();
-  final _runRepo = RunRepository();
-  final _runPlanRepo = RunPlanRepository();
+  final _workoutRepo = DatabaseHelper.instance.workoutRepo;
+  final _routineRepo = DatabaseHelper.instance.routineRepo;
+  final _runRepo = DatabaseHelper.instance.runRepo;
+  final _runPlanRepo = DatabaseHelper.instance.runPlanRepo;
   DateTime _selectedDate = DateTime.now();
   int _currentMonth = DateTime.now().month;
   int _currentYear = DateTime.now().year;

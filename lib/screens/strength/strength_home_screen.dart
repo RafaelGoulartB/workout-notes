@@ -6,8 +6,6 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/goal.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
-import 'package:workout_notes/repositories/strength_repository.dart';
-import 'package:workout_notes/repositories/workout_repository.dart';
 import 'package:workout_notes/screens/strength/strength_history_screen.dart';
 import 'package:workout_notes/screens/strength/strength_insights_screen.dart';
 import 'package:workout_notes/screens/strength/strength_records_screen.dart';
@@ -47,9 +45,9 @@ class StrengthHomeScreen extends StatefulWidget {
 }
 
 class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
-  final _repo = StrengthRepository();
-  final _recordsRepo = StrengthRecordsRepository();
-  final _workoutRepo = WorkoutRepository();
+  final _repo = DatabaseHelper.instance.strengthRepo;
+  final _recordsRepo = DatabaseHelper.instance.strengthRecordsRepo;
+  final _workoutRepo = DatabaseHelper.instance.workoutRepo;
   final _todayService = StrengthTodayService();
 
   List<StrengthWorkoutSummary> _finished = const [];

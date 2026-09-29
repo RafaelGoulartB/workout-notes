@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
-import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/screens/run/plan_editor/run_plan_editor_blocks.dart';
 import 'package:workout_notes/screens/run/plan_editor/run_plan_editor_sheets.dart';
 import 'package:workout_notes/screens/run/plan_editor/run_plan_editor_summary.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Session editor — the running counterpart of [RoutineDayEditorScreen].
 /// A session is either a continuous run (just a target) or a structured one
@@ -26,7 +26,7 @@ class RunPlanWorkoutEditorScreen extends StatefulWidget {
 
 class _RunPlanWorkoutEditorScreenState
     extends State<RunPlanWorkoutEditorScreen> {
-  final _repo = RunPlanRepository();
+  final _repo = DatabaseHelper.instance.runPlanRepo;
   RunPlanWorkout? _workout;
   bool _loading = true;
 

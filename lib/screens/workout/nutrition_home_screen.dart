@@ -31,6 +31,7 @@ import 'nutrition_settings_screen.dart';
 import 'settings_screen.dart';
 import 'saved_meals_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Nutrition dashboard. Shows the day's totals at a glance, a tools
 /// grid (progress, saved meals, food library, settings) and a
@@ -46,7 +47,7 @@ class NutritionHomeScreen extends StatefulWidget {
 }
 
 class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
-  final NutritionRepository _repository = NutritionRepository();
+  final NutritionRepository _repository = DatabaseHelper.instance.nutritionRepo;
   final NutritionGateway _gateway = OpenFoodFactsGateway.instance;
   final ScrollController _scrollController = ScrollController();
 

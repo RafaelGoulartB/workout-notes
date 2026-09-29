@@ -7,6 +7,7 @@ import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/models/run_session_context.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// In-app timer for indoor sessions: stationary bike and treadmill.
 ///
@@ -25,7 +26,7 @@ class StationaryBikeTrackingService extends ChangeNotifier {
 
   StationaryBikeTrackingService._();
 
-  final RunRepository _repository = RunRepository();
+  final RunRepository _repository = DatabaseHelper.instance.runRepo;
   RunTrackingState _state = const RunTrackingState.initial(supported: true);
   CardioActivityType _activityType = CardioActivityType.stationaryBike;
 

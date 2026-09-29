@@ -1,4 +1,5 @@
 import '../repositories/settings_repository.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Persists the user's target amount of sleep per night.
 ///
@@ -7,7 +8,7 @@ import '../repositories/settings_repository.dart';
 /// dashboard can compare a night consistently with the configured target.
 class SleepGoalService {
   SleepGoalService({SettingsRepository? settings})
-    : _settings = settings ?? SettingsRepository();
+    : _settings = settings ?? DatabaseHelper.instance.settingsRepo;
 
   static const settingKey = 'sleep_goal_minutes';
   static const defaultGoalMinutes = 480;

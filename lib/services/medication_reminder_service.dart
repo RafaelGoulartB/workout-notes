@@ -5,6 +5,7 @@ import '../models/medication.dart';
 import '../repositories/medication_repository.dart';
 import 'traditional_alarm_service.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Where one of today's doses stands.
 enum MedicationDoseState {
@@ -54,7 +55,7 @@ class MedicationReminderService extends ChangeNotifier {
       MedicationReminderService._();
   static const _channel = MethodChannel('workout_notes/medication/methods');
 
-  MedicationRepository _repository = MedicationRepository();
+  MedicationRepository _repository = DatabaseHelper.instance.medicationRepo;
   DateTime Function() _clock = DateTime.now;
 
   List<Medication> _medications = const [];
@@ -69,7 +70,7 @@ class MedicationReminderService extends ChangeNotifier {
     MedicationRepository? repository,
     DateTime Function()? clock,
   }) {
-    _repository = repository ?? MedicationRepository();
+    _repository = repository ?? DatabaseHelper.instance.medicationRepo;
     _clock = clock ?? DateTime.now;
     _medications = const [];
     _todayDoses = const [];

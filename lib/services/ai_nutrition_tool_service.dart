@@ -28,9 +28,9 @@ class AiNutritionToolService {
     PeriodizationRepository? periodizationRepository,
     DateTime Function()? now,
   }) : db = db ?? DatabaseHelper.instance,
-       nutritionRepository = nutritionRepository ?? NutritionRepository(),
+       nutritionRepository = nutritionRepository ?? DatabaseHelper.instance.nutritionRepo,
        periodizationRepository =
-           periodizationRepository ?? PeriodizationRepository(),
+           periodizationRepository ?? DatabaseHelper.instance.periodizationRepo,
        _now = now ?? DateTime.now;
 
   Future<Map<String, dynamic>> diaryDay({String? date}) async {

@@ -453,8 +453,8 @@ class RunTodayService {
   final RunRepository _runRepo;
 
   RunTodayService({RunPlanRepository? planRepo, RunRepository? runRepo})
-    : _planRepo = planRepo ?? RunPlanRepository(),
-      _runRepo = runRepo ?? RunRepository();
+    : _planRepo = planRepo ?? DatabaseHelper.instance.runPlanRepo,
+      _runRepo = runRepo ?? DatabaseHelper.instance.runRepo;
 
   Future<RunHomeSnapshot> load({
     DateTime? now,

@@ -32,8 +32,8 @@ class AiRunToolService {
     RunPlanRepository? plans,
     DateTime Function()? now,
   }) : db = db ?? DatabaseHelper.instance,
-       activities = activities ?? RunRepository(),
-       plans = plans ?? RunPlanRepository(),
+       activities = activities ?? DatabaseHelper.instance.runRepo,
+       plans = plans ?? DatabaseHelper.instance.runPlanRepo,
        _now = now ?? DateTime.now;
 
   Future<Map<String, dynamic>> listActivities({

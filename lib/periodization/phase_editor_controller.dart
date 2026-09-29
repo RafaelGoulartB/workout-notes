@@ -15,6 +15,7 @@ import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Per-week deviation from the phase targets: a label ("Deload", "Refeed")
 /// and/or different calories for training and rest days.
@@ -47,7 +48,7 @@ class PhaseEditorController extends ChangeNotifier {
     PeriodizationRepository? repository,
     DateTime? today,
   }) : _phase = phase,
-       _repository = repository ?? PeriodizationRepository(),
+       _repository = repository ?? DatabaseHelper.instance.periodizationRepo,
        _today = today ?? DateTime.now() {
     name.text = phase.name;
     intent.text = phase.intent ?? '';
@@ -131,13 +132,13 @@ class PhaseEditorController extends ChangeNotifier {
     NutritionRepository? nutritionRepository,
     BodyMeasurementRepository? bodyRepository,
   }) async {
-    final routineRepo = routineRepository ?? RoutineRepository();
+    final routineRepo = routineRepository ?? DatabaseHelper.instance.routineRepo;
     final results = await Future.wait<Object?>([
       routineRepo.getRoutines(),
       routineRepo.getRoutineDayNames(),
-      (runPlanRepository ?? RunPlanRepository()).listPlans(hydrate: true),
-      (nutritionRepository ?? NutritionRepository()).getActiveGoal(),
-      (bodyRepository ?? BodyMeasurementRepository()).getLatestWeightKg(),
+      (runPlanRepository ?? DatabaseHelper.instance.runPlanRepo).listPlans(hydrate: true),
+      (nutritionRepository ?? DatabaseHelper.instance.nutritionRepo).getActiveGoal(),
+      (bodyRepository ?? DatabaseHelper.instance.bodyMeasurementRepo).getLatestWeightKg(),
       _repository.getWeeklyTargets(_phase),
       _repository.getPhases(_phase.planId),
     ]);

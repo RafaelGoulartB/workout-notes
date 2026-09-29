@@ -8,6 +8,7 @@ import '../../widgets/exercise_picker_sheet.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Screen for editing a completed (or in-progress) workout.
 ///
@@ -28,7 +29,7 @@ class EditWorkoutScreen extends StatefulWidget {
 }
 
 class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
-  final _workoutRepo = WorkoutRepository();
+  final _workoutRepo = DatabaseHelper.instance.workoutRepo;
   final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
   final _commentController = TextEditingController();
 

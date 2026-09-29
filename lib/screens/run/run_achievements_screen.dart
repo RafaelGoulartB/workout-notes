@@ -3,7 +3,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_achievement.dart';
-import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/services/run_pace_calculator.dart';
@@ -13,6 +12,7 @@ import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/run/run_achievements_section.dart';
 import 'package:workout_notes/widgets/run/run_medal_badge.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Complete, all-time personal-record board for outdoor GPS runs.
 class RunAchievementsScreen extends StatefulWidget {
@@ -23,7 +23,7 @@ class RunAchievementsScreen extends StatefulWidget {
 }
 
 class _RunAchievementsScreenState extends State<RunAchievementsScreen> {
-  final _repository = RunRepository();
+  final _repository = DatabaseHelper.instance.runRepo;
   RunAchievementBoard _board = RunAchievementBoard.empty;
   bool _loading = true;
 

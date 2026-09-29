@@ -41,7 +41,7 @@ class GoalsSection extends StatefulWidget {
 }
 
 class _GoalsSectionState extends State<GoalsSection> {
-  final GoalRepository _goalRepo = GoalRepository();
+  final GoalRepository _goalRepo = DatabaseHelper.instance.goalRepo;
   List<Goal> _goals = [];
   final Map<String, GoalProgress> _progressByGoal = {};
   final _generation = LoadGeneration();

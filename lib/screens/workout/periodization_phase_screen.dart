@@ -8,13 +8,12 @@ import 'package:workout_notes/models/periodization_schedule.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/periodization/week_progress.dart';
-import 'package:workout_notes/repositories/periodization_repository.dart';
-import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 
 import 'periodization_checkin_flow.dart';
 import 'periodization_phase_editor_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// A phase at a glance: what it plans (targets and template week) and how
 /// each of its weeks went (planned vs done, weekly review).
@@ -34,7 +33,7 @@ class PeriodizationPhaseScreen extends StatefulWidget {
 }
 
 class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
-  final _repository = PeriodizationRepository();
+  final _repository = DatabaseHelper.instance.periodizationRepo;
   late PeriodizationPhase _phase = widget.phase;
   late PeriodizationPlan _plan = widget.plan;
   List<PeriodizationPhase> _planPhases = const [];
@@ -64,7 +63,7 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
       if (mounted) Navigator.pop(context, true);
       return;
     }
-    final routineRepo = RoutineRepository();
+    final routineRepo = DatabaseHelper.instance.routineRepo;
     final results = await Future.wait<Object?>([
       _repository.getWeeklyTargets(phase),
       _repository.getCheckins(phase.id),

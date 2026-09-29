@@ -10,6 +10,7 @@ import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
 import 'package:workout_notes/services/sleep_diagnostic_store.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Flutter facade for the Android foreground sleep monitor.
 ///
@@ -24,7 +25,7 @@ class SleepMonitorService extends ChangeNotifier {
   static const methods = MethodChannel('workout_notes/sleep_monitor/methods');
   static const events = EventChannel('workout_notes/sleep_monitor/events');
 
-  final SleepMonitorRepository _repository = SleepMonitorRepository();
+  final SleepMonitorRepository _repository = DatabaseHelper.instance.sleepMonitorRepo;
   SleepMonitorState _state = SleepMonitorState.initial(
     supported: defaultTargetPlatform == TargetPlatform.android,
   );

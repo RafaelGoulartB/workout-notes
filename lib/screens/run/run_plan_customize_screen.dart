@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_template.dart';
-import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/screens/run/plan_wizard/run_plan_wizard_controller.dart';
 import 'package:workout_notes/screens/run/plan_wizard/run_plan_wizard_days_step.dart';
 import 'package:workout_notes/screens/run/plan_wizard/run_plan_wizard_intent_step.dart';
@@ -13,6 +12,7 @@ import 'package:workout_notes/services/run_plan_history.dart';
 import 'package:workout_notes/services/run_plan_templates.dart';
 import 'package:workout_notes/services/run_plan_text.dart';
 import 'package:workout_notes/services/runner_strength_routine.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 export 'package:workout_notes/screens/run/plan_wizard/run_plan_wizard_time.dart'
     show parseRaceTime;
@@ -43,7 +43,7 @@ class RunPlanCustomizeScreen extends StatefulWidget {
 }
 
 class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
-  final _repo = RunPlanRepository();
+  final _repo = DatabaseHelper.instance.runPlanRepo;
   late final RunPlanWizardController _controller;
   bool _creating = false;
 

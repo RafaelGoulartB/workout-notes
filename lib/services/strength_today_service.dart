@@ -138,7 +138,7 @@ class StrengthTodayService {
   final StrengthRepository _repo;
 
   StrengthTodayService({StrengthRepository? repo})
-    : _repo = repo ?? StrengthRepository();
+    : _repo = repo ?? DatabaseHelper.instance.strengthRepo;
 
   Future<StrengthHomeSnapshot> load({
     DateTime? now,

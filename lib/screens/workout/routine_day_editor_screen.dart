@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/screens/workout/exercise_detail_tabs_screen.dart';
 import 'package:workout_notes/utils/strength_routine_summary.dart';
 import 'package:workout_notes/widgets/exercise_picker_sheet.dart';
@@ -10,6 +9,7 @@ import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_exercise_card.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_set_sheets.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_sheets.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Full-screen editor for a routine day.
 /// Allows adding/removing exercises and managing predefined sets,
@@ -33,7 +33,7 @@ class RoutineDayEditorScreen extends StatefulWidget {
 }
 
 class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
-  final _routineRepo = RoutineRepository();
+  final _routineRepo = DatabaseHelper.instance.routineRepo;
   List<Map<String, dynamic>> _exercises = [];
   Map<String, List<Map<String, dynamic>>> _predefinedSets = {};
   bool _isLoading = true;

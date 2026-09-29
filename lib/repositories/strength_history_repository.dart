@@ -264,7 +264,7 @@ class StrengthHistoryRepository extends BaseRepository {
     WorkoutRepository? workouts,
     StrengthRecordsRepository? records,
   }) : _workouts = workouts ?? DatabaseHelper.instance.workoutRepo,
-       _records = records ?? StrengthRecordsRepository();
+       _records = records ?? DatabaseHelper.instance.strengthRecordsRepo;
 
   static const _anaerobic =
       "IFNULL(c.energy_system, 'anaerobic') = 'anaerobic'";

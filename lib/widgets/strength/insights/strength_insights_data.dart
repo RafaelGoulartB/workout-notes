@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import 'package:workout_notes/repositories/exercise_repository.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/screens/workout/exercise_detail_tabs_screen.dart';
 import 'package:workout_notes/utils/strength_insights_calculator.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Everything the strength analysis needs, loaded once: every completed
 /// working set and finished workout, plus the muscle groups that were trained.
@@ -43,11 +43,11 @@ class StrengthInsightsData {
 
   static Future<StrengthInsightsData> load({DateTime? now}) async {
     final today = now ?? DateTime.now();
-    final records = StrengthRecordsRepository();
+    final records = DatabaseHelper.instance.strengthRecordsRepo;
     final results = await Future.wait([
       records.loadSets(includeUnweighted: true),
       records.loadWorkouts(),
-      ExerciseRepository().getCategories(),
+      DatabaseHelper.instance.exerciseRepo.getCategories(),
     ]);
     final sets = results[0] as List<StrengthSetSample>;
     final trained = {for (final s in sets) s.categoryId};

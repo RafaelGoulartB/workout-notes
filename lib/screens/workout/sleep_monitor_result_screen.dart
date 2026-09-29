@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
-import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_stage_card.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Detail of one monitored night: headline sleep and efficiency, the night's
 /// numbers, the stage timeline and the estimate disclaimer.
@@ -21,7 +21,7 @@ class SleepMonitorResultScreen extends StatefulWidget {
 }
 
 class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
-  final _repository = SleepMonitorRepository();
+  final _repository = DatabaseHelper.instance.sleepMonitorRepo;
   SleepMonitorSession? _session;
   SleepEntry? _entry;
   bool _isLoading = true;

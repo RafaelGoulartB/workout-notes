@@ -12,9 +12,6 @@ import 'package:workout_notes/models/periodization_schedule.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/periodization/phase_seed.dart';
 import 'package:workout_notes/periodization/week_progress.dart';
-import 'package:workout_notes/repositories/body_measurement_repository.dart';
-import 'package:workout_notes/repositories/nutrition_repository.dart';
-import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
 import 'package:workout_notes/utils/load_generation.dart';
@@ -35,6 +32,7 @@ import 'periodization_plan_screen.dart';
 import 'periodization_plans_screen.dart';
 import 'settings_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Progress tab: body weight, then the active plan — what today asks for,
 /// how this week is going, and the plan's phases on a roadmap.
@@ -47,8 +45,8 @@ class PeriodizationHomeScreen extends StatefulWidget {
 }
 
 class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
-  final _repository = PeriodizationRepository();
-  final _bodyRepo = BodyMeasurementRepository();
+  final _repository = DatabaseHelper.instance.periodizationRepo;
+  final _bodyRepo = DatabaseHelper.instance.bodyMeasurementRepo;
 
   PlanOverviewData? _overview;
   PeriodizationPhase? _currentPhase;
@@ -156,7 +154,7 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
         _safe(_repository.getDayPlan(day)),
         _safe(EffectiveNutritionGoalService.resolve(date: day)),
         _safe(
-          NutritionRepository().getDailySummary(
+          DatabaseHelper.instance.nutritionRepo.getDailySummary(
             dateKey(day),
           ),
         ),
@@ -311,7 +309,7 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
     if (kind == null || !mounted) return;
     final loc = AppLocalizations.of(context)!;
     final results = await Future.wait<Object?>([
-      NutritionRepository().getActiveGoal(),
+      DatabaseHelper.instance.nutritionRepo.getActiveGoal(),
       _bodyRepo.getLatestWeightKg(),
     ]);
     final last = overview.phases.lastOrNull;

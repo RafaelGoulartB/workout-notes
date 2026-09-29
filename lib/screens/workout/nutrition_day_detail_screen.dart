@@ -24,6 +24,7 @@ import 'nutrition_settings_screen.dart';
 import 'saved_meal_editor_screen.dart';
 import 'saved_meals_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 part 'nutrition_day_detail_widgets.dart';
 
@@ -54,7 +55,7 @@ class NutritionDayDetailScreen extends StatefulWidget {
 
 class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
     with SingleTickerProviderStateMixin {
-  final NutritionRepository _repository = NutritionRepository();
+  final NutritionRepository _repository = DatabaseHelper.instance.nutritionRepo;
   final NutritionGateway _gateway = OpenFoodFactsGateway.instance;
 
   late DateTime _selectedDate;

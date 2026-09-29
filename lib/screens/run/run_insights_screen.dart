@@ -3,7 +3,6 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_gear.dart';
-import 'package:workout_notes/repositories/run_insights_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_gear_screen.dart';
@@ -31,8 +30,8 @@ class RunInsightsScreen extends StatefulWidget {
 }
 
 class _RunInsightsScreenState extends State<RunInsightsScreen> {
-  final _runRepo = RunRepository();
-  final _insightsRepo = RunInsightsRepository();
+  final _runRepo = DatabaseHelper.instance.runRepo;
+  final _insightsRepo = DatabaseHelper.instance.runInsightsRepo;
 
   bool _loading = true;
   _InsightsTab _tab = _InsightsTab.fitness;

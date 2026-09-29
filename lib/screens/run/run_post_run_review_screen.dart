@@ -7,7 +7,6 @@ import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
-import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_route_map_screen.dart';
@@ -45,8 +44,8 @@ class RunPostRunReviewScreen extends StatefulWidget {
 }
 
 class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
-  final _runRepository = RunRepository();
-  final _planRepository = RunPlanRepository();
+  final _runRepository = DatabaseHelper.instance.runRepo;
+  final _planRepository = DatabaseHelper.instance.runPlanRepo;
   final _trackingService = RunTrackingService.instance;
   final _selectedDistance = ValueNotifier<double?>(null);
   late final TextEditingController _titleController;

@@ -9,8 +9,6 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
 import 'package:workout_notes/models/sleep_night_summary.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
-import 'package:workout_notes/repositories/sleep_repository.dart';
-import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'package:workout_notes/services/sleep_goal_service.dart';
 
@@ -31,6 +29,7 @@ import 'traditional_alarms_screen.dart';
 import 'settings_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/duration_format.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 class SleepTrackerScreen extends StatefulWidget {
   const SleepTrackerScreen({super.key});
@@ -43,8 +42,8 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   static const int _historyPageSize = 10;
   static const int _trendDays = 30;
 
-  final _repository = SleepRepository();
-  final _monitorRepository = SleepMonitorRepository();
+  final _repository = DatabaseHelper.instance.sleepRepo;
+  final _monitorRepository = DatabaseHelper.instance.sleepMonitorRepo;
   final _monitorService = SleepMonitorService.instance;
   final _sleepGoalService = SleepGoalService();
   List<SleepEntry> _entries = const [];

@@ -34,6 +34,7 @@ import 'package:workout_notes/widgets/run/plan_detail/run_plan_week_strip.dart';
 import 'package:workout_notes/widgets/run/run_balance_dialog.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Plan detail: identity header, status, week picker and the training week
 /// laid out by weekday. A running week is read by day ("longão no domingo"),
@@ -51,7 +52,7 @@ class RunPlanDetailScreen extends StatefulWidget {
 }
 
 class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
-  final _repo = RunPlanRepository();
+  final _repo = DatabaseHelper.instance.runPlanRepo;
   final _weekStrip = ScrollController();
   RunPlan? _plan;
   Set<int> _scheduledWeeks = const {};

@@ -2,9 +2,9 @@ part of 'active_workout_screen.dart';
 
 /// Owns mutable workout state, timer coordination, and set mutations.
 mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
-  final _workoutRepo = WorkoutRepository();
-  final _routineRepo = RoutineRepository();
-  final _settingsRepo = SettingsRepository();
+  final _workoutRepo = DatabaseHelper.instance.workoutRepo;
+  final _routineRepo = DatabaseHelper.instance.routineRepo;
+  final _settingsRepo = DatabaseHelper.instance.settingsRepo;
   final _summaryService = WorkoutSummaryService();
   final _timerService = RestTimerService.instance;
   bool _isLoading = true;
