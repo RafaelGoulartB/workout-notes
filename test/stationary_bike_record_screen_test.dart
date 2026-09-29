@@ -3,13 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
-import 'package:workout_notes/services/stationary_bike_tracking_service.dart';
+import 'package:workout_notes/services/indoor_tracking_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   tearDown(() async {
-    await StationaryBikeTrackingService.instance.discard();
+    await IndoorTrackingService.instance.discard();
   });
 
   testWidgets('shows stationary bike as a secondary exercise choice', (

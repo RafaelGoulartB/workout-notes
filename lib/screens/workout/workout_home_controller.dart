@@ -8,7 +8,7 @@ import 'package:workout_notes/repositories/strength_repository.dart';
 import 'package:workout_notes/repositories/workout_repository.dart';
 import 'package:workout_notes/services/run_today_service.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
-import 'package:workout_notes/services/stationary_bike_tracking_service.dart';
+import 'package:workout_notes/services/indoor_tracking_service.dart';
 import 'package:workout_notes/services/strength_routine_day_inference.dart';
 import 'package:workout_notes/services/strength_today_service.dart';
 import 'package:workout_notes/utils/date_utils.dart';
@@ -44,7 +44,7 @@ class WorkoutHomeData {
 }
 
 /// State and data loading of the Treino tab: this week across gym and
-/// running, today's plan, recent sessions, and whether a run / bike session is
+/// running, today's plan, recent sessions, and whether a run / indoor session is
 /// being recorded. Only the newest load applies its result, and a failed one
 /// keeps whatever is already on screen (with a retry), instead of passing for
 /// an empty history.
@@ -55,17 +55,17 @@ class WorkoutHomeController extends ChangeNotifier {
     StrengthTodayService? strengthToday,
     RunRepository? runRepo,
     RunTrackingService? runTracking,
-    StationaryBikeTrackingService? bikeTracking,
+    IndoorTrackingService? indoorTracking,
   }) : _workoutRepo = workoutRepo ?? DatabaseHelper.instance.workoutRepo,
        _strengthRepo = strengthRepo ?? DatabaseHelper.instance.strengthRepo,
        _strengthToday = strengthToday ?? StrengthTodayService(),
        _runRepo = runRepo ?? DatabaseHelper.instance.runRepo,
        runTracking = runTracking ?? RunTrackingService.instance,
-       bikeTracking = bikeTracking ?? StationaryBikeTrackingService.instance {
+       indoorTracking = indoorTracking ?? IndoorTrackingService.instance {
     _runActive = this.runTracking.state.isActive;
-    _bikeActive = this.bikeTracking.state.isActive;
+    _indoorActive = this.indoorTracking.state.isActive;
     this.runTracking.addListener(_onTrackingChanged);
-    this.bikeTracking.addListener(_onTrackingChanged);
+    this.indoorTracking.addListener(_onTrackingChanged);
     this.runTracking.initialize().catchError((Object _) {});
   }
 
@@ -74,7 +74,7 @@ class WorkoutHomeController extends ChangeNotifier {
   final StrengthTodayService _strengthToday;
   final RunRepository _runRepo;
   final RunTrackingService runTracking;
-  final StationaryBikeTrackingService bikeTracking;
+  final IndoorTrackingService indoorTracking;
   final _generation = LoadGeneration();
   bool _disposed = false;
 
@@ -83,10 +83,10 @@ class WorkoutHomeController extends ChangeNotifier {
   bool _loadFailed = false;
   List<Map<String, dynamic>> _activeWorkouts = [];
 
-  // Whether a run / a bike session is being recorded. The hub only rebuilds
+  // Whether a run / an indoor session is being recorded. The hub only rebuilds
   // when this flips; the banners follow the live tracking state themselves.
   bool _runActive = false;
-  bool _bikeActive = false;
+  bool _indoorActive = false;
 
   WorkoutWeekOverview _overview = WorkoutWeekOverview.empty;
   StrengthHomeSnapshot? _strengthSnapshot;
@@ -106,7 +106,7 @@ class WorkoutHomeController extends ChangeNotifier {
   bool get loadFailed => _loadFailed;
   List<Map<String, dynamic>> get activeWorkouts => _activeWorkouts;
   bool get runActive => _runActive;
-  bool get bikeActive => _bikeActive;
+  bool get indoorActive => _indoorActive;
   WorkoutWeekOverview get overview => _overview;
   StrengthHomeSnapshot? get strengthSnapshot => _strengthSnapshot;
   RunHomeSnapshot? get runSnapshot => _runSnapshot;
@@ -118,14 +118,14 @@ class WorkoutHomeController extends ChangeNotifier {
   int get pendingReviewRefresh => _pendingReviewRefresh;
 
   bool get hasAnyHistory =>
-      _hasHistory || _activeWorkouts.isNotEmpty || _runActive || _bikeActive;
+      _hasHistory || _activeWorkouts.isNotEmpty || _runActive || _indoorActive;
 
   void _onTrackingChanged() {
     final run = runTracking.state.isActive;
-    final bike = bikeTracking.state.isActive;
-    if (_disposed || (run == _runActive && bike == _bikeActive)) return;
+    final indoor = indoorTracking.state.isActive;
+    if (_disposed || (run == _runActive && indoor == _indoorActive)) return;
     _runActive = run;
-    _bikeActive = bike;
+    _indoorActive = indoor;
     notifyListeners();
   }
 
@@ -278,7 +278,7 @@ class WorkoutHomeController extends ChangeNotifier {
     _disposed = true;
     _generation.invalidate();
     runTracking.removeListener(_onTrackingChanged);
-    bikeTracking.removeListener(_onTrackingChanged);
+    indoorTracking.removeListener(_onTrackingChanged);
     super.dispose();
   }
 }

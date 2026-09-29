@@ -16,15 +16,13 @@ import 'package:workout_notes/database/database_helper.dart';
 /// correct when Flutter pauses periodic timers while the app is backgrounded.
 /// The distance is typed on the review screen.
 ///
-/// The name predates the treadmill: it started as the bike timer and now
-/// serves every indoor activity (`CardioActivityType.isIndoor`).
-class StationaryBikeTrackingService extends ChangeNotifier {
-  static final StationaryBikeTrackingService instance =
-      StationaryBikeTrackingService._();
+/// It serves every indoor activity (`CardioActivityType.isIndoor`).
+class IndoorTrackingService extends ChangeNotifier {
+  static final IndoorTrackingService instance = IndoorTrackingService._();
 
   static const _uuid = Uuid();
 
-  StationaryBikeTrackingService._();
+  IndoorTrackingService._();
 
   final RunRepository _repository = DatabaseHelper.instance.runRepo;
   RunTrackingState _state = const RunTrackingState.initial(supported: true);

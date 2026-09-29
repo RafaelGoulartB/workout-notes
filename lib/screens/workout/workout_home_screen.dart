@@ -229,7 +229,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                       onChanged: _loadData,
                     ),
                   ),
-                  if (_controller.bikeActive)
+                  if (_controller.indoorActive)
                     SliverToBoxAdapter(
                       child: _buildActiveBikeBanner(theme, loc),
                     ),
@@ -675,9 +675,9 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       background: theme.colorScheme.secondaryContainer,
       foreground: theme.colorScheme.onSecondaryContainer,
       title: loc.cardioActivityStationaryBike,
-      refresh: _controller.bikeTracking,
+      refresh: _controller.indoorTracking,
       subtitle: () {
-        final state = _controller.bikeTracking.state;
+        final state = _controller.indoorTracking.state;
         final time = RunFormatters.duration(state.durationSeconds);
         return state.isPaused
             ? '${loc.workoutHomeRunPaused} · $time'

@@ -20,7 +20,7 @@ import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
-import 'package:workout_notes/services/stationary_bike_tracking_service.dart';
+import 'package:workout_notes/services/indoor_tracking_service.dart';
 import 'package:workout_notes/widgets/run/record/run_data_fields_grid.dart';
 import 'package:workout_notes/widgets/run/record/run_goal_sheet.dart';
 import 'package:workout_notes/widgets/run/record/run_record_countdown.dart';
@@ -644,7 +644,7 @@ void main() {
     });
 
     tearDown(() async {
-      await StationaryBikeTrackingService.instance.discard();
+      await IndoorTrackingService.instance.discard();
       DatabaseHelper.overrideDatabase = null;
       await database.close();
     });

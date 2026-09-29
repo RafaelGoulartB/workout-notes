@@ -21,7 +21,7 @@ import 'package:workout_notes/services/run_audio_gate_service.dart';
 import 'package:workout_notes/services/run_data_fields_store.dart';
 import 'package:workout_notes/services/run_session_coach.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
-import 'package:workout_notes/services/stationary_bike_tracking_service.dart';
+import 'package:workout_notes/services/indoor_tracking_service.dart';
 import 'package:workout_notes/widgets/run/record/run_data_fields_grid.dart';
 import 'package:workout_notes/widgets/run/record/run_goal_sheet.dart';
 import 'package:workout_notes/widgets/run/record/run_record_countdown.dart';
@@ -60,7 +60,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   static const _maxSheetSize = 0.90;
 
   final _service = RunTrackingService.instance;
-  final _indoorService = StationaryBikeTrackingService.instance;
+  final _indoorService = IndoorTrackingService.instance;
   final _mapController = MapController();
   final _coach = RunSessionCoach();
   final _planRepo = DatabaseHelper.instance.runPlanRepo;
