@@ -102,7 +102,7 @@ Future<void> showRunInsightInfo(
     context: context,
     showDragHandle: true,
     builder: (context) => SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,

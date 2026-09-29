@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import '../repositories/exercise_repository.dart';
+import 'package:workout_notes/repositories/exercise_repository.dart';
+import 'package:workout_notes/utils/exercise_equipment.dart';
+import 'package:workout_notes/widgets/run/run_ui.dart';
 
 /// A bottom sheet that lets the user add/remove exercises to a workout or routine.
 /// Keeps open and calls [onExerciseAdded] / [onExerciseRemoved] in real-time.
@@ -40,7 +42,7 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
 
   Future<void> _load() async {
     _categories = await _exerciseRepo.getCategories();
-    
+
     // Load all exercises grouped by category
     final allExercises = await _exerciseRepo.getExercises();
     for (final cat in _categories) {
@@ -49,23 +51,24 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
           .where((e) => e['category_id'] == catId)
           .toList();
     }
-    
+
+    if (!mounted) return;
     setState(() => _isLoading = false);
   }
 
   List<Map<String, dynamic>> get _filteredExercises {
     if (_selectedCategoryId == null) return [];
-    
+
     final exercises = _exercisesByCategory[_selectedCategoryId] ?? [];
     if (_search.isEmpty) return exercises;
-    
+
     final loc = AppLocalizations.of(context);
     if (loc != null) {
       return exercises.where((e) {
         return ExerciseLocaleHelper.exerciseMatchesSearch(loc, e, _search);
       }).toList();
     }
-    
+
     return exercises.where((e) {
       final name = (e['name'] as String? ?? '').toLowerCase();
       return name.contains(_search.toLowerCase());
@@ -126,7 +129,9 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                 Expanded(
                   child: Text(
                     loc.routinesAddExercise,
-                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 if (_selectedCategoryId != null)
@@ -159,68 +164,60 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                         .where((e) => _selectedIds.contains(e['id']))
                         .length;
 
-                    return Card(
-                      margin: const EdgeInsets.symmetric(vertical: 4),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(
-                          color: theme.colorScheme.outlineVariant.withAlpha(80),
-                        ),
-                      ),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: RunSectionCard(
                         onTap: () => setState(() {
                           _selectedCategoryId = catId;
                           _search = '';
                         }),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: color.withAlpha(30),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Icon(
-                                  Icons.fitness_center,
-                                  color: color,
-                                  size: 28,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, cat),
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        child: Row(
+                          children: [
+                            RunIconBadge(
+                              Icons.fitness_center_rounded,
+                              color: color,
+                              size: 40,
+                              iconSize: 22,
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    ExerciseLocaleHelper.categoryName(loc, cat),
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w700,
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${exercises.length} ${loc.commonExercises.toLowerCase()}${selectedCount > 0 ? ' · $selectedCount' : ''}',
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: selectedCount > 0
-                                            ? theme.colorScheme.primary
-                                            : theme.colorScheme.onSurfaceVariant,
-                                        fontWeight: selectedCount > 0 ? FontWeight.w600 : null,
+                                  ),
+                                  Text(
+                                    [
+                                      loc.routinesExercisesValue(
+                                        exercises.length,
                                       ),
+                                      if (selectedCount > 0) '$selectedCount ✓',
+                                    ].join(' · '),
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: selectedCount > 0
+                                          ? theme.colorScheme.primary
+                                          : theme.colorScheme.onSurfaceVariant,
+                                      fontWeight: selectedCount > 0
+                                          ? FontWeight.w600
+                                          : null,
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                              Icon(
-                                Icons.chevron_right,
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ],
-                          ),
+                            ),
+                            Icon(
+                              Icons.chevron_right,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ],
                         ),
                       ),
                     );
@@ -235,16 +232,26 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                   children: [
                     // Category header
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
-                        color: Color(selectedCategory['color'] as int? ?? 0xFF757575).withAlpha(20),
+                        color: Color(
+                          selectedCategory['color'] as int? ?? 0xFF757575,
+                        ).withAlpha(20),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, selectedCategory),
+                        ExerciseLocaleHelper.categoryName(
+                          loc,
+                          selectedCategory,
+                        ),
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: Color(selectedCategory['color'] as int? ?? 0xFF757575),
+                          color: Color(
+                            selectedCategory['color'] as int? ?? 0xFF757575,
+                          ),
                         ),
                       ),
                     ),
@@ -255,9 +262,12 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                       decoration: InputDecoration(
                         hintText: loc.exerciseLibrarySearch,
                         prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         filled: true,
-                        fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
+                        fillColor: theme.colorScheme.surfaceContainerHighest
+                            .withAlpha(80),
                       ),
                       onChanged: (v) => setState(() => _search = v),
                     ),
@@ -283,8 +293,11 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                                 final ex = filtered[i];
                                 final exId = ex['id'] as String;
                                 final isSelected = _selectedIds.contains(exId);
-                                final catColor = Color(selectedCategory['color'] as int? ?? 0xFF757575);
-                                
+                                final catColor = Color(
+                                  selectedCategory['color'] as int? ??
+                                      0xFF757575,
+                                );
+
                                 return ListTile(
                                   leading: Container(
                                     width: 8,
@@ -295,14 +308,30 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                                     ),
                                   ),
                                   title: Text(
-                                    ExerciseLocaleHelper.exerciseName(AppLocalizations.of(context)!, ex),
+                                    ExerciseLocaleHelper.exerciseName(
+                                      AppLocalizations.of(context)!,
+                                      ex,
+                                    ),
                                     style: TextStyle(
-                                      fontWeight: isSelected ? FontWeight.w600 : null,
-                                      color: isSelected ? theme.colorScheme.primary : null,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : null,
+                                      color: isSelected
+                                          ? theme.colorScheme.primary
+                                          : null,
                                     ),
                                   ),
-                                  subtitle: ExerciseLocaleHelper.equipment(ex).isNotEmpty
-                                      ? Text(ExerciseLocaleHelper.equipment(ex))
+                                  subtitle:
+                                      ExerciseEquipment.label(
+                                        loc,
+                                        ex['equipment'] as String?,
+                                      ).isNotEmpty
+                                      ? Text(
+                                          ExerciseEquipment.label(
+                                            loc,
+                                            ex['equipment'] as String?,
+                                          ),
+                                        )
                                       : null,
                                   trailing: AnimatedSwitcher(
                                     duration: const Duration(milliseconds: 200),
@@ -317,7 +346,8 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                                             ),
                                             child: Icon(
                                               Icons.check,
-                                              color: theme.colorScheme.onPrimary,
+                                              color:
+                                                  theme.colorScheme.onPrimary,
                                               size: 20,
                                             ),
                                           )

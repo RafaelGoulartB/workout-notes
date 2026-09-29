@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
+import 'package:workout_notes/utils/exercise_equipment.dart';
 import 'package:workout_notes/widgets/form_section_card.dart';
 import '../../repositories/exercise_repository.dart';
 
@@ -39,18 +40,6 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
     {'id': 'timeOnly', 'icon': Icons.timer_outlined},
   ];
 
-  final _equipmentOptions = [
-    'Barbell',
-    'Dumbbell',
-    'Cable',
-    'Machine',
-    'Bodyweight',
-    'Treadmill',
-    'Stationary',
-    'Kettlebell',
-    'Band',
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -77,12 +66,14 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
         _notesCtl.text = ex['notes'] as String? ?? '';
         _equipment = ex['equipment'] as String? ?? '';
         final wi = (ex['weight_increment'] as num?)?.toDouble();
-        _weightIncrementCtl.text =
-            wi != null ? wi.toStringAsFixed(wi.truncateToDouble() == wi ? 0 : 1) : '';
+        _weightIncrementCtl.text = wi != null
+            ? wi.toStringAsFixed(wi.truncateToDouble() == wi ? 0 : 1)
+            : '';
         final drt = ex['default_rest_time'] as int?;
         _defaultRestCtl.text = drt?.toString() ?? '';
       }
     }
+    if (!mounted) return;
     setState(() => _isLoading = false);
   }
 
@@ -90,9 +81,7 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
     if (_nameCtl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            AppLocalizations.of(context)!.exerciseFormNameRequired,
-          ),
+          content: Text(AppLocalizations.of(context)!.exerciseFormNameRequired),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -113,7 +102,8 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
           categoryId: _categoryId,
           type: _type,
           notes: _notesCtl.text.trim(),
-          equipment: _equipment.isEmpty ? null : _equipment,
+          // Empty string clears the equipment (null would keep the old one).
+          equipment: _equipment,
           weightIncrement: weightInc,
           defaultRestTime: restTime,
         );
@@ -198,35 +188,7 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
                     _buildTypePicker(theme),
                     const SizedBox(height: 16),
                     FormFieldLabel(text: loc.exerciseFormEquipment),
-                    Autocomplete<String>(
-                      optionsBuilder: (textEditingValue) {
-                        if (textEditingValue.text.isEmpty) {
-                          return _equipmentOptions;
-                        }
-                        return _equipmentOptions.where(
-                          (opt) => opt.toLowerCase().contains(
-                                textEditingValue.text.toLowerCase(),
-                              ),
-                        );
-                      },
-                      initialValue: TextEditingValue(text: _equipment),
-                      onSelected: (v) => _equipment = v,
-                      fieldViewBuilder:
-                          (ctx, ctl, focusNode, onSubmit) => TextField(
-                        controller: ctl,
-                        focusNode: focusNode,
-                        decoration: InputDecoration(
-                          hintText: loc.exerciseFormEquipmentHint,
-                          border: const OutlineInputBorder(),
-                          filled: true,
-                          fillColor:
-                              theme.colorScheme.surfaceContainerHighest
-                                  .withAlpha(60),
-                        ),
-                        onSubmitted: (_) => onSubmit(),
-                        onChanged: (v) => _equipment = v,
-                      ),
-                    ),
+                    _buildEquipmentPicker(theme, loc),
                   ],
                 ),
                 const SizedBox(height: 14),
@@ -283,84 +245,64 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
 
   Widget _buildCategoryPicker(ThemeData theme) {
     final loc = AppLocalizations.of(context)!;
-    final current = _categories.firstWhere(
-      (c) => c['id'] == _categoryId,
-      orElse: () => {'id': _categoryId, 'name': _categoryId, 'color': 0xFF757575},
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: [
+        for (final cat in _categories)
+          Builder(
+            builder: (context) {
+              final color = Color(cat['color'] as int? ?? 0xFF757575);
+              final selected = cat['id'] == _categoryId;
+              return ChoiceChip(
+                avatar: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                label: Text(ExerciseLocaleHelper.categoryName(loc, cat)),
+                selected: selected,
+                showCheckmark: false,
+                visualDensity: VisualDensity.compact,
+                selectedColor: color.withAlpha(50),
+                side: selected ? BorderSide(color: color.withAlpha(160)) : null,
+                onSelected: (_) =>
+                    setState(() => _categoryId = cat['id'] as String),
+              );
+            },
+          ),
+      ],
     );
-    final currentName = ExerciseLocaleHelper.categoryName(loc, current);
-    final currentColor = Color(current['color'] as int? ?? 0xFF757575);
+  }
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: () async {
-        final selected = await showModalBottomSheet<String>(
-          context: context,
-          showDragHandle: true,
-          builder: (ctx) {
-            return SafeArea(
-              child: ListView.builder(
-                shrinkWrap: true,
-                padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
-                itemCount: _categories.length,
-                itemBuilder: (ctx, i) {
-                  final cat = _categories[i];
-                  final color = Color(cat['color'] as int? ?? 0xFF757575);
-                  final isSelected = cat['id'] == _categoryId;
-                  return ListTile(
-                    leading: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    title: Text(
-                      ExerciseLocaleHelper.categoryName(loc, cat),
-                    ),
-                    trailing: isSelected
-                        ? Icon(
-                            Icons.check_rounded,
-                            color: theme.colorScheme.primary,
-                          )
-                        : null,
-                    onTap: () => Navigator.pop(ctx, cat['id'] as String),
-                  );
-                },
-              ),
-            );
-          },
-        );
-        if (selected != null) {
-          setState(() => _categoryId = selected);
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-        decoration: BoxDecoration(
-          border: Border.all(color: theme.colorScheme.outline),
-          borderRadius: BorderRadius.circular(8),
-          color: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: currentColor,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: Text(currentName)),
-            Icon(
-              Icons.arrow_drop_down_rounded,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ],
-        ),
-      ),
+  /// Equipment as localized chips. The stored value stays the English
+  /// identifier; a value typed by an older version shows up as its own chip.
+  Widget _buildEquipmentPicker(ThemeData theme, AppLocalizations loc) {
+    final current = _equipment.trim();
+    final canonical = ExerciseEquipment.canonical(current);
+    final options = [
+      ...ExerciseEquipment.options,
+      if (current.isNotEmpty && !ExerciseEquipment.options.contains(canonical))
+        canonical ?? current,
+    ];
+    final selected = canonical ?? (current.isEmpty ? null : current);
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: [
+        for (final option in options)
+          ChoiceChip(
+            label: Text(ExerciseEquipment.label(loc, option)),
+            selected: option == selected,
+            visualDensity: VisualDensity.compact,
+            // Tapping the selected chip clears the equipment again.
+            onSelected: (isSelected) =>
+                setState(() => _equipment = isSelected ? option : ''),
+          ),
+      ],
     );
   }
 
@@ -398,8 +340,7 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
                             color: theme.colorScheme.primary,
                           )
                         : null,
-                    onTap: () =>
-                        Navigator.pop(ctx, t['id'] as String),
+                    onTap: () => Navigator.pop(ctx, t['id'] as String),
                   );
                 },
               ),
