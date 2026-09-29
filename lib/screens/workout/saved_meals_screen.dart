@@ -7,6 +7,7 @@ import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/saved_meal.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
+import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
 
 import 'saved_meal_editor_screen.dart';
 
@@ -192,17 +193,7 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(loc.nutritionSavedMeals),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            tooltip: loc.nutritionSavedMealNew,
-            onPressed: _isLogging ? null : _createMeal,
-            icon: const Icon(Icons.add),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: Text(loc.nutritionSavedMeals)),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _meals.isEmpty
@@ -257,111 +248,141 @@ class _SavedMealCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final totals = meal.totals;
     final subtitle = <String>[
-      if (meal.meal.mealType != null) _mealLabel(loc, meal.meal.mealType!),
-      if (meal.meal.portions != 1)
-        loc.nutritionSavedMealPortionsLabel(_format(meal.meal.portions)),
       if (totals?.calories != null)
-        loc.nutritionConsumedKcal(_format(totals!.calories!)),
+        loc.nutritionConsumedKcal(
+          nutritionNumber(totals!.calories!.roundToDouble()),
+        ),
+      loc.nutritionItemCount(meal.items.length),
+      if (meal.meal.portions != 1)
+        loc.nutritionSavedMealPortionsLabel(
+          nutritionNumber(meal.meal.portions),
+        ),
+      if (meal.meal.mealType != null) _mealLabel(loc, meal.meal.mealType!),
     ];
-    final macros = <String>[
-      if (totals?.proteinG != null) 'P ${_format(totals!.proteinG!)} g',
-      if (totals?.carbsG != null) 'C ${_format(totals!.carbsG!)} g',
-      if (totals?.fatG != null) 'G ${_format(totals!.fatG!)} g',
-    ];
-    return Card(
-      elevation: 0,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
+    final hasMacros =
+        totals != null &&
+        (totals.proteinG != null ||
+            totals.carbsG != null ||
+            totals.fatG != null);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: colors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      margin: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withAlpha(90),
-                  borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 2, 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: colors.primaryContainer.withAlpha(140),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.bookmark_rounded,
+                    color: colors.primary,
+                    size: 20,
+                  ),
                 ),
-                child: Icon(
-                  Icons.restaurant_menu,
-                  color: theme.colorScheme.onPrimaryContainer,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      meal.meal.name,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        meal.meal.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    if (subtitle.isNotEmpty)
+                      const SizedBox(height: 2),
                       Text(
                         subtitle.join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                          color: colors.onSurfaceVariant,
                         ),
                       ),
-                    if (macros.isNotEmpty)
-                      Text(
-                        macros.join(' · '),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                      if (hasMacros) ...[
+                        const SizedBox(height: 6),
+                        NutritionMacroLine(
+                          proteinG: totals.proteinG ?? 0,
+                          carbsG: totals.carbsG ?? 0,
+                          fatG: totals.fatG ?? 0,
                         ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (!isLogging)
+                  IconButton(
+                    tooltip: loc.nutritionSavedMealLogToday,
+                    onPressed: onLog,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 36,
+                      height: 36,
+                    ),
+                    padding: EdgeInsets.zero,
+                    style: IconButton.styleFrom(
+                      backgroundColor: colors.primary.withAlpha(28),
+                    ),
+                    icon: Icon(
+                      Icons.playlist_add_rounded,
+                      color: colors.primary,
+                      size: 20,
+                    ),
+                  ),
+                PopupMenuButton<String>(
+                  tooltip: loc.nutritionMealMenu,
+                  icon: Icon(
+                    Icons.more_vert_rounded,
+                    size: 20,
+                    color: colors.onSurfaceVariant,
+                  ),
+                  onSelected: (action) {
+                    switch (action) {
+                      case 'edit':
+                        onTap();
+                      case 'delete':
+                        onDelete();
+                    }
+                  },
+                  itemBuilder: (ctx) => [
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.edit_outlined),
+                        title: Text(loc.nutritionEditItem),
                       ),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.delete_outline),
+                        title: Text(loc.nutritionSavedMealDelete),
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              if (!isLogging)
-                IconButton(
-                  tooltip: loc.nutritionSavedMealLogToday,
-                  onPressed: onLog,
-                  icon: const Icon(Icons.playlist_add),
-                ),
-              PopupMenuButton<String>(
-                tooltip: loc.nutritionMealMenu,
-                onSelected: (action) {
-                  switch (action) {
-                    case 'edit':
-                      onTap();
-                    case 'delete':
-                      onDelete();
-                  }
-                },
-                itemBuilder: (ctx) => [
-                  PopupMenuItem(
-                    value: 'edit',
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.edit_outlined),
-                      title: Text(loc.nutritionEditItem),
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'delete',
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.delete_outline),
-                      title: Text(loc.nutritionSavedMealDelete),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -380,12 +401,5 @@ class _SavedMealCard extends StatelessWidget {
         return loc.nutritionMealSnacks;
     }
     return type;
-  }
-
-  static String _format(double value) {
-    if (value == value.roundToDouble()) {
-      return value.toStringAsFixed(0);
-    }
-    return value.toStringAsFixed(1);
   }
 }

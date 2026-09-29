@@ -5,6 +5,8 @@ import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
+import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
+import 'package:workout_notes/widgets/run/run_ui.dart';
 
 import 'food_label_photo_screen.dart';
 import 'manual_food_screen.dart';
@@ -260,7 +262,7 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         itemCount: foods.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        separatorBuilder: (_, _) => const SizedBox(height: 6),
         itemBuilder: (context, index) => _FoodLibraryTile(
           entry: foods[index],
           onFavorite: () => _toggleFavorite(foods[index]),
@@ -285,34 +287,25 @@ class _FoodLibraryFilters extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final labels = <_FoodLibraryFilter, String>{
-      _FoodLibraryFilter.all: loc.nutritionSearchAll,
-      _FoodLibraryFilter.manual: loc.nutritionSearchManual,
-      _FoodLibraryFilter.database: loc.nutritionSearchDatabase,
-    };
-    return SizedBox(
-      height: 40,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        children: [
-          for (final entry in labels.entries)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: ChoiceChip(
-                label: Text(entry.value),
-                selected: active == entry.key,
-                showCheckmark: false,
-                visualDensity: VisualDensity.compact,
-                onSelected: (_) => onSelected(entry.key),
-              ),
-            ),
-        ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: RunSegmentedTabs<_FoodLibraryFilter>(
+        values: _FoodLibraryFilter.values,
+        selected: active,
+        labelOf: (filter) => switch (filter) {
+          _FoodLibraryFilter.all => loc.nutritionSearchAll,
+          _FoodLibraryFilter.manual => loc.nutritionSearchManual,
+          _FoodLibraryFilter.database => loc.nutritionSearchDatabase,
+        },
+        onChanged: onSelected,
       ),
     );
   }
 }
 
+/// One food: icon, name, reference portion with calories and macros, the
+/// source, a favorite star and (for user foods) an edit / delete menu.
+/// Tapping a user food opens the editor.
 class _FoodLibraryTile extends StatelessWidget {
   final FoodSearchResultLite entry;
   final VoidCallback onFavorite;
@@ -330,93 +323,138 @@ class _FoodLibraryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final food = entry.food;
     final variant = entry.primaryVariant;
-    final calories = variant?.values.calories;
+    final values = variant?.values;
+    final calories = values?.calories;
+    final favorite = food.isFavorite ?? false;
     final details = <String>[
-      if (food.brand?.trim().isNotEmpty ?? false) food.brand!.trim(),
       if (variant != null)
-        '${_format(variant.referenceAmount)} ${variant.referenceUnit}'
-            '${calories == null ? '' : ' · ${_format(calories)} kcal'}',
-      food.isUserCreated
-          ? loc.nutritionSourceManual
-          : loc.nutritionSourceGateway,
+        '${nutritionNumber(variant.referenceAmount)} ${variant.referenceUnit}',
+      if (calories != null) '${nutritionNumber(calories.roundToDouble())} kcal',
+      if (food.brand?.trim().isNotEmpty ?? false) food.brand!.trim(),
     ];
 
-    return Card(
-      margin: EdgeInsets.zero,
-      child: ListTile(
-        contentPadding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-        leading: CircleAvatar(
-          backgroundColor: theme.colorScheme.primaryContainer,
-          foregroundColor: theme.colorScheme.onPrimaryContainer,
-          child: const Icon(Icons.restaurant_outlined),
-        ),
-        title: Text(
-          food.name,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Text(
-          details.join('\n'),
-          maxLines: 3,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              tooltip: (food.isFavorite ?? false)
-                  ? loc.nutritionSearchUnfavorite
-                  : loc.nutritionSearchFavorite,
-              onPressed: onFavorite,
-              icon: Icon(
-                (food.isFavorite ?? false)
-                    ? Icons.star_rounded
-                    : Icons.star_border_rounded,
-                color: (food.isFavorite ?? false)
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurfaceVariant,
+    return Material(
+      color: colors.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onEdit,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 2, 10),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: colors.primaryContainer.withAlpha(140),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  food.isUserCreated
+                      ? Icons.restaurant_rounded
+                      : Icons.public_rounded,
+                  color: colors.primary,
+                  size: 20,
+                ),
               ),
-            ),
-            if (onEdit != null && onDelete != null)
-              PopupMenuButton<_FoodLibraryAction>(
-                tooltip: loc.nutritionFoodActions,
-                onSelected: (action) {
-                  switch (action) {
-                    case _FoodLibraryAction.edit:
-                      onEdit!();
-                    case _FoodLibraryAction.delete:
-                      onDelete!();
-                  }
-                },
-                itemBuilder: (_) => [
-                  PopupMenuItem(
-                    value: _FoodLibraryAction.edit,
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.edit_outlined),
-                      title: Text(loc.nutritionFoodEdit),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      food.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  PopupMenuItem(
-                    value: _FoodLibraryAction.delete,
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.delete_outline),
-                      title: Text(loc.nutritionFoodDelete),
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        ...details,
+                        food.isUserCreated
+                            ? loc.nutritionSourceManual
+                            : loc.nutritionSourceGateway,
+                      ].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                ],
+                    if (values != null &&
+                        (values.proteinG != null ||
+                            values.carbsG != null ||
+                            values.fatG != null)) ...[
+                      const SizedBox(height: 5),
+                      NutritionMacroLine(
+                        proteinG: values.proteinG ?? 0,
+                        carbsG: values.carbsG ?? 0,
+                        fatG: values.fatG ?? 0,
+                      ),
+                    ],
+                  ],
+                ),
               ),
-          ],
+              IconButton(
+                tooltip: favorite
+                    ? loc.nutritionSearchUnfavorite
+                    : loc.nutritionSearchFavorite,
+                onPressed: onFavorite,
+                icon: Icon(
+                  favorite ? Icons.star_rounded : Icons.star_border_rounded,
+                  size: 22,
+                  color: favorite ? colors.primary : colors.onSurfaceVariant,
+                ),
+              ),
+              if (onEdit != null && onDelete != null)
+                PopupMenuButton<_FoodLibraryAction>(
+                  tooltip: loc.nutritionFoodActions,
+                  icon: Icon(
+                    Icons.more_vert_rounded,
+                    size: 20,
+                    color: colors.onSurfaceVariant,
+                  ),
+                  onSelected: (action) {
+                    switch (action) {
+                      case _FoodLibraryAction.edit:
+                        onEdit!();
+                      case _FoodLibraryAction.delete:
+                        onDelete!();
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: _FoodLibraryAction.edit,
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.edit_outlined),
+                        title: Text(loc.nutritionFoodEdit),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: _FoodLibraryAction.delete,
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.delete_outline),
+                        title: Text(loc.nutritionFoodDelete),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                const SizedBox(width: 8),
+            ],
+          ),
         ),
       ),
     );
   }
-
-  static String _format(double value) => value == value.roundToDouble()
-      ? value.toStringAsFixed(0)
-      : value.toStringAsFixed(1);
 }

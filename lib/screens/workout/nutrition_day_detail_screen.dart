@@ -13,13 +13,14 @@ import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 import 'package:workout_notes/services/open_food_facts_gateway.dart';
+import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
+import 'package:workout_notes/widgets/run/run_ui.dart';
 
 import 'food_quantity_sheet.dart';
 import 'food_search_screen.dart';
 import 'nutrition_progress_screen.dart';
 import 'nutrition_replicate_day_dialog.dart';
 import 'nutrition_settings_screen.dart';
-import 'periodization_home_screen.dart';
 import 'saved_meal_editor_screen.dart';
 import 'saved_meals_screen.dart';
 
@@ -32,10 +33,6 @@ enum _NutritionMenuAction {
   replicateDay,
   manageMeals,
 }
-
-const _proteinMacroColor = Color(0xFF2563EB);
-const _carbMacroColor = Color(0xFFD97706);
-const _fatMacroColor = Color(0xFF7C3AED);
 
 /// Daily food diary. This is opened from the nutrition dashboard so meal
 /// management stays focused and does not overwhelm the primary tab.
@@ -266,6 +263,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
       primaryVariant: variant,
       servings: result.servings[variant.id] ?? const [],
       existing: item,
+      onRemove: () => _deleteItem(item),
     );
     if (selection == null) return;
     if (!mounted) return;
@@ -550,188 +548,138 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final isToday = _selectedDate == _dateOnly(DateTime.now());
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: theme.colorScheme.surface,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
         titleSpacing: 0,
-        title: _DateNavigator(
-          date: _selectedDate,
-          onPrevious: () => _changeDay(-1),
-          onNext: () => _changeDay(1),
-          onJumpToday: _jumpToToday,
-          onPickDate: _pickDate,
-          compact: true,
+        centerTitle: false,
+        title: Tooltip(
+          message: loc.nutritionChooseDate,
+          child: InkWell(
+            onTap: _pickDate,
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      isToday
+                          ? loc.nutritionJumpToday
+                          : DateFormat(
+                              'EEE, d MMM',
+                              Intl.defaultLocale,
+                            ).format(_selectedDate),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(
+                    Icons.arrow_drop_down_rounded,
+                    size: 22,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
         actions: [
-          PopupMenuButton<_NutritionMenuAction>(
-            tooltip: loc.nutritionMoreOptions,
-            onSelected: (action) {
-              switch (action) {
-                case _NutritionMenuAction.progress:
-                  _openProgress();
-                  break;
-                case _NutritionMenuAction.savedMeals:
-                  _openSavedMeals();
-                  break;
-                case _NutritionMenuAction.copyPreviousDay:
-                  _copyPreviousDay();
-                  break;
-                case _NutritionMenuAction.replicateDay:
-                  _replicateDay();
-                  break;
-                case _NutritionMenuAction.manageMeals:
-                  _openSettings();
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: _NutritionMenuAction.manageMeals,
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.restaurant_outlined),
-                  title: Text(loc.nutritionDiaryManageMeals),
-                ),
-              ),
-              PopupMenuItem(
-                value: _NutritionMenuAction.progress,
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.insights_outlined),
-                  title: Text(loc.nutritionProgressTitle),
-                ),
-              ),
-              PopupMenuItem(
-                value: _NutritionMenuAction.savedMeals,
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.restaurant_menu_outlined),
-                  title: Text(loc.nutritionSavedMeals),
-                ),
-              ),
-              const PopupMenuDivider(),
-              PopupMenuItem(
-                value: _NutritionMenuAction.copyPreviousDay,
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.content_copy_outlined),
-                  title: Text(loc.nutritionCopyPreviousDay),
-                ),
-              ),
-              PopupMenuItem(
-                value: _NutritionMenuAction.replicateDay,
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.calendar_month_outlined),
-                  title: Text(loc.nutritionReplicateDay),
-                ),
-              ),
-            ],
+          if (!isToday)
+            IconButton(
+              tooltip: loc.nutritionJumpToday,
+              onPressed: _jumpToToday,
+              icon: const Icon(Icons.today_rounded),
+            ),
+          IconButton(
+            tooltip: loc.nutritionPreviousDay,
+            onPressed: () => _changeDay(-1),
+            icon: const Icon(Icons.chevron_left_rounded),
           ),
+          IconButton(
+            tooltip: loc.nutritionNextDay,
+            onPressed: () => _changeDay(1),
+            icon: const Icon(Icons.chevron_right_rounded),
+          ),
+          _buildMenu(loc),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: AnimatedBuilder(
+              animation: _tabController,
+              builder: (context, _) => RunSegmentedTabs<int>(
+                values: const [0, 1],
+                selected: _tabController.index,
+                labelOf: (tab) => tab == 0
+                    ? loc.nutritionDiaryTab
+                    : loc.nutritionDailyStatsTab,
+                onChanged: _tabController.animateTo,
+              ),
+            ),
+          ),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : IgnorePointer(
               ignoring: _isMutating,
-              child: Column(
+              child: TabBarView(
+                controller: _tabController,
                 children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(
-                          color: theme.colorScheme.outlineVariant.withAlpha(90),
-                        ),
-                      ),
-                    ),
-                    child: SizedBox(
-                      height: 44,
-                      child: TabBar(
-                        controller: _tabController,
-                        dividerHeight: 0,
-                        labelPadding: const EdgeInsets.symmetric(horizontal: 8),
-                        tabs: [
-                          Tab(
-                            child: _CompactTabLabel(
-                              icon: Icons.menu_book_outlined,
-                              label: loc.nutritionDiaryTab,
-                            ),
-                          ),
-                          Tab(
-                            child: _CompactTabLabel(
-                              icon: Icons.donut_large_outlined,
-                              label: loc.nutritionDailyStatsTab,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: [
-                        RefreshIndicator(
-                          onRefresh: _load,
-                          child: CustomScrollView(
-                            key: const PageStorageKey('nutrition-diary'),
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            slivers: [
-                              SliverToBoxAdapter(
-                                child: Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    16,
-                                    12,
-                                    16,
-                                    8,
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      if (_effective.fromPlan)
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                            bottom: 8,
-                                          ),
-                                          child: _DayPlanGoalChip(
-                                            planInfo: _effective,
-                                          ),
-                                        ),
-                                      _StatisticsSectionCard(
-                                        title: loc.nutritionCaloriesTitle,
-                                        icon: Icons
-                                            .local_fire_department_outlined,
-                                        compact: true,
-                                        child: _CalorieEquation(
-                                          consumed:
-                                              _summary.consumed.calories ?? 0,
-                                          goal: _effective.goal?.calories,
-                                          carbsG: _summary.consumed.carbsG,
-                                          proteinG: _summary.consumed.proteinG,
-                                          fatG: _summary.consumed.fatG,
-                                          onConfigureGoal: _openSettings,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ).animate().fadeIn(duration: 220.ms),
-                              ),
-                              ..._buildMealSlivers(loc, theme),
-                              const SliverToBoxAdapter(
-                                child: SizedBox(height: 32),
-                              ),
-                            ],
-                          ),
-                        ),
-                        RefreshIndicator(
-                          onRefresh: _load,
-                          child: _DailyStatisticsView(
-                            key: const PageStorageKey('nutrition-statistics'),
+                  RefreshIndicator(
+                    onRefresh: _load,
+                    child: CustomScrollView(
+                      key: const PageStorageKey('nutrition-diary'),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: NutritionSummaryCard(
                             summary: _summary,
                             goal: _effective.goal,
+                            planInfo: _effective,
+                            onConfigureGoal: _openSettings,
+                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                          ).animate().fadeIn(duration: 220.ms),
+                        ),
+                        SliverToBoxAdapter(
+                          child: NutritionSectionLabel(
+                            title: loc.nutritionDiaryMealsSection,
+                            value: (_summary.consumed.calories ?? 0) > 0
+                                ? loc.nutritionConsumedKcal(
+                                    nutritionNumber(
+                                      _summary.consumed.calories!
+                                          .roundToDouble(),
+                                    ),
+                                  )
+                                : null,
+                            count: _meals.fold<int>(
+                              0,
+                              (sum, meal) => sum + meal.items.length,
+                            ),
+                            padding: const EdgeInsets.fromLTRB(20, 26, 20, 4),
                           ),
                         ),
+                        ..._buildMealSlivers(loc),
+                        const SliverToBoxAdapter(child: SizedBox(height: 32)),
                       ],
+                    ),
+                  ),
+                  RefreshIndicator(
+                    onRefresh: _load,
+                    child: _DailyStatisticsView(
+                      key: const PageStorageKey('nutrition-statistics'),
+                      summary: _summary,
+                      goal: _effective.goal,
                     ),
                   ),
                 ],
@@ -740,10 +688,63 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
     );
   }
 
-  /// Renders one section per configured meal type (in catalog order),
-  /// then any leftover sections whose type was deleted from the catalog
-  /// — history stays visible with its stored name.
-  List<Widget> _buildMealSlivers(AppLocalizations loc, ThemeData theme) {
+  Widget _buildMenu(AppLocalizations loc) {
+    PopupMenuItem<_NutritionMenuAction> item(
+      _NutritionMenuAction value,
+      IconData icon,
+      String label,
+    ) => PopupMenuItem(
+      value: value,
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(icon),
+        title: Text(label),
+      ),
+    );
+    return PopupMenuButton<_NutritionMenuAction>(
+      tooltip: loc.nutritionMoreOptions,
+      onSelected: (action) => switch (action) {
+        _NutritionMenuAction.progress => _openProgress(),
+        _NutritionMenuAction.savedMeals => _openSavedMeals(),
+        _NutritionMenuAction.copyPreviousDay => _copyPreviousDay(),
+        _NutritionMenuAction.replicateDay => _replicateDay(),
+        _NutritionMenuAction.manageMeals => _openSettings(),
+      },
+      itemBuilder: (context) => [
+        item(
+          _NutritionMenuAction.manageMeals,
+          Icons.restaurant_outlined,
+          loc.nutritionDiaryManageMeals,
+        ),
+        item(
+          _NutritionMenuAction.progress,
+          Icons.insights_outlined,
+          loc.nutritionProgressTitle,
+        ),
+        item(
+          _NutritionMenuAction.savedMeals,
+          Icons.restaurant_menu_outlined,
+          loc.nutritionSavedMeals,
+        ),
+        const PopupMenuDivider(),
+        item(
+          _NutritionMenuAction.copyPreviousDay,
+          Icons.content_copy_outlined,
+          loc.nutritionCopyPreviousDay,
+        ),
+        item(
+          _NutritionMenuAction.replicateDay,
+          Icons.calendar_month_outlined,
+          loc.nutritionReplicateDay,
+        ),
+      ],
+    );
+  }
+
+  /// Renders one card per configured meal type (in catalog order), then
+  /// any leftover meals whose type was deleted from the catalog — history
+  /// stays visible with its stored name.
+  List<Widget> _buildMealSlivers(AppLocalizations loc) {
     final configuredKeys = {for (final type in _mealTypes) type.key};
     final orphanMeals = _meals
         .where((m) => !configuredKeys.contains(m.log.mealType))
@@ -755,42 +756,32 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
         ),
       ];
     }
+    Widget card(MealLogWithItems meal, String title) {
+      void add() => _addItem(meal.log.mealType, title);
+      return NutritionMealCard(
+        key: _mealSectionKey(meal.log.mealType),
+        keyPrefix: 'nutrition-diary',
+        title: title,
+        meal: meal,
+        detailed: true,
+        emptyLabel: loc.nutritionMealEmptyHint,
+        onOpen: meal.items.isEmpty ? add : null,
+        onAdd: add,
+        onEditItem: _editItem,
+        menu: _MealMenu(
+          onRepeat: () => _repeatMeal(meal),
+          onSaveAsMeal: () => _saveMealFromDay(meal),
+        ),
+      ).animate().fadeIn(duration: 250.ms, delay: 40.ms).slideY(begin: 0.02);
+    }
+
     return [
       for (final type in _mealTypes)
         SliverToBoxAdapter(
-          child:
-              _MealSection(
-                    key: _mealSectionKey(type.key),
-                    title: type.displayName(loc),
-                    meal: _mealFor(type.key),
-                    onAdd: () => _addItem(type.key, type.displayName(loc)),
-                    onEdit: _editItem,
-                    onDelete: _deleteItem,
-                    onRepeat: () => _repeatMeal(_mealFor(type.key)),
-                    onSaveAsMeal: () => _saveMealFromDay(_mealFor(type.key)),
-                  )
-                  .animate()
-                  .fadeIn(duration: 250.ms, delay: 40.ms)
-                  .slideY(begin: 0.02),
+          child: card(_mealFor(type.key), type.displayName(loc)),
         ),
       for (final meal in orphanMeals)
-        SliverToBoxAdapter(
-          child:
-              _MealSection(
-                    key: _mealSectionKey(meal.log.mealType),
-                    title: meal.log.displayName(loc),
-                    meal: meal,
-                    onAdd: () =>
-                        _addItem(meal.log.mealType, meal.log.displayName(loc)),
-                    onEdit: _editItem,
-                    onDelete: _deleteItem,
-                    onRepeat: () => _repeatMeal(meal),
-                    onSaveAsMeal: () => _saveMealFromDay(meal),
-                  )
-                  .animate()
-                  .fadeIn(duration: 250.ms, delay: 40.ms)
-                  .slideY(begin: 0.02),
-        ),
+        SliverToBoxAdapter(child: card(meal, meal.log.displayName(loc))),
     ];
   }
 
@@ -814,69 +805,4 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
 
   static String _dateString(DateTime value) =>
       _dateOnly(value).toIso8601String().substring(0, 10);
-}
-
-/// Small chip shown when an active plan's current week is overriding
-/// the settings goal for the viewed day. Tapping opens the
-/// periodization home.
-class _DayPlanGoalChip extends StatelessWidget {
-  final EffectiveNutritionGoal planInfo;
-
-  const _DayPlanGoalChip({required this.planInfo});
-
-  @override
-  Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final phase = planInfo.phase!;
-    final color = Color(phase.color);
-    final badge = loc.nutritionGoalPlanBadge(
-      phase.name,
-      planInfo.weekNumber ?? 1,
-      planInfo.totalWeeks ?? 1,
-    );
-    // Phases with rest-day nutrition say which target today uses.
-    final label = switch (planInfo.trainingDay) {
-      true => '$badge · ${loc.planningTrainingDayShort}',
-      false => '$badge · ${loc.planningRestDayShort}',
-      null => badge,
-    };
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Material(
-        color: color.withAlpha(38),
-        borderRadius: BorderRadius.circular(999),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(999),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => const PeriodizationHomeScreen(),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.event_note_rounded, size: 14, color: color),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: color,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

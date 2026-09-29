@@ -1280,7 +1280,7 @@
   "nutritionGoalSurplus": "{value} kcal acima",
   "nutritionGoalNoGoal": "Sem meta configurada",
   "nutritionConfigureGoal": "Configurar meta",
-  "nutritionItemCount": "{count, plural, =1{1 item} other{{count} itens}}",
+  "nutritionItemCount": "{count, plural, =0{Nenhum item} =1{1 item} other{{count} itens}}",
   "nutritionSummaryTitle": "Resumo do dia",
   "nutritionProgressProtein": "Proteína",
   "nutritionProgressCarbs": "Carboidratos",
@@ -3823,5 +3823,11 @@
   "activeWorkoutSuggestionFacts": "{routine} · {count, plural, =1{1 exercício} other{{count} exercícios}}",
   "activeWorkoutBuildSection": "Montar treino",
   "activeWorkoutAddExerciseHint": "Escolha na biblioteca de exercícios",
-  "activeWorkoutImportRoutineHint": "Copie os exercícios de um dia de rotina"
+  "activeWorkoutImportRoutineHint": "Copie os exercícios de um dia de rotina",
+  "nutritionDiaryMealsSection": "REFEIÇÕES",
+  "nutritionMealEmptyHint": "Nenhum alimento ainda",
+  "nutritionMacroSplitTitle": "Calorias por macro",
+  "nutritionNutrientOfGoal": "de {goal}",
+  "nutritionNutrientLeft": "faltam {value}",
+  "nutritionNutrientGoalReached": "Meta atingida"
 }

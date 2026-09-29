@@ -244,7 +244,6 @@ class _ControlledGateway implements NutritionGateway {
   String? get baseUrl => 'https://stub.test';
 }
 
-
 /// Real-I/O loads (sqflite FFI) only progress inside runAsync windows and
 /// can be slow on CI machines, so poll for the expected widget instead of
 /// relying on a fixed delay.
@@ -327,7 +326,8 @@ void main() {
     expect(find.text(loc.nutritionJumpToday), findsOneWidget);
     expect(find.text(loc.nutritionDiaryTab), findsOneWidget);
     expect(find.text(loc.nutritionDailyStatsTab), findsOneWidget);
-    expect(find.text(loc.nutritionCaloriesTitle), findsOneWidget);
+    expect(find.text(loc.nutritionSummaryTitle), findsOneWidget);
+    expect(find.text(loc.nutritionDiaryMealsSection), findsOneWidget);
     expect(find.byIcon(Icons.settings_outlined), findsNothing);
     expect(find.text(loc.nutritionAddManually), findsNothing);
     expect(find.byType(FloatingActionButton), findsNothing);
@@ -335,13 +335,13 @@ void main() {
     await tester.tap(find.text(loc.nutritionDailyStatsTab));
     await tester.pumpAndSettle();
 
-    expect(find.text(loc.nutritionCaloriesTitle), findsNothing);
+    expect(find.text(loc.nutritionSummaryTitle), findsNothing);
     expect(find.byType(ExpansionTile), findsNothing);
     expect(find.text(loc.nutritionMacrosTitle), findsOneWidget);
-    expect(find.text(loc.nutritionNutrientsTitle), findsOneWidget);
-    expect(find.text(loc.nutritionNutrientConsumedHeader), findsOneWidget);
-    expect(find.text(loc.nutritionNutrientGoalHeader), findsOneWidget);
-    expect(find.text(loc.nutritionNutrientRemainingHeader), findsOneWidget);
+    expect(
+      find.text(loc.nutritionNutrientsTitle.toUpperCase()),
+      findsOneWidget,
+    );
     expect(find.byKey(const ValueKey('nutrition-stat-fiber')), findsOneWidget);
     expect(find.byKey(const ValueKey('nutrition-stat-sugars')), findsOneWidget);
     expect(find.byKey(const ValueKey('nutrition-stat-sodium')), findsOneWidget);
@@ -353,12 +353,9 @@ void main() {
       loc.nutritionNutrientMineralsTitle,
       loc.nutritionNutrientVitaminsTitle,
     ]) {
-      await tester.scrollUntilVisible(
-        find.text(title),
-        240,
-        scrollable: statisticsList,
-      );
-      expect(find.text(title), findsOneWidget);
+      final header = find.text(title.toUpperCase());
+      await tester.scrollUntilVisible(header, 240, scrollable: statisticsList);
+      expect(header, findsOneWidget);
     }
 
     await tester.tap(find.text(loc.nutritionDiaryTab));
@@ -610,7 +607,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(mealRow);
       await tester.pump();
-      await _waitUntilFound(tester, find.text(loc.nutritionDiaryTab));
+      await _waitUntilFound(
+        tester,
+        find.byKey(const PageStorageKey('nutrition-diary')),
+      );
 
       expect(find.byType(NutritionDayDetailScreen), findsOneWidget);
       expect(find.byType(FoodSearchScreen), findsNothing);
@@ -1176,31 +1176,32 @@ void main() {
     },
   );
 
-  testWidgets('MainShell renders Workout, Sleep, Nutrition, and Progress tabs', (
-    tester,
-  ) async {
-    // Render a structure equivalent to MainShell: we use a stub body
-    // so the test does not depend on the Workout/Sleep screens.
-    late AppLocalizations loc;
-    await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        locale: const Locale('en'),
-        home: Builder(
-          builder: (context) {
-            loc = AppLocalizations.of(context)!;
-            return const _StubMainShell();
-          },
+  testWidgets(
+    'MainShell renders Workout, Sleep, Nutrition, and Progress tabs',
+    (tester) async {
+      // Render a structure equivalent to MainShell: we use a stub body
+      // so the test does not depend on the Workout/Sleep screens.
+      late AppLocalizations loc;
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('en'),
+          home: Builder(
+            builder: (context) {
+              loc = AppLocalizations.of(context)!;
+              return const _StubMainShell();
+            },
+          ),
         ),
-      ),
-    );
-    await tester.pump();
-    expect(find.text(loc.tabWorkout), findsOneWidget);
-    expect(find.text(loc.tabSleep), findsOneWidget);
-    expect(find.text(loc.tabNutrition), findsOneWidget);
-    expect(find.text(loc.tabPlan), findsOneWidget);
-  });
+      );
+      await tester.pump();
+      expect(find.text(loc.tabWorkout), findsOneWidget);
+      expect(find.text(loc.tabSleep), findsOneWidget);
+      expect(find.text(loc.tabNutrition), findsOneWidget);
+      expect(find.text(loc.tabPlan), findsOneWidget);
+    },
+  );
 }
 
 class _StubMainShell extends StatelessWidget {
