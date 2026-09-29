@@ -1,5 +1,6 @@
 import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 
 enum RunStepEnginePhase { idle, running, done }
 
@@ -153,7 +154,6 @@ class RunStepResult {
     durationSeconds: (row['durationSeconds'] as num?)?.toInt() ?? 0,
   );
 
-  double? get actualPaceSecPerKm => distanceMeters < 1 || durationSeconds <= 0
-      ? null
-      : durationSeconds / (distanceMeters / 1000.0);
+  double? get actualPaceSecPerKm =>
+      RunFormatters.paceOrNull(distanceMeters, durationSeconds);
 }

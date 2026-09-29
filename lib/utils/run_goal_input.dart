@@ -1,3 +1,5 @@
+import 'package:workout_notes/utils/run_formatters.dart';
+
 /// Parsing for the free-text goal fields of the record screen (custom
 /// distance, custom time, pace goal). Accepts both `,` and `.` decimals.
 class RunGoalInput {
@@ -53,8 +55,7 @@ class RunGoalInput {
   }
 
   /// `5:30` for 330 s/km, the editable form of [paceSecPerKm].
-  static String paceText(int secPerKm) =>
-      '${secPerKm ~/ 60}:${(secPerKm % 60).toString().padLeft(2, '0')}';
+  static String paceText(int secPerKm) => RunFormatters.minSec(secPerKm);
 
   static double? _decimal(String raw) {
     final text = raw.trim().replaceAll(',', '.');

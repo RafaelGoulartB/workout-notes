@@ -114,10 +114,9 @@ abstract final class RunPlanUi {
           : '${hours}h${rest.toString().padLeft(2, '0')}';
     }
     if (minutes == 0) return '${seconds}s';
-    final rest = seconds % 60;
-    return rest == 0
+    return seconds % 60 == 0
         ? '$minutes min'
-        : '$minutes:${rest.toString().padLeft(2, '0')}';
+        : RunFormatters.minSec(seconds);
   }
 
   /// Rounded duration for estimates — `38 min`, `1h05`. The exact form
@@ -137,8 +136,7 @@ abstract final class RunPlanUi {
   /// `4:35` for 275 s/km.
   static String paceLabel(double? secPerKm) {
     if (secPerKm == null || secPerKm <= 0 || !secPerKm.isFinite) return '—';
-    final total = secPerKm.round();
-    return '${total ~/ 60}:${(total % 60).toString().padLeft(2, '0')}';
+    return RunFormatters.minSec(secPerKm.round());
   }
 
   /// `4:20–4:35` (or a single value when only one bound is set).
@@ -265,7 +263,7 @@ abstract final class RunPlanUi {
   /// `2:30`, so a 20-minute warm-up is not typed as `1200`.
   static String secondsInput(int seconds) {
     if (seconds < 60) return seconds.toString();
-    return '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
+    return RunFormatters.minSec(seconds);
   }
 
   /// Parses a step duration: `90` (seconds) or `1:30` (minutes and seconds).

@@ -1,4 +1,5 @@
 import 'package:workout_notes/models/run_lap.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 
 /// Manual laps for the Dart-side (debug) tracker. Mirrors the Android
 /// `RunLapTracker`: a lap is measured on moving time, and a double tap
@@ -30,9 +31,7 @@ class RunLapLog {
       startDistanceMeters: _startDistance,
       distanceMeters: distance,
       durationSeconds: duration,
-      paceSecPerKm: distance < 1 || duration <= 0
-          ? null
-          : duration / (distance / 1000.0),
+      paceSecPerKm: RunFormatters.paceOrNull(distance, duration),
     );
   }
 

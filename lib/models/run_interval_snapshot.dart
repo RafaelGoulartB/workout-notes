@@ -62,7 +62,9 @@ class RunIntervalSnapshot {
       currentMetric: metricOf(map['metric']),
       currentTarget: (map['target'] as num?)?.toInt() ?? 0,
       nextPhase: phaseOf(map['nextPhase']),
-      nextMetric: map['nextMetric'] == null ? null : metricOf(map['nextMetric']),
+      nextMetric: map['nextMetric'] == null
+          ? null
+          : metricOf(map['nextMetric']),
       nextTarget: (map['nextTarget'] as num?)?.toInt(),
     );
   }

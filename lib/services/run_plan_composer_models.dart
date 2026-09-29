@@ -100,13 +100,9 @@ class _PaceBook {
   String? get easyWindowLabel {
     final fast = easyFast, slow = easySlow;
     if (fast == null || slow == null) return null;
-    return '${_paceText(fast)}–${_paceText(slow)}/km';
+    return '${RunFormatters.minSec(fast.round())}–'
+        '${RunFormatters.minSec(slow.round())}/km';
   }
-}
-
-String _paceText(double secPerKm) {
-  final total = secPerKm.round();
-  return '${total ~/ 60}:${(total % 60).toString().padLeft(2, '0')}';
 }
 
 /// One planned week: periodisation phase, volume budget and session roles.

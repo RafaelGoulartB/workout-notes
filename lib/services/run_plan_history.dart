@@ -1,5 +1,6 @@
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/services/run_plan_composer.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 
 /// A completed GPS run the wizard can use as "recent race" calibration.
 class RunPlanSuggestedRace {
@@ -65,7 +66,10 @@ class RunPlanHistoryInsights {
       : activity.durationSeconds;
 
   static double _paceSecPerKm(RunActivity activity) =>
-      _effortSeconds(activity) / (activity.distanceMeters / 1000);
+      RunFormatters.paceSecondsPerKm(
+        activity.distanceMeters,
+        _effortSeconds(activity),
+      );
 
   /// Monday of the calendar week containing [date], local date only.
   static DateTime weekStart(DateTime date) {

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/models/run_track_point.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 
 /// One pace sample along the run, keyed by cumulative distance.
 class RunPaceSample {
@@ -65,9 +66,8 @@ class RunPaceAnalytics {
   }
 
   static double? paceSecPerKm(double distanceMeters, int movingTimeSeconds) {
-    if (distanceMeters < 1.0 || movingTimeSeconds <= 0) return null;
-    final pace = movingTimeSeconds / (distanceMeters / 1000.0);
-    if (!pace.isFinite || pace <= 0) return null;
+    final pace = RunFormatters.paceOrNull(distanceMeters, movingTimeSeconds);
+    if (pace == null || !pace.isFinite || pace <= 0) return null;
     return pace;
   }
 
@@ -166,7 +166,7 @@ class RunPaceAnalytics {
       final dt = movingSeconds[i] - movingSeconds[windowStart];
       if (dt <= 0) continue;
 
-      final pace = dt / (dd / 1000.0);
+      final pace = RunFormatters.paceSecondsPerKm(dd, dt);
       if (!pace.isFinite) continue;
       if (pace < minPaceSecPerKm || pace > maxPaceSecPerKm) continue;
 

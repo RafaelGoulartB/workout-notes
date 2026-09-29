@@ -3,6 +3,7 @@ import 'package:workout_notes/models/run_lap.dart';
 import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 
 /// A completed native spool that has not been accepted into run history yet.
 /// Keeping the source payload makes saving idempotent and lets Android recover
@@ -96,13 +97,9 @@ class RunReviewDraft {
                 ?.toDouble(),
             actualDistanceMeters: distance,
             actualDurationSeconds: duration,
-            actualPaceSecPerKm:
-                distance == null ||
-                    distance < 1 ||
-                    duration == null ||
-                    duration <= 0
+            actualPaceSecPerKm: distance == null || duration == null
                 ? null
-                : duration / (distance / 1000),
+                : RunFormatters.paceOrNull(distance, duration),
           );
         })
         .toList(growable: false);

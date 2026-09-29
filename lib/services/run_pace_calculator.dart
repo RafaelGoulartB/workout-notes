@@ -1,3 +1,5 @@
+import 'package:workout_notes/utils/run_formatters.dart';
+
 import 'dart:math' as math;
 
 /// Coaching pace targets derived from a known race or a goal race time.
@@ -77,7 +79,7 @@ abstract final class RunPaceCalculator {
     }
     return fromVdot(
       vdotFor(distanceMeters: distanceMeters, timeSeconds: timeSeconds),
-      raceSecPerKm: timeSeconds / (distanceMeters / 1000),
+      raceSecPerKm: RunFormatters.paceSecondsPerKm(distanceMeters, timeSeconds),
       calibrationDistanceMeters: distanceMeters,
     );
   }
@@ -155,7 +157,7 @@ abstract final class RunPaceCalculator {
     required int timeSeconds,
   }) {
     if (distanceMeters <= 0 || timeSeconds <= 0) return false;
-    final pace = timeSeconds / (distanceMeters / 1000);
+    final pace = RunFormatters.paceSecondsPerKm(distanceMeters, timeSeconds);
     return pace >= minPlausibleSecPerKm && pace <= maxPlausibleSecPerKm;
   }
 

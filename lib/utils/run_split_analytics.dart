@@ -1,4 +1,5 @@
 import 'package:workout_notes/models/run_split.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 
 /// How a split compares with the run's average pace.
 enum RunSplitTone { faster, even, slower, unknown }
@@ -52,8 +53,7 @@ abstract final class RunSplitAnalytics {
       meters += split.distanceMeters;
       seconds += split.durationSeconds;
     }
-    if (meters < 1 || seconds <= 0) return null;
-    return seconds / (meters / 1000);
+    return RunFormatters.paceOrNull(meters, seconds);
   }
 
   static RunSplitTone toneFor(double? delta) {
