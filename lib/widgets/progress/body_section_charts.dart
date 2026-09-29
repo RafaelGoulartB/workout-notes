@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/progress_helpers.dart';
@@ -319,7 +320,7 @@ class _BodyCompositionChart extends StatelessWidget {
                           }
                           final d = validData[idx]['date'] as String? ?? '';
                           return Text(
-                            d.length >= 10 ? d.substring(5) : d,
+                            _shortDate(d),
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontSize: 7,
                             ),
@@ -411,7 +412,7 @@ class _BodyCompositionChart extends StatelessWidget {
                               '${loc.bodyTrackerWaist}: ${s.y.toStringAsFixed(1)}cm';
                         }
                         return LineTooltipItem(
-                          '$d\n$label',
+                          '${_longDate(d)}\n$label',
                           TextStyle(
                             color: theme.colorScheme.onSurface,
                             fontWeight: FontWeight.bold,
@@ -531,7 +532,7 @@ class _BodyWeightChart extends StatelessWidget {
                           }
                           final d = data[idx]['date'] as String? ?? '';
                           return Text(
-                            d.length >= 10 ? d.substring(5) : d,
+                            _shortDate(d),
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontSize: 7,
                             ),
@@ -594,7 +595,7 @@ class _BodyWeightChart extends StatelessWidget {
                             : '';
                         final isWeight = s.barIndex == 0;
                         return LineTooltipItem(
-                          '$d\n${isWeight ? '${loc.progressBodyWeight}: ${s.y.toStringAsFixed(1)}${loc.workoutDetailKg}' : '${loc.commonVolume}: ${formatVolume(s.y)}'}',
+                          '${_longDate(d)}\n${isWeight ? '${loc.progressBodyWeight}: ${s.y.toStringAsFixed(1)}${loc.workoutDetailKg}' : '${loc.commonVolume}: ${formatVolume(s.y)}'}',
                           TextStyle(
                             color: theme.colorScheme.onSurface,
                             fontWeight: FontWeight.bold,
@@ -700,4 +701,16 @@ class _BodyTrackerLink extends StatelessWidget {
       ),
     );
   }
+}
+
+/// `dd/MM` for an ISO `yyyy-MM-dd` date (axis labels).
+String _shortDate(String iso) {
+  final date = DateTime.tryParse(iso);
+  return date == null ? iso : DateFormat('dd/MM').format(date);
+}
+
+/// `dd/MM/yyyy` for an ISO `yyyy-MM-dd` date (tooltips).
+String _longDate(String iso) {
+  final date = DateTime.tryParse(iso);
+  return date == null ? iso : DateFormat('dd/MM/yyyy').format(date);
 }
