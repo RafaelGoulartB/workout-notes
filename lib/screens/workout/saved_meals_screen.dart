@@ -154,7 +154,7 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
     setState(() => _isLogging = true);
     try {
       final result = await widget.repository.addSavedMealToDate(
-        date: _todayString(),
+        date: dateKey(DateTime.now()),
         mealType: mealType,
         mealName: type.displayName(loc),
         savedMealId: meal.meal.id,
@@ -179,11 +179,6 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
     } finally {
       if (mounted) setState(() => _isLogging = false);
     }
-  }
-
-  static String _todayString() {
-    final now = DateTime.now();
-    return dateKey(DateTime(now.year,now.month,now.day,));
   }
 
   @override

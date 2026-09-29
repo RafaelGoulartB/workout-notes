@@ -200,18 +200,10 @@ class AiRunToolService {
 
   Future<Map<String, dynamic>> cardioSummary({int weeks = 4}) async {
     final end = _now();
-    final start = DateTime(
-      end.year,
-      end.month,
-      end.day,
-    ).subtract(Duration(days: weeks * 7 - 1));
+    final start = addDays(end, -(weeks * 7 - 1));
     final all = await _completedActivities();
     final recent = all.where((activity) {
-      final day = DateTime(
-        activity.startedAt.year,
-        activity.startedAt.month,
-        activity.startedAt.day,
-      );
+      final day = dayOf(activity.startedAt);
       return !day.isBefore(start) && !day.isAfter(end);
     }).toList();
     final byType = <String, List<RunActivity>>{};

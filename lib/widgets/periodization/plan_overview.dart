@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
-import 'package:workout_notes/repositories/routine_repository.dart';
-import 'package:workout_notes/repositories/run_plan_repository.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 
 /// A plan with its phases and, per phase, the target that best describes it
@@ -35,7 +35,7 @@ class PlanOverviewData {
     DateTime? today,
   }) async {
     final now = today ?? DateTime.now();
-    final day = DateTime(now.year, now.month, now.day);
+    final day = dayOf(now);
     final phases = await repository.getPhases(plan.id);
     final targets = await Future.wait([
       for (final phase in phases)
@@ -48,8 +48,10 @@ class PlanOverviewData {
               : phase.startDate,
         ),
     ]);
-    final routines = await RoutineRepository().getRoutines();
-    final runPlans = await RunPlanRepository().listPlans(includeArchived: true);
+    final routines = await DatabaseHelper.instance.routineRepo.getRoutines();
+    final runPlans = await DatabaseHelper.instance.runPlanRepo.listPlans(
+      includeArchived: true,
+    );
     return PlanOverviewData(
       plan: plan,
       phases: phases,

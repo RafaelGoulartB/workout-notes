@@ -4,6 +4,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
 
 class SleepStageCard extends StatelessWidget {
   final SleepMonitorSession session;
@@ -192,13 +193,16 @@ class _NightMetrics extends StatelessWidget {
         loc.sleepOnsetTime,
         session.sleepOnsetAt == null
             ? '--'
-            : _wallTime(session.sleepOnsetAt!, session.utcOffsetStartMinutes),
+            : SleepUi.wallTime(
+                session.sleepOnsetAt!,
+                session.utcOffsetStartMinutes,
+              ),
       ),
       (
         loc.sleepFinalWake,
         session.finalWakeAt == null
             ? '--'
-            : _wallTime(
+            : SleepUi.wallTime(
                 session.finalWakeAt!,
                 session.utcOffsetEndMinutes ?? session.utcOffsetStartMinutes,
               ),
@@ -262,12 +266,6 @@ class _StageValue extends StatelessWidget {
       ],
     );
   }
-}
-
-String _wallTime(DateTime value, int offsetMinutes) {
-  final wallClock = value.toUtc().add(Duration(minutes: offsetMinutes));
-  return '${wallClock.hour.toString().padLeft(2, '0')}:'
-      '${wallClock.minute.toString().padLeft(2, '0')}';
 }
 
 String _minutes(int? value) {

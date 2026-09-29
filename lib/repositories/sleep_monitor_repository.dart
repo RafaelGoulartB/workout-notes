@@ -206,11 +206,7 @@ class SleepMonitorRepository extends BaseRepository {
         Duration(minutes: importedSession.utcOffsetStartMinutes),
       );
       final wallClockEnd = end.toUtc().add(Duration(minutes: endOffsetMinutes));
-      final localDate = DateTime(
-        wallClockEnd.year,
-        wallClockEnd.month,
-        wallClockEnd.day,
-      );
+      final localDate = dayOf(wallClockEnd);
       final duration = end.difference(importedSession.startedAt);
       final canCreateSleepEntry =
           const {

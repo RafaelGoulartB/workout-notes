@@ -1,11 +1,13 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_progress.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// State and data loading of the nutrition progress screen: the selected
 /// calendar week/month, the calorie balance and breakdowns for it, and the
@@ -14,9 +16,9 @@ class NutritionProgressController extends ChangeNotifier {
   NutritionProgressController({
     NutritionRepository? repository,
     DateTime Function()? now,
-  }) : _repository = repository ?? NutritionRepository(),
+  }) : _repository = repository ?? DatabaseHelper.instance.nutritionRepo,
        _now = now ?? DateTime.now {
-    _periodAnchor = NutritionProgressCalculator.dateOnly(_now());
+    _periodAnchor = dayOf(_now());
   }
 
   final NutritionRepository _repository;

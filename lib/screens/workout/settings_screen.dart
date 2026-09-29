@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/screens/workout/ai_coach_settings_screen.dart';
 import 'package:workout_notes/screens/workout/data_privacy_screen.dart';
 import 'package:workout_notes/screens/workout/general_settings_screen.dart';
@@ -68,7 +68,9 @@ class AppSettingsScreen extends StatelessWidget {
                 subtitle: loc.settingsNutritionSubtitle,
                 onTap: () => _open(
                   context,
-                  NutritionSettingsScreen(repository: NutritionRepository()),
+                  NutritionSettingsScreen(
+                    repository: DatabaseHelper.instance.nutritionRepo,
+                  ),
                 ),
               ),
               const SettingsCardDivider(),

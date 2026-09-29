@@ -9,6 +9,7 @@ import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:workout_notes/screens/strength/strength_home_screen.dart';
 import 'package:workout_notes/services/run_today_service.dart';
 import 'package:workout_notes/services/strength_today_service.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_week_analytics.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
@@ -279,7 +280,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       activeSeconds: _controller.overview.activeSeconds,
       streakWeeks: _controller.overview.streakWeeks,
       days: _controller.weekDays,
-      today: DateTime(now.year, now.month, now.day),
+      today: dayOf(now),
       onOpenStrength: _openStrengthHub,
       onOpenRun: _openRunHub,
     ).animate().fadeIn(duration: 300.ms);

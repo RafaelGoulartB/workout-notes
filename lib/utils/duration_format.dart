@@ -4,6 +4,13 @@
 abstract final class DurationFormat {
   static String _two(int value) => value.toString().padLeft(2, '0');
 
+  /// Two-digit, zero-padded number: `05`, `42`.
+  static String twoDigits(int value) => _two(value);
+
+  /// `HH:mm` of a whole number of minutes: `07:05`, `23:40`.
+  static String hhmm(int totalMinutes) =>
+      '${_two(totalMinutes ~/ 60)}:${_two(totalMinutes % 60)}';
+
   /// `m:ss` with the minutes unpadded: `5:42`, `95:05`.
   static String minSec(int totalSeconds) =>
       '${totalSeconds ~/ 60}:${_two(totalSeconds % 60)}';

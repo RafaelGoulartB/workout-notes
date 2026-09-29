@@ -190,11 +190,7 @@ class BodyGoalProgress {
   DateTime? etaFrom(DateTime now) {
     final weeks = weeksToTarget;
     if (weeks == null) return null;
-    return DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).add(Duration(days: (weeks * 7).ceil()));
+    return addDays(now, (weeks * 7).ceil());
   }
 }
 

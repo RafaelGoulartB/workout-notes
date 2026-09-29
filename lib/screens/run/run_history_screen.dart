@@ -7,6 +7,7 @@ import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_activity_filter.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/run_achievement_engine.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
@@ -131,7 +132,7 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> {
     String? lastKey;
     for (final activity in _activities) {
       final local = activity.startedAt.toLocal();
-      final key = _monthKey(local);
+      final key = monthKey(local);
       if (key != lastKey) {
         entries.add(_MonthEntry(DateTime(local.year, local.month)));
         lastKey = key;
@@ -140,10 +141,6 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> {
     }
     return entries;
   }
-
-  static String _monthKey(DateTime date) =>
-      '${date.year.toString().padLeft(4, '0')}-'
-      '${date.month.toString().padLeft(2, '0')}';
 
   void _setFilter(RunHistoryFilter filter) {
     setState(() => _filter = filter);
@@ -266,7 +263,7 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> {
         return switch (_entries[entryIndex]) {
           _MonthEntry(:final month) => RunHistoryMonthHeader(
             month: month,
-            totals: _monthTotals[_monthKey(month)],
+            totals: _monthTotals[monthKey(month)],
           ),
           _ActivityEntry(:final activity) => RunHistoryRow(
             activity: activity,

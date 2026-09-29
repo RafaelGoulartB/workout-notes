@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_schedule_chart.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
@@ -30,13 +31,13 @@ class SleepDurationChart extends StatelessWidget {
     final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
     final byDate = {
-      for (final entry in entries) _dateString(entry.date): entry,
+      for (final entry in entries) dateKey(entry.date): entry,
     };
     final goalHours = goalMinutes / 60;
     final groups = <BarChartGroupData>[];
     var maxHours = goalHours;
     for (var index = 0; index < days.length; index++) {
-      final entry = byDate[_dateString(days[index])];
+      final entry = byDate[dateKey(days[index])];
       final recorded = entry == null ? null : entry.sleepMinutes / 60;
       final actualMinutes =
           entry?.actualSleepMinutes ?? entry?.estimatedSleepMinutes;
@@ -177,10 +178,4 @@ class SleepDurationChart extends StatelessWidget {
     color: color,
     borderRadius: BorderRadius.circular(4),
   );
-
-  static String _dateString(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
 }

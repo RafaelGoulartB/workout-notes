@@ -132,7 +132,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
 
   bool get _showLoadError =>
       _loadFailed &&
-      (_dataDate == null || !_isSameDay(_dataDate!, _selectedDate));
+      (_dataDate == null || !isSameDay(_dataDate!, _selectedDate));
 
   Future<void> _loadEffectiveGoal(DateTime selectedDate, int generation) async {
     try {
@@ -151,7 +151,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
 
   Future<void> _selectDate(DateTime date) async {
     final normalized = dayOf(date);
-    if (_isSameDay(normalized, _selectedDate)) return;
+    if (isSameDay(normalized, _selectedDate)) return;
     setState(() => _selectedDate = normalized);
     await _load();
   }
@@ -620,7 +620,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                       ),
                       SliverToBoxAdapter(
                         child: NutritionSectionLabel(
-                          title: _isSameDay(_selectedDate, DateTime.now())
+                          title: isSameDay(_selectedDate, DateTime.now())
                               ? loc.nutritionHomeSectionToday
                               : DateFormat(
                                   'EEEE',
@@ -649,9 +649,6 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
             ),
     );
   }
-
-  static bool _isSameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
 }
 
 class _NutritionWeekSelector extends StatelessWidget {
@@ -694,11 +691,11 @@ class _NutritionWeekSelector extends StatelessWidget {
                 date: weekStart.add(Duration(days: index)),
                 locale: locale,
                 collapseProgress: collapseProgress,
-                isSelected: _isSameDay(
+                isSelected: isSameDay(
                   weekStart.add(Duration(days: index)),
                   selectedDate,
                 ),
-                isToday: _isSameDay(
+                isToday: isSameDay(
                   weekStart.add(Duration(days: index)),
                   today,
                 ),
@@ -719,9 +716,6 @@ class _NutritionWeekSelector extends StatelessWidget {
       ),
     );
   }
-
-  static bool _isSameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
 
   double? _calorieProgress(double? calories) {
     if (calorieGoal == null || calorieGoal! <= 0) return null;

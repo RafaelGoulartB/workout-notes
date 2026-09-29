@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/main.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
 import 'package:workout_notes/services/notification_service.dart';
@@ -11,7 +12,7 @@ import 'package:workout_notes/services/notification_service.dart';
 /// read the same keys the rest of the app persists.
 class WorkoutPreferencesController extends ChangeNotifier {
   WorkoutPreferencesController({SettingsRepository? repository})
-    : _repo = repository ?? SettingsRepository();
+    : _repo = repository ?? DatabaseHelper.instance.settingsRepo;
 
   final SettingsRepository _repo;
 
@@ -79,7 +80,7 @@ class WorkoutPreferencesController extends ChangeNotifier {
 /// to the app-wide notifiers.
 class AppearanceController extends ChangeNotifier {
   AppearanceController({SettingsRepository? repository})
-    : _repo = repository ?? SettingsRepository(),
+    : _repo = repository ?? DatabaseHelper.instance.settingsRepo,
       _accentIndex = AccentColors.indexOf(
         WorkoutNotesApp.themeNotifier.seedColor,
       ),

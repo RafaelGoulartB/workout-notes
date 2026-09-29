@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_duration_chart.dart';
 import 'package:workout_notes/widgets/sleep/sleep_schedule_chart.dart';
@@ -40,7 +41,7 @@ class _SleepWeekCardState extends State<SleepWeekCard> {
     final first = widget.days.first;
     final last = widget.days.last;
     final inWeek = widget.entries.where((entry) {
-      final date = DateTime(entry.date.year, entry.date.month, entry.date.day);
+      final date = dayOf(entry.date);
       return !date.isBefore(first) && !date.isAfter(last);
     }).toList();
     final average = inWeek.isEmpty

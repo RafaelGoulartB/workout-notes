@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// A standalone wake-up alarm. Weekdays use [DateTime.weekday] values
 /// (Monday = 1 through Sunday = 7); an empty list represents a one-shot alarm.
@@ -66,11 +67,7 @@ class TraditionalAlarm {
   DateTime nextOccurrence({DateTime? now}) {
     final reference = now ?? DateTime.now();
     for (var offset = 0; offset <= 7; offset++) {
-      final date = DateTime(
-        reference.year,
-        reference.month,
-        reference.day,
-      ).add(Duration(days: offset));
+      final date = addDays(reference, offset);
       final candidate = DateTime(date.year, date.month, date.day, hour, minute);
       if (candidate.isAfter(reference) &&
           (!repeats || weekdays.contains(candidate.weekday))) {

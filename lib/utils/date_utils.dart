@@ -9,6 +9,10 @@ library;
 /// Midnight (local) of [value]'s calendar day.
 DateTime dayOf(DateTime value) => DateTime(value.year, value.month, value.day);
 
+/// Whether [a] and [b] fall on the same calendar day (wall-clock fields).
+bool isSameDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
+
 /// Midnight (local) of the day [days] after (or before, when negative) the
 /// calendar day of [value].
 DateTime addDays(DateTime value, int days) =>
@@ -23,6 +27,9 @@ DateTime mondayOf(DateTime value) =>
 /// to 0).
 DateTime sundayOf(DateTime value) =>
     DateTime(value.year, value.month, value.day - value.weekday % 7);
+
+/// `yyyy-MM` of [value]'s month, used to group history by month.
+String monthKey(DateTime value) => dateKey(value).substring(0, 7);
 
 /// `yyyy-MM-dd` of [value]'s calendar day, the format stored in `date`
 /// columns.

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
@@ -6,6 +7,7 @@ import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
 import 'package:workout_notes/utils/body_progress_analytics.dart';
 import 'package:workout_notes/utils/body_tracker_utils.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Which trend chart the chart card is showing.
 enum BodyChartTab { weekly, delta, daily }
@@ -29,9 +31,9 @@ class BodyStatsController extends ChangeNotifier {
     PeriodizationRepository? periodizationRepo,
   }) : _selectedType = initialTypeId,
        _types = types.isEmpty ? kBodyMeasureTypes : types,
-       _bodyRepo = bodyRepo ?? BodyMeasurementRepository(),
-       _settingsRepo = settingsRepo ?? SettingsRepository(),
-       _periodizationRepo = periodizationRepo ?? PeriodizationRepository();
+       _bodyRepo = bodyRepo ?? DatabaseHelper.instance.bodyMeasurementRepo,
+       _settingsRepo = settingsRepo ?? DatabaseHelper.instance.settingsRepo,
+       _periodizationRepo = periodizationRepo ?? DatabaseHelper.instance.periodizationRepo;
 
   final BodyMeasurementRepository _bodyRepo;
   final SettingsRepository _settingsRepo;
@@ -217,7 +219,7 @@ class BodyStatsController extends ChangeNotifier {
   /// after it, otherwise the latest one before it.
   @visibleForTesting
   static double? closestValue(List<Map<String, dynamic>> rows, DateTime date) {
-    final target = DateTime(date.year, date.month, date.day);
+    final target = dayOf(date);
     // Rows come newest first, so the last match walking down is the closest
     // entry on or after the phase start.
     double? onOrAfter;

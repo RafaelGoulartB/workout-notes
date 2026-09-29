@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show DateUtils;
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
@@ -10,6 +11,7 @@ import 'package:workout_notes/services/run_tracking_service.dart';
 import 'package:workout_notes/services/stationary_bike_tracking_service.dart';
 import 'package:workout_notes/services/strength_routine_day_inference.dart';
 import 'package:workout_notes/services/strength_today_service.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/load_generation.dart';
 import 'package:workout_notes/utils/strength_week_analytics.dart';
 import 'package:workout_notes/widgets/strength/home/workout_home_widgets.dart';
@@ -54,10 +56,10 @@ class WorkoutHomeController extends ChangeNotifier {
     RunRepository? runRepo,
     RunTrackingService? runTracking,
     StationaryBikeTrackingService? bikeTracking,
-  }) : _workoutRepo = workoutRepo ?? WorkoutRepository(),
-       _strengthRepo = strengthRepo ?? StrengthRepository(),
+  }) : _workoutRepo = workoutRepo ?? DatabaseHelper.instance.workoutRepo,
+       _strengthRepo = strengthRepo ?? DatabaseHelper.instance.strengthRepo,
        _strengthToday = strengthToday ?? StrengthTodayService(),
-       _runRepo = runRepo ?? RunRepository(),
+       _runRepo = runRepo ?? DatabaseHelper.instance.runRepo,
        runTracking = runTracking ?? RunTrackingService.instance,
        bikeTracking = bikeTracking ?? StationaryBikeTrackingService.instance {
     _runActive = this.runTracking.state.isActive;
@@ -172,8 +174,8 @@ class WorkoutHomeController extends ChangeNotifier {
     // Links old workouts to their routine day; the strength snapshot reads
     // that link, so it goes first.
     await StrengthRoutineDayInference.runOnce();
-    final today = DateTime(now.year, now.month, now.day);
-    final monday = StrengthWeekAnalytics.mondayOf(today);
+    final today = dayOf(now);
+    final monday = mondayOf(today);
     // A year of history is enough for a week streak and keeps the reads
     // cheap; older weeks never change the number shown.
     final since = monday.subtract(const Duration(days: 7 * 52));
@@ -234,7 +236,7 @@ class WorkoutHomeController extends ChangeNotifier {
       cardio: [
         for (final a in cardio)
           WorkoutCardioStamp(
-            date: _dateOnly(a.startedAt.toLocal()),
+            date: dayOf(a.startedAt.toLocal()),
             durationSeconds: a.movingTimeSeconds > 0
                 ? a.movingTimeSeconds
                 : a.durationSeconds,
@@ -257,8 +259,6 @@ class WorkoutHomeController extends ChangeNotifier {
       strengthAverageSessions: averageWeeklySessions(stamps, monday),
     );
   }
-
-  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
   /// Sessions per week over the last 12 calendar weeks (this one
   /// included) — the same default period the gym hub averages over, so both

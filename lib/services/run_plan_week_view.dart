@@ -36,7 +36,7 @@ class RunPlanSessionView {
     required this.ledger,
   });
 
-  bool isToday(DateTime today) => date != null && _sameDay(date!, today);
+  bool isToday(DateTime today) => date != null && isSameDay(date!, today);
 }
 
 /// Pure helpers that turn a plan and its ledger into what the plan detail
@@ -62,11 +62,7 @@ abstract final class RunPlanWeekView {
       final cycle = elapsed < 0 ? 0 : elapsed ~/ plan.weeks;
       offset = (cycle + cycleShift) * plan.weeks + week;
     }
-    return DateTime(
-      anchorMonday.year,
-      anchorMonday.month,
-      anchorMonday.day + 7 * offset,
-    );
+    return addDays(anchorMonday, 7 * offset);
   }
 
   static DateTime? dateFor(
@@ -79,7 +75,7 @@ abstract final class RunPlanWeekView {
     if (dayOfWeek == null) return null;
     final start = weekStart(plan, week, today, cycleShift: cycleShift);
     if (start == null) return null;
-    return DateTime(start.year, start.month, start.day + dayOfWeek - 1);
+    return addDays(start, dayOfWeek - 1);
   }
 
   /// State of one session. [date] is its scheduled date (null: unknown).
@@ -137,7 +133,7 @@ abstract final class RunPlanWeekView {
     // falls inside the week shown says anything about this cycle.
     if (entry != null && plan.repeats && start != null) {
       final at = entry.date;
-      final end = DateTime(start.year, start.month, start.day + 6);
+      final end = addDays(start, 6);
       if (at == null || dayOf(at).isBefore(start) || dayOf(at).isAfter(end)) {
         entry = null;
       }
@@ -199,6 +195,3 @@ abstract final class RunPlanWeekView {
     return best;
   }
 }
-
-bool _sameDay(DateTime a, DateTime b) =>
-    a.year == b.year && a.month == b.month && a.day == b.day;

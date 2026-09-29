@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Calendar window analysed by the nutrition progress screen.
 enum BalancePeriod { week, month }
@@ -128,26 +129,16 @@ class NutritionProgressCalculator {
   /// A day within this fraction of the goal counts as "on target".
   static const double onTargetTolerance = 0.10;
 
-  static DateTime dateOnly(DateTime value) =>
-      DateTime(value.year, value.month, value.day);
-
-  static bool isSameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
-
-  /// Sunday on or before [date] (weeks start on Sunday in this screen).
-  static DateTime weekStart(DateTime date) =>
-      date.subtract(Duration(days: date.weekday % DateTime.daysPerWeek));
-
   static DateTime periodStart(BalancePeriod period, DateTime anchor) =>
       switch (period) {
-        BalancePeriod.week => weekStart(anchor),
+        BalancePeriod.week => sundayOf(anchor),
         BalancePeriod.month => DateTime(anchor.year, anchor.month),
       };
 
   static DateTime periodEnd(BalancePeriod period, DateTime anchor) {
     final start = periodStart(period, anchor);
     return switch (period) {
-      BalancePeriod.week => start.add(const Duration(days: 6)),
+      BalancePeriod.week => addDays(start, 6),
       BalancePeriod.month => DateTime(anchor.year, anchor.month + 1, 0),
     };
   }
@@ -162,7 +153,7 @@ class NutritionProgressCalculator {
     DateTime anchor,
     int delta,
   ) => switch (period) {
-    BalancePeriod.week => anchor.add(Duration(days: 7 * delta)),
+    BalancePeriod.week => addDays(anchor, 7 * delta),
     BalancePeriod.month => DateTime(anchor.year, anchor.month + delta, 1),
   };
 
@@ -173,9 +164,9 @@ class NutritionProgressCalculator {
     DateTime anchor,
     DateTime today,
   ) {
-    final todayDate = dateOnly(today);
+    final todayDate = dayOf(today);
     final currentStart = switch (period) {
-      BalancePeriod.week => weekStart(todayDate),
+      BalancePeriod.week => sundayOf(todayDate),
       BalancePeriod.month => DateTime(todayDate.year, todayDate.month),
     };
     return periodStart(period, anchor).isBefore(currentStart);
@@ -186,7 +177,7 @@ class NutritionProgressCalculator {
     DateTime anchor,
     DateTime today,
   ) {
-    final todayDate = dateOnly(today);
+    final todayDate = dayOf(today);
     return !todayDate.isBefore(periodStart(period, anchor)) &&
         !todayDate.isAfter(periodEnd(period, anchor));
   }
@@ -272,7 +263,7 @@ class NutritionProgressCalculator {
   ) {
     final groups = <DateTime, List<DailyCalorieTotal>>{};
     for (final day in dailies) {
-      groups.putIfAbsent(dateOnly(weekStart(day.date)), () => []).add(day);
+      groups.putIfAbsent(sundayOf(day.date), () => []).add(day);
     }
 
     final entries = groups.entries.toList()

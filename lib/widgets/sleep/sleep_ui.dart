@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
 
 /// Formatting and colours shared by the sleep screens.
@@ -24,8 +25,7 @@ abstract final class SleepUi {
   static String clock(int? minutes) {
     if (minutes == null) return '--';
     final wrapped = minutes % 1440;
-    return '${(wrapped ~/ 60).toString().padLeft(2, '0')}:'
-        '${(wrapped % 60).toString().padLeft(2, '0')}';
+    return DurationFormat.hhmm(wrapped);
   }
 
   /// "23:40 → 07:05" when both ends are known.
@@ -37,8 +37,7 @@ abstract final class SleepUi {
   /// Wall-clock time of a monitored instant, in the offset it was recorded.
   static String wallTime(DateTime value, int offsetMinutes) {
     final wall = value.toUtc().add(Duration(minutes: offsetMinutes));
-    return '${wall.hour.toString().padLeft(2, '0')}:'
-        '${wall.minute.toString().padLeft(2, '0')}';
+    return DurationFormat.hhmm(wall.hour * 60 + wall.minute);
   }
 
   static String dayMonth(DateTime date) =>

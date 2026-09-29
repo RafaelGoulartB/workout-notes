@@ -6,6 +6,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/periodization/phase_week_plan.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Shared building blocks of the planning screens. They follow the running
 /// plan screens: flat tonal cards, uppercase section labels, small pills.
@@ -209,7 +210,7 @@ class PlanRoadmap extends StatelessWidget {
     final start = phases.first.startDate;
     final end = phases.last.endDate;
     final totalDays = end.difference(start).inDays + 1;
-    final day = DateTime(today.year, today.month, today.day);
+    final day = dayOf(today);
     final inside = !day.isBefore(start) && !day.isAfter(end);
     final todayFraction = inside
         ? (day.difference(start).inDays + 0.5) / totalDays
@@ -641,7 +642,7 @@ String phaseStatusLabel(
   PeriodizationPhase phase,
   DateTime today,
 ) {
-  final day = DateTime(today.year, today.month, today.day);
+  final day = dayOf(today);
   if (phase.endDate.isBefore(day)) return loc.planningPhaseDone;
   if (phase.contains(day)) {
     return loc.planningWeekOf(phase.weekAt(day), phase.totalWeeks);

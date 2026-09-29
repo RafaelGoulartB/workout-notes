@@ -3,6 +3,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/services/run_voice_settings_store.dart';
 import 'package:workout_notes/services/run_native_voice_service.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
 
@@ -163,7 +164,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                             for (var s = 0; s < 60; s += 5)
                               DropdownMenuItem(
                                 value: s,
-                                child: Text(s.toString().padLeft(2, '0')),
+                                child: Text(DurationFormat.twoDigits(s)),
                               ),
                           ],
                           onChanged: (v) {

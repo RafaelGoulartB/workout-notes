@@ -61,7 +61,7 @@ class RunFormatters {
     final hours = totalSeconds ~/ 3600;
     final minutes = (totalSeconds % 3600) ~/ 60;
     if (hours == 0) return '${minutes}min';
-    return '${hours}h ${minutes.toString().padLeft(2, '0')}min';
+    return '${hours}h ${DurationFormat.twoDigits(minutes)}min';
   }
 
   static String pace(double? secPerKm) {

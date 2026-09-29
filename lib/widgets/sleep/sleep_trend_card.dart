@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
 
@@ -34,15 +35,15 @@ class SleepTrendCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
-    final last = DateTime(end.year, end.month, end.day);
-    final start = last.subtract(const Duration(days: _days - 1));
+    final last = dayOf(end);
+    final start = addDays(last, -(_days - 1));
     final byDate = {
-      for (final entry in entries) _dateString(entry.date): entry,
+      for (final entry in entries) dateKey(entry.date): entry,
     };
     final sleepSpots = <FlSpot>[];
     final deepSpots = <FlSpot>[];
     for (var index = 0; index < _days; index++) {
-      final entry = byDate[_dateString(start.add(Duration(days: index)))];
+      final entry = byDate[dateKey(addDays(start, index))];
       if (entry == null) continue;
       sleepSpots.add(
         FlSpot(index.toDouble(), entry.effectiveSleepMinutes / 60),
@@ -278,10 +279,4 @@ class SleepTrendCard extends StatelessWidget {
       ),
     );
   }
-
-  static String _dateString(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
 }

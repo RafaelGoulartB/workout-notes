@@ -173,9 +173,9 @@ class _NutritionReplicateDayDialogState
     ThemeData theme, {
     required bool isInCurrentMonth,
   }) {
-    final isSource = _isSameDay(date, _sourceDate);
+    final isSource = isSameDay(date, _sourceDate);
     final isSelected = _selectedDates.contains(date);
-    final isToday = _isSameDay(date, DateTime.now());
+    final isToday = isSameDay(date, DateTime.now());
     final isInRange = !date.isBefore(_firstDate) && !date.isAfter(_lastDate);
     final enabled = isInCurrentMonth && isInRange && !isSource;
     final colors = theme.colorScheme;
@@ -249,7 +249,4 @@ class _NutritionReplicateDayDialogState
       _focusedMonth = DateTime(_focusedMonth.year, _focusedMonth.month + delta);
     });
   }
-
-  static bool _isSameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
 }

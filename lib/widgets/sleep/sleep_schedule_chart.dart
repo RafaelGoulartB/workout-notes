@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
 
@@ -28,11 +30,11 @@ class SleepScheduleChart extends StatelessWidget {
     final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
     final byDate = {
-      for (final entry in entries) _dateString(entry.date): entry,
+      for (final entry in entries) dateKey(entry.date): entry,
     };
     final windows = <({int index, double start, double end})>[];
     for (var index = 0; index < days.length; index++) {
-      final entry = byDate[_dateString(days[index])];
+      final entry = byDate[dateKey(days[index])];
       if (entry?.bedtimeMinutes == null || entry?.wakeTimeMinutes == null) {
         continue;
       }
@@ -130,7 +132,7 @@ class SleepScheduleChart extends StatelessWidget {
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       final index = group.x;
                       if (index < 0 || index >= days.length) return null;
-                      final entry = byDate[_dateString(days[index])];
+                      final entry = byDate[dateKey(days[index])];
                       return BarTooltipItem(
                         _tooltipFor(loc, days[index], entry),
                         TextStyle(
@@ -270,15 +272,9 @@ class SleepScheduleChart extends StatelessWidget {
     final minutes = (value * 60).round() % 1440;
     final hour = minutes ~/ 60;
     final minute = minutes % 60;
-    if (minute == 0) return '${hour.toString().padLeft(2, '0')}h';
-    return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+    if (minute == 0) return '${DurationFormat.twoDigits(hour)}h';
+    return DurationFormat.hhmm(minutes);
   }
-
-  static String _dateString(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
 }
 
 /// Two-line x-axis label for the weekly sleep charts: weekday initial over

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_monitor_mode.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 
 /// Localized text and time formatting shared by the sleep monitor screen and
 /// its section widgets.
@@ -68,12 +69,7 @@ String formatMonitorTime(BuildContext context, DateTime date) =>
 
 /// `HH:mm:ss` elapsed clock.
 String formatMonitorDuration(Duration duration) {
-  final hours = duration.inHours;
-  final minutes = duration.inMinutes.remainder(60);
-  final seconds = duration.inSeconds.remainder(60);
-  return '${hours.toString().padLeft(2, '0')}:'
-      '${minutes.toString().padLeft(2, '0')}:'
-      '${seconds.toString().padLeft(2, '0')}';
+  return DurationFormat.clock(duration);
 }
 
 /// Time left until [alarmAt], clamped at zero.
@@ -83,8 +79,5 @@ String formatMonitorRemaining(DateTime alarmAt, {bool withSeconds = false}) {
   final hours = safe.inHours;
   final minutes = safe.inMinutes.remainder(60);
   if (!withSeconds) return '${hours}h ${minutes}min';
-  final seconds = safe.inSeconds.remainder(60);
-  return '${hours.toString().padLeft(2, '0')}:'
-      '${minutes.toString().padLeft(2, '0')}:'
-      '${seconds.toString().padLeft(2, '0')}';
+  return DurationFormat.clock(safe);
 }

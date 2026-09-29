@@ -1,3 +1,5 @@
+import 'package:workout_notes/utils/duration_format.dart';
+
 /// Shared calculations for planned workout duration and calorie estimates.
 ///
 /// The duration estimate intentionally works on normalized input objects so
@@ -96,7 +98,7 @@ class WorkoutEstimateCalculator {
     final hours = totalMinutes ~/ 60;
     final minutes = totalMinutes % 60;
     if (hours > 0) {
-      return '${hours}h ${minutes.toString().padLeft(2, '0')}min';
+      return '${hours}h ${DurationFormat.twoDigits(minutes)}min';
     }
     return '$totalMinutes min';
   }

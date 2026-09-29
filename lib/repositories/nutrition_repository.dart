@@ -1522,7 +1522,7 @@ class NutritionRepository extends BaseRepository {
     final lastDay = DateTime.parse(end);
     final days = lastDay.difference(firstDay).inDays + 1;
     for (var i = 0; i < days; i++) {
-      final d = DateTime(firstDay.year, firstDay.month, firstDay.day + i);
+      final d = addDays(firstDay, i);
       final key = dateKey(d);
       result.add(DailyCalorieTotal(date: d, calories: totalsByDate[key]));
     }

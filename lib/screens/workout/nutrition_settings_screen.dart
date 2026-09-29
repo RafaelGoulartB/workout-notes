@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
-import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
-import 'package:workout_notes/repositories/settings_repository.dart';
 import 'package:workout_notes/screens/workout/nutrition_goal_suggest_sheet.dart';
 import 'package:workout_notes/screens/workout/nutrition_settings_controller.dart';
 import 'package:workout_notes/utils/nutrition_goal_suggest.dart';
@@ -32,8 +31,8 @@ class NutritionSettingsScreen extends StatefulWidget {
 }
 
 class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
-  final _bodyRepo = BodyMeasurementRepository();
-  final _settingsRepo = SettingsRepository();
+  final _bodyRepo = DatabaseHelper.instance.bodyMeasurementRepo;
+  final _settingsRepo = DatabaseHelper.instance.settingsRepo;
   late final NutritionSettingsController _controller;
 
   NutritionGoal? get _current => _controller.current;

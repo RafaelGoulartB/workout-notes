@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/dev_tools/test_data/test_data_generator.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/repositories/export_import_repository.dart';
 import 'package:workout_notes/services/export_service.dart';
 import 'package:workout_notes/widgets/settings/backup_flows.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
@@ -176,7 +176,7 @@ class _DataPrivacyScreenState extends State<DataPrivacyScreen> {
     );
 
     if (confirm == true) {
-      final repo = ExportImportRepository();
+      final repo = DatabaseHelper.instance.exportImportRepo;
       await repo.deleteAllWorkoutData();
       await repo.deleteAllNutritionData();
       if (mounted) {

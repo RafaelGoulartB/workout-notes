@@ -7,6 +7,7 @@ import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/repositories/strength_history_repository.dart';
 import 'package:workout_notes/screens/workout/active_workout_screen.dart';
 import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
@@ -153,7 +154,7 @@ class _StrengthHistoryScreenState extends State<StrengthHistoryScreen> {
     final entries = <_Entry>[];
     String? lastKey;
     for (final workout in _workouts) {
-      final key = _monthKey(workout.day);
+      final key = monthKey(workout.day);
       if (key != lastKey) {
         entries.add(_MonthEntry(DateTime(workout.day.year, workout.day.month)));
         lastKey = key;
@@ -162,10 +163,6 @@ class _StrengthHistoryScreenState extends State<StrengthHistoryScreen> {
     }
     return entries;
   }
-
-  static String _monthKey(DateTime date) =>
-      '${date.year.toString().padLeft(4, '0')}-'
-      '${date.month.toString().padLeft(2, '0')}';
 
   void _setFilter(StrengthHistoryFilter filter) {
     setState(() => _filter = filter);
@@ -290,7 +287,7 @@ class _StrengthHistoryScreenState extends State<StrengthHistoryScreen> {
         return switch (_entries[entryIndex]) {
           _MonthEntry(:final month) => StrengthHistoryMonthHeader(
             month: month,
-            totals: _monthTotals[_monthKey(month)],
+            totals: _monthTotals[monthKey(month)],
           ),
           _WorkoutEntry(:final workout) => StrengthHistoryRow(
             workout: workout.withRecordCount(_recordCounts[workout.id] ?? 0),

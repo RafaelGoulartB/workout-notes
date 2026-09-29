@@ -170,9 +170,6 @@ class RunWeekGoal {
 /// Pure decision logic, kept apart from the repositories so it can be tested
 /// with plain fixtures.
 abstract final class RunTodayResolver {
-  static bool _sameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
-
   /// Decides what today looks like.
   ///
   /// Priority: a pending scheduled session; a completed one; skipped rows
@@ -193,7 +190,7 @@ abstract final class RunTodayResolver {
     final rows = scheduledToday.where((s) => s.workout != null).toList();
     final ranToday =
         todayActivities
-            .where((a) => a.isCompleted && _sameDay(a.startedAt.toLocal(), day))
+            .where((a) => a.isCompleted && isSameDay(a.startedAt.toLocal(), day))
             .toList()
           ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
 
@@ -425,7 +422,7 @@ abstract final class RunTodayResolver {
     return [
       for (final p in plan)
         if (p.state == RunPlannedDayState.missed &&
-            runsByDay.any((r) => _sameDay(r.date, p.date) && r.count > 0))
+            runsByDay.any((r) => isSameDay(r.date, p.date) && r.count > 0))
           RunPlannedDay(
             date: p.date,
             kind: p.kind,

@@ -12,6 +12,7 @@ import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/models/nutrition/saved_meal.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Chip filter shown while the search field is empty.
 enum FoodSearchFilter { all, meals, favorites, myFoods }
@@ -75,7 +76,7 @@ class FoodSearchController extends ChangeNotifier {
     String? date,
   }) : _selectedMealType = mealType,
        _selectedMealName = mealName,
-       date = date ?? _todayString();
+       date = date ?? dateKey(DateTime.now());
 
   final NutritionGateway gateway;
   final NutritionRepository repository;
@@ -544,15 +545,6 @@ class FoodSearchController extends ChangeNotifier {
         _notify();
       }
     }
-  }
-
-  static String _todayString() {
-    final now = DateTime.now();
-    return DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).toIso8601String().substring(0, 10);
   }
 
   void _notify() {
