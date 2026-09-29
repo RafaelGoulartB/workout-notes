@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
@@ -14,9 +13,12 @@ import 'package:workout_notes/services/run_today_service.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
 import 'package:workout_notes/services/stationary_bike_tracking_service.dart';
 import 'package:workout_notes/services/strength_today_service.dart';
+import 'package:workout_notes/utils/load_generation.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_week_analytics.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
+import 'package:workout_notes/widgets/load_error_view.dart';
+import 'package:workout_notes/widgets/workout/active_session_banner.dart';
 import 'package:workout_notes/widgets/run/run_pending_review_banner.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/models/run_activity.dart';
@@ -37,12 +39,37 @@ import 'rest_timer_screen.dart';
 /// The Treino tab: live banners, this week across gym and running, and the
 /// two hub entries (Musculação and Corrida) with a start button each.
 class WorkoutHomeScreen extends StatefulWidget {
-  final ValueListenable<int>? selectedTab;
-
-  const WorkoutHomeScreen({super.key, this.selectedTab});
+  const WorkoutHomeScreen({super.key});
 
   @override
   State<WorkoutHomeScreen> createState() => _WorkoutHomeScreenState();
+}
+
+/// Everything one load of the hub reads.
+class _HomeData {
+  final List<Map<String, dynamic>> active;
+  final WorkoutWeekOverview overview;
+  final StrengthHomeSnapshot? strengthSnapshot;
+  final RunHomeSnapshot? runSnapshot;
+  final bool hasHistory;
+  final List<WorkoutDayMark> weekDays;
+  final List<StrengthWorkoutSummary> recentGym;
+  final List<RunActivity> recentCardio;
+  final Map<String, StrengthCategoryInfo> categories;
+  final double strengthAverageSessions;
+
+  const _HomeData({
+    required this.active,
+    required this.overview,
+    required this.strengthSnapshot,
+    required this.runSnapshot,
+    required this.hasHistory,
+    required this.weekDays,
+    required this.recentGym,
+    required this.recentCardio,
+    required this.categories,
+    required this.strengthAverageSessions,
+  });
 }
 
 class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
@@ -53,8 +80,16 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   final _timerService = RestTimerService.instance;
   final _runTrackingService = RunTrackingService.instance;
   final _bikeTrackingService = StationaryBikeTrackingService.instance;
+  final _generation = LoadGeneration();
   bool _isLoading = true;
+  bool _hasLoaded = false;
+  bool _loadFailed = false;
   List<Map<String, dynamic>> _activeWorkouts = [];
+
+  // Whether a run / a bike session is being recorded. The hub only rebuilds
+  // when this flips; the banners follow the live tracking state themselves.
+  bool _runActive = false;
+  bool _bikeActive = false;
 
   WorkoutWeekOverview _overview = WorkoutWeekOverview.empty;
   StrengthHomeSnapshot? _strengthSnapshot;
@@ -69,55 +104,33 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   // Bumped on every reload so the unsaved-run banner re-reads its list.
   int _pendingReviewRefresh = 0;
 
-  // Elapsed time timer for active workout
-  Timer? _elapsedTimer;
-
   @override
   void initState() {
     super.initState();
-    widget.selectedTab?.addListener(_onTabSelectionChanged);
-    _runTrackingService.addListener(_onRunTrackingChanged);
-    _bikeTrackingService.addListener(_onRunTrackingChanged);
-    _runTrackingService.initialize();
+    _runActive = _runTrackingService.state.isActive;
+    _bikeActive = _bikeTrackingService.state.isActive;
+    _runTrackingService.addListener(_onTrackingChanged);
+    _bikeTrackingService.addListener(_onTrackingChanged);
+    _runTrackingService.initialize().catchError((Object _) {});
     _loadData();
   }
 
   @override
   void dispose() {
-    widget.selectedTab?.removeListener(_onTabSelectionChanged);
-    _runTrackingService.removeListener(_onRunTrackingChanged);
-    _bikeTrackingService.removeListener(_onRunTrackingChanged);
-    _elapsedTimer?.cancel();
+    _generation.invalidate();
+    _runTrackingService.removeListener(_onTrackingChanged);
+    _bikeTrackingService.removeListener(_onTrackingChanged);
     super.dispose();
   }
 
-  void _onRunTrackingChanged() {
-    if (mounted) setState(() {});
-  }
-
-  void _onTabSelectionChanged() {
-    if (widget.selectedTab?.value == 0 && _activeWorkouts.isNotEmpty) {
-      _startElapsedTimer();
-    } else {
-      _stopElapsedTimer();
-    }
-  }
-
-  /// Starts a periodic timer that keeps the elapsed time on the active
-  /// workout banner live. Cancels any previous timer first.
-  void _startElapsedTimer() {
-    _elapsedTimer?.cancel();
-    _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted && _activeWorkouts.isNotEmpty) {
-        setState(() {});
-      }
+  void _onTrackingChanged() {
+    final run = _runTrackingService.state.isActive;
+    final bike = _bikeTrackingService.state.isActive;
+    if (!mounted || (run == _runActive && bike == _bikeActive)) return;
+    setState(() {
+      _runActive = run;
+      _bikeActive = bike;
     });
-  }
-
-  /// Cancels the elapsed timer.
-  void _stopElapsedTimer() {
-    _elapsedTimer?.cancel();
-    _elapsedTimer = null;
   }
 
   Future<T?> _safe<T>(Future<T> future) async {
@@ -128,105 +141,131 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     }
   }
 
+  /// Reloads the hub. Only the newest load applies its result, and a failed
+  /// one keeps whatever is already on screen (with a retry), instead of
+  /// passing for an empty history.
   Future<void> _loadData() async {
+    final token = _generation.begin();
     setState(() {
-      _isLoading = true;
       _pendingReviewRefresh++;
+      if (!_hasLoaded) _isLoading = true;
     });
     try {
-      final now = DateTime.now();
-      await StrengthRoutineDayInference.runOnce();
-      final today = DateTime(now.year, now.month, now.day);
-      final monday = StrengthWeekAnalytics.mondayOf(today);
-      // A year of history is enough for a week streak and keeps the reads
-      // cheap; older weeks never change the number shown.
-      final since = monday.subtract(const Duration(days: 7 * 52));
-
-      final active = await _workoutRepo.getActiveWorkouts();
-      final stamps = await _strengthRepo.loadWorkoutStamps(from: since);
-      final cardio = await _runRepo.listActivities(
-        limit: null,
-        activityType: null,
-        startedFrom: since,
-      );
-      final runs = cardio.where((a) => a.isRunning).toList();
-      final strengthSnapshot = await _safe(_strengthToday.load(now: now));
-      final runSnapshot = await _safe(RunTodayService().load(activities: runs));
-      final recentGym =
-          await _safe(_strengthRepo.loadFinishedWorkouts(limit: 3)) ??
-          const <StrengthWorkoutSummary>[];
-      final categories =
-          await _safe(_strengthRepo.loadCategories()) ??
-          const <String, StrengthCategoryInfo>{};
-
-      // Monday–Sunday marks: what was done and what the plans expect.
-      final plannedStrengthDays =
-          strengthSnapshot?.plannedStrengthDays ?? const <int>[];
-      final weekDays = [
-        for (var i = 0; i < 7; i++)
-          () {
-            final date = monday.add(Duration(days: i));
-            return WorkoutDayMark(
-              date: date,
-              strengthDone: stamps.any(
-                (g) => DateUtils.isSameDay(g.date, date),
-              ),
-              // Sub-minute sessions are aborted starts, not runs.
-              runDone: runs.any(
-                (a) =>
-                    (a.durationSeconds >= 60 || a.distanceMeters >= 100) &&
-                    DateUtils.isSameDay(a.startedAt.toLocal(), date),
-              ),
-              strengthPlanned: plannedStrengthDays.contains(date.weekday),
-              runPlanned: (runSnapshot?.weekPlan ?? const []).any(
-                (d) => DateUtils.isSameDay(d.date, date),
-              ),
-            );
-          }(),
-      ];
-
-      final overview = WorkoutWeekOverview.compute(
-        gym: stamps,
-        cardio: [
-          for (final a in cardio)
-            WorkoutCardioStamp(
-              date: _dateOnly(a.startedAt.toLocal()),
-              durationSeconds: a.movingTimeSeconds > 0
-                  ? a.movingTimeSeconds
-                  : a.durationSeconds,
-              runDistanceMeters: a.isRunning ? a.distanceMeters : 0,
-            ),
-        ],
-        now: now,
-      );
-
-      if (!mounted) return;
+      final data = await _fetchData();
+      if (!mounted || !_generation.isCurrent(token)) return;
       setState(() {
-        _activeWorkouts = active;
-        _overview = overview;
-        _strengthSnapshot = strengthSnapshot;
-        _runSnapshot = runSnapshot;
-        _weekDays = weekDays;
-        _recentGym = recentGym;
-        // Sub-minute sessions are aborted starts, not activities to revisit.
-        _recentCardio = cardio
-            .where((a) => a.durationSeconds >= 60 || a.distanceMeters >= 100)
-            .take(3)
-            .toList();
-        _strengthAverageSessions = _averageWeeklySessions(stamps, monday);
-        _categories = categories;
-        _hasHistory = stamps.isNotEmpty || cardio.isNotEmpty;
+        _activeWorkouts = data.active;
+        _overview = data.overview;
+        _strengthSnapshot = data.strengthSnapshot;
+        _runSnapshot = data.runSnapshot;
+        _weekDays = data.weekDays;
+        _recentGym = data.recentGym;
+        _recentCardio = data.recentCardio;
+        _strengthAverageSessions = data.strengthAverageSessions;
+        _categories = data.categories;
+        _hasHistory = data.hasHistory;
+        _hasLoaded = true;
+        _loadFailed = false;
         _isLoading = false;
       });
-      // Keep the elapsed time live when there is an active workout
-      if (active.isNotEmpty && (widget.selectedTab?.value ?? 0) == 0) {
-        _startElapsedTimer();
-      } else {
-        _stopElapsedTimer();
-      }
-    } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+    } catch (_) {
+      if (!mounted || !_generation.isCurrent(token)) return;
+      setState(() {
+        _loadFailed = true;
+        _isLoading = false;
+      });
     }
+  }
+
+  Future<_HomeData> _fetchData() async {
+    final now = DateTime.now();
+    // Links old workouts to their routine day; the strength snapshot reads
+    // that link, so it goes first.
+    await StrengthRoutineDayInference.runOnce();
+    final today = DateTime(now.year, now.month, now.day);
+    final monday = StrengthWeekAnalytics.mondayOf(today);
+    // A year of history is enough for a week streak and keeps the reads
+    // cheap; older weeks never change the number shown.
+    final since = monday.subtract(const Duration(days: 7 * 52));
+
+    // The rest is independent, so the awaits no longer chain (SQLite still
+    // serialises the statements). Only this week's runs are read in full —
+    // the plan card needs them; the year is read as light stamps.
+    final weekRuns = _runRepo
+        .listActivities(limit: null, activityType: null, startedFrom: monday)
+        .then((all) => all.where((a) => a.isRunning).toList());
+    final (
+      active,
+      stamps,
+      cardio,
+      recentCardio,
+      strengthSnapshot,
+      runSnapshot,
+      recentGym,
+      categories,
+    ) = await (
+      _workoutRepo.getActiveWorkouts(),
+      _strengthRepo.loadWorkoutStamps(from: since),
+      _runRepo.listCardioStamps(startedFrom: since),
+      _runRepo.listRecentCardio(limit: 3, startedFrom: since),
+      _safe(_strengthToday.load(now: now)),
+      weekRuns.then((runs) => _safe(RunTodayService().load(activities: runs))),
+      _safe(_strengthRepo.loadFinishedWorkouts(limit: 3)),
+      _safe(_strengthRepo.loadCategories()),
+    ).wait;
+
+    // Monday–Sunday marks: what was done and what the plans expect.
+    final plannedStrengthDays =
+        strengthSnapshot?.plannedStrengthDays ?? const <int>[];
+    final weekDays = [
+      for (var i = 0; i < 7; i++)
+        () {
+          final date = monday.add(Duration(days: i));
+          return WorkoutDayMark(
+            date: date,
+            strengthDone: stamps.any((g) => DateUtils.isSameDay(g.date, date)),
+            // Sub-minute sessions are aborted starts, not runs.
+            runDone: cardio.any(
+              (a) =>
+                  a.isRunning &&
+                  a.countsAsSession &&
+                  DateUtils.isSameDay(a.startedAt.toLocal(), date),
+            ),
+            strengthPlanned: plannedStrengthDays.contains(date.weekday),
+            runPlanned: (runSnapshot?.weekPlan ?? const []).any(
+              (d) => DateUtils.isSameDay(d.date, date),
+            ),
+          );
+        }(),
+    ];
+
+    final overview = WorkoutWeekOverview.compute(
+      gym: stamps,
+      cardio: [
+        for (final a in cardio)
+          WorkoutCardioStamp(
+            date: _dateOnly(a.startedAt.toLocal()),
+            durationSeconds: a.movingTimeSeconds > 0
+                ? a.movingTimeSeconds
+                : a.durationSeconds,
+            runDistanceMeters: a.isRunning ? a.distanceMeters : 0,
+          ),
+      ],
+      now: now,
+    );
+
+    return _HomeData(
+      active: active,
+      overview: overview,
+      strengthSnapshot: strengthSnapshot,
+      runSnapshot: runSnapshot,
+      hasHistory: stamps.isNotEmpty || cardio.isNotEmpty,
+      weekDays: weekDays,
+      recentGym: recentGym ?? const <StrengthWorkoutSummary>[],
+      recentCardio: recentCardio,
+      categories: categories ?? const <String, StrengthCategoryInfo>{},
+      strengthAverageSessions: _averageWeeklySessions(stamps, monday),
+    );
   }
 
   static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
@@ -350,27 +389,8 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     ).format(DateTime.now());
   }
 
-  /// Pretty-prints the elapsed time of the active workout (e.g. "23 min",
-  /// "1h 12min"). Returns null if it can't be computed.
-  String? _activeElapsed(Map<String, dynamic> workout) {
-    final startStr = workout['start_time'] as String?;
-    if (startStr == null) return null;
-    final start = DateTime.tryParse(startStr);
-    if (start == null) return null;
-    final elapsed = DateTime.now().difference(start);
-    if (elapsed.isNegative) return null;
-    final h = elapsed.inHours;
-    final m = elapsed.inMinutes % 60;
-    if (h > 0) return '${h}h ${m}min';
-    if (m > 0) return '${m}min';
-    return '${elapsed.inSeconds}s';
-  }
-
   bool get _hasAnyHistory =>
-      _hasHistory ||
-      _activeWorkouts.isNotEmpty ||
-      _runTrackingService.state.isActive ||
-      _bikeTrackingService.state.isActive;
+      _hasHistory || _activeWorkouts.isNotEmpty || _runActive || _bikeActive;
 
   // ===================== BUILD =====================
   @override
@@ -394,11 +414,17 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       ),
       body: _isLoading
           ? const _LoadingSkeleton()
+          : (_loadFailed && !_hasLoaded)
+          ? LoadErrorView(onRetry: _loadData)
           : RefreshIndicator(
               onRefresh: _loadData,
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
+                  if (_loadFailed)
+                    SliverToBoxAdapter(
+                      child: LoadErrorBanner(onRetry: _loadData),
+                    ),
                   // The week hero leads; live sessions sit right below it.
                   if (_hasAnyHistory)
                     SliverPadding(
@@ -413,7 +439,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                         _activeWorkouts.first,
                       ),
                     ),
-                  if (_runTrackingService.state.isActive)
+                  if (_runActive)
                     SliverToBoxAdapter(
                       child: _buildActiveRunBanner(theme, loc),
                     ),
@@ -423,7 +449,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                       onChanged: _loadData,
                     ),
                   ),
-                  if (_bikeTrackingService.state.isActive)
+                  if (_bikeActive)
                     SliverToBoxAdapter(
                       child: _buildActiveBikeBanner(theme, loc),
                     ),
@@ -765,211 +791,118 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     ];
   }
 
-  // ===================== ACTIVE WORKOUT BANNER =====================
+  // ===================== ACTIVE SESSION BANNERS =====================
+  // The banners refresh their own subtitle (a clock, or the tracking service),
+  // so the hub is not rebuilt for them.
+
+  /// Pretty-prints the elapsed time of the active workout (e.g. "23 min",
+  /// "1h 12min"). Returns null if it can't be computed.
+  static String? _activeElapsed(Map<String, dynamic> workout) {
+    final startStr = workout['start_time'] as String?;
+    if (startStr == null) return null;
+    final start = DateTime.tryParse(startStr);
+    if (start == null) return null;
+    final elapsed = DateTime.now().difference(start);
+    if (elapsed.isNegative) return null;
+    final h = elapsed.inHours;
+    final m = elapsed.inMinutes % 60;
+    if (h > 0) return '${h}h ${m}min';
+    if (m > 0) return '${m}min';
+    return '${elapsed.inSeconds}s';
+  }
+
   Widget _buildActiveBanner(
     ThemeData theme,
     AppLocalizations loc,
     Map<String, dynamic> workout,
   ) {
-    final elapsed = _activeElapsed(workout);
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Material(
-        color: theme.colorScheme.primary,
-        borderRadius: BorderRadius.circular(20),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => _openActiveWorkout(workout),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 12, 16),
-            child: Row(
-              children: [
-                // Pulsing dot
-                _PulsingDot(color: theme.colorScheme.onPrimary),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        loc.workoutHomeOngoing,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: theme.colorScheme.onPrimary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        elapsed == null
-                            ? loc.workoutHomeActiveNotStarted
-                            : loc.workoutHomeActiveBannerSubtitle(elapsed),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onPrimary.withAlpha(220),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.onPrimary,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.play_arrow_rounded,
-                        size: 18,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        loc.workoutHomeActiveBannerAction,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+    return ActiveSessionBanner(
+      background: theme.colorScheme.primary,
+      foreground: theme.colorScheme.onPrimary,
+      title: loc.workoutHomeOngoing,
+      tickEverySecond: true,
+      subtitle: () {
+        final elapsed = _activeElapsed(workout);
+        return elapsed == null
+            ? loc.workoutHomeActiveNotStarted
+            : loc.workoutHomeActiveBannerSubtitle(elapsed);
+      },
+      onTap: () => _openActiveWorkout(workout),
+      entranceDuration: const Duration(milliseconds: 350),
+      entranceDelay: const Duration(milliseconds: 60),
+      action: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.onPrimary,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.play_arrow_rounded,
+              size: 18,
+              color: theme.colorScheme.primary,
             ),
-          ),
+            const SizedBox(width: 2),
+            Text(
+              loc.workoutHomeActiveBannerAction,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
       ),
-    ).animate().fadeIn(duration: 350.ms, delay: 60.ms).slideY(begin: 0.05);
+    );
   }
 
   Widget _buildActiveRunBanner(ThemeData theme, AppLocalizations loc) {
-    final state = _runTrackingService.state;
-    final subtitle = loc.workoutHomeRunActiveSubtitle(
-      RunFormatters.distanceWithUnit(state.distanceMeters),
-      RunFormatters.duration(state.durationSeconds),
-    );
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Material(
-        color: theme.colorScheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(20),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: _startRun,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 12, 16),
-            child: Row(
-              children: [
-                _PulsingDot(color: theme.colorScheme.onSecondaryContainer),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        loc.workoutHomeRunOngoing,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: theme.colorScheme.onSecondaryContainer,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        state.isPaused
-                            ? '${loc.workoutHomeRunPaused} · $subtitle'
-                            : subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSecondaryContainer
-                              .withAlpha(220),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.tonalIcon(
-                  onPressed: _startRun,
-                  icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                  label: Text(loc.workoutHomeActiveBannerAction),
-                ),
-              ],
-            ),
-          ),
-        ),
+    return ActiveSessionBanner(
+      background: theme.colorScheme.secondaryContainer,
+      foreground: theme.colorScheme.onSecondaryContainer,
+      title: loc.workoutHomeRunOngoing,
+      refresh: _runTrackingService,
+      subtitle: () {
+        final state = _runTrackingService.state;
+        final subtitle = loc.workoutHomeRunActiveSubtitle(
+          RunFormatters.distanceWithUnit(state.distanceMeters),
+          RunFormatters.duration(state.durationSeconds),
+        );
+        return state.isPaused
+            ? '${loc.workoutHomeRunPaused} · $subtitle'
+            : subtitle;
+      },
+      onTap: _startRun,
+      action: FilledButton.tonalIcon(
+        onPressed: _startRun,
+        icon: const Icon(Icons.play_arrow_rounded, size: 18),
+        label: Text(loc.workoutHomeActiveBannerAction),
       ),
-    ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.05);
+    );
   }
 
   Widget _buildActiveBikeBanner(ThemeData theme, AppLocalizations loc) {
-    final state = _bikeTrackingService.state;
-    final time = RunFormatters.duration(state.durationSeconds);
-    final subtitle = state.isPaused
-        ? '${loc.workoutHomeRunPaused} · $time'
-        : '$time · ${loc.cardioActivityStationaryBikeSubtitle}';
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Material(
-        color: theme.colorScheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(20),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: _openActiveBike,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 12, 16),
-            child: Row(
-              children: [
-                _PulsingDot(color: theme.colorScheme.onSecondaryContainer),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        loc.cardioActivityStationaryBike,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: theme.colorScheme.onSecondaryContainer,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSecondaryContainer
-                              .withAlpha(220),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                FilledButton.tonalIcon(
-                  onPressed: _openActiveBike,
-                  icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                  label: Text(loc.workoutHomeActiveBannerAction),
-                ),
-              ],
-            ),
-          ),
-        ),
+    return ActiveSessionBanner(
+      background: theme.colorScheme.secondaryContainer,
+      foreground: theme.colorScheme.onSecondaryContainer,
+      title: loc.cardioActivityStationaryBike,
+      refresh: _bikeTrackingService,
+      subtitle: () {
+        final state = _bikeTrackingService.state;
+        final time = RunFormatters.duration(state.durationSeconds);
+        return state.isPaused
+            ? '${loc.workoutHomeRunPaused} · $time'
+            : '$time · ${loc.cardioActivityStationaryBikeSubtitle}';
+      },
+      onTap: _openActiveBike,
+      action: FilledButton.tonalIcon(
+        onPressed: _openActiveBike,
+        icon: const Icon(Icons.play_arrow_rounded, size: 18),
+        label: Text(loc.workoutHomeActiveBannerAction),
       ),
-    ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.05);
+    );
   }
 
   // ===================== FIRST-TIME EMPTY =====================
@@ -1072,41 +1005,6 @@ class _LoadingSkeleton extends StatelessWidget {
         const SizedBox(height: 8),
         line(h: 64, r: 12),
       ],
-    );
-  }
-}
-
-class _PulsingDot extends StatelessWidget {
-  final Color color;
-  const _PulsingDot({required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 16,
-      height: 16,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-                width: 16,
-                height: 16,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              )
-              .animate(onPlay: (c) => c.repeat(reverse: true))
-              .scale(
-                begin: const Offset(0.6, 0.6),
-                end: const Offset(1.0, 1.0),
-                duration: 1.seconds,
-              )
-              .fadeOut(begin: 0.6, duration: 1.seconds),
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-        ],
-      ),
     );
   }
 }
