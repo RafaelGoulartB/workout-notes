@@ -1,5 +1,5 @@
 import 'package:workout_notes/repositories/base_repository.dart';
-import 'package:workout_notes/utils/run_fitness_analytics.dart';
+import 'package:workout_notes/utils/run_training_load_analytics.dart';
 
 /// Bulk reads that only the running insights screen needs.
 class RunInsightsRepository extends BaseRepository {

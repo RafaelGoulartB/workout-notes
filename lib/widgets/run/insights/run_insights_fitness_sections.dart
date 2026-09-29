@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/run_fitness_analytics.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
+import 'package:workout_notes/utils/run_training_load_analytics.dart';
 import 'package:workout_notes/widgets/run/home/run_home_fitness_card.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
 import 'package:workout_notes/widgets/run/run_insights_charts.dart';

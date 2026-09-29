@@ -2,7 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/services/run_pace_calculator.dart';
+import 'package:workout_notes/utils/heat_levels.dart';
+import 'package:workout_notes/utils/run_calendar_stats.dart';
 import 'package:workout_notes/utils/run_fitness_analytics.dart';
+import 'package:workout_notes/utils/run_training_load_analytics.dart';
 
 RunActivity _run(
   String id,
@@ -148,10 +151,10 @@ void main() {
 
     test('session load is minutes times RPE with a pace-based fallback', () {
       final rated = _run('rated', now, movingTimeSeconds: 3600, rpe: 6);
-      expect(RunFitnessAnalytics.sessionLoad(rated, null), 360);
+      expect(RunTrainingLoadAnalytics.sessionLoad(rated, null), 360);
 
       final unrated = _run('unrated', now, movingTimeSeconds: 3600);
-      expect(RunFitnessAnalytics.sessionLoad(unrated, null), 300); // RPE 5
+      expect(RunTrainingLoadAnalytics.sessionLoad(unrated, null), 300); // RPE 5
 
       final zones = RunFitnessAnalytics.estimate([
         _run('e', DateTime(2026, 8, 1, 7), effort5k: 1500),
@@ -162,18 +165,18 @@ void main() {
         movingTimeSeconds: 3600,
         distanceMeters: 8000, // 7:30 /km, far slower than easy pace
       );
-      expect(RunFitnessAnalytics.fallbackRpe(slow, zones), 3);
+      expect(RunTrainingLoadAnalytics.fallbackRpe(slow, zones), 3);
       final fast = _run(
         'fast',
         now,
         movingTimeSeconds: 1200,
         distanceMeters: 5000, // 4:00 /km
       );
-      expect(RunFitnessAnalytics.fallbackRpe(fast, zones), greaterThan(7));
+      expect(RunTrainingLoadAnalytics.fallbackRpe(fast, zones), greaterThan(7));
     });
 
     test('steady training is balanced with a ratio near one', () {
-      final load = RunFitnessAnalytics.trainingLoad(steady(), now: now);
+      final load = RunTrainingLoadAnalytics.trainingLoad(steady(), now: now);
       expect(load.days.length, 84);
       expect(load.acwr, closeTo(1.0, 0.15));
       expect(load.status, RunLoadStatus.balanced);
@@ -192,7 +195,7 @@ void main() {
             rpe: 9,
           ),
       ];
-      final load = RunFitnessAnalytics.trainingLoad(activities, now: now);
+      final load = RunTrainingLoadAnalytics.trainingLoad(activities, now: now);
       expect(load.acwr, greaterThan(1.3));
       expect(load.status, RunLoadStatus.rapidIncrease);
     });
@@ -214,12 +217,12 @@ void main() {
           rpe: 3,
         ),
       ];
-      final load = RunFitnessAnalytics.trainingLoad(activities, now: now);
+      final load = RunTrainingLoadAnalytics.trainingLoad(activities, now: now);
       expect(load.status, RunLoadStatus.detraining);
     });
 
     test('needs a few runs before judging the load', () {
-      final load = RunFitnessAnalytics.trainingLoad([
+      final load = RunTrainingLoadAnalytics.trainingLoad([
         _run('one', DateTime(2026, 8, 18, 7)),
       ], now: now);
       expect(load.acwr, isNull);
@@ -235,20 +238,20 @@ void main() {
             distanceMeters: km * 500,
           ),
       ];
-      final grew = RunFitnessAnalytics.trainingLoad([
+      final grew = RunTrainingLoadAnalytics.trainingLoad([
         ...week(DateTime(2026, 8, 19, 7), 24, 'now'), // 24 km
         ...week(DateTime(2026, 8, 12, 7), 20, 'prev'), // 20 km
       ], now: now);
       expect(grew.weeklyVolumeGrowth, closeTo(0.2, 1e-9));
       expect(grew.volumeGrowthWarning, isTrue);
 
-      final flat = RunFitnessAnalytics.trainingLoad([
+      final flat = RunTrainingLoadAnalytics.trainingLoad([
         ...week(DateTime(2026, 8, 19, 7), 21, 'now'),
         ...week(DateTime(2026, 8, 12, 7), 20, 'prev'),
       ], now: now);
       expect(flat.volumeGrowthWarning, isFalse);
 
-      final tiny = RunFitnessAnalytics.trainingLoad([
+      final tiny = RunTrainingLoadAnalytics.trainingLoad([
         ...week(DateTime(2026, 8, 19, 7), 4, 'now'),
         ...week(DateTime(2026, 8, 12, 7), 2, 'prev'),
       ], now: now);
@@ -290,7 +293,7 @@ void main() {
         movingTimeSeconds: (easyPace * 5).round(),
       );
 
-      final distribution = RunFitnessAnalytics.intensityDistribution(
+      final distribution = RunTrainingLoadAnalytics.intensityDistribution(
         [withSplits, withoutSplits],
         zones: bounds,
         splits: {
@@ -324,7 +327,7 @@ void main() {
         distanceMeters: 5000,
         movingTimeSeconds: ((bounds.tempoSecPerKm - 10) * 5).round(),
       );
-      final distribution = RunFitnessAnalytics.intensityDistribution(
+      final distribution = RunTrainingLoadAnalytics.intensityDistribution(
         [hard],
         zones: bounds,
         now: now,
@@ -344,22 +347,22 @@ void main() {
     ];
 
     test('dailyDistance sums per local day and filters by year', () {
-      final daily = RunFitnessAnalytics.dailyDistance(runs, year: 2026);
+      final daily = RunCalendarStats.dailyDistance(runs, year: 2026);
       expect(daily[DateTime(2026, 1, 5)], 8000);
       expect(daily[DateTime(2026, 3, 1)], 10000);
       expect(daily.containsKey(DateTime(2025, 12, 31)), isFalse);
     });
 
     test('heat levels are quartiles of the runner active days', () {
-      final t = RunFitnessAnalytics.heatThresholds([1000, 2000, 3000, 4000, 0]);
-      expect(RunFitnessAnalytics.heatLevel(0, t), 0);
-      expect(RunFitnessAnalytics.heatLevel(1000, t), 1);
-      expect(RunFitnessAnalytics.heatLevel(4000, t), 4);
-      expect(RunFitnessAnalytics.heatThresholds(const []), [0, 0, 0]);
+      final t = heatThresholds([1000, 2000, 3000, 4000, 0]);
+      expect(heatLevel(0, t), 0);
+      expect(heatLevel(1000, t), 1);
+      expect(heatLevel(4000, t), 4);
+      expect(heatThresholds(const []), [0, 0, 0]);
     });
 
     test('monthlyTotals covers the last months including empty ones', () {
-      final months = RunFitnessAnalytics.monthlyTotals(runs, now: now);
+      final months = RunCalendarStats.monthlyTotals(runs, now: now);
       expect(months.length, 12);
       expect(months.first.month, DateTime(2025, 9));
       expect(months.last.month, DateTime(2026, 8));
@@ -378,7 +381,7 @@ void main() {
     });
 
     test('cumulativeMonthly accumulates and stops after the current month', () {
-      final cumulative = RunFitnessAnalytics.cumulativeMonthly(
+      final cumulative = RunCalendarStats.cumulativeMonthly(
         runs,
         2026,
         now: now,
@@ -388,20 +391,20 @@ void main() {
       expect(cumulative[2], 18000);
       expect(cumulative[7], 18000); // August
       expect(cumulative[8], isNull);
-      final last = RunFitnessAnalytics.cumulativeMonthly(runs, 2025, now: now);
+      final last = RunCalendarStats.cumulativeMonthly(runs, 2025, now: now);
       expect(last[11], 11000);
       expect(last.every((v) => v != null), isTrue);
     });
 
     test('availableYears is newest first and always has the current year', () {
-      expect(RunFitnessAnalytics.availableYears(runs, now: now), [2026, 2025]);
-      expect(RunFitnessAnalytics.availableYears(const [], now: now), [2026]);
+      expect(RunCalendarStats.availableYears(runs, now: now), [2026, 2025]);
+      expect(RunCalendarStats.availableYears(const [], now: now), [2026]);
     });
   });
 
   group('consistency', () {
     test('counts current and longest day and week streaks', () {
-      final consistency = RunFitnessAnalytics.consistency([
+      final consistency = RunCalendarStats.consistency([
         // Current streak: yesterday and the day before (none yet today).
         _run('d1', DateTime(2026, 8, 18, 7)),
         _run('d2', DateTime(2026, 8, 17, 7)),
@@ -419,7 +422,7 @@ void main() {
     test(
       'share of weeks with a run never counts weeks before the first run',
       () {
-        final consistency = RunFitnessAnalytics.consistency([
+        final consistency = RunCalendarStats.consistency([
           _run('w0', DateTime(2026, 8, 18, 7)),
           _run('w1', DateTime(2026, 8, 11, 7)),
         ], now: now);
@@ -427,7 +430,7 @@ void main() {
         expect(consistency.weeksWithRuns, 2);
         expect(consistency.weeksWithRunsShare, 1);
 
-        final empty = RunFitnessAnalytics.consistency(const [], now: now);
+        final empty = RunCalendarStats.consistency(const [], now: now);
         expect(empty.weeksConsidered, 0);
         expect(empty.weeksWithRunsShare, 0);
       },
@@ -435,7 +438,7 @@ void main() {
   });
 
   test('weeklyEffort averages RPE and feeling per week', () {
-    final weeks = RunFitnessAnalytics.weeklyEffort([
+    final weeks = RunTrainingLoadAnalytics.weeklyEffort([
       _run('a', DateTime(2026, 8, 18, 7), rpe: 4, feeling: 5),
       _run('b', DateTime(2026, 8, 19, 7), rpe: 6, feeling: 3),
       _run('c', DateTime(2026, 8, 12, 7), rpe: 8),
@@ -449,7 +452,7 @@ void main() {
   });
 
   test('elevation summary totals gain and finds the biggest climb', () {
-    final summary = RunFitnessAnalytics.elevation([
+    final summary = RunCalendarStats.elevation([
       _run('a', DateTime(2026, 8, 1, 7), elevation: 120),
       _run('b', DateTime(2026, 8, 2, 7), elevation: 300),
       _run('c', DateTime(2026, 8, 3, 7)),
@@ -458,12 +461,12 @@ void main() {
     expect(summary.runsWithData, 2);
     expect(summary.avgGainPerRunMeters, 210);
     expect(summary.highest?.id, 'b');
-    expect(RunFitnessAnalytics.elevation(const []).hasData, isFalse);
+    expect(RunCalendarStats.elevation(const []).hasData, isFalse);
   });
 
   group('year review', () {
     test('summarises the year', () {
-      final review = RunFitnessAnalytics.yearReview([
+      final review = RunCalendarStats.yearReview([
         // Two Saturday-morning runs in March, one Tuesday evening in May.
         _run(
           'm1',
@@ -501,7 +504,7 @@ void main() {
     });
 
     test('an empty year is flagged as empty', () {
-      final review = RunFitnessAnalytics.yearReview(const [], 2026);
+      final review = RunCalendarStats.yearReview(const [], 2026);
       expect(review.isEmpty, isTrue);
       expect(review.mostActiveMonth, isNull);
       expect(review.favoriteDayPart, isNull);
