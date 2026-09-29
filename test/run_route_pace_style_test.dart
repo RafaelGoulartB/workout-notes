@@ -59,4 +59,34 @@ void main() {
     expect(paces, hasLength(points.length - 1));
     expect(paces.every((pace) => pace != null && pace > 0), isTrue);
   });
+
+  test('groups consecutive same-colour segments into polylines', () {
+    final runs = RunRoutePaceStyle.colorRuns([
+      400,
+      400,
+      400,
+      320,
+      320,
+      400,
+    ], averagePaceSecPerKm: 400);
+    expect(runs, hasLength(3));
+    expect(runs[0].startSegment, 0);
+    expect(runs[0].endSegment, 2);
+    expect(runs[0].color, RunRoutePaceStyle.averageColor);
+    expect(runs[1].color, RunRoutePaceStyle.fastColor);
+    // A run's polyline covers the points of its segments, sharing the joint.
+    expect(runs[1].firstPoint, 3);
+    expect(runs[1].lastPoint, 5);
+    expect(runs[2].firstPoint, runs[1].lastPoint);
+    expect(RunRoutePaceStyle.colorRuns([], averagePaceSecPerKm: 400), isEmpty);
+  });
+
+  test('legend ends at the pace where the route turns fully red', () {
+    expect(RunRoutePaceStyle.fastestLegendPace(400), closeTo(320, 0.001));
+    expect(
+      RunRoutePaceStyle.legendColors.first,
+      RunRoutePaceStyle.averageColor,
+    );
+    expect(RunRoutePaceStyle.legendColors.last, RunRoutePaceStyle.fastColor);
+  });
 }

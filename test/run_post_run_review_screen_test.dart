@@ -98,7 +98,7 @@ void main() {
     });
 
     expect(find.text('Revisar corrida'), findsOneWidget);
-    expect(find.text('5.00 km'), findsWidgets);
+    expect(find.text('5.00'), findsWidgets);
     await tester.scrollUntilVisible(
       find.text('ESFORÇO PERCEBIDO'),
       250,
@@ -127,6 +127,11 @@ void main() {
     expect(find.byIcon(Icons.star_rounded), findsNWidgets(3));
     expect(find.byIcon(Icons.star_outline_rounded), findsNWidgets(2));
 
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('run-review-rpe-1')),
+      -250,
+      scrollable: find.byType(Scrollable).first,
+    );
     final firstRpe = tester.getCenter(
       find.byKey(const ValueKey('run-review-rpe-1')),
     );
