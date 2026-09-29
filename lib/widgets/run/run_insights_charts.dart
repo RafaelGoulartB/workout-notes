@@ -43,11 +43,13 @@ String runZoneName(AppLocalizations loc, RunZone zone) => switch (zone) {
 class RunVdotChart extends StatelessWidget {
   final List<RunVdotPoint> points;
   final String emptyLabel;
+  final double height;
 
   const RunVdotChart({
     super.key,
     required this.points,
     required this.emptyLabel,
+    this.height = RunChartStyle.height,
   });
 
   @override
@@ -74,7 +76,7 @@ class RunVdotChart extends StatelessWidget {
     final tickEvery = math.max(1, (maxX / 4).ceil());
 
     return SizedBox(
-      height: RunChartStyle.height,
+      height: height,
       child: LineChart(
         LineChartData(
           minX: -0.3,

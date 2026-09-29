@@ -242,35 +242,45 @@ void main() {
   });
 
   group('RunInsightsScreen', () {
-    testWidgets('renders every section for a runner', (tester) async {
+    testWidgets('groups the analysis into form, training and year tabs', (
+      tester,
+    ) async {
       phoneSize(tester);
       await tester.runAsync(seedRuns);
       await _pump(tester, const RunInsightsScreen());
 
-      expect(find.text('CONDICIONAMENTO'), findsOneWidget);
-      expect(find.textContaining('VDOT'), findsWidgets);
-      expect(tester.takeException(), isNull);
-
-      final list = find.byType(Scrollable).first;
-      for (final header in [
-        'PREVISÃO DE PROVAS',
-        'CARGA DE TREINO',
-        'DISTRIBUIÇÃO DE INTENSIDADE',
-        'CONSISTÊNCIA',
-        'CALENDÁRIO DE ATIVIDADE',
-        'VOLUME MENSAL',
-        'ELEVAÇÃO',
-        'TÊNIS',
-      ]) {
-        await tester.dragUntilVisible(
-          find.text(header),
-          list,
-          const Offset(0, -300),
-        );
-        await tester.pump(const Duration(milliseconds: 100));
-        expect(find.text(header), findsOneWidget, reason: header);
-        expect(tester.takeException(), isNull, reason: header);
+      Future<void> expectCards(List<String> titles) async {
+        final list = find.byType(Scrollable).first;
+        for (final title in titles) {
+          await tester.dragUntilVisible(
+            find.text(title),
+            list,
+            const Offset(0, -300),
+          );
+          await tester.pump(const Duration(milliseconds: 100));
+          expect(find.text(title), findsOneWidget, reason: title);
+          expect(tester.takeException(), isNull, reason: title);
+        }
       }
+
+      expect(find.textContaining('VDOT'), findsWidgets);
+      await expectCards([
+        'Condicionamento',
+        'Previsão de provas',
+        'Carga de treino',
+      ]);
+
+      await tester.tap(find.text('Treinos'));
+      await tester.pump(const Duration(milliseconds: 300));
+      await expectCards([
+        'Distribuição de intensidade',
+        'Consistência',
+        'Esforço e sensação',
+      ]);
+
+      await tester.tap(find.text('Ano'));
+      await tester.pump(const Duration(milliseconds: 300));
+      await expectCards(['Calendário de atividade', 'Volume', 'Tênis']);
     });
 
     testWidgets('shows an empty state without runs', (tester) async {

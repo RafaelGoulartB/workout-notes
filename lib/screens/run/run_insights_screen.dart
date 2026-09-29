@@ -13,10 +13,13 @@ import 'package:workout_notes/widgets/run/insights/run_insights_fitness_sections
 import 'package:workout_notes/widgets/run/insights/run_insights_year_sections.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
 
-/// Deeper running analysis: fitness estimate, race predictions, training load,
-/// intensity mix, consistency and effort trends, then year views (calendar,
-/// volume, elevation, review) and shoe mileage. Everything is computed once
-/// per load from the full running history.
+/// Which group of analysis cards is showing.
+enum _InsightsTab { fitness, training, year }
+
+/// Deeper running analysis in three tabs: current form (fitness estimate,
+/// race predictions, training load), how you train (intensity mix,
+/// consistency, effort) and the year (review, calendar, volume, shoes).
+/// Everything is computed once per load from the full running history.
 class RunInsightsScreen extends StatefulWidget {
   const RunInsightsScreen({super.key});
 
@@ -29,6 +32,7 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
   final _insightsRepo = RunInsightsRepository();
 
   bool _loading = true;
+  _InsightsTab _tab = _InsightsTab.fitness;
   List<RunActivity> _activities = const [];
   RunFitnessEstimate? _estimate;
   List<RunVdotPoint> _evolution = const [];
@@ -153,9 +157,30 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
+    final showTabs = !_loading && _activities.isNotEmpty;
 
     return Scaffold(
-      appBar: AppBar(title: Text(loc.runInsightsTitle)),
+      appBar: AppBar(
+        title: Text(loc.runInsightsTitle),
+        bottom: showTabs
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(60),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: RunSegmentedTabs<_InsightsTab>(
+                    values: _InsightsTab.values,
+                    selected: _tab,
+                    labelOf: (tab) => switch (tab) {
+                      _InsightsTab.fitness => loc.runInsightsTabFitness,
+                      _InsightsTab.training => loc.runInsightsTabTraining,
+                      _InsightsTab.year => loc.runInsightsTabYear,
+                    },
+                    onChanged: (tab) => setState(() => _tab = tab),
+                  ),
+                ),
+              )
+            : null,
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _activities.isEmpty
@@ -167,49 +192,57 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
           : RefreshIndicator(
               onRefresh: _loadAll,
               child: ListView(
-                padding: RunUi.screenPadding.copyWith(top: 0, bottom: 40),
-                children: _sections(loc),
+                key: PageStorageKey(_tab),
+                padding: RunUi.screenPadding.copyWith(top: 8, bottom: 40),
+                children: [
+                  for (final (i, card) in _cards().indexed) ...[
+                    if (i > 0) const SizedBox(height: 12),
+                    card,
+                  ],
+                ],
               ),
             ),
     );
   }
 
-  List<Widget> _sections(AppLocalizations loc) {
+  /// Cards of the selected tab: current form, how you train, the year.
+  List<Widget> _cards() {
     final estimate = _estimate;
     final load = _load;
     final consistency = _consistency;
     final review = _review;
 
-    return [
-      RunFitnessSection(estimate: estimate, evolution: _evolution),
-      if (estimate != null) RunPredictorSection(estimate: estimate),
-      if (load != null) RunLoadSection(load: load),
-      RunIntensitySection(distribution: _intensity, zones: estimate?.zones),
-      if (consistency != null) RunConsistencySection(consistency: consistency),
-      RunEffortSection(weeks: _effort),
-      RunYearSelector(
-        years: _years,
-        selected: _year,
-        onChanged: (year) => setState(() => _computeYear(year)),
-      ),
-      const SizedBox(height: 12),
-      RunHeatmapSection(year: _year, daily: _daily, today: _today),
-      RunVolumeSection(
-        year: _year,
-        months: _months,
-        thisYear: _thisYearCumulative,
-        lastYear: _lastYearCumulative,
-        today: _today,
-      ),
-      if (review != null) ...[
-        RunElevationSection(
-          year: _year,
-          elevation: review.elevation,
-          onOpenRun: _openRun,
-        ),
-        RunYearReviewSection(review: review, onOpenRun: _openRun),
+    return switch (_tab) {
+      _InsightsTab.fitness => [
+        RunFitnessSection(estimate: estimate, evolution: _evolution),
+        if (estimate != null) RunPredictorSection(estimate: estimate),
+        if (load != null) RunLoadSection(load: load),
       ],
-      RunShoesSection(shoes: _shoes, onOpen: _openShoes),
-    ];
+      _InsightsTab.training => [
+        RunIntensitySection(distribution: _intensity, zones: estimate?.zones),
+        if (consistency != null)
+          RunConsistencySection(consistency: consistency),
+        RunEffortSection(weeks: _effort),
+      ],
+      _InsightsTab.year => [
+        if (_years.length > 1)
+          RunYearSelector(
+            years: _years,
+            selected: _year,
+            onChanged: (year) => setState(() => _computeYear(year)),
+          ),
+        if (review != null)
+          RunYearReviewSection(review: review, onOpenRun: _openRun),
+        RunHeatmapSection(year: _year, daily: _daily, today: _today),
+        RunVolumeSection(
+          year: _year,
+          months: _months,
+          thisYear: _thisYearCumulative,
+          lastYear: _lastYearCumulative,
+          today: _today,
+        ),
+        RunShoesSection(shoes: _shoes, onOpen: _openShoes),
+      ],
+    };
   }
 }
