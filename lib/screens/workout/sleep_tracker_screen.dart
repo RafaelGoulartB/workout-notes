@@ -30,14 +30,6 @@ import 'sleep_monitor_screen.dart';
 import 'traditional_alarms_screen.dart';
 import 'settings_screen.dart';
 
-/// The legacy-entry repair reads every monitor session and rewrites its
-/// entry, so it runs once per app process, after the screen is showing — not
-/// on every load and refresh.
-bool _repairStarted = false;
-
-@visibleForTesting
-void resetSleepRepairForTest() => _repairStarted = false;
-
 class SleepTrackerScreen extends StatefulWidget {
   const SleepTrackerScreen({super.key});
 
@@ -174,7 +166,6 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
         _loadFailed = false;
         _isLoading = false;
       });
-      _repairLegacyEntriesOnce();
     } catch (_) {
       if (!mounted || !_generation.isCurrent(token)) return;
       setState(() {
@@ -182,20 +173,6 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
         _isLoading = false;
       });
     }
-  }
-
-  /// Runs the repair in the background the first time the dashboard is
-  /// shown in this process and reloads once it has finished, since it may have
-  /// filled in older entries.
-  void _repairLegacyEntriesOnce() {
-    if (_repairStarted) return;
-    _repairStarted = true;
-    unawaited(
-      _monitorRepository
-          .repairSleepEntriesFromSessions()
-          .then((_) => mounted ? _load() : null)
-          .catchError((Object _) {}),
-    );
   }
 
   Future<void> _loadMoreHistory() async {
