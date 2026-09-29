@@ -6,6 +6,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../models/ai_chat_message.dart';
+import 'package:workout_notes/widgets/ai/ai_thumbnail.dart';
 
 class AiMessageBubble extends StatelessWidget {
   final AiChatMessage message;
@@ -190,8 +191,13 @@ class _MessageImageGrid extends StatelessWidget {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.file(
-                  File(attachment.path),
+                child: Image(
+                  image: aiThumbnailProvider(
+                    context,
+                    FileImage(File(attachment.path)),
+                    width: single ? 260 : 104,
+                    height: single ? 176 : 104,
+                  ),
                   width: single ? 260 : 104,
                   height: single ? 176 : 104,
                   fit: BoxFit.cover,

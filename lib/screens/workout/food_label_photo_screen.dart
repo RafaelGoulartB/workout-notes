@@ -11,6 +11,7 @@ import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/services/ai_food_label_service.dart';
 import 'package:workout_notes/state/ai_settings_notifier.dart';
 import 'package:workout_notes/utils/ai_error_localizer.dart';
+import 'package:workout_notes/widgets/ai/ai_thumbnail.dart';
 
 import 'ai_settings_screen.dart';
 import 'manual_food_screen.dart';
@@ -350,7 +351,15 @@ class _SelectedImagesPreview extends StatelessWidget {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.memory(images[index].bytes, fit: BoxFit.cover),
+                  child: Image(
+                    image: aiThumbnailProvider(
+                      context,
+                      MemoryImage(images[index].bytes),
+                      width: images.length == 1 ? constraints.maxWidth : 180,
+                      height: 220,
+                    ),
+                    fit: BoxFit.cover,
+                  ),
                 ),
                 Positioned(
                   top: 8,

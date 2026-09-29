@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../models/ai_image_attachment.dart';
+import 'package:workout_notes/widgets/ai/ai_thumbnail.dart';
 
 /// Mobile-first composer inspired by current conversational AI apps.
 ///
@@ -243,8 +244,13 @@ class _PendingImagePreview extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.memory(
-            image.bytes,
+          child: Image(
+            image: aiThumbnailProvider(
+              context,
+              MemoryImage(image.bytes),
+              width: 64,
+              height: 64,
+            ),
             width: 64,
             height: 64,
             fit: BoxFit.cover,
