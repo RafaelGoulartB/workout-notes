@@ -1,11 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:workout_notes/models/run_plan.dart';
+import 'package:workout_notes/models/run_plan_template.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/services/run_pace_calculator.dart';
-import 'package:workout_notes/services/run_plan_templates.dart';
 import 'package:workout_notes/services/run_plan_text.dart';
 
 /// How hard the athlete wants to push weekly volume and quality load.

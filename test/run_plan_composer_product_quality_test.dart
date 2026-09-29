@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:workout_notes/models/run_plan_template.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/models/run_workout_step.dart';

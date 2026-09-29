@@ -7,6 +7,7 @@ import 'package:workout_notes/database/database_periodization_schema.dart';
 import 'package:workout_notes/database/database_run_plan_schema.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
+import 'package:workout_notes/models/run_plan_template.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/screens/run/run_plan_customize_screen.dart';
 import 'package:workout_notes/services/run_plan_history.dart';

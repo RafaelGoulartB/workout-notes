@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/run_plan_template.dart';
 import 'package:workout_notes/screens/run/plan_wizard/run_plan_wizard_controller.dart';
 import 'package:workout_notes/screens/run/plan_wizard/run_plan_wizard_widgets.dart';
 import 'package:workout_notes/services/run_plan_composer.dart';

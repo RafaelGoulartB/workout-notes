@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_plan.dart';
+import 'package:workout_notes/models/run_plan_template.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
