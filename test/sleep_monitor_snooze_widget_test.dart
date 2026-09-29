@@ -2,8 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/screens/workout/sleep_monitor_screen.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
@@ -12,7 +10,6 @@ import 'support/test_db.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  late Database database;
   late Map<String, Object?> nativeState;
   final calls = <String>[];
   final messenger =
@@ -22,18 +19,7 @@ void main() {
   setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 1,
-        onCreate: (db, version) async {
-          await db.execute(
-            'CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT)',
-          );
-        },
-      ),
-    );
-    DatabaseHelper.overrideDatabase = database;
+    await installTestDb();
     nativeState = {
       'supported': true,
       'microphone_granted': true,
@@ -94,8 +80,7 @@ void main() {
   tearDown(() async {
     messenger.setMockMethodCallHandler(SleepMonitorService.methods, null);
     messenger.setMockMethodCallHandler(eventMethods, null);
-    DatabaseHelper.overrideDatabase = null;
-    await database.close();
+    await uninstallTestDb();
   });
 
   testWidgets('opens a monitored mission directly from an active snooze', (

@@ -81,21 +81,15 @@ class RoutineRepository extends BaseRepository {
       ORDER BY rd.routine_id, rd.order_index, re.order_index, ps.order_index
       ''', routineArgs);
 
-    final workoutColumns = await db.rawQuery('PRAGMA table_info(workouts)');
-    final hasDayColumn = workoutColumns.any(
-      (c) => c['name'] == 'routine_day_id',
-    );
     // Older workouts may only carry the (inferred) routine day, so resolve
     // the routine through routine_days when routine_id is missing.
-    final routineExpr = hasDayColumn
-        ? 'COALESCE(w.routine_id, rd.routine_id)'
-        : 'w.routine_id';
+    const routineExpr = 'COALESCE(w.routine_id, rd.routine_id)';
     final lastRows = await db.rawQuery('''
       SELECT $routineExpr AS routine_id,
-        ${hasDayColumn ? 'w.routine_day_id' : 'NULL'} AS routine_day_id,
+        w.routine_day_id AS routine_day_id,
         MAX(w.date) AS last_date
       FROM workouts w
-      ${hasDayColumn ? 'LEFT JOIN routine_days rd ON rd.id = w.routine_day_id' : ''}
+      LEFT JOIN routine_days rd ON rd.id = w.routine_day_id
       WHERE w.end_time IS NOT NULL AND $routineExpr IS NOT NULL
         ${routineId == null ? '' : 'AND $routineExpr = ?'}
       GROUP BY 1, 2

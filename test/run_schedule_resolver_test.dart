@@ -1,9 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:workout_notes/database/database_helper.dart';
-import 'package:workout_notes/database/database_periodization_schema.dart';
-import 'package:workout_notes/database/database_run_plan_schema.dart';
 import 'package:workout_notes/models/periodization_phase_draft.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
@@ -32,59 +29,12 @@ void main() {
   setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 45,
-        onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-        onCreate: (db, version) async {
-          await db.execute(
-            'CREATE TABLE routines (id TEXT PRIMARY KEY, name TEXT NOT NULL, notes TEXT, created_at TEXT NOT NULL)',
-          );
-          await db.execute(
-            'CREATE TABLE routine_days (id TEXT PRIMARY KEY, routine_id TEXT NOT NULL, name TEXT NOT NULL, order_index INTEGER NOT NULL DEFAULT 0, FOREIGN KEY (routine_id) REFERENCES routines(id) ON DELETE CASCADE)',
-          );
-          await db.execute(
-            'CREATE TABLE workouts (id TEXT PRIMARY KEY, date TEXT NOT NULL, start_time TEXT, end_time TEXT, duration_seconds INTEGER, routine_id TEXT, created_at TEXT NOT NULL)',
-          );
-          await db.execute(
-            'CREATE TABLE exercise_entries (id TEXT PRIMARY KEY, workout_id TEXT NOT NULL, exercise_id TEXT NOT NULL, order_index INTEGER, FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE)',
-          );
-          await db.execute(
-            'CREATE TABLE sets (id TEXT PRIMARY KEY, exercise_entry_id TEXT NOT NULL, weight REAL, reps INTEGER, rpe REAL, is_complete INTEGER DEFAULT 0, is_warmup INTEGER DEFAULT 0, order_index INTEGER, FOREIGN KEY (exercise_entry_id) REFERENCES exercise_entries(id) ON DELETE CASCADE)',
-          );
-          await db.execute(
-            'CREATE TABLE body_measurements (id TEXT PRIMARY KEY, type TEXT, value REAL, unit TEXT, date TEXT, created_at TEXT)',
-          );
-          await db.execute(
-            'CREATE TABLE sleep_entries (id TEXT PRIMARY KEY, date TEXT, sleep_minutes INTEGER, actual_sleep_minutes INTEGER, estimated_sleep_minutes INTEGER)',
-          );
-          await db.execute(
-            'CREATE TABLE meal_logs (id TEXT PRIMARY KEY, date TEXT, meal_type TEXT)',
-          );
-          await db.execute(
-            'CREATE TABLE meal_log_items (id TEXT PRIMARY KEY, meal_log_id TEXT, calories REAL, protein_g REAL, carbs_g REAL, fat_g REAL, FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE)',
-          );
-          await db.execute(
-            'CREATE TABLE run_activities (id TEXT PRIMARY KEY, started_at TEXT NOT NULL, ended_at TEXT, '
-            'duration_seconds INTEGER NOT NULL DEFAULT 0, moving_time_seconds INTEGER NOT NULL DEFAULT 0, '
-            'distance_meters REAL NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT \'completed\', '
-            'created_at TEXT NOT NULL, updated_at TEXT NOT NULL, plan_workout_id TEXT)',
-          );
-          await DatabasePeriodizationSchema.create(db);
-          await DatabaseRunPlanSchema.create(db);
-        },
-      ),
-    );
-    DatabaseHelper.overrideDatabase = database;
+    database = await installTestDb();
     periodization = PeriodizationRepository();
     runPlans = RunPlanRepository();
   });
 
-  tearDown(() async {
-    DatabaseHelper.overrideDatabase = null;
-    await database.close();
-  });
+  tearDown(uninstallTestDb);
 
   /// Creates an active plan with one phase covering [phaseStart]..[phaseEnd],
   /// whose weekly target links [runPlanIds] and carries the given run volume.

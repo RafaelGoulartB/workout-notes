@@ -17,7 +17,7 @@ import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/periodization/phase_week_plan.dart';
 import 'package:workout_notes/periodization/run_plan_week_resolver.dart';
-import 'package:workout_notes/repositories/run_plan_repository.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 import 'base_repository.dart';
 
@@ -527,10 +527,9 @@ class PeriodizationRepository extends BaseRepository {
     if (planId != null) {
       final cache = runPlanCache ?? <String, RunPlan?>{};
       if (!cache.containsKey(planId)) {
-        final database = await db;
-        cache[planId] = await _tableExists(database, 'run_plans')
-            ? await RunPlanRepository().getPlan(planId)
-            : null;
+        cache[planId] = await DatabaseHelper.instance.runPlanRepo.getPlan(
+          planId,
+        );
       }
       runPlan = cache[planId];
       if (runPlan != null) {
@@ -575,24 +574,17 @@ class PeriodizationRepository extends BaseRepository {
       ''',
       [_date(start), _date(end)],
     );
-    final runs = <String>{};
-    if (await _tableExists(database, 'run_activities')) {
-      final hasType = await _columnExists(
-        database,
-        'run_activities',
-        'activity_type',
-      );
-      final rows = await database.rawQuery(
-        '''
-        SELECT DISTINCT date(started_at) AS day FROM run_activities
-        WHERE status = 'completed'
-          ${hasType ? "AND activity_type = 'running'" : ''}
-          AND date(started_at) BETWEEN ? AND ?
-        ''',
-        [_date(start), _date(end)],
-      );
-      runs.addAll(rows.map((row) => row['day']).whereType<String>());
-    }
+    // `started_at >= day AND started_at < nextDay` matches the same rows as
+    // comparing `date(started_at)` but can use the started_at indexes.
+    final runRows = await database.rawQuery(
+      '''
+      SELECT DISTINCT date(started_at) AS day FROM run_activities
+      WHERE status = 'completed' AND activity_type = 'running'
+        AND started_at >= ? AND started_at < ?
+      ''',
+      [_date(start), _dayAfter(end)],
+    );
+    final runs = runRows.map((row) => row['day']).whereType<String>().toSet();
     return (
       strength: strengthRows
           .map((row) => (row['date'] as String?)?.substring(0, 10))
@@ -868,9 +860,7 @@ class PeriodizationRepository extends BaseRepository {
     final planIds = target?.runPlanIds ?? const <String>[];
     if (planIds.isEmpty) return null;
 
-    final database = await db;
-    if (!await _tableExists(database, 'run_plans')) return null;
-    final runPlanRepo = RunPlanRepository();
+    final runPlanRepo = DatabaseHelper.instance.runPlanRepo;
     final weekStart = _weekStart(day);
     const resolver = RunPlanWeekResolver();
     final phaseWeekIndex = resolver.phaseWeekOf(
@@ -946,12 +936,8 @@ class PeriodizationRepository extends BaseRepository {
     PeriodizationPhase phase, {
     DateTime? from,
   }) async {
-    final database = await db;
-    if (!await _tableExists(database, 'run_plans')) {
-      return const PeriodizationRunScheduleResult();
-    }
     const resolver = RunPlanWeekResolver();
-    final runPlanRepo = RunPlanRepository();
+    final runPlanRepo = DatabaseHelper.instance.runPlanRepo;
     final phaseStartWeek = _weekStart(phase.startDate);
     final fromWeek = _weekStart(_day(from ?? DateTime.now()));
     final firstWeek = fromWeek.isAfter(phaseStartWeek)
@@ -999,21 +985,14 @@ class PeriodizationRepository extends BaseRepository {
 
   Future<int> _completedRunsBetween(DateTime start, DateTime end) async {
     final database = await db;
-    if (!await _tableExists(database, 'run_activities')) return 0;
-    final hasActivityType = await _columnExists(
-      database,
-      'run_activities',
-      'activity_type',
-    );
     return Sqflite.firstIntValue(
           await database.rawQuery(
             '''
             SELECT COUNT(*) FROM run_activities
-            WHERE status = 'completed'
-              ${hasActivityType ? "AND activity_type = 'running'" : ''}
-              AND date(started_at) BETWEEN ? AND ?
+            WHERE status = 'completed' AND activity_type = 'running'
+              AND started_at >= ? AND started_at < ?
             ''',
-            [_date(start), _date(end)],
+            [_date(start), _dayAfter(end)],
           ),
         ) ??
         0;
@@ -1112,6 +1091,7 @@ class PeriodizationRepository extends BaseRepository {
     final database = await db;
     final startText = _date(start);
     final endText = _date(end);
+    final endAfterText = _dayAfter(end);
     final targetHistory = await getTargetHistory(phase.id);
     final routineIds = <String>{};
     for (
@@ -1171,52 +1151,38 @@ class PeriodizationRepository extends BaseRepository {
       }
     }
 
-    // Devices that predate the run tables (or a failed migration) must still
-    // render the phase — the same guard the sleep repository uses.
-    final hasRunActivities = await _tableExists(database, 'run_activities');
-    final hasRunActivityType =
-        hasRunActivities &&
-        await _columnExists(database, 'run_activities', 'activity_type');
-    final run = hasRunActivities
-        ? (await database.rawQuery(
-            '''
-            SELECT COUNT(*) AS run_count,
-                   COALESCE(SUM(distance_meters), 0) AS distance_meters,
-                   COALESCE(SUM(moving_time_seconds), 0) AS moving_time_seconds,
-                   COALESCE(MAX(distance_meters), 0) AS longest_run_meters
-            FROM run_activities
-            WHERE status = 'completed'
-              ${hasRunActivityType ? "AND activity_type = 'running'" : ''}
-              AND date(started_at) BETWEEN ? AND ?
-            ''',
-            [startText, endText],
-          )).first
-        : const <String, Object?>{};
+    final run = (await database.rawQuery(
+      '''
+      SELECT COUNT(*) AS run_count,
+             COALESCE(SUM(distance_meters), 0) AS distance_meters,
+             COALESCE(SUM(moving_time_seconds), 0) AS moving_time_seconds,
+             COALESCE(MAX(distance_meters), 0) AS longest_run_meters
+      FROM run_activities
+      WHERE status = 'completed' AND activity_type = 'running'
+        AND started_at >= ? AND started_at < ?
+      ''',
+      [startText, endAfterText],
+    )).first;
 
     // A "quality" run is one linked to a tempo/interval/hills/fartlek/race
     // session of a plan. Ad-hoc runs count as volume, never as quality.
-    final hasRunPlans =
-        hasRunActivities &&
-        await _tableExists(database, 'run_plan_workouts') &&
-        await _columnExists(database, 'run_activities', 'plan_workout_id');
-    final qualityRunCount = hasRunPlans
-        ? Sqflite.firstIntValue(
-                await database.rawQuery(
-                  '''
-                  SELECT COUNT(*) FROM run_activities activity
-                  JOIN run_plan_workouts session
-                    ON session.id = activity.plan_workout_id
-                  WHERE activity.status = 'completed'
-                    ${hasRunActivityType ? "AND activity.activity_type = 'running'" : ''}
-                    AND date(activity.started_at) BETWEEN ? AND ?
-                    AND session.kind IN
-                        ('tempo', 'interval', 'fartlek', 'hills', 'race')
-                  ''',
-                  [startText, endText],
-                ),
-              ) ??
-              0
-        : 0;
+    final qualityRunCount =
+        Sqflite.firstIntValue(
+          await database.rawQuery(
+            '''
+            SELECT COUNT(*) FROM run_activities activity
+            JOIN run_plan_workouts session
+              ON session.id = activity.plan_workout_id
+            WHERE activity.status = 'completed'
+              AND activity.activity_type = 'running'
+              AND activity.started_at >= ? AND activity.started_at < ?
+              AND session.kind IN
+                  ('tempo', 'interval', 'fartlek', 'hills', 'race')
+            ''',
+            [startText, endAfterText],
+          ),
+        ) ??
+        0;
 
     final workoutRows = await database.rawQuery(
       '''
@@ -1834,26 +1800,6 @@ class PeriodizationRepository extends BaseRepository {
 
   static DateTime _day(DateTime date) =>
       DateTime(date.year, date.month, date.day);
-  static Future<bool> _tableExists(
-    DatabaseExecutor database,
-    String table,
-  ) async {
-    final rows = await database.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
-      [table],
-    );
-    return rows.isNotEmpty;
-  }
-
-  static Future<bool> _columnExists(
-    DatabaseExecutor database,
-    String table,
-    String column,
-  ) async {
-    final rows = await database.rawQuery('PRAGMA table_info($table)');
-    return rows.any((row) => row['name'] == column);
-  }
-
   static DateTime _weekStart(DateTime date) {
     final day = _day(date);
     return day.subtract(Duration(days: day.weekday - DateTime.monday));
@@ -1861,6 +1807,11 @@ class PeriodizationRepository extends BaseRepository {
 
   static String _date(DateTime date) =>
       _day(date).toIso8601String().substring(0, 10);
+
+  /// Exclusive upper bound for "started on or before [date]" on a
+  /// `started_at` text column: the day after, as `yyyy-MM-dd`.
+  static String _dayAfter(DateTime date) =>
+      _date(DateTime(date.year, date.month, date.day + 1));
   static String? _optional(String? value) =>
       value == null || value.trim().isEmpty ? null : value.trim();
 }

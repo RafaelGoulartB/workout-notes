@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:workout_notes/database/database_helper.dart';
-import 'package:workout_notes/database/database_periodization_schema.dart';
-import 'package:workout_notes/database/database_run_plan_schema.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
@@ -22,36 +18,16 @@ Widget _app(Widget child) => MaterialApp(
 );
 
 void main() {
-  late Database database;
   late RunPlanRepository repo;
 
   setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 45,
-        onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-        onCreate: (db, version) async {
-          await db.execute(
-            'CREATE TABLE run_activities (id TEXT PRIMARY KEY, started_at TEXT NOT NULL, '
-            'status TEXT NOT NULL DEFAULT \'completed\', created_at TEXT NOT NULL, '
-            'updated_at TEXT NOT NULL, plan_workout_id TEXT)',
-          );
-          await DatabasePeriodizationSchema.create(db);
-          await DatabaseRunPlanSchema.create(db);
-        },
-      ),
-    );
-    DatabaseHelper.overrideDatabase = database;
+    await installTestDb();
     repo = RunPlanRepository();
   });
 
-  tearDown(() async {
-    DatabaseHelper.overrideDatabase = null;
-    await database.close();
-  });
+  tearDown(uninstallTestDb);
 
   /// `2 km warmup + 6x(800 m / 2 min) + 1 km cooldown`.
   Future<String> seedIntervalSession() async {

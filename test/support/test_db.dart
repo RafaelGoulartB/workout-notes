@@ -1,6 +1,7 @@
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/database/database_schema.dart';
+import 'package:workout_notes/database/database_seed.dart';
 
 /// Initializes the sqflite FFI factory once for the current test isolate.
 ///
@@ -15,9 +16,13 @@ void initSqfliteFfiForTests() {
 /// ([DatabaseSchema.createSchema], foreign keys on) and no seed rows.
 ///
 /// Pass [seed] to also insert the catalog seed (exercise categories,
-/// built-in exercises, meal types) exactly like a fresh install. The caller
-/// owns the handle and must close it (or use [installTestDb]).
-Future<Database> openTestDb({bool seed = false}) async {
+/// built-in exercises, meal types) exactly like a fresh install, or just
+/// [seedMealTypes] for the four default diary meals. The caller owns the
+/// handle and must close it (or use [installTestDb]).
+Future<Database> openTestDb({
+  bool seed = false,
+  bool seedMealTypes = false,
+}) async {
   initSqfliteFfiForTests();
   return databaseFactoryFfi.openDatabase(
     inMemoryDatabasePath,
@@ -25,8 +30,14 @@ Future<Database> openTestDb({bool seed = false}) async {
       version: 1,
       singleInstance: false,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-      onCreate: (db, _) =>
-          seed ? DatabaseSchema.onCreate(db, 1) : DatabaseSchema.createSchema(db),
+      onCreate: (db, _) async {
+        if (seed) {
+          await DatabaseSchema.onCreate(db, 1);
+          return;
+        }
+        await DatabaseSchema.createSchema(db);
+        if (seedMealTypes) await DatabaseSeed.seedMealTypes(db);
+      },
     ),
   );
 }
@@ -36,9 +47,12 @@ Database? _installed;
 /// Opens a real-schema in-memory database (see [openTestDb]) and installs it
 /// as [DatabaseHelper.overrideDatabase]. Pair with [uninstallTestDb] in
 /// `tearDown`. Installing again closes the previously installed database.
-Future<Database> installTestDb({bool seed = false}) async {
+Future<Database> installTestDb({
+  bool seed = false,
+  bool seedMealTypes = false,
+}) async {
   await uninstallTestDb();
-  final db = await openTestDb(seed: seed);
+  final db = await openTestDb(seed: seed, seedMealTypes: seedMealTypes);
   _installed = db;
   DatabaseHelper.overrideDatabase = db;
   return db;

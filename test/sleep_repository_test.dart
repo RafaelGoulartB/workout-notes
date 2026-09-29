@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/repositories/sleep_repository.dart';
 import 'support/test_db.dart';
 
@@ -12,37 +11,11 @@ void main() {
   setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 1,
-        onCreate: (db, version) async {
-          await db.execute('''
-            CREATE TABLE sleep_entries (
-              id TEXT PRIMARY KEY,
-              date TEXT NOT NULL UNIQUE,
-              sleep_minutes INTEGER NOT NULL,
-              actual_sleep_minutes INTEGER,
-              bedtime_minutes INTEGER,
-              wake_time_minutes INTEGER,
-              comment TEXT,
-              source TEXT NOT NULL DEFAULT 'monitored',
-              time_in_bed_minutes INTEGER,
-              estimated_sleep_minutes INTEGER,
-              created_at TEXT NOT NULL
-            )
-          ''');
-        },
-      ),
-    );
-    DatabaseHelper.overrideDatabase = database;
+    database = await installTestDb();
     repository = SleepRepository();
   });
 
-  tearDown(() async {
-    DatabaseHelper.overrideDatabase = null;
-    await database.close();
-  });
+  tearDown(uninstallTestDb);
 
   test('reads records in date order and deletes by id', () async {
     await _insertEntry(

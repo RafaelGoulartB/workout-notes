@@ -1,8 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:workout_notes/database/database_helper.dart';
-import 'package:workout_notes/database/database_periodization_schema.dart';
 import 'package:workout_notes/models/periodization_checkin.dart';
 import 'package:workout_notes/models/periodization_phase_draft.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
@@ -18,51 +16,11 @@ void main() {
   setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 37,
-        onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-        onCreate: (db, version) async {
-          await db.execute(
-            'CREATE TABLE routines (id TEXT PRIMARY KEY, name TEXT NOT NULL, notes TEXT, created_at TEXT NOT NULL)',
-          );
-          await db.execute(
-            'CREATE TABLE routine_days (id TEXT PRIMARY KEY, routine_id TEXT NOT NULL, name TEXT NOT NULL, order_index INTEGER NOT NULL DEFAULT 0, FOREIGN KEY (routine_id) REFERENCES routines(id) ON DELETE CASCADE)',
-          );
-          await db.execute(
-            'CREATE TABLE workouts (id TEXT PRIMARY KEY, date TEXT NOT NULL, start_time TEXT, end_time TEXT, duration_seconds INTEGER, estimated_calories REAL, comment TEXT, feeling_rating INTEGER, is_from_routine INTEGER DEFAULT 0, routine_id TEXT, pause_start_time TEXT, created_at TEXT NOT NULL)',
-          );
-          await db.execute(
-            'CREATE TABLE exercise_entries (id TEXT PRIMARY KEY, workout_id TEXT NOT NULL, exercise_id TEXT NOT NULL, order_index INTEGER, FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE)',
-          );
-          await db.execute(
-            'CREATE TABLE sets (id TEXT PRIMARY KEY, exercise_entry_id TEXT NOT NULL, weight REAL, reps INTEGER, rpe REAL, is_complete INTEGER DEFAULT 0, is_warmup INTEGER DEFAULT 0, order_index INTEGER, FOREIGN KEY (exercise_entry_id) REFERENCES exercise_entries(id) ON DELETE CASCADE)',
-          );
-          await db.execute(
-            'CREATE TABLE body_measurements (id TEXT PRIMARY KEY, type TEXT, value REAL, unit TEXT, date TEXT, created_at TEXT)',
-          );
-          await db.execute(
-            'CREATE TABLE sleep_entries (id TEXT PRIMARY KEY, date TEXT, sleep_minutes INTEGER, actual_sleep_minutes INTEGER, estimated_sleep_minutes INTEGER)',
-          );
-          await db.execute(
-            'CREATE TABLE meal_logs (id TEXT PRIMARY KEY, date TEXT, meal_type TEXT)',
-          );
-          await db.execute(
-            'CREATE TABLE meal_log_items (id TEXT PRIMARY KEY, meal_log_id TEXT, calories REAL, protein_g REAL, carbs_g REAL, fat_g REAL, FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE)',
-          );
-          await DatabasePeriodizationSchema.create(db);
-        },
-      ),
-    );
-    DatabaseHelper.overrideDatabase = database;
+    database = await installTestDb();
     repository = PeriodizationRepository();
   });
 
-  tearDown(() async {
-    DatabaseHelper.overrideDatabase = null;
-    await database.close();
-  });
+  tearDown(uninstallTestDb);
 
   PeriodizationTarget target({
     double calories = 2200,
@@ -153,6 +111,17 @@ void main() {
         'end_time': '2026-01-02T11:00:00',
         'created_at': '2026-01-02T10:00:00',
       });
+      await database.insert('exercise_categories', {
+        'id': 'category',
+        'name': 'Category',
+        'color': 1,
+      });
+      await database.insert('exercises', {
+        'id': 'exercise',
+        'name': 'Exercise',
+        'category_id': 'category',
+        'created_at': '2026-01-01T08:00:00',
+      });
       await database.insert('exercise_entries', {
         'id': 'e1',
         'workout_id': 'w1',
@@ -171,10 +140,16 @@ void main() {
         'id': 'm1',
         'date': '2026-01-02',
         'meal_type': 'lunch',
+        'created_at': '2026-01-01T08:00:00',
       });
       await database.insert('meal_log_items', {
         'id': 'mi1',
         'meal_log_id': 'm1',
+        'food_name_snapshot': 'Food',
+        'quantity': 1,
+        'unit': 'serving',
+        'nutrition_snapshot_json': '{}',
+        'created_at': '2026-01-01T08:00:00',
         'calories': 2100,
         'protein_g': 170,
       });
@@ -198,6 +173,7 @@ void main() {
         'id': 'sl1',
         'date': '2026-01-02',
         'sleep_minutes': 480,
+        'created_at': '2026-01-02T08:00:00',
       });
 
       final metrics = await repository.getPhaseMetrics(
@@ -293,10 +269,16 @@ void main() {
         'id': 'meal-only',
         'date': '2026-01-01',
         'meal_type': 'lunch',
+        'created_at': '2026-01-01T08:00:00',
       });
       await database.insert('meal_log_items', {
         'id': 'item-only',
         'meal_log_id': 'meal-only',
+        'food_name_snapshot': 'Food',
+        'quantity': 1,
+        'unit': 'serving',
+        'nutrition_snapshot_json': '{}',
+        'created_at': '2026-01-01T08:00:00',
         'calories': 2200,
         'protein_g': 180,
       });

@@ -3,12 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_activity_filter.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_history_screen.dart';
+
+import 'support/test_db.dart';
 
 Future<T> real<T>(WidgetTester tester, Future<T> Function() body) async {
   late T result;
@@ -30,55 +31,18 @@ void main() {
   late RunRepository repository;
 
   setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    initSqfliteFfiForTests();
     Intl.defaultLocale = 'pt_BR';
   });
 
   tearDownAll(() => Intl.defaultLocale = null);
 
   setUp(() async {
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 1,
-        onCreate: (db, version) async {
-          await db.execute('''
-            CREATE TABLE run_activities (
-              id TEXT PRIMARY KEY,
-              activity_type TEXT NOT NULL DEFAULT 'running',
-              started_at TEXT NOT NULL,
-              ended_at TEXT,
-              duration_seconds INTEGER NOT NULL DEFAULT 0,
-              moving_time_seconds INTEGER NOT NULL DEFAULT 0,
-              distance_meters REAL NOT NULL DEFAULT 0,
-              avg_pace_sec_per_km REAL,
-              max_pace_sec_per_km REAL,
-              calories INTEGER,
-              title TEXT,
-              notes TEXT,
-              rpe REAL,
-              feeling_rating INTEGER,
-              status TEXT NOT NULL DEFAULT 'completed',
-              polyline_summary TEXT,
-              created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL,
-              efforts_computed INTEGER NOT NULL DEFAULT 1,
-              plan_workout_id TEXT,
-              gear_id TEXT
-            )
-          ''');
-        },
-      ),
-    );
-    DatabaseHelper.overrideDatabase = database;
+    database = await installTestDb();
     repository = RunRepository();
   });
 
-  tearDown(() async {
-    DatabaseHelper.overrideDatabase = null;
-    await database.close();
-  });
+  tearDown(uninstallTestDb);
 
   Future<void> seed(
     String id,

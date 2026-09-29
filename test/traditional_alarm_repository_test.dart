@@ -1,41 +1,19 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/repositories/traditional_alarm_repository.dart';
 import 'support/test_db.dart';
 
 void main() {
-  late Database database;
   late TraditionalAlarmRepository repository;
 
   setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 1,
-        onCreate: (db, version) => db.execute('''
-          CREATE TABLE traditional_alarms (
-            id TEXT PRIMARY KEY, hour INTEGER NOT NULL, minute INTEGER NOT NULL,
-            weekdays_json TEXT NOT NULL, enabled INTEGER NOT NULL,
-            snooze_enabled INTEGER NOT NULL, snooze_minutes INTEGER NOT NULL,
-            max_snoozes INTEGER NOT NULL,
-            requires_mission INTEGER NOT NULL, next_trigger_at TEXT,
-            created_at TEXT NOT NULL, updated_at TEXT NOT NULL
-          )
-        '''),
-      ),
-    );
-    DatabaseHelper.overrideDatabase = database;
+    await installTestDb();
     repository = TraditionalAlarmRepository();
   });
 
-  tearDown(() async {
-    DatabaseHelper.overrideDatabase = null;
-    await database.close();
-  });
+  tearDown(uninstallTestDb);
 
   test(
     'creates, updates native schedule state, and deletes an alarm',

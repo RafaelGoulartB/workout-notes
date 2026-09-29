@@ -19,9 +19,6 @@ class SleepMonitorRepository extends BaseRepository {
 
   Future<List<SleepMonitorSession>> getUnestimatedSessions() async {
     final database = await db;
-    if (!await _tableExists(database, 'sleep_monitor_sessions')) {
-      return const [];
-    }
     final rows = await database.query(
       'sleep_monitor_sessions',
       where:
@@ -285,14 +282,9 @@ class SleepMonitorRepository extends BaseRepository {
       final session = entry == null
           ? importedSession
           : importedSession.copyWith(sleepEntryId: entry.id);
-      final sessionColumns = (await txn.rawQuery(
-        'PRAGMA table_info(sleep_monitor_sessions)',
-      )).map((row) => row['name'] as String).toSet();
-      final sessionMap = session.toMap()
-        ..removeWhere((key, _) => !sessionColumns.contains(key));
       await txn.insert(
         'sleep_monitor_sessions',
-        sessionMap,
+        session.toMap(),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
       // Segments and stage epochs are transient calculation material. They
@@ -340,17 +332,6 @@ class SleepMonitorRepository extends BaseRepository {
 
   Future<SleepEntry?> getSleepEntry(String id) async =>
       _sleepEntries.getById(await db, id);
-
-  static Future<bool> _tableExists(
-    DatabaseExecutor database,
-    String table,
-  ) async {
-    final rows = await database.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
-      [table],
-    );
-    return rows.isNotEmpty;
-  }
 }
 
 /// Small transaction-aware adapter that keeps sleep merging inside the same

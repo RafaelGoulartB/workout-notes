@@ -60,8 +60,7 @@ class WorkoutRepository extends BaseRepository {
       'date': (date ?? now).toIso8601String().substring(0, 10),
       'is_from_routine': routineId != null ? 1 : 0,
       'routine_id': routineId,
-      if (routineDayId != null && await _hasRoutineDayColumn(db))
-        'routine_day_id': routineDayId,
+      'routine_day_id': ?routineDayId,
       'created_at': now.toIso8601String(),
     });
 
@@ -109,7 +108,8 @@ class WorkoutRepository extends BaseRepository {
   }) async {
     final db = await this.db;
     final entryId = const Uuid().v4();
-    final count = Sqflite.firstIntValue(
+    final count =
+        Sqflite.firstIntValue(
           await db.rawQuery(
             'SELECT COUNT(*) FROM exercise_entries WHERE workout_id = ?',
             [workoutId],
@@ -156,7 +156,8 @@ class WorkoutRepository extends BaseRepository {
 
     for (final re in routineExercises) {
       final entryId = const Uuid().v4();
-      final count = Sqflite.firstIntValue(
+      final count =
+          Sqflite.firstIntValue(
             await db.rawQuery(
               'SELECT COUNT(*) FROM exercise_entries WHERE workout_id = ?',
               [workoutId],
@@ -421,7 +422,8 @@ class WorkoutRepository extends BaseRepository {
     final routineId = workout['routine_id'] as String?;
     final routineDayId = workout['routine_day_id'] as String?;
     final currentDate = workout['date'] as String? ?? '';
-    final currentMoment = (workout['end_time'] as String?) ??
+    final currentMoment =
+        (workout['end_time'] as String?) ??
         (workout['start_time'] as String?) ??
         (workout['created_at'] as String?) ??
         '';
@@ -692,7 +694,8 @@ class WorkoutRepository extends BaseRepository {
       duration = now.difference(startTime).inSeconds;
     }
 
-    final calories = estimatedCalories ??
+    final calories =
+        estimatedCalories ??
         await _estimateCaloriesForWorkout(db, id, durationSeconds: duration);
 
     await db.update(
@@ -982,7 +985,8 @@ class WorkoutRepository extends BaseRepository {
     final today = DateTime.now().toIso8601String().substring(0, 10);
     return db.delete(
       'workouts',
-      where: '''
+      where:
+          '''
         end_time IS NULL AND date <= ?
         AND IFNULL(is_from_routine, 0) = 0
         AND IFNULL(comment, '') = ''
@@ -1011,7 +1015,8 @@ class WorkoutRepository extends BaseRepository {
   }) async {
     final db = await this.db;
     final id = const Uuid().v4();
-    final count = Sqflite.firstIntValue(
+    final count =
+        Sqflite.firstIntValue(
           await db.rawQuery(
             'SELECT COUNT(*) FROM sets WHERE exercise_entry_id = ?',
             [exerciseEntryId],
@@ -1190,13 +1195,6 @@ class WorkoutRepository extends BaseRepository {
   // ===================================================================
   // INTERNAL HELPERS (used by importRoutineDayToWorkout)
 
-  /// Older test schemas and partially migrated databases lack the v54
-  /// `workouts.routine_day_id` column.
-  Future<bool> _hasRoutineDayColumn(DatabaseExecutor db) async {
-    final columns = await db.rawQuery('PRAGMA table_info(workouts)');
-    return columns.any((c) => c['name'] == 'routine_day_id');
-  }
-
   /// Records which routine day (and routine) a workout trains. Keeps an
   /// existing link: importing a second day into the same session does not
   /// relabel it.
@@ -1205,7 +1203,6 @@ class WorkoutRepository extends BaseRepository {
     String workoutId,
     String routineDayId,
   ) async {
-    if (!await _hasRoutineDayColumn(db)) return;
     final day = await db.query(
       'routine_days',
       columns: ['routine_id'],

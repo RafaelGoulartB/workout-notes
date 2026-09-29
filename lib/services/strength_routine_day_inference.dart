@@ -38,19 +38,13 @@ class StrengthRoutineDayInference {
   /// Returns how many workouts were linked (0 once done).
   static Future<int> runOnce({Database? database}) async {
     final db = database ?? await DatabaseHelper.instance.database;
-    try {
-      final columns = await db.rawQuery('PRAGMA table_info(workouts)');
-      if (!columns.any((c) => c['name'] == 'routine_day_id')) return 0;
-      final done = await db.query(
-        'app_settings',
-        where: 'key = ?',
-        whereArgs: [flagKey],
-        limit: 1,
-      );
-      if (done.isNotEmpty) return 0;
-    } catch (_) {
-      return 0;
-    }
+    final done = await db.query(
+      'app_settings',
+      where: 'key = ?',
+      whereArgs: [flagKey],
+      limit: 1,
+    );
+    if (done.isNotEmpty) return 0;
 
     final dayRows = await db.rawQuery(
       'SELECT routine_day_id, exercise_id FROM routine_exercises',
