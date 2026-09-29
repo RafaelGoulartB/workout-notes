@@ -60,7 +60,8 @@ abstract final class DatabaseSchema {
         is_from_routine INTEGER NOT NULL DEFAULT 0,
         routine_id TEXT,
         pause_start_time TEXT,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        routine_day_id TEXT
       )
     ''');
 

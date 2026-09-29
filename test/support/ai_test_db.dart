@@ -24,7 +24,7 @@ Future<Database> installAiTestDb({bool includeRoutineDayNotes = true}) async {
           'CREATE TABLE exercises (id TEXT PRIMARY KEY, name TEXT, category_id TEXT, type TEXT DEFAULT \'weightReps\', notes TEXT, equipment TEXT, is_favorite INTEGER DEFAULT 0, default_rest_time INTEGER, weight_increment REAL, created_at TEXT, locale_key TEXT)',
         );
         await db.execute(
-          'CREATE TABLE workouts (id TEXT PRIMARY KEY, date TEXT, start_time TEXT, end_time TEXT, duration_seconds INTEGER, estimated_calories REAL, comment TEXT, feeling_rating INTEGER, is_from_routine INTEGER DEFAULT 0, routine_id TEXT, pause_start_time TEXT, created_at TEXT)',
+          'CREATE TABLE workouts (id TEXT PRIMARY KEY, date TEXT, start_time TEXT, end_time TEXT, duration_seconds INTEGER, estimated_calories REAL, comment TEXT, feeling_rating INTEGER, is_from_routine INTEGER DEFAULT 0, routine_id TEXT, pause_start_time TEXT, created_at TEXT, routine_day_id TEXT)',
         );
         await db.execute(
           'CREATE TABLE exercise_entries (id TEXT PRIMARY KEY, workout_id TEXT, exercise_id TEXT, order_index INTEGER, superset_group_id TEXT, notes TEXT, rest_time_seconds INTEGER, FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE, FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE)',

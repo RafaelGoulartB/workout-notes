@@ -1,105 +1,107 @@
 import 'package:sqflite/sqflite.dart';
-import 'base_repository.dart';
+import 'package:workout_notes/repositories/base_repository.dart';
+import 'package:workout_notes/repositories/strength_records_repository.dart';
 
 /// Time bucketing used for the anaerobic volume trend chart.
 enum AnaerobicTrendBucket { week, month, year }
 
 /// Repository for statistics, progress charts, PRs, heatmap, and trends.
 class AnalyticsRepository extends BaseRepository {
+  /// A working set that really happened: completed, not a warm-up. Every
+  /// statistic below joins `workouts w` and also requires [_finished], so
+  /// planned or abandoned sessions never leak into the numbers.
+  static const _workSet = 's.is_complete = 1 AND IFNULL(s.is_warmup, 0) = 0';
+  static const _finished = 'w.end_time IS NOT NULL';
+
   // ===================================================================
   // EXERCISE HISTORY
   // ===================================================================
 
+  /// Sessions of one exercise, oldest first (only the newest [limit] when
+  /// given). Only completed, non-warm-up sets of finished workouts count. Each
+  /// session carries its best estimated 1RM (the maximum over its sets, not
+  /// the estimate of the heaviest set) and the sets themselves.
   Future<Map<String, dynamic>> getExerciseHistory(
     String exerciseId, {
     int? limit,
   }) async {
     final db = await this.db;
-    final query = '''
-      SELECT s.*, w.date, w.id as workout_id, ee.exercise_id
+    final results = await db.rawQuery(
+      '''
+      SELECT s.weight AS weight, s.reps AS reps,
+        w.date AS date, w.id AS workout_id
       FROM sets s
       JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
       JOIN workouts w ON ee.workout_id = w.id
-      WHERE ee.exercise_id = ? AND s.is_warmup = 0
-      ORDER BY w.date ASC
-    ''';
+      WHERE ee.exercise_id = ? AND $_workSet AND $_finished
+      ORDER BY w.date ASC, w.start_time ASC, ee.order_index ASC,
+        s.order_index ASC
+    ''',
+      [exerciseId],
+    );
 
-    final results = await db.rawQuery(query, [exerciseId]);
-    final effectiveLimit = limit ?? results.length;
-
-    // Group by date
-    final Map<String, List<Map<String, dynamic>>> byDate = {};
+    // Group by workout (two sessions on the same day stay separate).
+    final byWorkout = <String, List<Map<String, dynamic>>>{};
     for (final row in results) {
-      final date = row['date'] as String;
-      byDate.putIfAbsent(date, () => []).add(row);
+      byWorkout.putIfAbsent(row['workout_id'] as String, () => []).add(row);
     }
 
-    // Calculate stats per session
+    final sessions = byWorkout.entries.toList();
+    final recent = limit == null || limit >= sessions.length
+        ? sessions
+        : sessions.sublist(sessions.length - limit);
+
     final history = <Map<String, dynamic>>[];
-    final entries = byDate.entries.toList();
-    final recent = entries.reversed
-        .take(effectiveLimit)
-        .toList()
-        .reversed
-        .toList();
-
     for (final entry in recent) {
-      final sets = entry.value;
-      final weights = sets
-          .map<double>((s) => (s['weight'] as num?)?.toDouble() ?? 0.0)
-          .toList();
-      final reps = sets.map<int>((s) => (s['reps'] as int?) ?? 0).toList();
-      final maxWeight = weights.isEmpty
-          ? 0.0
-          : weights.reduce((a, b) => a > b ? a : b);
-      final totalVolume = weights.asMap().entries.fold<double>(
-        0.0,
-        (sum, e) => sum + (e.value * reps[e.key]),
-      );
-      final bestSetIndex = weights.indexOf(maxWeight);
-
-      double? estimated1RM;
-      if (maxWeight > 0 && reps[bestSetIndex] > 0) {
-        // Epley formula: 1RM = weight * (1 + reps/30)
-        estimated1RM = maxWeight * (1 + (reps[bestSetIndex] / 30));
+      final sets = <Map<String, dynamic>>[];
+      var maxWeight = 0.0;
+      var totalVolume = 0.0;
+      var totalReps = 0;
+      double? best1rm;
+      Map<String, dynamic>? bestSet;
+      double bestSetScore = -1;
+      for (final row in entry.value) {
+        final weight = (row['weight'] as num?)?.toDouble() ?? 0.0;
+        final reps = (row['reps'] as num?)?.toInt() ?? 0;
+        final e1rm = strengthE1rm(weight, reps);
+        sets.add({'weight': weight, 'reps': reps, 'e1rm': e1rm});
+        if (weight > maxWeight) maxWeight = weight;
+        totalVolume += weight * reps;
+        totalReps += reps;
+        if (e1rm != null && (best1rm == null || e1rm > best1rm)) {
+          best1rm = e1rm;
+        }
+        // Best set: highest e1RM, else heaviest, else most reps.
+        final score = e1rm ?? (weight > 0 ? weight / 1000 : reps / 1000000);
+        if (score > bestSetScore) {
+          bestSetScore = score;
+          bestSet = {'weight': weight, 'reps': reps};
+        }
       }
-
-      final firstSet = entry.value.first;
       history.add({
-        'date': entry.key,
+        'date': entry.value.first['date'] as String,
         'max_weight': maxWeight,
         'total_volume': totalVolume,
         'total_sets': sets.length,
-        'total_reps': reps.fold<int>(0, (a, b) => a + b),
-        'estimated_1rm': estimated1RM,
-        'workout_id': firstSet['workout_id'],
-        'best_set': {'weight': maxWeight, 'reps': reps[bestSetIndex]},
+        'total_reps': totalReps,
+        'estimated_1rm': best1rm,
+        'workout_id': entry.key,
+        'best_set': bestSet ?? {'weight': 0.0, 'reps': 0},
+        'sets': sets,
       });
     }
 
-    // Best records
-    double allMaxWeight = 0;
-    double allMaxVolume = 0;
-    if (history.isNotEmpty) {
-      allMaxWeight = history
-          .map((h) => (h['max_weight'] as num).toDouble())
-          .reduce((a, b) => a > b ? a : b);
-      allMaxVolume = history
-          .map((h) => (h['total_volume'] as num).toDouble())
-          .reduce((a, b) => a > b ? a : b);
-    }
+    double best(String key) => history.fold<double>(0, (a, h) {
+      final v = (h[key] as num?)?.toDouble() ?? 0;
+      return v > a ? v : a;
+    });
 
     return {
       'exercise_id': exerciseId,
       'history': history,
-      'best_weight': allMaxWeight,
-      'best_volume': allMaxVolume,
-      'best_1rm': history.fold<double>(
-        0,
-        (a, b) => (b['estimated_1rm'] as double? ?? 0) > a
-            ? (b['estimated_1rm'] as double? ?? 0)
-            : a,
-      ),
+      'best_weight': best('max_weight'),
+      'best_volume': best('total_volume'),
+      'best_1rm': best('estimated_1rm'),
     };
   }
 
@@ -127,7 +129,7 @@ class AnalyticsRepository extends BaseRepository {
         JOIN exercises e ON ee.exercise_id = e.id
         JOIN exercise_categories ec ON e.category_id = ec.id
         JOIN workouts w ON ee.workout_id = w.id
-        WHERE w.date >= ? AND w.date <= ? AND s.is_warmup = 0
+        WHERE w.date >= ? AND w.date <= ? AND $_workSet AND $_finished
         GROUP BY ec.id
         ORDER BY volume DESC
       ''',
@@ -161,7 +163,7 @@ class AnalyticsRepository extends BaseRepository {
         FROM sets s
         JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
         JOIN workouts w ON ee.workout_id = w.id
-        WHERE w.date LIKE ? AND s.is_warmup = 0
+        WHERE w.date LIKE ? AND $_workSet AND $_finished
       ''',
         ['$monthStr%'],
       );
@@ -191,8 +193,8 @@ class AnalyticsRepository extends BaseRepository {
       SELECT w.date, COALESCE(SUM(s.weight * s.reps), 0) as volume
       FROM workouts w
       LEFT JOIN exercise_entries ee ON w.id = ee.workout_id
-      LEFT JOIN sets s ON ee.id = s.exercise_entry_id AND s.is_warmup = 0
-      WHERE w.date >= ? AND w.date <= ?
+      LEFT JOIN sets s ON ee.id = s.exercise_entry_id AND $_workSet
+      WHERE w.date >= ? AND w.date <= ? AND $_finished
       GROUP BY w.date
       ORDER BY w.date
     ''',
@@ -217,7 +219,7 @@ class AnalyticsRepository extends BaseRepository {
       SELECT date, duration_seconds, start_time,
         CAST(strftime('%w', date) AS INTEGER) as day_of_week
       FROM workouts
-      WHERE date >= ?
+      WHERE date >= ? AND end_time IS NOT NULL
       ORDER BY date ASC
     ''',
       [startStr],
@@ -237,7 +239,8 @@ class AnalyticsRepository extends BaseRepository {
       FROM exercise_categories ec
       JOIN exercises e ON e.category_id = ec.id
       JOIN exercise_entries ee ON ee.exercise_id = e.id
-      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
+      JOIN workouts w ON ee.workout_id = w.id AND $_finished
+      JOIN sets s ON s.exercise_entry_id = ee.id AND $_workSet
       GROUP BY ec.id
       ORDER BY volume DESC
     ''');
@@ -260,8 +263,8 @@ class AnalyticsRepository extends BaseRepository {
       JOIN exercise_entries ee ON w.id = ee.workout_id
       JOIN exercises e ON ee.exercise_id = e.id
       JOIN exercise_categories ec ON e.category_id = ec.id
-      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
-      WHERE w.date >= ?
+      JOIN sets s ON s.exercise_entry_id = ee.id AND $_workSet
+      WHERE w.date >= ? AND $_finished
       GROUP BY w.date, ec.id
       ORDER BY w.date
     ''',
@@ -281,7 +284,8 @@ class AnalyticsRepository extends BaseRepository {
       FROM exercises e
       JOIN exercise_categories ec ON e.category_id = ec.id
       JOIN exercise_entries ee ON ee.exercise_id = e.id
-      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
+      JOIN workouts w ON ee.workout_id = w.id AND $_finished
+      JOIN sets s ON s.exercise_entry_id = ee.id AND $_workSet
       GROUP BY e.id
       ORDER BY volume DESC
       LIMIT ?
@@ -299,7 +303,8 @@ class AnalyticsRepository extends BaseRepository {
       FROM exercise_categories ec
       JOIN exercises e ON e.category_id = ec.id
       JOIN exercise_entries ee ON ee.exercise_id = e.id
-      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
+      JOIN workouts w ON ee.workout_id = w.id AND $_finished
+      JOIN sets s ON s.exercise_entry_id = ee.id AND $_workSet
       GROUP BY ec.energy_system
     ''');
   }
@@ -329,9 +334,9 @@ class AnalyticsRepository extends BaseRepository {
       FROM exercise_categories ec
       JOIN exercises e ON e.category_id = ec.id
       JOIN exercise_entries ee ON ee.exercise_id = e.id
-      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
+      JOIN sets s ON s.exercise_entry_id = ee.id AND $_workSet
       JOIN workouts w ON ee.workout_id = w.id
-      WHERE ec.energy_system = 'anaerobic'
+      WHERE ec.energy_system = 'anaerobic' AND $_finished
         AND w.date >= ? AND w.date <= ?
       GROUP BY ec.id
       ORDER BY volume DESC
@@ -361,9 +366,9 @@ class AnalyticsRepository extends BaseRepository {
       FROM exercises e
       JOIN exercise_categories ec ON e.category_id = ec.id
       JOIN exercise_entries ee ON ee.exercise_id = e.id
-      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
+      JOIN sets s ON s.exercise_entry_id = ee.id AND $_workSet
       JOIN workouts w ON ee.workout_id = w.id
-      WHERE ec.energy_system = 'anaerobic'
+      WHERE ec.energy_system = 'anaerobic' AND $_finished
         AND w.date >= ? AND w.date <= ?
       GROUP BY e.id
       ORDER BY volume DESC
@@ -405,7 +410,7 @@ class AnalyticsRepository extends BaseRepository {
           JOIN exercise_categories ec ON e.category_id = ec.id
           JOIN workouts w ON ee.workout_id = w.id
           WHERE ec.energy_system = 'anaerobic'
-            AND s.is_warmup = 0
+            AND $_workSet AND $_finished
             AND w.date >= ? AND w.date <= ?
         ''',
           [
@@ -437,7 +442,7 @@ class AnalyticsRepository extends BaseRepository {
           JOIN exercise_categories ec ON e.category_id = ec.id
           JOIN workouts w ON ee.workout_id = w.id
           WHERE ec.energy_system = 'anaerobic'
-            AND s.is_warmup = 0
+            AND $_workSet AND $_finished
             AND w.date >= ? AND w.date <= ?
         ''',
           ['$monthStr-01', lastDay.toIso8601String().substring(0, 10)],
@@ -462,7 +467,7 @@ class AnalyticsRepository extends BaseRepository {
           JOIN exercise_categories ec ON e.category_id = ec.id
           JOIN workouts w ON ee.workout_id = w.id
           WHERE ec.energy_system = 'anaerobic'
-            AND s.is_warmup = 0
+            AND $_workSet AND $_finished
             AND w.date >= ? AND w.date <= ?
         ''',
           ['$year-01-01', '$year-12-31'],
@@ -489,7 +494,7 @@ class AnalyticsRepository extends BaseRepository {
       FROM sets s
       JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
       JOIN workouts w ON ee.workout_id = w.id
-      WHERE s.rpe IS NOT NULL AND s.is_warmup = 0
+      WHERE s.rpe IS NOT NULL AND $_workSet AND $_finished
       GROUP BY w.id
       ORDER BY w.date DESC
       LIMIT ?
@@ -506,8 +511,9 @@ class AnalyticsRepository extends BaseRepository {
         COALESCE(SUM(s.weight * s.reps), 0) as volume
       FROM workouts w
       JOIN exercise_entries ee ON w.id = ee.workout_id
-      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
+      JOIN sets s ON s.exercise_entry_id = ee.id AND $_workSet
       WHERE w.duration_seconds IS NOT NULL AND w.duration_seconds > 0
+        AND $_finished
       GROUP BY w.id
       ORDER BY w.date DESC
       LIMIT ?
@@ -516,36 +522,26 @@ class AnalyticsRepository extends BaseRepository {
     );
   }
 
+  /// Heaviest weighted set per exercise (completed working sets of finished
+  /// workouts), with its reps and date.
   Future<List<Map<String, dynamic>>> getPersonalRecords({
     int limit = 20,
   }) async {
     final db = await this.db;
+    // A single MAX() aggregate makes SQLite take the bare columns (reps,
+    // date) from the row holding the maximum weight.
     return db.rawQuery(
       '''
       SELECT e.id as exercise_id, e.name as exercise_name,
         ec.name as category_name, ec.color as category_color,
         MAX(s.weight) as best_weight,
-        (SELECT s2.reps FROM sets s2
-          JOIN exercise_entries ee2 ON s2.exercise_entry_id = ee2.id
-          WHERE ee2.exercise_id = e.id AND s2.is_warmup = 0
-          AND s2.weight = (SELECT MAX(s3.weight) FROM sets s3
-            JOIN exercise_entries ee3 ON s3.exercise_entry_id = ee3.id
-            WHERE ee3.exercise_id = e.id AND s3.is_warmup = 0)
-          LIMIT 1
-        ) as best_reps,
-        (SELECT w2.date FROM sets s2
-          JOIN exercise_entries ee2 ON s2.exercise_entry_id = ee2.id
-          JOIN workouts w2 ON ee2.workout_id = w2.id
-          WHERE ee2.exercise_id = e.id AND s2.is_warmup = 0
-          AND s2.weight = (SELECT MAX(s3.weight) FROM sets s3
-            JOIN exercise_entries ee3 ON s3.exercise_entry_id = ee3.id
-            WHERE ee3.exercise_id = e.id AND s3.is_warmup = 0)
-          LIMIT 1
-        ) as date
+        s.reps as best_reps,
+        w.date as date
       FROM exercises e
       JOIN exercise_categories ec ON e.category_id = ec.id
       JOIN exercise_entries ee ON ee.exercise_id = e.id
-      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
+      JOIN workouts w ON ee.workout_id = w.id AND $_finished
+      JOIN sets s ON s.exercise_entry_id = ee.id AND $_workSet
       GROUP BY e.id
       HAVING best_weight > 0
       ORDER BY best_weight DESC
@@ -565,7 +561,7 @@ class AnalyticsRepository extends BaseRepository {
       '''
       SELECT date, feeling_rating, duration_seconds
       FROM workouts
-      WHERE feeling_rating IS NOT NULL
+      WHERE feeling_rating IS NOT NULL AND end_time IS NOT NULL
       ORDER BY date DESC
       LIMIT ?
     ''',
@@ -581,8 +577,8 @@ class AnalyticsRepository extends BaseRepository {
         COUNT(DISTINCT w.id) as workout_count
       FROM workouts w
       JOIN exercise_entries ee ON w.id = ee.workout_id
-      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
-      WHERE w.feeling_rating IS NOT NULL
+      JOIN sets s ON s.exercise_entry_id = ee.id AND $_workSet
+      WHERE w.feeling_rating IS NOT NULL AND $_finished
       GROUP BY w.feeling_rating
       ORDER BY w.feeling_rating
     ''');
@@ -599,6 +595,7 @@ class AnalyticsRepository extends BaseRepository {
       SELECT date, duration_seconds
       FROM workouts
       WHERE duration_seconds IS NOT NULL AND duration_seconds > 0
+        AND end_time IS NOT NULL
       ORDER BY date DESC
       LIMIT ?
     ''',
@@ -624,8 +621,9 @@ class AnalyticsRepository extends BaseRepository {
         (SELECT COALESCE(SUM(s2.weight * s2.reps), 0)
          FROM workouts w2
          JOIN exercise_entries ee2 ON w2.id = ee2.workout_id
-         JOIN sets s2 ON s2.exercise_entry_id = ee2.id AND s2.is_warmup = 0
-         WHERE w2.date = bm.date
+         JOIN sets s2 ON s2.exercise_entry_id = ee2.id
+           AND s2.is_complete = 1 AND IFNULL(s2.is_warmup, 0) = 0
+         WHERE w2.date = bm.date AND w2.end_time IS NOT NULL
         ) as volume
       FROM body_measurements bm
       WHERE bm.type = 'weight' AND bm.date >= ?
@@ -650,7 +648,7 @@ class AnalyticsRepository extends BaseRepository {
         AVG(feeling_rating) as avg_feeling,
         COUNT(CASE WHEN feeling_rating IS NOT NULL THEN 1 END) as feeling_count
       FROM workouts
-      WHERE date LIKE ?
+      WHERE date LIKE ? AND end_time IS NOT NULL
     ''',
       ['$monthStr%'],
     );
@@ -662,7 +660,7 @@ class AnalyticsRepository extends BaseRepository {
       FROM sets s
       JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
       JOIN workouts w ON ee.workout_id = w.id
-      WHERE w.date LIKE ? AND s.is_warmup = 0
+      WHERE w.date LIKE ? AND $_workSet AND $_finished
     ''',
       ['$monthStr%'],
     );
@@ -673,9 +671,9 @@ class AnalyticsRepository extends BaseRepository {
       FROM exercise_categories ec
       JOIN exercises e ON e.category_id = ec.id
       JOIN exercise_entries ee ON ee.exercise_id = e.id
-      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
+      JOIN sets s ON s.exercise_entry_id = ee.id AND $_workSet
       JOIN workouts w ON ee.workout_id = w.id
-      WHERE w.date LIKE ?
+      WHERE w.date LIKE ? AND $_finished
       GROUP BY ec.id
       ORDER BY volume DESC
     ''',
@@ -686,7 +684,8 @@ class AnalyticsRepository extends BaseRepository {
         Sqflite.firstIntValue(
           await db.rawQuery(
             '''
-      SELECT COUNT(DISTINCT date) FROM workouts WHERE date LIKE ?
+      SELECT COUNT(DISTINCT date) FROM workouts
+      WHERE date LIKE ? AND end_time IS NOT NULL
     ''',
             ['$monthStr%'],
           ),
@@ -778,10 +777,10 @@ class AnalyticsRepository extends BaseRepository {
         COUNT(DISTINCT CASE WHEN w.end_time IS NOT NULL THEN w.id END)
           AS total_workouts,
         COUNT(CASE WHEN w.end_time IS NOT NULL
-          AND s.is_complete = 1 AND s.is_warmup = 0 THEN s.id END)
+          AND $_workSet THEN s.id END)
           AS total_sets,
         COALESCE(SUM(CASE WHEN w.end_time IS NOT NULL
-          AND s.is_complete = 1 AND s.is_warmup = 0
+          AND $_workSet
           THEN COALESCE(s.weight, 0) * COALESCE(s.reps, 0) ELSE 0 END), 0)
           AS total_volume
       FROM workouts w
@@ -827,7 +826,7 @@ class AnalyticsRepository extends BaseRepository {
       JOIN exercises e ON ee.exercise_id = e.id
       JOIN exercise_categories ec ON e.category_id = ec.id
       JOIN workouts w ON ee.workout_id = w.id
-      WHERE ec.energy_system = 'aerobic' AND s.is_warmup = 0
+      WHERE ec.energy_system = 'aerobic' AND $_workSet AND $_finished
         AND s.distance IS NOT NULL AND s.distance > 0
         AND w.date >= ?
       ORDER BY w.date ASC
@@ -857,7 +856,7 @@ class AnalyticsRepository extends BaseRepository {
       JOIN exercises e ON ee.exercise_id = e.id
       JOIN exercise_categories ec ON e.category_id = ec.id
       JOIN workouts w ON ee.workout_id = w.id
-      WHERE ec.energy_system = 'aerobic' AND s.is_warmup = 0
+      WHERE ec.energy_system = 'aerobic' AND $_workSet AND $_finished
         AND s.distance IS NOT NULL AND s.distance > 0
         AND w.date >= ?
       GROUP BY month, ec.id
@@ -877,7 +876,8 @@ class AnalyticsRepository extends BaseRepository {
       FROM exercise_categories ec
       JOIN exercises e ON e.category_id = ec.id
       JOIN exercise_entries ee ON ee.exercise_id = e.id
-      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
+      JOIN workouts w ON ee.workout_id = w.id AND $_finished
+      JOIN sets s ON s.exercise_entry_id = ee.id AND $_workSet
       WHERE ec.energy_system = 'aerobic' AND s.distance IS NOT NULL AND s.distance > 0
       GROUP BY ec.id
       ORDER BY total_distance DESC
@@ -899,7 +899,7 @@ class AnalyticsRepository extends BaseRepository {
       FROM sets s
       JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
       JOIN workouts w ON ee.workout_id = w.id
-      WHERE ee.exercise_id = ? AND s.is_warmup = 0
+      WHERE ee.exercise_id = ? AND $_workSet AND $_finished
         AND s.distance IS NOT NULL AND s.distance > 0
         AND s.time_seconds IS NOT NULL AND s.time_seconds > 0
       GROUP BY w.id
@@ -923,7 +923,8 @@ class AnalyticsRepository extends BaseRepository {
       FROM exercises e
       JOIN exercise_categories ec ON e.category_id = ec.id
       JOIN exercise_entries ee ON ee.exercise_id = e.id
-      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
+      JOIN workouts w ON ee.workout_id = w.id AND $_finished
+      JOIN sets s ON s.exercise_entry_id = ee.id AND $_workSet
       WHERE ec.energy_system = 'aerobic'
         AND s.distance IS NOT NULL AND s.distance > 0
       GROUP BY e.id
@@ -954,7 +955,7 @@ class AnalyticsRepository extends BaseRepository {
       JOIN exercises e ON ee.exercise_id = e.id
       JOIN exercise_categories ec ON e.category_id = ec.id
       JOIN workouts w ON ee.workout_id = w.id
-      WHERE ec.energy_system = 'aerobic' AND s.is_warmup = 0
+      WHERE ec.energy_system = 'aerobic' AND $_workSet AND $_finished
         AND w.date LIKE ? AND s.distance IS NOT NULL AND s.distance > 0
     ''',
       ['$monthStr%'],

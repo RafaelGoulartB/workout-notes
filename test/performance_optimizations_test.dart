@@ -18,6 +18,13 @@ void main() {
     await db.insert('workouts', {
       'id': 'august',
       'date': '2026-08-20',
+      'end_time': '2026-08-20T11:00:00.000',
+      'created_at': '2026-08-20T10:00:00.000',
+    });
+    // A planned (unfinished) workout of the month is not a session.
+    await db.insert('workouts', {
+      'id': 'august-planned',
+      'date': '2026-08-25',
       'created_at': '2026-08-20T10:00:00.000',
     });
     await db.insert('exercise_categories', {
@@ -45,6 +52,7 @@ void main() {
       'reps': 10,
       'distance': 100.0,
       'time_seconds': 30,
+      'is_complete': 1,
       'is_warmup': 1,
       'order_index': 0,
     });
@@ -55,8 +63,19 @@ void main() {
       'reps': 5,
       'distance': 250.0,
       'time_seconds': 60,
+      'is_complete': 1,
       'is_warmup': 0,
       'order_index': 1,
+    });
+    // An unchecked set never counts towards the month.
+    await db.insert('sets', {
+      'id': 'unchecked',
+      'exercise_entry_id': 'entry',
+      'weight': 200.0,
+      'reps': 10,
+      'is_complete': 0,
+      'is_warmup': 0,
+      'order_index': 2,
     });
 
     final summary = await WorkoutRepository().getMonthlySummary(

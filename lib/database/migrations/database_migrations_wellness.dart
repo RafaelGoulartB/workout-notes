@@ -593,5 +593,14 @@ abstract final class DatabaseWellnessMigrations {
         await DatabaseRunExtrasSchema.create(db);
       } catch (_) {}
     }
+    if (oldVersion < 54) {
+      // Which routine day a workout trained, so history and the strength
+      // hub can name the session and pick the next day.
+      try {
+        await db.execute(
+          'ALTER TABLE workouts ADD COLUMN routine_day_id TEXT',
+        );
+      } catch (_) {}
+    }
   }
 }

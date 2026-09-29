@@ -10,6 +10,24 @@ import 'base_repository.dart';
 double _normalizeWorkoutDecimal(double value, int decimals) =>
     double.tryParse(value.toStringAsFixed(decimals)) ?? 0;
 
+/// What made a previous session comparable to another workout.
+enum WorkoutComparisonBasis { routineDay, routine, exercises }
+
+/// A previous finished session picked for comparison.
+class WorkoutComparable {
+  final String id;
+
+  /// `yyyy-MM-dd`.
+  final String date;
+  final WorkoutComparisonBasis basis;
+
+  const WorkoutComparable({
+    required this.id,
+    required this.date,
+    required this.basis,
+  });
+}
+
 /// Repository for workouts, exercise entries, and sets CRUD operations.
 class WorkoutRepository extends BaseRepository {
   // ===================================================================
@@ -19,16 +37,31 @@ class WorkoutRepository extends BaseRepository {
   Future<String> createWorkout({
     DateTime? date,
     String? routineId,
+    String? routineDayId,
     List<Map<String, dynamic>>? exercises,
   }) async {
     final db = await this.db;
     final id = const Uuid().v4();
     final now = DateTime.now();
+    // A routine day always belongs to a routine: fill it in when the caller
+    // only knows the day.
+    if (routineDayId != null && routineId == null) {
+      final day = await db.query(
+        'routine_days',
+        columns: ['routine_id'],
+        where: 'id = ?',
+        whereArgs: [routineDayId],
+        limit: 1,
+      );
+      if (day.isNotEmpty) routineId = day.first['routine_id'] as String?;
+    }
     await db.insert('workouts', {
       'id': id,
       'date': (date ?? now).toIso8601String().substring(0, 10),
       'is_from_routine': routineId != null ? 1 : 0,
       'routine_id': routineId,
+      if (routineDayId != null && await _hasRoutineDayColumn(db))
+        'routine_day_id': routineDayId,
       'created_at': now.toIso8601String(),
     });
 
@@ -118,6 +151,7 @@ class WorkoutRepository extends BaseRepository {
     String routineDayId,
   ) async {
     final db = await this.db;
+    await _linkRoutineDay(db, workoutId, routineDayId);
     final routineExercises = await _getRoutineExercises(db, routineDayId);
 
     for (final re in routineExercises) {
@@ -184,6 +218,8 @@ class WorkoutRepository extends BaseRepository {
       'feeling_rating': null,
       'is_from_routine': sourceWorkout['is_from_routine'] ?? 0,
       'routine_id': sourceWorkout['routine_id'],
+      if (sourceWorkout['routine_day_id'] != null)
+        'routine_day_id': sourceWorkout['routine_day_id'],
       'created_at': now,
     });
 
@@ -304,9 +340,11 @@ class WorkoutRepository extends BaseRepository {
     );
   }
 
-  /// Returns all headline values used by the workout home screen in one
-  /// indexed range query. This replaces the previous workout -> exercises ->
-  /// sets N+1 traversal.
+  /// Headline values of a month in one indexed range query. Only finished
+  /// workouts count (planned or abandoned sessions are ignored) and only
+  /// their completed, non-warm-up sets; volume is limited to strength
+  /// (anaerobic) exercises. Workouts without any completed set are still
+  /// counted as sessions.
   Future<Map<String, dynamic>> getMonthlySummary(DateTime month) async {
     final database = await db;
     final start = DateTime(month.year, month.month, 1);
@@ -315,17 +353,23 @@ class WorkoutRepository extends BaseRepository {
       '''
       SELECT
         COUNT(DISTINCT w.id) AS workout_count,
-        COALESCE(SUM(CASE WHEN s.is_warmup = 0
+        COALESCE(SUM(CASE
+          WHEN s.is_complete = 1 AND IFNULL(s.is_warmup, 0) = 0
+            AND IFNULL(c.energy_system, 'anaerobic') = 'anaerobic'
           THEN COALESCE(s.weight, 0) * COALESCE(s.reps, 0) ELSE 0 END), 0)
           AS total_volume,
-        COALESCE(SUM(CASE WHEN s.is_warmup = 0
+        COALESCE(SUM(CASE
+          WHEN s.is_complete = 1 AND IFNULL(s.is_warmup, 0) = 0
           THEN COALESCE(s.distance, 0) ELSE 0 END), 0) AS cardio_distance,
-        COALESCE(SUM(CASE WHEN s.is_warmup = 0
+        COALESCE(SUM(CASE
+          WHEN s.is_complete = 1 AND IFNULL(s.is_warmup, 0) = 0
           THEN COALESCE(s.time_seconds, 0) ELSE 0 END), 0) AS cardio_time
       FROM workouts w
       LEFT JOIN exercise_entries ee ON ee.workout_id = w.id
+      LEFT JOIN exercises e ON e.id = ee.exercise_id
+      LEFT JOIN exercise_categories c ON c.id = e.category_id
       LEFT JOIN sets s ON s.exercise_entry_id = ee.id
-      WHERE w.date >= ? AND w.date < ?
+      WHERE w.end_time IS NOT NULL AND w.date >= ? AND w.date < ?
       ''',
       [
         start.toIso8601String().substring(0, 10),
@@ -455,23 +499,40 @@ class WorkoutRepository extends BaseRepository {
   Future<String?> _findComparableWorkoutId(
     Database db,
     String workoutId,
+  ) async => (await _findComparableWorkout(db, workoutId))?.id;
+
+  /// The previous finished session to compare [workoutId] against: the same
+  /// routine day when known, else the same routine, else the finished workout
+  /// sharing the most exercises.
+  Future<WorkoutComparable?> findComparableWorkout(String workoutId) async =>
+      _findComparableWorkout(await db, workoutId);
+
+  Future<WorkoutComparable?> _findComparableWorkout(
+    Database db,
+    String workoutId,
   ) async {
     final workout = await _getWorkout(db, workoutId);
     if (workout == null) return null;
 
     final routineId = workout['routine_id'] as String?;
+    final routineDayId = workout['routine_day_id'] as String?;
     final currentDate = workout['date'] as String? ?? '';
     final currentMoment = (workout['end_time'] as String?) ??
         (workout['start_time'] as String?) ??
         (workout['created_at'] as String?) ??
         '';
-    if (routineId != null && routineId.isNotEmpty) {
+
+    Future<WorkoutComparable?> previousBy(
+      String column,
+      String value,
+      WorkoutComparisonBasis basis,
+    ) async {
       final rows = await db.rawQuery(
         '''
-        SELECT id
+        SELECT id, date
         FROM workouts
         WHERE id != ?
-          AND routine_id = ?
+          AND $column = ?
           AND end_time IS NOT NULL
           AND (
             date < ?
@@ -480,9 +541,31 @@ class WorkoutRepository extends BaseRepository {
         ORDER BY date DESC, end_time DESC, created_at DESC
         LIMIT 1
       ''',
-        [workoutId, routineId, currentDate, currentDate, currentMoment],
+        [workoutId, value, currentDate, currentDate, currentMoment],
       );
-      if (rows.isNotEmpty) return rows.first['id'] as String;
+      if (rows.isEmpty) return null;
+      return WorkoutComparable(
+        id: rows.first['id'] as String,
+        date: rows.first['date'] as String? ?? '',
+        basis: basis,
+      );
+    }
+
+    if (routineDayId != null && routineDayId.isNotEmpty) {
+      final byDay = await previousBy(
+        'routine_day_id',
+        routineDayId,
+        WorkoutComparisonBasis.routineDay,
+      );
+      if (byDay != null) return byDay;
+    }
+    if (routineId != null && routineId.isNotEmpty) {
+      final byRoutine = await previousBy(
+        'routine_id',
+        routineId,
+        WorkoutComparisonBasis.routine,
+      );
+      if (byRoutine != null) return byRoutine;
     }
 
     final currentExerciseRows = await db.rawQuery(
@@ -507,7 +590,7 @@ class WorkoutRepository extends BaseRepository {
       ...exerciseIds,
     ];
     final rows = await db.rawQuery('''
-      SELECT w.id, COUNT(DISTINCT ee.exercise_id) as shared_count
+      SELECT w.id, w.date, COUNT(DISTINCT ee.exercise_id) as shared_count
       FROM workouts w
       JOIN exercise_entries ee ON ee.workout_id = w.id
       WHERE w.id != ?
@@ -523,7 +606,11 @@ class WorkoutRepository extends BaseRepository {
       LIMIT 1
     ''', args);
     if (rows.isEmpty) return null;
-    return rows.first['id'] as String;
+    return WorkoutComparable(
+      id: rows.first['id'] as String,
+      date: rows.first['date'] as String? ?? '',
+      basis: WorkoutComparisonBasis.exercises,
+    );
   }
 
   Future<List<ExerciseVolumeComparison>> getExerciseVolumeComparisons(
@@ -932,6 +1019,44 @@ class WorkoutRepository extends BaseRepository {
     await db.delete('workouts', where: 'id = ?', whereArgs: [id]);
   }
 
+  /// Removes a workout only if it is still an untouched blank session: not
+  /// finished, no exercises and no notes. Returns whether it was deleted.
+  Future<bool> deleteIfBlank(String id) async {
+    final db = await this.db;
+    final removed = await db.delete(
+      'workouts',
+      where: '''
+        id = ? AND end_time IS NULL
+        AND IFNULL(comment, '') = ''
+        AND NOT EXISTS (
+          SELECT 1 FROM exercise_entries WHERE workout_id = workouts.id)
+      ''',
+      whereArgs: [id],
+    );
+    return removed > 0;
+  }
+
+  /// Cleans up blank sessions abandoned by older versions (a new workout used
+  /// to be inserted immediately). Only touches unfinished, non-routine,
+  /// empty workouts dated today or earlier, never planned future ones.
+  Future<int> deleteAbandonedBlankWorkouts({String? exceptId}) async {
+    final db = await this.db;
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    return db.delete(
+      'workouts',
+      where: '''
+        end_time IS NULL AND date <= ?
+        AND IFNULL(is_from_routine, 0) = 0
+        AND IFNULL(comment, '') = ''
+        AND feeling_rating IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM exercise_entries WHERE workout_id = workouts.id)
+        ${exceptId == null ? '' : 'AND id != ?'}
+      ''',
+      whereArgs: [today, ?exceptId],
+    );
+  }
+
   // ===================================================================
   // SETS
   // ===================================================================
@@ -1126,6 +1251,41 @@ class WorkoutRepository extends BaseRepository {
 
   // ===================================================================
   // INTERNAL HELPERS (used by importRoutineDayToWorkout)
+
+  /// Older test schemas and partially migrated databases lack the v54
+  /// `workouts.routine_day_id` column.
+  Future<bool> _hasRoutineDayColumn(DatabaseExecutor db) async {
+    final columns = await db.rawQuery('PRAGMA table_info(workouts)');
+    return columns.any((c) => c['name'] == 'routine_day_id');
+  }
+
+  /// Records which routine day (and routine) a workout trains. Keeps an
+  /// existing link: importing a second day into the same session does not
+  /// relabel it.
+  Future<void> _linkRoutineDay(
+    DatabaseExecutor db,
+    String workoutId,
+    String routineDayId,
+  ) async {
+    if (!await _hasRoutineDayColumn(db)) return;
+    final day = await db.query(
+      'routine_days',
+      columns: ['routine_id'],
+      where: 'id = ?',
+      whereArgs: [routineDayId],
+      limit: 1,
+    );
+    await db.rawUpdate(
+      '''
+      UPDATE workouts SET
+        routine_day_id = COALESCE(routine_day_id, ?),
+        routine_id = COALESCE(routine_id, ?),
+        is_from_routine = 1
+      WHERE id = ?
+      ''',
+      [routineDayId, day.isEmpty ? null : day.first['routine_id'], workoutId],
+    );
+  }
   // ===================================================================
 
   Future<List<Map<String, dynamic>>> _getRoutineExercises(
