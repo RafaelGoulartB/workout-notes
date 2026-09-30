@@ -3492,8 +3492,6 @@
   "workoutHomeQuickStrength": "Lift",
   "workoutHomeQuickRun": "Run",
   "workoutHomeAreasTitle": "Your training",
-  "workoutHomeAreaStrengthLast": "Last: {when}",
-  "@workoutHomeAreaStrengthLast": {"placeholders": {"when": {"type": "String"}}},
   "workoutHomeRecentTitle": "Recent",
   "workoutHomeRecentFree": "Free workout",
   "workoutHomeRecentRun": "Run",

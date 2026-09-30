@@ -977,6 +977,9 @@ class _ThisWeekCard extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                ),
                 onPressed: onSetUp,
                 icon: const Icon(Icons.tune_rounded, size: 18),
                 label: Text(loc.planningSetUpWeek),

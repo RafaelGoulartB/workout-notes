@@ -409,15 +409,6 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
 
   Widget _buildAreas(AppLocalizations loc) {
     final colors = Theme.of(context).colorScheme;
-    final locale = Localizations.localeOf(context).toString();
-    String? last(DateTime? date) => date == null
-        ? null
-        : loc.workoutHomeAreaStrengthLast(DateFormat.MMMd(locale).format(date));
-    final lastGym = _controller.recentGym.isEmpty
-        ? null
-        : _controller.recentGym.first.date;
-    final runs = _controller.recentCardio.where((a) => a.isRunning);
-    final lastRun = runs.isEmpty ? null : runs.first.startedAt.toLocal();
 
     return FadeSlideIn(
       delay: const Duration(milliseconds: 120),
@@ -434,7 +425,6 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                 line1: loc.workoutHomeHubStrengthWeek(
                   _controller.overview.strengthSessions,
                 ),
-                line2: last(lastGym),
                 onTap: _openStrengthHub,
               ),
             ),
@@ -450,7 +440,6 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                     _controller.overview.runMeters,
                   ),
                 ),
-                line2: last(lastRun),
                 onTap: _openRunHub,
               ),
             ),

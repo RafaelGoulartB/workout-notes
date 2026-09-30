@@ -555,7 +555,6 @@ class WorkoutAreaTile extends StatelessWidget {
   final Color color;
   final String title;
   final String line1;
-  final String? line2;
   final VoidCallback onTap;
 
   const WorkoutAreaTile({
@@ -565,7 +564,6 @@ class WorkoutAreaTile extends StatelessWidget {
     required this.color,
     required this.title,
     required this.line1,
-    this.line2,
     required this.onTap,
   });
 
@@ -605,15 +603,6 @@ class WorkoutAreaTile extends StatelessWidget {
               color: colors.onSurfaceVariant,
             ),
           ),
-          if (line2 != null)
-            Text(
-              line2!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colors.onSurfaceVariant,
-              ),
-            ),
         ],
       ),
     );

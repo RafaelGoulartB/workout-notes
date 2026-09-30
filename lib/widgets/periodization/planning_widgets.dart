@@ -428,27 +428,31 @@ class _DayColumn extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          AspectRatio(
-            aspectRatio: 1,
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 44, maxHeight: 44),
-              decoration: BoxDecoration(
-                color: done
-                    ? tint
-                    : training
-                    ? tint.withAlpha(46)
-                    : scheme.surfaceContainerHighest.withAlpha(90),
-                borderRadius: BorderRadius.circular(12),
-                border: highlighted ? Border.all(color: tint, width: 2) : null,
-              ),
-              child: Icon(
-                done ? Icons.check_rounded : icon,
-                size: 18,
-                color: done
-                    ? scheme.onPrimary
-                    : training
-                    ? tint
-                    : scheme.onSurfaceVariant.withAlpha(140),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 44),
+            child: AspectRatio(
+              aspectRatio: 1,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: done
+                      ? tint
+                      : training
+                      ? tint.withAlpha(46)
+                      : scheme.surfaceContainerHighest.withAlpha(90),
+                  borderRadius: BorderRadius.circular(12),
+                  border: highlighted
+                      ? Border.all(color: tint, width: 2)
+                      : null,
+                ),
+                child: Icon(
+                  done ? Icons.check_rounded : icon,
+                  size: 18,
+                  color: done
+                      ? scheme.onPrimary
+                      : training
+                      ? tint
+                      : scheme.onSurfaceVariant.withAlpha(140),
+                ),
               ),
             ),
           ),
