@@ -3,27 +3,25 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/utils/run_elevation_analytics.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/run/run_pace_chart.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Smoothed altitude profile over distance. Touching it reports the distance
 /// through [selectedDistance], like [RunPaceChart].
 class RunElevationChart extends StatelessWidget {
   final RunElevationProfile profile;
   final ValueNotifier<double?>? selectedDistance;
-  final double height;
 
   const RunElevationChart({
     super.key,
     required this.profile,
     this.selectedDistance,
-    this.height = 220,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final samples = profile.samples;
-    if (samples.length < 2) return SizedBox(height: height);
+    if (samples.length < 2) return const SizedBox(height: 220);
 
     final axis = RunElevationAxis.compute(profile);
     final maxKm = samples.last.distanceMeters / 1000.0;
@@ -33,7 +31,7 @@ class RunElevationChart extends StatelessWidget {
     final muted = theme.colorScheme.onSurfaceVariant;
 
     return SizedBox(
-      height: height,
+      height: 220,
       child: LineChart(
         LineChartData(
           minX: 0,
@@ -70,7 +68,7 @@ class RunElevationChart extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
                     height: 1.25,
-                    fontFeatures: RunUi.tabular,
+                    fontFeatures: AppUi.tabular,
                   ),
                 );
               }).toList(),
@@ -115,7 +113,7 @@ class RunElevationChart extends StatelessWidget {
                     '${value.round()}',
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: muted,
-                      fontFeatures: RunUi.tabular,
+                      fontFeatures: AppUi.tabular,
                     ),
                   ),
                 ),

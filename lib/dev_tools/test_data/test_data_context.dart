@@ -29,12 +29,6 @@ class TestDataContext {
 
   String id(String domain, Object value) => '$devDataPrefix$domain:$value';
 
-  String date(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
-
   double jitter(double center, double spread) =>
       center + (random.nextDouble() * 2 - 1) * spread;
 }

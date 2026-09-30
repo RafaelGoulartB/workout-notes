@@ -59,7 +59,7 @@ void main() {
     );
 
     test('computes per-gram multiplier for a 50 g portion', () {
-      final conv = NutritionConversion(
+      const conv = NutritionConversion(
         quantity: 50,
         unit: 'g',
         referenceAmount: 100,
@@ -85,7 +85,7 @@ void main() {
         referenceUnit: 'ml',
         values: NutritionValues(calories: 80, proteinG: 0, carbsG: 10, fatG: 2),
       );
-      final conv = NutritionConversion(
+      const conv = NutritionConversion(
         quantity: 50,
         unit: 'ml',
         referenceAmount: 200,
@@ -105,7 +105,7 @@ void main() {
         unit: 'slice',
         gramsEquivalent: 30,
       );
-      final conv = NutritionConversion(
+      const conv = NutritionConversion(
         quantity: 2,
         unit: 'serving',
         referenceAmount: 100,
@@ -126,7 +126,7 @@ void main() {
         quantity: 1,
         unit: 'handful',
       );
-      final conv = NutritionConversion(
+      const conv = NutritionConversion(
         quantity: 1,
         unit: 'serving',
         referenceAmount: 100,
@@ -140,7 +140,7 @@ void main() {
     });
 
     test('rejects incompatible units (g against ml reference)', () {
-      final conv = NutritionConversion(
+      const conv = NutritionConversion(
         quantity: 50,
         unit: 'g',
         referenceAmount: 200,
@@ -160,7 +160,7 @@ void main() {
         referenceUnit: 'fatia',
         values: NutritionValues(calories: 80, proteinG: 4),
       );
-      final conv = NutritionConversion(
+      const conv = NutritionConversion(
         quantity: 2,
         unit: 'fatia',
         referenceAmount: 1,
@@ -179,7 +179,7 @@ void main() {
         referenceUnit: 'unidade',
         values: NutritionValues(calories: 50, proteinG: 2),
       );
-      final conv = NutritionConversion(
+      const conv = NutritionConversion(
         quantity: 3,
         unit: 'unidade',
         referenceAmount: 1,
@@ -190,7 +190,7 @@ void main() {
     });
 
     test('rejects a custom unit against a gram reference', () {
-      final conv = NutritionConversion(
+      const conv = NutritionConversion(
         quantity: 2,
         unit: 'fatia',
         referenceAmount: 100,
@@ -204,7 +204,7 @@ void main() {
 
     test('rejects non-positive quantities and reference amounts', () {
       expect(
-        () => NutritionConversion(
+        () => const NutritionConversion(
           quantity: 0,
           unit: 'g',
           referenceAmount: 100,
@@ -213,7 +213,7 @@ void main() {
         throwsA(isA<NutritionConversionException>()),
       );
       expect(
-        () => NutritionConversion(
+        () => const NutritionConversion(
           quantity: 50,
           unit: 'g',
           referenceAmount: 0,
@@ -232,7 +232,7 @@ void main() {
         values: NutritionValues(calories: double.nan, proteinG: 10),
       );
       expect(
-        () => NutritionConversion(
+        () => const NutritionConversion(
           quantity: 50,
           unit: 'g',
           referenceAmount: 100,
@@ -248,7 +248,7 @@ void main() {
         values: NutritionValues(calories: -10, proteinG: 1),
       );
       expect(
-        () => NutritionConversion(
+        () => const NutritionConversion(
           quantity: 50,
           unit: 'g',
           referenceAmount: 100,

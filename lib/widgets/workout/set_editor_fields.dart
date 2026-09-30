@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/utils/workout_card_helpers.dart';
 import 'package:workout_notes/widgets/workout/stepper_button.dart';
 
@@ -356,8 +357,6 @@ class WorkoutSetFieldControls extends StatelessWidget {
 
   Widget _buildPaceDisplay(BuildContext context) {
     final pace = timeSeconds / distance;
-    final minutes = pace ~/ 60;
-    final seconds = pace.round() % 60;
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
     return Padding(
@@ -375,9 +374,7 @@ class WorkoutSetFieldControls extends StatelessWidget {
             const Icon(Icons.speed, size: 16, color: Color(0xFFE53935)),
             const SizedBox(width: 6),
             Text(
-              loc.activeWorkoutPaceValue(
-                '$minutes:${seconds.toString().padLeft(2, '0')}',
-              ),
+              loc.activeWorkoutPaceValue(DurationFormat.minSec(pace.round())),
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
                 color: const Color(0xFFE53935),
@@ -598,15 +595,8 @@ class WorkoutSetFieldControls extends StatelessWidget {
 
   static String _formatDuration(int seconds) {
     if (seconds <= 0) return '0 s';
-    final hours = seconds ~/ 3600;
-    final minutes = (seconds % 3600) ~/ 60;
-    final remainingSeconds = seconds % 60;
-    if (hours > 0) {
-      return '$hours:${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
-    }
-    if (minutes > 0) {
-      return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
-    }
+    if (seconds >= 3600) return DurationFormat.hms(seconds);
+    if (seconds >= 60) return DurationFormat.minSec(seconds);
     return '$seconds s';
   }
 }

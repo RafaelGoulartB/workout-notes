@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// One row of the "This run" card: icon, title, up to two lines of subtitle,
 /// a trailing control and an optional footer (progress bar).
@@ -36,7 +36,7 @@ class RunRecordOptionTile extends StatelessWidget {
           children: [
             Row(
               children: [
-                RunIconBadge(
+                AppIconBadge(
                   icon,
                   color: selected ? colors.primary : colors.onSurfaceVariant,
                 ),

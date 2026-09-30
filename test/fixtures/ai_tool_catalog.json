@@ -1,0 +1,1064 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "list_recent_workouts",
+      "description": "Lista os treinos mais recentes com volume, sensação e contagem de exercícios.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Quantos treinos retornar (padrão 8).",
+            "default": 8
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_workout_history",
+      "description": "Histórico paginado de treinos, inclusive períodos antigos. Permite filtrar por data e status; cada item distingue treino concluído, em andamento e planejado e resume somente séries concluídas sem aquecimento.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "start_date": {
+            "type": "string",
+            "description": "Primeiro dia em YYYY-MM-DD."
+          },
+          "end_date": {
+            "type": "string",
+            "description": "Último dia em YYYY-MM-DD."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "all",
+              "completed",
+              "in_progress",
+              "planned"
+            ],
+            "default": "all"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 20
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_workout_detail",
+      "description": "Retorna todos os exercícios e séries de um treino específico.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "workout_id": {
+            "type": "string",
+            "description": "UUID do treino."
+          }
+        },
+        "required": [
+          "workout_id"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "list_exercises",
+      "description": "Lista os exercícios cadastrados, opcionalmente filtrando por categoria, nome ou favoritos.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name_contains": {
+            "type": "string"
+          },
+          "category_id": {
+            "type": "string"
+          },
+          "is_favorite": {
+            "type": "boolean"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 20
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_exercise_detail",
+      "description": "Perfil completo de um exercício: categoria, sistema energético, tipo, equipamento, notas, favorito, descanso padrão, incremento de carga e estatísticas de uso concluído.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "exercise_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "exercise_id"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_exercise_history",
+      "description": "Histórico de séries de um exercício, com top sets, médias e totais.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "exercise_id": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 12
+          },
+          "start_date": {
+            "type": "string"
+          },
+          "end_date": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "exercise_id"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_exercise_personal_records",
+      "description": "Recordes pessoais (PRs) de um exercício.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "exercise_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "exercise_id"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_weekly_volume_breakdown",
+      "description": "Volume semanal agrupado por categoria, nas últimas N semanas.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "weeks_back": {
+            "type": "integer",
+            "default": 8
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_progress_trend",
+      "description": "Tendência de progressão (peso, reps, volume) de um exercício nas últimas N semanas.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "exercise_id": {
+            "type": "string"
+          },
+          "weeks_back": {
+            "type": "integer",
+            "default": 8
+          }
+        },
+        "required": [
+          "exercise_id"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_training_summary",
+      "description": "Analisa um período de treino: frequência e status, duração, calorias, sensação, séries, volume, repetições, distância, tempo, RPE, densidade, categorias e exercícios mais usados. Métricas de desempenho usam apenas treinos e séries concluídos, sem aquecimento.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 366,
+            "default": 30
+          },
+          "start_date": {
+            "type": "string"
+          },
+          "end_date": {
+            "type": "string"
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "list_routines",
+      "description": "Lista todas as rotinas com contagem de dias e exercícios.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name_contains": {
+            "type": "string"
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_routine_detail",
+      "description": "Detalha uma rotina: dias, exercícios e séries predefinidas.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "routine_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "routine_id"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "list_body_measurements",
+      "description": "Lista medidas corporais (peso, circunferências, etc.) com data e valor.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Tipo de medida. Vazio = todas."
+          },
+          "limit": {
+            "type": "integer",
+            "default": 20
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_cardio_summary",
+      "description": "Resumo de corridas GPS, bicicleta estacionária e cardio legado, com distância, duração, ritmo, velocidade e esforço.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "weeks_back": {
+            "type": "integer",
+            "default": 4
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "list_run_activities",
+      "description": "Lista corridas GPS ou sessões de bicicleta registradas, com distância, tempo, pace, calorias, RPE, sensação e melhores esforços.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "start_date": {
+            "type": "string",
+            "description": "Data inicial yyyy-MM-dd."
+          },
+          "end_date": {
+            "type": "string",
+            "description": "Data final yyyy-MM-dd."
+          },
+          "activity_type": {
+            "type": "string",
+            "enum": [
+              "running",
+              "stationary_bike",
+              "all"
+            ],
+            "default": "running"
+          },
+          "page": {
+            "type": "integer",
+            "default": 1
+          },
+          "page_size": {
+            "type": "integer",
+            "default": 20
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_run_activity_detail",
+      "description": "Detalha uma corrida ou pedal registrado: métricas, rota agregada, plano associado e comparação planejado versus realizado por etapa.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "activity_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "activity_id"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_run_progress",
+      "description": "Analisa evolução de corrida: volume, frequência, ritmo, comparação com período anterior, sequência semanal e tendências.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "string",
+            "enum": [
+              "4_weeks",
+              "12_weeks",
+              "year",
+              "all"
+            ],
+            "default": "12_weeks"
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_run_achievements",
+      "description": "Retorna recordes e pódios de corrida: maior distância/duração, melhor pace, split e esforços de 1 km a maratona.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "list_run_plans",
+      "description": "Lista planos de corrida com ativação, semana atual, objetivo, progresso, sessões concluídas, puladas e pendentes.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "include_archived": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_run_plan_detail",
+      "description": "Detalha um plano de corrida: progresso e aderência, semanas, treinos e etapas (aquecimento, tiros, recuperação e desaquecimento).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "plan_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_id"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_run_schedule",
+      "description": "Corridas planejadas em um intervalo de datas, com status e a corrida registrada quando já foi concluída.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "start_date": {
+            "type": "string",
+            "description": "yyyy-MM-dd. Padrão: hoje."
+          },
+          "end_date": {
+            "type": "string",
+            "description": "yyyy-MM-dd. Padrão: 4 semanas à frente."
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "list_goals",
+      "description": "Lista metas (goals) ativas com progresso atual.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "description": "anaerobic ou aerobic."
+          },
+          "metric": {
+            "type": "string",
+            "description": "volume, days, distance ou time."
+          },
+          "is_active": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_goal_progress_history",
+      "description": "Progresso de uma meta nos últimos N períodos.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "goal_id": {
+            "type": "string"
+          },
+          "periods_back": {
+            "type": "integer",
+            "default": 6
+          }
+        },
+        "required": [
+          "goal_id"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_sleep_summary",
+      "description": "Resumo agregado do sono recente: duração, eficiência, cobertura e regularidade de horários. Use antes de opinar sobre sono.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "description": "Janela em dias (3 a 90).",
+            "default": 14,
+            "minimum": 3,
+            "maximum": 90
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_sleep_night_detail",
+      "description": "Detalha uma noite de sono por data local: duração registrada, real, estimada e efetiva com sua origem; horários; tempo na cama; comentário; estágios; latência; despertares; eficiência; confiança; ruído e qualidade do sinal. Use para perguntas sobre hoje, ontem ou uma noite específica. Dados acústicos são estimativas não clínicas e não diagnosticam ronco ou apneia.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Data local no formato YYYY-MM-DD. Se omitida, usa a data local atual."
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_sleep_history",
+      "description": "Histórico diário paginado do sono. Retorna todas as noites registradas na janela, durações separadas e sua origem efetiva, horários, eficiência e disponibilidade de estágios. Datas sem registro ficam ausentes.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31,
+            "default": 30
+          },
+          "end_date": {
+            "type": "string",
+            "description": "Último dia da janela em YYYY-MM-DD; o padrão é hoje."
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_sleep_profile",
+      "description": "Retorna a meta diária de sono, modo padrão de monitoramento, contagens de noites manuais e monitoradas, cobertura de estágios e comparação da média com a meta em todo o histórico e nos últimos 30 dias. Não expõe segredos de missões ou alarmes.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_nutrition_summary",
+      "description": "Resumo agregado de calorias, macros, gorduras, fibras, açúcares e micronutrientes, com meta ativa, cobertura e qualidade dos registros. Para itens/refeições de um dia use get_nutrition_diary_day.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "description": "Janela em dias (3 a 90).",
+            "default": 14,
+            "minimum": 3,
+            "maximum": 90
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_nutrition_diary_day",
+      "description": "Retorna o diário alimentar completo de um dia: refeições, alimentos, quantidades, origem, calorias, macros, gorduras, fibras, açúcares, sódio e todos os micronutrientes registrados. Preserva null como valor não informado.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Data local no formato YYYY-MM-DD. O padrão é hoje."
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_nutrition_history",
+      "description": "Histórico diário completo de nutrientes. Retorna totais e cobertura por nutriente para cada dia registrado; dias sem registro ficam ausentes. Use end_date para paginar janelas antigas.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31,
+            "default": 30
+          },
+          "end_date": {
+            "type": "string",
+            "description": "Último dia da janela em YYYY-MM-DD; padrão hoje."
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_micronutrient_summary",
+      "description": "Análise dedicada de fibras, açúcares, sódio, potássio, cálcio, ferro, magnésio, zinco e vitaminas A, C, D e B12. Inclui cobertura, médias somente em dias reportados e principais alimentos-fonte.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "description": "Janela em dias (1 a 90).",
+            "default": 30,
+            "minimum": 1,
+            "maximum": 90
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "search_food_library",
+      "description": "Busca na biblioteca local de alimentos do usuário. Retorna IDs, origem, favorito, uso recente e a variante nutricional principal. Use get_food_detail com o ID para todas as variantes e porções.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Nome ou marca; vazio lista a biblioteca."
+          },
+          "favorites_only": {
+            "type": "boolean",
+            "default": false
+          },
+          "recent_only": {
+            "type": "boolean",
+            "default": false
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "default": 15
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_food_detail",
+      "description": "Detalha um alimento da biblioteca pelo ID: metadados, todas as variantes, nutrientes padronizados, nutrientes extras e porções/conversões.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "food_id": {
+            "type": "string",
+            "description": "ID retornado por search_food_library."
+          }
+        },
+        "required": [
+          "food_id"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "list_saved_meals",
+      "description": "Lista refeições-modelo salvas pelo usuário, com totais nutricionais atuais e IDs para detalhamento.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 20
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_saved_meal_detail",
+      "description": "Detalha uma refeição salva: porções, ingredientes, quantidades, referências de alimento e todos os nutrientes calculáveis.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "saved_meal_id": {
+            "type": "string",
+            "description": "ID retornado por list_saved_meals."
+          }
+        },
+        "required": [
+          "saved_meal_id"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_nutrition_profile",
+      "description": "Retorna a meta diária ativa e seu histórico, perfil usado na sugestão de meta (idade, sexo, altura, peso, atividade e razões de macros), tipos de refeição e contagens do diário, biblioteca e refeições salvas.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "analyze_sleep_performance",
+      "description": "Calcula associações observacionais entre sono e volume/sensação dos treinos em datas pareadas. Não implica causalidade.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "description": "Janela em dias (7 a 90).",
+            "default": 42,
+            "minimum": 7,
+            "maximum": 90
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "analyze_nutrition_body_trend",
+      "description": "Relaciona ingestão semanal de calorias/macros com medidas de peso corporal e informa cobertura dos dados.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "description": "Janela em dias (14 a 180).",
+            "default": 84,
+            "minimum": 14,
+            "maximum": 180
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_weekly_recovery_trend",
+      "description": "Tendência semanal não clínica de recuperação, combinando apenas componentes disponíveis de sono, regularidade e sensação dos treinos.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "weeks": {
+            "type": "integer",
+            "description": "Semanas (2 a 12; padrão 8).",
+            "default": 8,
+            "minimum": 2,
+            "maximum": 12
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "propose_manual_food_creation",
+      "description": "Prepare a prévia de um NOVO ALIMENTO MANUAL quando o usuário pedir para criar ou cadastrar um alimento. Identifique o alimento descrito e preencha o máximo possível de calorias, macronutrientes, gorduras, fibras, açúcares, sódio, micronutrientes e porções usuais. Use valores típicos estimados quando não houver rótulo exato e deixe de fora somente o que não puder ser identificado com segurança. Não salva nada: o app exibirá uma prévia e, após aprovação, abrirá o formulário manual preenchido para revisão e salvamento pelo usuário.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Nome claro e específico do alimento."
+          },
+          "brand": {
+            "type": "string",
+            "description": "Marca somente quando informada ou identificada; omita se desconhecida."
+          },
+          "barcode": {
+            "type": "string",
+            "description": "Código de barras somente quando informado; nunca invente."
+          },
+          "reference_amount": {
+            "type": "number",
+            "description": "Quantidade à qual todos os nutrientes se referem; prefira 100."
+          },
+          "reference_unit": {
+            "type": "string",
+            "description": "Unidade da referência; prefira g ou ml conforme o alimento."
+          },
+          "per": {
+            "type": "object",
+            "properties": {
+              "calories": {
+                "type": "number"
+              },
+              "protein_g": {
+                "type": "number"
+              },
+              "carbs_g": {
+                "type": "number"
+              },
+              "fat_g": {
+                "type": "number"
+              },
+              "saturated_fat_g": {
+                "type": "number"
+              },
+              "monounsaturated_fat_g": {
+                "type": "number"
+              },
+              "polyunsaturated_fat_g": {
+                "type": "number"
+              },
+              "trans_fat_g": {
+                "type": "number"
+              },
+              "fiber_g": {
+                "type": "number"
+              },
+              "sugars_g": {
+                "type": "number"
+              },
+              "sodium_mg": {
+                "type": "number"
+              },
+              "potassium_mg": {
+                "type": "number"
+              },
+              "calcium_mg": {
+                "type": "number"
+              },
+              "iron_mg": {
+                "type": "number"
+              },
+              "magnesium_mg": {
+                "type": "number"
+              },
+              "zinc_mg": {
+                "type": "number"
+              },
+              "vitamin_a_ug": {
+                "type": "number"
+              },
+              "vitamin_c_mg": {
+                "type": "number"
+              },
+              "vitamin_d_ug": {
+                "type": "number"
+              },
+              "vitamin_b12_ug": {
+                "type": "number"
+              }
+            },
+            "required": []
+          },
+          "servings": {
+            "type": "array",
+            "description": "Porções comuns úteis para registrar o alimento.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "quantity": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "grams_equivalent": {
+                  "type": "number"
+                },
+                "ml_equivalent": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "label",
+                "quantity",
+                "unit"
+              ]
+            }
+          },
+          "notes": {
+            "type": "string",
+            "description": "Resumo curto das estimativas, preparo ou variedade assumidos; não exponha raciocínio interno."
+          }
+        },
+        "required": [
+          "name",
+          "reference_amount",
+          "reference_unit",
+          "per",
+          "servings"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "propose_routine_change",
+      "description": "PREPARE A PROPOSTA quando o usuário pedir explicitamente para criar ou editar uma rotina. Não aplica dados: o app mostrará a prévia para aprovação. Para criar, primeiro use list_exercises e use IDs retornados. Para editar, primeiro use list_routines e get_routine_detail; mantenha os source_*_id retornados. Envie a árvore final inteira da rotina.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "update"
+            ]
+          },
+          "routine_id": {
+            "type": "string"
+          },
+          "routine": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "notes": {
+                "type": "string"
+              },
+              "days": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "source_day_id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "notes": {
+                      "type": "string"
+                    },
+                    "exercises": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "source_routine_exercise_id": {
+                            "type": "string"
+                          },
+                          "exercise_id": {
+                            "type": "string"
+                          },
+                          "rest_time_seconds": {
+                            "type": "integer"
+                          },
+                          "superset_group_id": {
+                            "type": "string"
+                          },
+                          "sets": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "source_set_id": {
+                                  "type": "string"
+                                },
+                                "weight": {
+                                  "type": "number"
+                                },
+                                "reps": {
+                                  "type": "integer"
+                                },
+                                "distance": {
+                                  "type": "number"
+                                },
+                                "time_seconds": {
+                                  "type": "integer"
+                                },
+                                "is_warmup": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": []
+                            }
+                          }
+                        },
+                        "required": [
+                          "exercise_id",
+                          "sets"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "exercises"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "name",
+              "days"
+            ]
+          }
+        },
+        "required": [
+          "action",
+          "routine"
+        ]
+      }
+    }
+  }
+]

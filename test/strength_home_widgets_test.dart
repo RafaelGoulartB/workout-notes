@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:workout_notes/services/strength_routine_day_inference.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:workout_notes/screens/strength/strength_home_screen.dart';
+import 'package:workout_notes/services/strength_routine_day_inference.dart';
 import 'package:workout_notes/services/strength_today_service.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
 import 'package:workout_notes/utils/strength_week_analytics.dart';
@@ -56,11 +56,11 @@ const _pushDay = StrengthRoutineDayInfo(
 Future<void> _pumpHub(WidgetTester tester) async {
   await tester.runAsync(() async {
     await tester.pumpWidget(
-      MaterialApp(
+      const MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        locale: const Locale('pt'),
-        home: const StrengthHomeScreen(),
+        locale: Locale('pt'),
+        home: StrengthHomeScreen(),
       ),
     );
     await Future<void>.delayed(const Duration(milliseconds: 500));

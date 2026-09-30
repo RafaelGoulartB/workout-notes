@@ -78,7 +78,9 @@ class AiImageAttachmentStore {
       try {
         final file = File(attachment.path);
         if (await file.exists()) await file.delete();
-      } catch (_) {}
+      } catch (_) {
+        // Best-effort cleanup; a leftover file is swept later.
+      }
     }
   }
 
@@ -88,7 +90,9 @@ class AiImageAttachmentStore {
       if (entity is File && !retainedPaths.contains(entity.path)) {
         try {
           await entity.delete();
-        } catch (_) {}
+        } catch (_) {
+          // Best-effort cleanup; a leftover file is swept later.
+        }
       }
     }
   }

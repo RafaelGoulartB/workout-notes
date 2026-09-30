@@ -79,7 +79,7 @@ void main() {
 
     final workout = await repository.getWorkout('quick-workout');
     // 2 x 40 seconds of execution + 90 seconds of rest = 170 seconds.
-    final expectedCalories = 5 * 3.5 * 70 / 200 * (170 / 60);
+    const expectedCalories = 5 * 3.5 * 70 / 200 * (170 / 60);
     expect(workout?['estimated_calories'], closeTo(expectedCalories, 0.001));
   });
 

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/utils/pace_calculator.dart';
+import 'package:workout_notes/utils/duration_format.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Summary data class for finished workout.
 class WorkoutSummary {
@@ -29,17 +30,12 @@ class WorkoutSummary {
   String get formattedDuration {
     if (durationSeconds <= 0) return '--';
     final h = durationSeconds ~/ 3600;
-    final m = (durationSeconds % 3600) ~/ 60;
-    final s = durationSeconds % 60;
     if (h >= 24) {
       final d = h ~/ 24;
       final restH = h % 24;
       return restH > 0 ? '${d}d ${restH}h' : '${d}d';
     }
-    if (h > 0) {
-      return '${h}h${m.toString().padLeft(2, '0')}min';
-    }
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    return DurationFormat.elapsed(durationSeconds);
   }
 
   String get formattedVolume {
@@ -126,25 +122,6 @@ class CardioBests {
     required this.distance,
     required this.timeSeconds,
   });
-
-  double get paceSeconds => distance > 0 ? timeSeconds / distance : 0;
-}
-
-/// Exercise bests data class.
-class ExerciseBests {
-  final String name;
-  final double maxWeight;
-  final int bestReps;
-  final double volume;
-  final int completedSets;
-
-  const ExerciseBests({
-    required this.name,
-    required this.maxWeight,
-    required this.bestReps,
-    required this.volume,
-    required this.completedSets,
-  });
 }
 
 /// A bottom sheet shown when finishing a workout.
@@ -229,7 +206,7 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
             // Header
             Row(
               children: [
-                RunIconBadge(
+                AppIconBadge(
                   s.prs.isNotEmpty
                       ? Icons.emoji_events_rounded
                       : Icons.check_circle_outline_rounded,
@@ -264,31 +241,31 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
             const SizedBox(height: 18),
 
             // Key numbers
-            RunMetricGrid(
+            AppMetricGrid(
               children: [
-                RunMetricBox(
+                AppMetricBox(
                   icon: Icons.timer_outlined,
                   label: loc.activeWorkoutTimerDuration,
                   value: s.formattedDuration,
                 ),
-                RunMetricBox(
+                AppMetricBox(
                   icon: Icons.monitor_weight_outlined,
                   label: loc.commonVolume,
                   value: StrengthWorkoutFormat.volume(s.totalVolume),
                 ),
-                RunMetricBox(
+                AppMetricBox(
                   icon: Icons.repeat_rounded,
                   label: loc.commonSets,
                   value: '${s.completedSets}/${s.totalSets}',
                 ),
                 if (s.densityKgPerMinute != null)
-                  RunMetricBox(
+                  AppMetricBox(
                     icon: Icons.bolt_rounded,
                     label: loc.workoutStatsDensity,
                     value: '${s.formattedDensity} ${loc.workoutStatsKgPerMin}',
                   ),
                 if (calories != null && calories > 0)
-                  RunMetricBox(
+                  AppMetricBox(
                     icon: Icons.local_fire_department_rounded,
                     label: loc.workoutEstimatedCalories,
                     value: '${s.formattedCalories} kcal',
@@ -310,25 +287,24 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
             // Cardio stats - only show if there's cardio data
             if (hasCardio) ...[
               const SizedBox(height: 12),
-              RunMetricGrid(
+              AppMetricGrid(
                 children: [
-                  RunMetricBox(
+                  AppMetricBox(
                     icon: Icons.map_outlined,
                     label: loc.workoutHomeCardioDistance,
                     value: s.formattedDistance,
                   ),
-                  RunMetricBox(
+                  AppMetricBox(
                     icon: Icons.timer_outlined,
                     label: loc.workoutHomeCardioTime,
                     value: s.formattedCardioTime,
                   ),
                   if (s.totalDistance > 0 && s.totalCardioTime > 0)
-                    RunMetricBox(
+                    AppMetricBox(
                       icon: Icons.speed_rounded,
                       label: loc.commonPace,
-                      value: PaceCalculator.formatPace(
-                        s.totalCardioTime / s.totalDistance,
-                      ),
+                      value:
+                          '${RunFormatters.paceShort(s.totalCardioTime / s.totalDistance)} /km',
                     ),
                 ],
               ),
@@ -336,21 +312,21 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
 
             // Personal records of this session
             if (s.prs.isNotEmpty) ...[
-              RunSectionHeader(loc.activeWorkoutPersonalRecords),
-              RunSectionCard(
+              AppSectionHeader(loc.activeWorkoutPersonalRecords),
+              AppSectionCard(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 4,
                 ),
-                child: RunDividedList(
+                child: AppDividedList(
                   children: [for (final pr in s.prs) _PrRow(pr: pr)],
                 ),
               ),
             ],
 
             // Feeling
-            RunSectionHeader(loc.activeWorkoutHowWasWorkout),
-            RunSectionCard(
+            AppSectionHeader(loc.activeWorkoutHowWasWorkout),
+            AppSectionCard(
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
               child: Column(
                 children: [
@@ -408,7 +384,7 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
               decoration: InputDecoration(
                 hintText: loc.activeWorkoutCommentHint,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(RunUi.tileRadius),
+                  borderRadius: BorderRadius.circular(AppUi.tileRadius),
                   borderSide: BorderSide.none,
                 ),
                 filled: true,
@@ -483,7 +459,7 @@ class _PrRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
-          RunIconBadge(pr.icon, color: colors.tertiary),
+          AppIconBadge(pr.icon, color: colors.tertiary),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

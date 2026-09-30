@@ -6,6 +6,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/periodization/phase_week_plan.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Shared building blocks of the planning screens. They follow the running
 /// plan screens: flat tonal cards, uppercase section labels, small pills.
@@ -192,14 +193,12 @@ class PlanningPill extends StatelessWidget {
 class PlanRoadmap extends StatelessWidget {
   final List<PeriodizationPhase> phases;
   final DateTime today;
-  final bool showLabels;
   final ValueChanged<PeriodizationPhase>? onPhaseTap;
 
   const PlanRoadmap({
     super.key,
     required this.phases,
     required this.today,
-    this.showLabels = true,
     this.onPhaseTap,
   });
 
@@ -211,7 +210,7 @@ class PlanRoadmap extends StatelessWidget {
     final start = phases.first.startDate;
     final end = phases.last.endDate;
     final totalDays = end.difference(start).inDays + 1;
-    final day = DateTime(today.year, today.month, today.day);
+    final day = dayOf(today);
     final inside = !day.isBefore(start) && !day.isAfter(end);
     final todayFraction = inside
         ? (day.difference(start).inDays + 0.5) / totalDays
@@ -265,33 +264,31 @@ class PlanRoadmap extends StatelessWidget {
                 ],
               ),
             ),
-            if (showLabels) ...[
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  for (var i = 0; i < phases.length; i++) ...[
-                    if (i > 0) const SizedBox(width: 3),
-                    Expanded(
-                      flex: phases[i].totalDays,
-                      child: Text(
-                        phases[i].name,
-                        maxLines: 1,
-                        overflow: TextOverflow.clip,
-                        softWrap: false,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: phases[i].contains(day)
-                              ? Color(phases[i].color)
-                              : scheme.onSurfaceVariant,
-                          fontWeight: phases[i].contains(day)
-                              ? FontWeight.w800
-                              : FontWeight.w600,
-                        ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                for (var i = 0; i < phases.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 3),
+                  Expanded(
+                    flex: phases[i].totalDays,
+                    child: Text(
+                      phases[i].name,
+                      maxLines: 1,
+                      overflow: TextOverflow.clip,
+                      softWrap: false,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: phases[i].contains(day)
+                            ? Color(phases[i].color)
+                            : scheme.onSurfaceVariant,
+                        fontWeight: phases[i].contains(day)
+                            ? FontWeight.w800
+                            : FontWeight.w600,
                       ),
                     ),
-                  ],
+                  ),
                 ],
-              ),
-            ],
+              ],
+            ),
           ],
         );
       },
@@ -645,7 +642,7 @@ String phaseStatusLabel(
   PeriodizationPhase phase,
   DateTime today,
 ) {
-  final day = DateTime(today.year, today.month, today.day);
+  final day = dayOf(today);
   if (phase.endDate.isBefore(day)) return loc.planningPhaseDone;
   if (phase.contains(day)) {
     return loc.planningWeekOf(phase.weekAt(day), phase.totalWeeks);

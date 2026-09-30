@@ -1,7 +1,11 @@
+// Read-only queries built for the AI Coach may run SQL directly (a documented
+// exception to the repository-only rule); writes never happen in this file.
 import 'dart:math' as math;
 
-import '../database/database_helper.dart';
-import 'effective_nutrition_goal_service.dart';
+import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/services/ai_tool_math.dart';
+import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Read-only, compact wellness analytics used by the AI Coach tools.
 ///
@@ -37,12 +41,20 @@ class AiWellnessAnalyticsService {
     return {
       'windowDays': days,
       'recordedNights': rows.length,
-      'coveragePct': _round(rows.length / days * 100),
-      'averageSleepMinutes': _roundOrNull(_average(durations)),
-      'minimumSleepMinutes': _roundOrNull(_minimum(durations)),
-      'maximumSleepMinutes': _roundOrNull(_maximum(durations)),
-      'averageEfficiencyPct': _roundOrNull(_average(efficiencies)),
-      'scheduleRegularityScore': _roundOrNull(
+      'coveragePct': AiToolMath.round1(rows.length / days * 100),
+      'averageSleepMinutes': AiToolMath.round1OrNull(
+        AiToolMath.average(durations),
+      ),
+      'minimumSleepMinutes': AiToolMath.round1OrNull(
+        AiToolMath.minimum(durations),
+      ),
+      'maximumSleepMinutes': AiToolMath.round1OrNull(
+        AiToolMath.maximum(durations),
+      ),
+      'averageEfficiencyPct': AiToolMath.round1OrNull(
+        AiToolMath.average(efficiencies),
+      ),
+      'scheduleRegularityScore': AiToolMath.round1OrNull(
         _scheduleRegularity(bedtimes, wakeTimes),
       ),
       'recentNights': rows.take(14).map(_compactSleepRow).toList(),
@@ -68,7 +80,9 @@ class AiWellnessAnalyticsService {
   Future<Map<String, dynamic>> nutritionSummary({int days = 14}) async {
     days = days.clamp(3, 90);
     final database = await db.database;
-    final start = _date(_today().subtract(Duration(days: days - 1)));
+    final start = dateKey(
+      _today().subtract(Duration(days: days - 1)),
+    );
     final rows = await database.rawQuery(
       '''
       SELECT ml.date,
@@ -115,35 +129,39 @@ class AiWellnessAnalyticsService {
     final effective = await EffectiveNutritionGoalService.resolve(date: _now());
     final goal = effective.goal;
 
-    double? avg(String key) => _average(
+    double? avg(String key) => AiToolMath.average(
       rows.map((row) => (row[key] as num?)?.toDouble()).whereType<double>(),
     );
 
     return {
       'windowDays': days,
       'loggedDays': rows.length,
-      'coveragePct': _round(rows.length / days * 100),
+      'coveragePct': AiToolMath.round1(rows.length / days * 100),
       'dailyAverage': {
-        'calories': _roundOrNull(avg('calories')),
-        'proteinG': _roundOrNull(avg('protein_g')),
-        'carbsG': _roundOrNull(avg('carbs_g')),
-        'fatG': _roundOrNull(avg('fat_g')),
-        'saturatedFatG': _roundOrNull(avg('saturated_fat_g')),
-        'monounsaturatedFatG': _roundOrNull(avg('monounsaturated_fat_g')),
-        'polyunsaturatedFatG': _roundOrNull(avg('polyunsaturated_fat_g')),
-        'transFatG': _roundOrNull(avg('trans_fat_g')),
-        'fiberG': _roundOrNull(avg('fiber_g')),
-        'sugarsG': _roundOrNull(avg('sugars_g')),
-        'sodiumMg': _roundOrNull(avg('sodium_mg')),
-        'potassiumMg': _roundOrNull(avg('potassium_mg')),
-        'calciumMg': _roundOrNull(avg('calcium_mg')),
-        'ironMg': _roundOrNull(avg('iron_mg')),
-        'magnesiumMg': _roundOrNull(avg('magnesium_mg')),
-        'zincMg': _roundOrNull(avg('zinc_mg')),
-        'vitaminAUg': _roundOrNull(avg('vitamin_a_ug')),
-        'vitaminCMg': _roundOrNull(avg('vitamin_c_mg')),
-        'vitaminDUg': _roundOrNull(avg('vitamin_d_ug')),
-        'vitaminB12Ug': _roundOrNull(avg('vitamin_b12_ug')),
+        'calories': AiToolMath.round1OrNull(avg('calories')),
+        'proteinG': AiToolMath.round1OrNull(avg('protein_g')),
+        'carbsG': AiToolMath.round1OrNull(avg('carbs_g')),
+        'fatG': AiToolMath.round1OrNull(avg('fat_g')),
+        'saturatedFatG': AiToolMath.round1OrNull(avg('saturated_fat_g')),
+        'monounsaturatedFatG': AiToolMath.round1OrNull(
+          avg('monounsaturated_fat_g'),
+        ),
+        'polyunsaturatedFatG': AiToolMath.round1OrNull(
+          avg('polyunsaturated_fat_g'),
+        ),
+        'transFatG': AiToolMath.round1OrNull(avg('trans_fat_g')),
+        'fiberG': AiToolMath.round1OrNull(avg('fiber_g')),
+        'sugarsG': AiToolMath.round1OrNull(avg('sugars_g')),
+        'sodiumMg': AiToolMath.round1OrNull(avg('sodium_mg')),
+        'potassiumMg': AiToolMath.round1OrNull(avg('potassium_mg')),
+        'calciumMg': AiToolMath.round1OrNull(avg('calcium_mg')),
+        'ironMg': AiToolMath.round1OrNull(avg('iron_mg')),
+        'magnesiumMg': AiToolMath.round1OrNull(avg('magnesium_mg')),
+        'zincMg': AiToolMath.round1OrNull(avg('zinc_mg')),
+        'vitaminAUg': AiToolMath.round1OrNull(avg('vitamin_a_ug')),
+        'vitaminCMg': AiToolMath.round1OrNull(avg('vitamin_c_mg')),
+        'vitaminDUg': AiToolMath.round1OrNull(avg('vitamin_d_ug')),
+        'vitaminB12Ug': AiToolMath.round1OrNull(avg('vitamin_b12_ug')),
       },
       'activeDailyGoal': goal == null
           ? null
@@ -223,7 +241,9 @@ class AiWellnessAnalyticsService {
   Future<Map<String, dynamic>> nutritionBodyTrend({int days = 84}) async {
     days = days.clamp(14, 180);
     final database = await db.database;
-    final start = _date(_today().subtract(Duration(days: days - 1)));
+    final start = dateKey(
+      _today().subtract(Duration(days: days - 1)),
+    );
     final nutrition = await database.rawQuery(
       '''
       SELECT ml.date, SUM(mli.calories) calories,
@@ -272,7 +292,7 @@ class AiWellnessAnalyticsService {
       'weightMeasurements': weights.length,
       'weightChangeKg': weightValues.length < 2
           ? null
-          : _round(weightValues.last - weightValues.first),
+          : AiToolMath.round1(weightValues.last - weightValues.first),
       'weeklyTrend': points.take(26).toList(),
       'caloriesVsWeightCorrelation': _correlationFrom(
         points,
@@ -325,7 +345,9 @@ class AiWellnessAnalyticsService {
 
   Future<List<Map<String, dynamic>>> _sleepRows(int days) async {
     final database = await db.database;
-    final start = _date(_today().subtract(Duration(days: days - 1)));
+    final start = dateKey(
+      _today().subtract(Duration(days: days - 1)),
+    );
     return database.query(
       'sleep_entries',
       where: 'date >= ?',
@@ -337,7 +359,9 @@ class AiWellnessAnalyticsService {
 
   Future<List<Map<String, dynamic>>> _dailyWorkoutRows(int days) async {
     final database = await db.database;
-    final start = _date(_today().subtract(Duration(days: days - 1)));
+    final start = dateKey(
+      _today().subtract(Duration(days: days - 1)),
+    );
     return database.rawQuery(
       '''
       SELECT date, SUM(workout_count) workout_count,
@@ -373,7 +397,7 @@ class AiWellnessAnalyticsService {
             ELSE ra.duration_seconds END AS cardio_moving_seconds,
           0.0 AS volume_kg, 0 AS completed_sets
         FROM run_activities ra
-        WHERE ra.status = 'completed' AND substr(ra.started_at, 1, 10) >= ?
+        WHERE ra.status = 'completed' AND ra.started_at >= ?
       ) daily
       GROUP BY date ORDER BY date ASC
       ''',
@@ -383,7 +407,7 @@ class AiWellnessAnalyticsService {
 
   DateTime _today() {
     final value = _now();
-    return DateTime(value.year, value.month, value.day);
+    return dayOf(value);
   }
 
   static Map<String, dynamic> _compactSleepRow(Map<String, dynamic> row) => {
@@ -396,7 +420,7 @@ class AiWellnessAnalyticsService {
     'timeInBedMinutes': row['time_in_bed_minutes'],
     'bedtimeMinutes': row['bedtime_minutes'],
     'wakeTimeMinutes': row['wake_time_minutes'],
-    'efficiencyPct': _roundOrNull(_sleepEfficiency(row)),
+    'efficiencyPct': AiToolMath.round1OrNull(_sleepEfficiency(row)),
     'source': row['source'],
   };
 
@@ -404,30 +428,48 @@ class AiWellnessAnalyticsService {
     Map<String, dynamic> row,
   ) => {
     'date': row['date'],
-    'calories': _roundOrNull((row['calories'] as num?)?.toDouble()),
-    'proteinG': _roundOrNull((row['protein_g'] as num?)?.toDouble()),
-    'carbsG': _roundOrNull((row['carbs_g'] as num?)?.toDouble()),
-    'fatG': _roundOrNull((row['fat_g'] as num?)?.toDouble()),
-    'saturatedFatG': _roundOrNull((row['saturated_fat_g'] as num?)?.toDouble()),
-    'monounsaturatedFatG': _roundOrNull(
+    'calories': AiToolMath.round1OrNull((row['calories'] as num?)?.toDouble()),
+    'proteinG': AiToolMath.round1OrNull((row['protein_g'] as num?)?.toDouble()),
+    'carbsG': AiToolMath.round1OrNull((row['carbs_g'] as num?)?.toDouble()),
+    'fatG': AiToolMath.round1OrNull((row['fat_g'] as num?)?.toDouble()),
+    'saturatedFatG': AiToolMath.round1OrNull(
+      (row['saturated_fat_g'] as num?)?.toDouble(),
+    ),
+    'monounsaturatedFatG': AiToolMath.round1OrNull(
       (row['monounsaturated_fat_g'] as num?)?.toDouble(),
     ),
-    'polyunsaturatedFatG': _roundOrNull(
+    'polyunsaturatedFatG': AiToolMath.round1OrNull(
       (row['polyunsaturated_fat_g'] as num?)?.toDouble(),
     ),
-    'transFatG': _roundOrNull((row['trans_fat_g'] as num?)?.toDouble()),
-    'fiberG': _roundOrNull((row['fiber_g'] as num?)?.toDouble()),
-    'sugarsG': _roundOrNull((row['sugars_g'] as num?)?.toDouble()),
-    'sodiumMg': _roundOrNull((row['sodium_mg'] as num?)?.toDouble()),
-    'potassiumMg': _roundOrNull((row['potassium_mg'] as num?)?.toDouble()),
-    'calciumMg': _roundOrNull((row['calcium_mg'] as num?)?.toDouble()),
-    'ironMg': _roundOrNull((row['iron_mg'] as num?)?.toDouble()),
-    'magnesiumMg': _roundOrNull((row['magnesium_mg'] as num?)?.toDouble()),
-    'zincMg': _roundOrNull((row['zinc_mg'] as num?)?.toDouble()),
-    'vitaminAUg': _roundOrNull((row['vitamin_a_ug'] as num?)?.toDouble()),
-    'vitaminCMg': _roundOrNull((row['vitamin_c_mg'] as num?)?.toDouble()),
-    'vitaminDUg': _roundOrNull((row['vitamin_d_ug'] as num?)?.toDouble()),
-    'vitaminB12Ug': _roundOrNull((row['vitamin_b12_ug'] as num?)?.toDouble()),
+    'transFatG': AiToolMath.round1OrNull(
+      (row['trans_fat_g'] as num?)?.toDouble(),
+    ),
+    'fiberG': AiToolMath.round1OrNull((row['fiber_g'] as num?)?.toDouble()),
+    'sugarsG': AiToolMath.round1OrNull((row['sugars_g'] as num?)?.toDouble()),
+    'sodiumMg': AiToolMath.round1OrNull((row['sodium_mg'] as num?)?.toDouble()),
+    'potassiumMg': AiToolMath.round1OrNull(
+      (row['potassium_mg'] as num?)?.toDouble(),
+    ),
+    'calciumMg': AiToolMath.round1OrNull(
+      (row['calcium_mg'] as num?)?.toDouble(),
+    ),
+    'ironMg': AiToolMath.round1OrNull((row['iron_mg'] as num?)?.toDouble()),
+    'magnesiumMg': AiToolMath.round1OrNull(
+      (row['magnesium_mg'] as num?)?.toDouble(),
+    ),
+    'zincMg': AiToolMath.round1OrNull((row['zinc_mg'] as num?)?.toDouble()),
+    'vitaminAUg': AiToolMath.round1OrNull(
+      (row['vitamin_a_ug'] as num?)?.toDouble(),
+    ),
+    'vitaminCMg': AiToolMath.round1OrNull(
+      (row['vitamin_c_mg'] as num?)?.toDouble(),
+    ),
+    'vitaminDUg': AiToolMath.round1OrNull(
+      (row['vitamin_d_ug'] as num?)?.toDouble(),
+    ),
+    'vitaminB12Ug': AiToolMath.round1OrNull(
+      (row['vitamin_b12_ug'] as num?)?.toDouble(),
+    ),
   };
 
   static double? _effectiveSleep(Map<String, dynamic> row) =>
@@ -473,30 +515,16 @@ class AiWellnessAnalyticsService {
   ) {
     if (bedtimes.length < 2 || wakeTimes.length < 2) return null;
     double score(List<double> values) {
-      final center = _circularCenter(values);
-      final deviation = _average(
+      final center = AiToolMath.circularMeanMinutes(values);
+      final deviation = AiToolMath.average(
         values.map((value) {
-          final direct = (value - center).abs();
-          return math.min(direct, 1440 - direct);
+          return AiToolMath.circularDistanceMinutes(value, center);
         }),
       )!;
       return (100 * (1 - math.min(deviation, 180) / 180)).clamp(0, 100);
     }
 
     return (score(bedtimes) + score(wakeTimes)) / 2;
-  }
-
-  static double _circularCenter(List<double> values) {
-    var sinSum = 0.0;
-    var cosSum = 0.0;
-    for (final value in values) {
-      final angle = value / 1440 * 2 * math.pi;
-      sinSum += math.sin(angle);
-      cosSum += math.cos(angle);
-    }
-    var angle = math.atan2(sinSum, cosSum);
-    if (angle < 0) angle += 2 * math.pi;
-    return angle / (2 * math.pi) * 1440;
   }
 
   static Map<String, dynamic> _correlationFrom(
@@ -517,8 +545,8 @@ class AiWellnessAnalyticsService {
         'quality': 'insufficient',
       };
     }
-    final meanX = _average(pairs.map((pair) => pair.$1))!;
-    final meanY = _average(pairs.map((pair) => pair.$2))!;
+    final meanX = AiToolMath.average(pairs.map((pair) => pair.$1))!;
+    final meanY = AiToolMath.average(pairs.map((pair) => pair.$2))!;
     var numerator = 0.0;
     var sumX = 0.0;
     var sumY = 0.0;
@@ -532,31 +560,14 @@ class AiWellnessAnalyticsService {
     final denominator = math.sqrt(sumX * sumY);
     final coefficient = denominator == 0 ? null : numerator / denominator;
     return {
-      'coefficient': _roundOrNull(coefficient),
+      'coefficient': AiToolMath.round1OrNull(coefficient),
       'sampleSize': pairs.length,
       'quality': pairs.length >= 14 ? 'usable' : 'low_sample',
     };
   }
 
-  static double? _average(Iterable<double> values) {
-    final list = values.toList();
-    if (list.isEmpty) return null;
-    return list.reduce((a, b) => a + b) / list.length;
-  }
-
-  static double? _minimum(List<double> values) =>
-      values.isEmpty ? null : values.reduce(math.min);
-  static double? _maximum(List<double> values) =>
-      values.isEmpty ? null : values.reduce(math.max);
-  static double _round(double value) => (value * 10).round() / 10;
-  static double? _roundOrNull(double? value) =>
-      value == null ? null : _round(value);
-  static String _date(DateTime value) =>
-      value.toIso8601String().substring(0, 10);
-
   static String _weekStart(String date) {
-    final parsed = DateTime.parse(date);
-    return _date(parsed.subtract(Duration(days: parsed.weekday - 1)));
+    return dateKey(mondayOf(DateTime.parse(date)));
   }
 }
 
@@ -587,21 +598,11 @@ class _WeeklyWellnessBucket {
   Map<String, dynamic> toMap(String weekStart) => {
     'weekStart': weekStart,
     'loggedNutritionDays': calories.length,
-    'averageCalories': AiWellnessAnalyticsService._roundOrNull(
-      AiWellnessAnalyticsService._average(calories),
-    ),
-    'averageProteinG': AiWellnessAnalyticsService._roundOrNull(
-      AiWellnessAnalyticsService._average(protein),
-    ),
-    'averageCarbsG': AiWellnessAnalyticsService._roundOrNull(
-      AiWellnessAnalyticsService._average(carbs),
-    ),
-    'averageFatG': AiWellnessAnalyticsService._roundOrNull(
-      AiWellnessAnalyticsService._average(fat),
-    ),
-    'weightKg': weights.isEmpty
-        ? null
-        : AiWellnessAnalyticsService._round(weights.last),
+    'averageCalories': AiToolMath.round1OrNull(AiToolMath.average(calories)),
+    'averageProteinG': AiToolMath.round1OrNull(AiToolMath.average(protein)),
+    'averageCarbsG': AiToolMath.round1OrNull(AiToolMath.average(carbs)),
+    'averageFatG': AiToolMath.round1OrNull(AiToolMath.average(fat)),
+    'weightKg': weights.isEmpty ? null : AiToolMath.round1(weights.last),
   };
 }
 
@@ -645,13 +646,13 @@ class _RecoveryBucket {
   }
 
   Map<String, dynamic> toMap(String weekStart) {
-    final avgSleep = AiWellnessAnalyticsService._average(sleepMinutes);
-    final avgEfficiency = AiWellnessAnalyticsService._average(efficiencies);
+    final avgSleep = AiToolMath.average(sleepMinutes);
+    final avgEfficiency = AiToolMath.average(efficiencies);
     final regularity = AiWellnessAnalyticsService._scheduleRegularity(
       bedtimes,
       wakeTimes,
     );
-    final avgFeeling = AiWellnessAnalyticsService._average(feelings);
+    final avgFeeling = AiToolMath.average(feelings);
     final components = <(double, double)>[];
     if (avgSleep != null) {
       components.add(((avgSleep / 480 * 100).clamp(0, 100), 0.5));
@@ -675,26 +676,20 @@ class _RecoveryBucket {
               weight;
     return {
       'weekStart': weekStart,
-      'recoveryScore': AiWellnessAnalyticsService._roundOrNull(score),
+      'recoveryScore': AiToolMath.round1OrNull(score),
       'sleepNights': sleepMinutes.length,
-      'averageSleepMinutes': AiWellnessAnalyticsService._roundOrNull(avgSleep),
-      'averageEfficiencyPct': AiWellnessAnalyticsService._roundOrNull(
-        avgEfficiency,
-      ),
-      'regularityScore': AiWellnessAnalyticsService._roundOrNull(regularity),
-      'averageWorkoutFeeling': AiWellnessAnalyticsService._roundOrNull(
-        avgFeeling,
-      ),
+      'averageSleepMinutes': AiToolMath.round1OrNull(avgSleep),
+      'averageEfficiencyPct': AiToolMath.round1OrNull(avgEfficiency),
+      'regularityScore': AiToolMath.round1OrNull(regularity),
+      'averageWorkoutFeeling': AiToolMath.round1OrNull(avgFeeling),
       'workoutCount': workoutCount,
-      'trainingVolumeKg': AiWellnessAnalyticsService._round(volumeKg),
+      'trainingVolumeKg': AiToolMath.round1(volumeKg),
       'recordedRuns': runCount,
       'stationaryBikeSessions': bikeCount,
-      'cardioDistanceMeters': AiWellnessAnalyticsService._round(
-        cardioDistanceMeters,
-      ),
+      'cardioDistanceMeters': AiToolMath.round1(cardioDistanceMeters),
       'cardioMovingTimeSeconds': cardioMovingSeconds,
-      'averageCardioRpe': AiWellnessAnalyticsService._roundOrNull(
-        AiWellnessAnalyticsService._average(cardioRpes),
+      'averageCardioRpe': AiToolMath.round1OrNull(
+        AiToolMath.average(cardioRpes),
       ),
     };
   }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/run_plan_template.dart';
 import 'package:workout_notes/services/run_plan_templates.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Bottom sheet result: a [RunPlanTemplate], or the string `'blank'`.
 Future<Object?> showRunPlanTemplatePicker(BuildContext context) {
@@ -314,14 +316,9 @@ class _GoalTemplateCard extends StatelessWidget {
       RunPlanTemplateLevel.intermediate => loc.runPlanTemplateLevelIntermediate,
       RunPlanTemplateLevel.advanced => loc.runPlanTemplateLevelAdvanced,
     };
-    return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: scheme.outlineVariant.withAlpha(100)),
-      ),
-      clipBehavior: Clip.antiAlias,
+    return AppSectionCard(
+      radius: 20,
+      padding: EdgeInsets.zero,
       child: InkWell(
         onTap: onTap,
         child: Padding(

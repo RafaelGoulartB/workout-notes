@@ -1,6 +1,8 @@
-import '../database/database_helper.dart';
-import '../models/run_plan_workout.dart';
-import '../repositories/run_plan_repository.dart';
+// Read-only queries built for the AI Coach may run SQL directly (a documented
+// exception to the repository-only rule); writes never happen in this file.
+import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/services/ai_tool_math.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Read-only, AI-facing workout queries.
 ///
@@ -96,7 +98,7 @@ class AiWorkoutToolService {
   }
 
   Future<Map<String, dynamic>?> workoutDetail(String id) async {
-    final workout = await db.getWorkout(id);
+    final workout = await db.workoutRepo.getWorkout(id);
     if (workout == null) return null;
     final rawDb = await db.database;
     final rows = await rawDb.rawQuery(
@@ -198,7 +200,7 @@ class AiWorkoutToolService {
         'totalReps': totalReps,
         'totalDistance': totalDistance,
         'exerciseTimeSeconds': exerciseTimeSeconds,
-        'averageRpe': _average(rpes),
+        'averageRpe': AiToolMath.average(rpes),
       },
       'exercises': byEntry.values.toList(),
     };
@@ -210,7 +212,7 @@ class AiWorkoutToolService {
     bool? favorites,
     int limit = 20,
   }) async {
-    final rows = await db.getExercises(
+    final rows = await db.exerciseRepo.getExercises(
       categoryId: categoryId,
       search: search,
       favorites: favorites,
@@ -219,7 +221,7 @@ class AiWorkoutToolService {
   }
 
   Future<Map<String, dynamic>?> exerciseDetail(String id) async {
-    final exercise = await db.getExercise(id);
+    final exercise = await db.exerciseRepo.getExercise(id);
     if (exercise == null) return null;
     final rawDb = await db.database;
     final usage = await rawDb.rawQuery(
@@ -287,7 +289,7 @@ class AiWorkoutToolService {
       'filters': {'startDate': startDate, 'endDate': endDate},
       'sessionCount': sessions.length,
       'totalSets': allSets.length,
-      'avgWeight': _average(weights),
+      'avgWeight': AiToolMath.average(weights),
       'avgReps': reps.isEmpty
           ? null
           : reps.reduce((a, b) => a + b) / reps.length,
@@ -298,7 +300,7 @@ class AiWorkoutToolService {
 
   Future<Map<String, dynamic>> exerciseRecords(String exerciseId) async {
     final rawDb = await db.database;
-    final exercise = await db.getExercise(exerciseId);
+    final exercise = await db.exerciseRepo.getExercise(exerciseId);
     final rows = await rawDb.rawQuery(
       '''
       SELECT w.id AS workout_id, w.date, s.weight, s.reps, s.distance,
@@ -388,14 +390,14 @@ class AiWorkoutToolService {
     final history = await exerciseHistory(
       exerciseId,
       limit: 1000,
-      startDate: _date(start),
-      endDate: _date(end),
+      startDate: dateKey(start),
+      endDate: dateKey(end),
     );
     return {
       'exerciseId': exerciseId,
       'weeksBack': weeks,
-      'startDate': _date(start),
-      'endDate': _date(end),
+      'startDate': dateKey(start),
+      'endDate': dateKey(end),
       'dataPoints': history['history'],
       'sessionCount': history['sessionCount'],
     };
@@ -404,7 +406,7 @@ class AiWorkoutToolService {
   Future<Map<String, dynamic>> weeklyVolume({int weeks = 8}) async {
     final rawDb = await db.database;
     final today = DateTime.now();
-    final currentMonday = today.subtract(Duration(days: today.weekday - 1));
+    final currentMonday = mondayOf(today);
     final firstMonday = currentMonday.subtract(Duration(days: (weeks - 1) * 7));
     final rows = await rawDb.rawQuery(
       '''
@@ -419,13 +421,13 @@ class AiWorkoutToolService {
         AND s.is_complete = 1 AND s.is_warmup = 0
       ORDER BY w.date ASC
     ''',
-      [_date(firstMonday), _date(today)],
+      [dateKey(firstMonday), dateKey(today)],
     );
     final buckets = <String, Map<String, Map<String, dynamic>>>{};
     for (final row in rows) {
       final date = DateTime.parse(row['date'] as String);
-      final monday = date.subtract(Duration(days: date.weekday - 1));
-      final weekKey = _date(monday);
+      final monday = mondayOf(date);
+      final weekKey = dateKey(monday);
       final categoryId = row['category_id'] as String;
       final category = buckets
           .putIfAbsent(weekKey, () => {})
@@ -458,9 +460,10 @@ class AiWorkoutToolService {
     for (var offset = weeks - 1; offset >= 0; offset--) {
       final start = currentMonday.subtract(Duration(days: offset * 7));
       output.add({
-        'startDate': _date(start),
-        'endDate': _date(start.add(const Duration(days: 6))),
-        'categories': buckets[_date(start)]?.values.toList() ?? const [],
+        'startDate': dateKey(start),
+        'endDate': dateKey(start.add(const Duration(days: 6))),
+        'categories':
+            buckets[dateKey(start)]?.values.toList() ?? const [],
       });
     }
     return {'weeksBack': weeks, 'weeks': output};
@@ -591,7 +594,7 @@ class AiWorkoutToolService {
         AND (COALESCE(s.distance, 0) > 0 OR COALESCE(s.time_seconds, 0) > 0)
       ORDER BY w.date ASC
     ''',
-      [_date(start), _date(end)],
+      [dateKey(start), dateKey(end)],
     );
     final modalities = <String, Map<String, dynamic>>{};
     final sessions = <Map<String, dynamic>>[];
@@ -646,121 +649,12 @@ class AiWorkoutToolService {
     }).toList();
     return {
       'weeksBack': weeks,
-      'startDate': _date(start),
-      'endDate': _date(end),
+      'startDate': dateKey(start),
+      'endDate': dateKey(end),
       'byModality': byModality,
       'sessions': sessions,
     };
   }
-
-  // ---------------- Running plans (read-only) ----------------
-
-  /// Lists structured running plans with their weekly shape.
-  Future<Map<String, dynamic>> listRunPlans({
-    bool includeArchived = false,
-  }) async {
-    final plans = await RunPlanRepository().listPlans(
-      includeArchived: includeArchived,
-    );
-    return {
-      'includeArchived': includeArchived,
-      'plans': [
-        for (final plan in plans)
-          {
-            'id': plan.id,
-            'name': plan.name,
-            'goal': plan.goalKind.value,
-            'weeks': plan.weeks,
-            'status': plan.status.value,
-            'raceDate': plan.raceDate == null
-                ? null
-                : _date(plan.raceDate!),
-          },
-      ],
-    };
-  }
-
-  /// Full detail of one plan: every week, session and step.
-  Future<Map<String, dynamic>> runPlanDetail(String planId) async {
-    final plan = await RunPlanRepository().getPlan(planId);
-    if (plan == null) return {'found': false, 'planId': planId};
-    return {
-      'found': true,
-      'id': plan.id,
-      'name': plan.name,
-      'goal': plan.goalKind.value,
-      'weeks': plan.weeks,
-      'notes': plan.notes,
-      'raceDate': plan.raceDate == null ? null : _date(plan.raceDate!),
-      'weekPlans': [
-        for (var week = 0; week < plan.weeks; week++)
-          {
-            'week': week + 1,
-            'plannedDistanceMeters': plan.weeklyDistanceMeters(week),
-            'qualitySessions': plan.qualitySessionsForWeek(week),
-            'sessions': [
-              for (final session in plan.workoutsForWeek(week))
-                _runSessionJson(session),
-            ],
-          },
-      ],
-    };
-  }
-
-  /// Planned runs in a date window, with the linked activity when done.
-  Future<Map<String, dynamic>> runSchedule({
-    String? startDate,
-    String? endDate,
-  }) async {
-    final today = DateTime.now();
-    final start =
-        DateTime.tryParse(startDate ?? '') ??
-        DateTime(today.year, today.month, today.day);
-    final end =
-        DateTime.tryParse(endDate ?? '') ?? start.add(const Duration(days: 27));
-    final scheduled = await RunPlanRepository().getScheduledRuns(start, end);
-    return {
-      'startDate': _date(start),
-      'endDate': _date(end),
-      'scheduledRuns': [
-        for (final run in scheduled)
-          {
-            'id': run.id,
-            'date': _date(run.date),
-            'status': run.status.value,
-            'runActivityId': run.runActivityId,
-            'notes': run.notes,
-            'session': run.workout == null
-                ? null
-                : _runSessionJson(run.workout!),
-          },
-      ],
-    };
-  }
-
-  static Map<String, dynamic> _runSessionJson(RunPlanWorkout session) => {
-    'id': session.id,
-    'name': session.name,
-    'kind': session.kind.value,
-    'isQuality': session.kind.isQuality,
-    'dayOfWeek': session.dayOfWeek,
-    'plannedDistanceMeters': session.plannedDistanceMeters,
-    'plannedDurationSeconds': session.plannedDurationSeconds,
-    'targetPaceSecPerKm': session.targetPaceSecPerKm,
-    'effortReps': session.workRepCount,
-    'steps': [
-      for (final step in session.steps)
-        {
-          'role': step.role.value,
-          'metric': step.metric.name,
-          'value': step.value,
-          'repeatGroup': step.repeatGroup,
-          'repeatCount': step.repeatCount,
-          'targetPaceMinSecPerKm': step.targetPaceMinSecPerKm,
-          'targetPaceMaxSecPerKm': step.targetPaceMaxSecPerKm,
-        },
-    ],
-  };
 
   Future<List<Map<String, dynamic>>> _exerciseSessions(
     String exerciseId, {
@@ -849,7 +743,7 @@ class AiWorkoutToolService {
     }
     return sessions.values.map((session) {
       final rpes = session.remove('rpeValues') as List<double>;
-      session['averageRpe'] = _average(rpes);
+      session['averageRpe'] = AiToolMath.average(rpes);
       return session;
     }).toList();
   }
@@ -894,13 +788,6 @@ class AiWorkoutToolService {
     if (workout['start_time'] != null) return 'in_progress';
     return 'planned';
   }
-
-  double? _average(Iterable<double> values) {
-    if (values.isEmpty) return null;
-    return values.reduce((a, b) => a + b) / values.length;
-  }
-
-  String _date(DateTime date) => date.toIso8601String().substring(0, 10);
 }
 
 class _RecordCandidate {

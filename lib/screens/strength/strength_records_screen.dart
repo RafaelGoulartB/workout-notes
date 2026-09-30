@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/repositories/exercise_repository.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_insights_data.dart';
 import 'package:workout_notes/widgets/strength/records/strength_recent_records.dart';
 import 'package:workout_notes/widgets/strength/records/strength_records_hero.dart';
 import 'package:workout_notes/widgets/strength/records/strength_records_list.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Personal records: headline counts, the latest bests as a timeline and the
 /// best e1RM / heaviest weight / best session volume of each exercise grouped
@@ -37,8 +36,8 @@ class _StrengthRecordsScreenState extends State<StrengthRecordsScreen> {
 
   Future<void> _load() async {
     try {
-      final sets = await StrengthRecordsRepository().loadSets();
-      final categories = await ExerciseRepository().getCategories();
+      final sets = await DatabaseHelper.instance.strengthRecordsRepo.loadSets();
+      final categories = await DatabaseHelper.instance.exerciseRepo.getCategories();
       if (!mounted) return;
       final records = StrengthRecordsCalculator.records(sets);
       // Oldest first from the calculator; the timeline wants newest first.
@@ -78,7 +77,7 @@ class _StrengthRecordsScreenState extends State<StrengthRecordsScreen> {
       exerciseRow: exerciseRow,
     );
     // The exercise may have been renamed or deleted meanwhile.
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   @override
@@ -102,13 +101,13 @@ class _StrengthRecordsScreenState extends State<StrengthRecordsScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _failed
-          ? EmptyStatePlaceholder(
+          ? AppEmptyState(
               icon: Icons.error_outline_rounded,
               title: loc.strengthInsightsLoadError,
               subtitle: '',
             )
           : _records.isEmpty
-          ? EmptyStatePlaceholder(
+          ? AppEmptyState(
               icon: Icons.emoji_events_outlined,
               title: loc.strengthRecordsEmptyTitle,
               subtitle: loc.strengthRecordsEmptySubtitle,
@@ -116,14 +115,14 @@ class _StrengthRecordsScreenState extends State<StrengthRecordsScreen> {
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
-                padding: RunUi.screenPadding.copyWith(top: 8, bottom: 40),
+                padding: AppUi.screenPadding.copyWith(top: 8, bottom: 40),
                 children: [
                   StrengthRecordsHero(
                     exercises: _records.length,
                     thisMonth: _thisMonth,
                     thisYear: _thisYear,
                   ),
-                  RunSectionHeader(loc.strengthRecordsRecent),
+                  AppSectionHeader(loc.strengthRecordsRecent),
                   StrengthRecentRecords(
                     events: _events,
                     onOpen: (e) => _open(
@@ -131,7 +130,7 @@ class _StrengthRecordsScreenState extends State<StrengthRecordsScreen> {
                       exerciseRow: e.exerciseRow,
                     ),
                   ),
-                  RunSectionHeader(loc.strengthRecordsByExercise),
+                  AppSectionHeader(loc.strengthRecordsByExercise),
                   StrengthRecordsList(
                     records: _records,
                     categories: _categories,

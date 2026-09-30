@@ -7,7 +7,6 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/screens/strength/strength_insights_screen.dart';
 import 'package:workout_notes/screens/strength/strength_records_screen.dart';
 import 'package:workout_notes/screens/workout/exercise_detail_tabs_screen.dart';
-import 'package:workout_notes/screens/workout/progress_screen.dart';
 
 import 'support/ai_test_db.dart';
 
@@ -47,6 +46,7 @@ Future<void> _workout(
         : null,
     'duration_seconds': 3600,
     'feeling_rating': feeling,
+    'created_at': DateTime(day.year, day.month, day.day, 7).toIso8601String(),
   });
   var order = 0;
   for (final entry in exercises.entries) {
@@ -91,11 +91,13 @@ Future<void> _seed(Database db) async {
     'name': 'Supino teste',
     'category_id': 'chest',
     'equipment': 'Barbell',
+    'created_at': '2026-01-01T00:00:00.000',
   });
   await db.insert('exercises', {
     'id': 'row',
     'name': 'Remada teste',
     'category_id': 'back',
+    'created_at': '2026-01-01T00:00:00.000',
   });
   final today = DateTime.now();
   DateTime ago(int d) => DateTime(today.year, today.month, today.day - d);
@@ -194,13 +196,11 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('legacy ProgressScreen opens the strength analysis', (
-    tester,
-  ) async {
+  testWidgets('analysis screen opens on the analysis title', (tester) async {
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(_app(const ProgressScreen()));
+    await tester.pumpWidget(_app(const StrengthInsightsScreen()));
     await _settle(tester);
     expect(find.text('Análise'), findsOneWidget);
     expect(tester.takeException(), isNull);

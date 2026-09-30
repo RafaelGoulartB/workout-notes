@@ -12,16 +12,34 @@ class RunVoiceBridge(private val context: Context) : MethodChannel.MethodCallHan
         @Volatile var pendingSettings: Map<String, Any?>? = null
         @Volatile var pendingGoal: Map<String, Any?>? = null
         @Volatile var pendingIntervalsOn: Boolean? = null
-        @Volatile var pendingBypassGate: Boolean? = null
 
         /** Structured plan steps waiting for the tracking service to start. */
         @Volatile var pendingPlan: Any? = null
     }
 
-    private fun voiceController(): RunVoiceController? {
+    private fun voiceController(): RunVoiceController {
         // Service companion holds singleton; bridge creates ephemeral controller for testSpeak when no service.
         val service = RunTrackingService.activeInstanceForVoice()
         return service?.voiceController ?: ephemeralController()
+    }
+
+    /**
+     * Controller for one-shot announcements outside a live session. Settings
+     * come from the call when Flutter sends them, else from the pending sync
+     * or storage.
+     */
+    private fun preparedController(call: MethodCall): RunVoiceController {
+        val ctrl = voiceController()
+        @Suppress("UNCHECKED_CAST")
+        val args = call.arguments as? Map<String, Any?>
+        @Suppress("UNCHECKED_CAST")
+        val settingsMap = args?.get("settings") as? Map<String, Any?>
+        when {
+            settingsMap != null -> ctrl.syncFromFlutter(settingsMap, null, null)
+            pendingSettings != null -> ctrl.syncFromFlutter(pendingSettings, pendingGoal, pendingIntervalsOn)
+            else -> ctrl.loadSettingsFromDb()
+        }
+        return ctrl
     }
 
     private var ephemeral: RunVoiceController? = null
@@ -44,17 +62,15 @@ class RunVoiceBridge(private val context: Context) : MethodChannel.MethodCallHan
                 @Suppress("UNCHECKED_CAST")
                 val goalMap = args["goal"] as? Map<String, Any?>
                 val intervalsOn = args["intervalsOn"] as? Boolean
-                val bypassGate = args["bypassHeadphonesGate"] as? Boolean
                 val plan = args["plan"]
                 pendingSettings = settingsMap
                 pendingGoal = goalMap
                 pendingIntervalsOn = intervalsOn
-                pendingBypassGate = bypassGate
                 if (args.containsKey("plan")) pendingPlan = plan
                 // If service already running, push immediately
                 val svc = RunTrackingService.activeInstanceForVoice()
                 if (svc != null) {
-                    svc.voiceController.syncFromFlutter(settingsMap, goalMap, intervalsOn, bypassGate, plan)
+                    svc.voiceController.syncFromFlutter(settingsMap, goalMap, intervalsOn, plan)
                 }
                 Log.i("RunVoiceBridge", "syncSettings intervalsOn=$intervalsOn")
                 result.success(null)
@@ -67,21 +83,19 @@ class RunVoiceBridge(private val context: Context) : MethodChannel.MethodCallHan
                 @Suppress("UNCHECKED_CAST")
                 val goalMap = args["goal"] as? Map<String, Any?>
                 val intervalsOn = args["intervalsOn"] as? Boolean
-                val bypassGate = args["bypassHeadphonesGate"] as? Boolean
                 val plan = args["plan"]
                 val svc = RunTrackingService.activeInstanceForVoice()
                 if (svc != null) {
-                    svc.voiceController.begin(settingsMap, goalMap, intervalsOn, bypassGate, plan)
+                    svc.voiceController.begin(settingsMap, goalMap, intervalsOn, plan)
                     svc.persistVoicePlan()
                 } else {
                     // No service yet — store pending, will be consumed on startRun
                     pendingSettings = settingsMap
                     pendingGoal = goalMap
                     pendingIntervalsOn = intervalsOn
-                    pendingBypassGate = bypassGate
-                    pendingPlan = plan
+                        pendingPlan = plan
                     // Also init ephemeral to allow test-like warm-up
-                    ephemeralController().begin(settingsMap, goalMap, intervalsOn, bypassGate, plan)
+                    ephemeralController().begin(settingsMap, goalMap, intervalsOn, plan)
                 }
                 result.success(null)
             }
@@ -92,7 +106,6 @@ class RunVoiceBridge(private val context: Context) : MethodChannel.MethodCallHan
                 pendingSettings = null
                 pendingGoal = null
                 pendingIntervalsOn = null
-                pendingBypassGate = null
                 pendingPlan = null
                 result.success(null)
             }
@@ -108,37 +121,26 @@ class RunVoiceBridge(private val context: Context) : MethodChannel.MethodCallHan
                 result.success(controller?.stepResults() ?: emptyList<Map<String, Any?>>())
             }
             "speakTest" -> {
-                val ctrl = voiceController()
-                // Ensure settings are loaded
-                if (ctrl != null) {
-                    // If we have pending settings, apply
-                    if (pendingSettings != null) {
-                        ctrl.syncFromFlutter(pendingSettings, pendingGoal, pendingIntervalsOn, pendingBypassGate)
-                    } else {
-                        ctrl.loadSettingsFromDb()
-                    }
-                    ctrl.speakTest()
-                    result.success(true)
-                } else {
-                    result.success(false)
-                }
+                val ctrl = preparedController(call)
+                ctrl.speakTest()
+                result.success(true)
+            }
+            "speakWorkoutComplete" -> {
+                val ctrl = preparedController(call)
+                ctrl.speakWorkoutComplete()
+                result.success(true)
             }
             "getCapabilities" -> {
                 // Reuse audio gate logic for Flutter UI
                 val am = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
                 val headset = try {
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                        val devices = am.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
-                        devices.any {
-                            it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET ||
-                                it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
-                                it.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-                                it.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
-                                it.type == android.media.AudioDeviceInfo.TYPE_USB_HEADSET
-                        }
-                    } else {
-                        @Suppress("DEPRECATION")
-                        am.isWiredHeadsetOn || am.isBluetoothA2dpOn || am.isBluetoothScoOn
+                    val devices = am.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
+                    devices.any {
+                        it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                            it.type == android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                            it.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                            it.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                            it.type == android.media.AudioDeviceInfo.TYPE_USB_HEADSET
                     }
                 } catch (_: Throwable) { false }
                 val inCall = when (am.mode) {

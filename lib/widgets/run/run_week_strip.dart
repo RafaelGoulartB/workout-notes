@@ -5,6 +5,7 @@ import 'package:workout_notes/services/run_today_service.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Monday-to-Sunday strip for the current week. Each day is a small vertical
 /// track filled proportionally to the distance run that day, so gaps and
@@ -16,14 +17,12 @@ import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 class RunWeekStrip extends StatelessWidget {
   final List<RunDayBucket> days;
   final DateTime today;
-  final double trackHeight;
   final List<RunPlannedDay> planned;
 
   const RunWeekStrip({
     super.key,
     required this.days,
     required this.today,
-    this.trackHeight = 56,
     this.planned = const [],
   });
 
@@ -65,7 +64,6 @@ class RunWeekStrip extends StatelessWidget {
                   .format(days[i].date)
                   .replaceAll('.', '')
                   .toUpperCase(),
-              trackHeight: trackHeight,
               loc: loc,
               colors: colors,
               theme: theme,
@@ -87,7 +85,6 @@ class _DayColumn extends StatelessWidget {
   final bool isFuture;
   final double maxDistance;
   final String label;
-  final double trackHeight;
   final AppLocalizations loc;
   final ColorScheme colors;
   final ThemeData theme;
@@ -99,7 +96,6 @@ class _DayColumn extends StatelessWidget {
     required this.isFuture,
     required this.maxDistance,
     required this.label,
-    required this.trackHeight,
     required this.loc,
     required this.colors,
     required this.theme,
@@ -151,128 +147,33 @@ class _DayColumn extends StatelessWidget {
         ? RunFormatters.distanceKmShort(p.plannedMeters)
         : null;
 
-    return Tooltip(
-      message: _tooltip,
-      child: Column(
-        children: [
-          SizedBox(
-            height: 14,
-            child: topLabel == null
-                ? null
-                : FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      topLabel,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        fontSize: 10,
-                        fontWeight: day.hasRun
-                            ? FontWeight.w800
-                            : FontWeight.w600,
-                        color: day.hasRun
-                            ? colors.onSurface
-                            : ghostColor.withValues(alpha: 0.9),
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ),
-          ),
-          Container(
-            height: trackHeight,
-            decoration: BoxDecoration(
-              color: isFuture
-                  ? colors.surfaceContainerHighest.withValues(alpha: 0.3)
-                  : colors.surfaceContainerHighest.withValues(alpha: 0.55),
-              borderRadius: BorderRadius.circular(6),
+    return AppWeekStripDay(
+      tooltip: _tooltip,
+      label: label,
+      isToday: isToday,
+      isFuture: isFuture,
+      topLabel: topLabel,
+      topLabelWeight: day.hasRun ? FontWeight.w800 : FontWeight.w600,
+      topLabelColor: day.hasRun
+          ? colors.onSurface
+          : ghostColor.withValues(alpha: 0.9),
+      barRatio: day.hasRun ? _ratio(day.distanceMeters) : null,
+      barColor: barColor,
+      ghostColor: ghost ? ghostColor : null,
+      ghostRatio: ghost ? _ratio(p.plannedMeters) : 1,
+      ghostIcon: !ghost
+          ? null
+          : Icon(
+              missed
+                  ? Icons.close_rounded
+                  : skipped
+                  ? Icons.remove_rounded
+                  : RunPlanUi.kindIcon(p.kind),
+              size: 14,
+              color: missed || skipped
+                  ? ghostColor
+                  : ghostColor.withValues(alpha: 0.85),
             ),
-            alignment: Alignment.bottomCenter,
-            child: day.hasRun
-                ? FractionallySizedBox(
-                    widthFactor: 1,
-                    heightFactor: _ratio(day.distanceMeters),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: barColor,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                  )
-                : ghost
-                ? FractionallySizedBox(
-                    widthFactor: 1,
-                    heightFactor: _ratio(p.plannedMeters),
-                    child: CustomPaint(
-                      painter: _DashedRRectPainter(
-                        color: ghostColor.withValues(alpha: 0.75),
-                        fill: ghostColor.withValues(alpha: 0.08),
-                      ),
-                      child: missed || skipped
-                          ? Center(
-                              child: Icon(
-                                missed
-                                    ? Icons.close_rounded
-                                    : Icons.remove_rounded,
-                                size: 14,
-                                color: ghostColor,
-                              ),
-                            )
-                          : Center(
-                              child: Icon(
-                                RunPlanUi.kindIcon(p.kind),
-                                size: 14,
-                                color: ghostColor.withValues(alpha: 0.85),
-                              ),
-                            ),
-                    ),
-                  )
-                : null,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.clip,
-            style: theme.textTheme.labelSmall?.copyWith(
-              fontSize: 10,
-              fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
-              color: isToday ? colors.primary : muted,
-            ),
-          ),
-        ],
-      ),
     );
   }
-}
-
-/// Dashed rounded rectangle outline with a faint fill.
-class _DashedRRectPainter extends CustomPainter {
-  final Color color;
-  final Color fill;
-
-  const _DashedRRectPainter({required this.color, required this.fill});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rrect = RRect.fromRectAndRadius(
-      (Offset.zero & size).deflate(0.75),
-      const Radius.circular(6),
-    );
-    canvas.drawRRect(rrect, Paint()..color = fill);
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    final path = Path()..addRRect(rrect);
-    for (final metric in path.computeMetrics()) {
-      var distance = 0.0;
-      while (distance < metric.length) {
-        final end = (distance + 4).clamp(0.0, metric.length);
-        canvas.drawPath(metric.extractPath(distance, end), paint);
-        distance += 7;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_DashedRRectPainter old) =>
-      old.color != color || old.fill != fill;
 }

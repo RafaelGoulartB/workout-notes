@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Distinguishes "not passed" from an explicit null in [PeriodizationTarget.copyWith].
 const Object _unset = Object();
@@ -314,7 +315,7 @@ class PeriodizationTarget {
 
   Map<String, dynamic> toSnapshot() => {
     'version': version,
-    'valid_from': _date(validFrom),
+    'valid_from': dateKey(validFrom),
     'nutrition': nutritionJson,
     'training': trainingJson,
     'body': bodyJson,
@@ -329,7 +330,7 @@ class PeriodizationTarget {
     'body_json': jsonEncode(bodyJson),
     'sleep_json': jsonEncode(sleepJson),
     'version': version,
-    'valid_from': _date(validFrom),
+    'valid_from': dateKey(validFrom),
     'created_at': createdAt.toIso8601String(),
   };
 
@@ -414,9 +415,4 @@ class PeriodizationTarget {
     return legacy is String && legacy.isNotEmpty ? [legacy] : const [];
   }
 
-  static String _date(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
 }

@@ -1,14 +1,15 @@
 package com.workoutnotes.workout_notes.sleep
 
 import android.app.Notification
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.workoutnotes.workout_notes.MainActivity
+import com.workoutnotes.workout_notes.common.PendingIntentFlags
+import com.workoutnotes.workout_notes.common.NotificationChannels
+import com.workoutnotes.workout_notes.common.NotificationChannels.silent
 
 object SleepMonitorNotification {
     const val CHANNEL_ID = "sleep_monitoring"
@@ -16,27 +17,20 @@ object SleepMonitorNotification {
     const val ACTION_STOP = "com.workoutnotes.workout_notes.sleep.STOP"
 
     fun ensureChannel(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val manager = context.getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(
-            NotificationChannel(
-                CHANNEL_ID,
-                if (context.resources.configuration.locales[0].language == "pt") {
-                    "Monitoramento do sono"
-                } else {
-                    "Sleep monitoring"
-                },
-                NotificationManager.IMPORTANCE_LOW,
-            ).apply {
-                description = if (context.resources.configuration.locales[0].language == "pt") {
-                    "Monitoramento local de sinais de áudio"
-                } else {
-                    "Local audio signal monitoring"
-                }
-                setSound(null, null)
-                enableVibration(false)
-            },
-        )
+        val pt = context.resources.configuration.locales[0].language == "pt"
+        NotificationChannels.ensure(
+            context,
+            CHANNEL_ID,
+            if (pt) "Monitoramento do sono" else "Sleep monitoring",
+            NotificationManager.IMPORTANCE_LOW,
+        ) {
+            description = if (pt) {
+                "Monitoramento local de sinais de áudio"
+            } else {
+                "Local audio signal monitoring"
+            }
+            silent()
+        }
     }
 
     fun build(
@@ -51,7 +45,7 @@ object SleepMonitorNotification {
             Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             },
-            PendingIntent.FLAG_UPDATE_CURRENT or pendingIntentImmutable(),
+            PendingIntentFlags.UPDATE_IMMUTABLE,
         )
         val stopIntent = PendingIntent.getBroadcast(
             context,
@@ -59,7 +53,7 @@ object SleepMonitorNotification {
             Intent(context, StopSleepMonitoringReceiver::class.java).apply {
                 action = ACTION_STOP
             },
-            PendingIntent.FLAG_UPDATE_CURRENT or pendingIntentImmutable(),
+            PendingIntentFlags.UPDATE_IMMUTABLE,
         )
         val pt = context.resources.configuration.locales[0].language == "pt"
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
@@ -83,7 +77,4 @@ object SleepMonitorNotification {
         }
         return builder.build()
     }
-
-    private fun pendingIntentImmutable(): Int =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
 }

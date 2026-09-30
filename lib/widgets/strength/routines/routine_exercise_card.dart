@@ -5,9 +5,9 @@ import 'package:workout_notes/utils/strength_routine_format.dart';
 import 'package:workout_notes/utils/strength_routine_summary.dart';
 import 'package:workout_notes/utils/workout_card_helpers.dart';
 import 'package:workout_notes/utils/workout_estimator.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_muscle_widgets.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_set_sheets.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Summary on top of the day editor: exercises, sets, time and volume plus
 /// the muscle split of the day.
@@ -22,29 +22,29 @@ class RoutineDaySummaryCard extends StatelessWidget {
     final duration = WorkoutEstimateCalculator.formatDuration(
       summary.estimatedSeconds,
     );
-    return RunHeroCard(
+    return AppHeroCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          RunStatRow(
+          AppStatRow(
             children: [
-              RunStatTile(
+              AppStatTile(
                 icon: Icons.fitness_center_rounded,
                 label: loc.routineStatExercises,
                 value: '${summary.exerciseCount}',
               ),
-              RunStatTile(
+              AppStatTile(
                 icon: Icons.stacked_bar_chart_rounded,
                 label: loc.commonSets,
                 value: '${summary.workingSets}',
               ),
-              RunStatTile(
+              AppStatTile(
                 icon: Icons.timer_outlined,
                 label: loc.routineStatSession,
                 value: duration ?? '--',
               ),
               if (summary.volumeKg > 0)
-                RunStatTile(
+                AppStatTile(
                   icon: Icons.scale_rounded,
                   label: loc.commonVolume,
                   value: StrengthRoutineFormat.volume(summary.volumeKg),
@@ -138,7 +138,7 @@ class RoutineExerciseCard extends StatelessWidget {
       workingNumbers.add(counter);
     }
 
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.fromLTRB(8, 10, 8, 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -189,7 +189,7 @@ class RoutineExerciseCard extends StatelessWidget {
                 onTap: actions.onRest,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: RunPill(
+                  child: AppPill(
                     icon: Icons.timer_outlined,
                     label: StrengthRoutineFormat.rest(restSeconds),
                   ),
@@ -276,7 +276,7 @@ class RoutineExerciseCard extends StatelessWidget {
                               child: Text(
                                 routineSetCell(set, key),
                                 style: theme.textTheme.bodyMedium?.copyWith(
-                                  fontFeatures: RunUi.tabular,
+                                  fontFeatures: AppUi.tabular,
                                 ),
                               ),
                             ),

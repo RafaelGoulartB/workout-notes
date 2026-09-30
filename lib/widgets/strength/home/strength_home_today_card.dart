@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:workout_notes/services/strength_today_service.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_format.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// "Today" card at the top of the gym hub: the routine day to train (with a
 /// one-tap start), the workout already done, a rest day of the plan, or a
@@ -28,11 +28,11 @@ class StrengthTodayCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
 
-    return RunSoftCard(
+    return AppSoftCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          RunTodayHeader(title: loc.strengthHomeTodayTitle),
+          AppTodayHeader(title: loc.strengthHomeTodayTitle),
           const SizedBox(height: 14),
           switch (info.status) {
             StrengthTodayStatus.planned => StrengthDayDetails(
@@ -102,7 +102,7 @@ class StrengthDayDetails extends StatelessWidget {
       children: [
         Row(
           children: [
-            const RunIconBadge(Icons.fitness_center, size: 48, iconSize: 26),
+            const AppIconBadge(Icons.fitness_center, size: 48, iconSize: 26),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -137,7 +137,7 @@ class StrengthDayDetails extends StatelessWidget {
             runSpacing: 6,
             children: [
               for (final category in day.categories.take(6))
-                RunPill(
+                AppPill(
                   label: StrengthHomeFormat.categoryName(loc, category),
                   color: Color(category.color),
                 ),
@@ -146,9 +146,9 @@ class StrengthDayDetails extends StatelessWidget {
         ],
         if (onAction != null && actionLabel != null) ...[
           const SizedBox(height: 14),
-          Divider(height: 1, color: RunUi.divider(colors)),
+          Divider(height: 1, color: AppUi.divider(colors)),
           const SizedBox(height: 12),
-          RunTodayFooter(
+          AppTodayFooter(
             caption: caption,
             actionKey: actionKey,
             actionLabel: actionLabel!,
@@ -193,7 +193,7 @@ class _Done extends StatelessWidget {
       children: [
         Row(
           children: [
-            RunIconBadge(
+            AppIconBadge(
               Icons.check_circle_rounded,
               color: colors.primary,
               size: 44,
@@ -213,7 +213,7 @@ class _Done extends StatelessWidget {
         const SizedBox(height: 10),
         Material(
           color: colors.surfaceContainerHighest.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(RunUi.tileRadius),
+          borderRadius: BorderRadius.circular(AppUi.tileRadius),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             key: const Key('strength-today-done-workout'),
@@ -329,7 +329,7 @@ class _Rest extends StatelessWidget {
       children: [
         Row(
           children: [
-            RunIconBadge(
+            AppIconBadge(
               Icons.self_improvement_rounded,
               color: colors.tertiary,
               size: 44,
@@ -402,7 +402,7 @@ class _NoRoutine extends StatelessWidget {
       children: [
         Row(
           children: [
-            const RunIconBadge(
+            const AppIconBadge(
               Icons.event_note_outlined,
               size: 44,
               iconSize: 24,

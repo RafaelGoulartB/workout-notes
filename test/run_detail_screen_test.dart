@@ -7,6 +7,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_lap.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
+import 'support/test_db.dart';
 
 const _metersPerDegree = 111195.0;
 
@@ -46,10 +47,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Database database;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(

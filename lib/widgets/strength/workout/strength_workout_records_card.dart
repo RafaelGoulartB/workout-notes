@@ -3,7 +3,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 String strengthRecordKindLabel(AppLocalizations loc, StrengthRecordKind kind) =>
     switch (kind) {
@@ -21,13 +21,13 @@ class StrengthWorkoutRecordsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final tint = Theme.of(context).colorScheme.tertiary;
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: RunDividedList(
+      child: AppDividedList(
         children: [
           for (final record in records)
-            RunListRow(
-              leading: RunIconBadge(Icons.emoji_events_rounded, color: tint),
+            AppListRow(
+              leading: AppIconBadge(Icons.emoji_events_rounded, color: tint),
               title: ExerciseLocaleHelper.exerciseName(loc, record.exerciseRow),
               subtitle:
                   '${strengthRecordKindLabel(loc, record.kind)} · '

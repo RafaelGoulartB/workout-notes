@@ -19,7 +19,7 @@ class SleepMonitorSegment {
   final double? digitalSilenceFraction;
   final double? audioLevelStddevDb;
 
-  // v28 spectral features (audio-features-v2). Null on older recordings.
+  // Spectral features. Null on older recordings.
   final double? spectralBandEnergy0;
   final double? spectralBandEnergy1;
   final double? spectralBandEnergy2;
@@ -71,12 +71,9 @@ class SleepMonitorSegment {
   bool get isNoise => classification == 'noise';
   bool get isInvalid => classification == 'invalid';
 
-  /// Whether this recording carries the v28 spectral features needed by the
-  /// heuristic staging engine (audio-features-v2 nights).
+  /// Whether this recording carries the spectral features needed by the
+  /// bedside staging engine.
   bool get hasSpectralFeatures => spectralFlatness != null;
-
-  /// Whether actigraphy aggregates were captured for this recording.
-  bool get hasMotionFeatures => motionActiveSeconds != null;
 
   Map<String, dynamic> toMap() => {
     'id': id,

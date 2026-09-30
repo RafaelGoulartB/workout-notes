@@ -55,7 +55,7 @@ class RunSessionContext {
       intervalsOn: map['intervals_on'] as bool? ?? false,
       planSteps: (map['plan_steps'] as List? ?? const [])
           .whereType<Map>()
-          .map((row) => Map<String, dynamic>.from(row))
+          .map(Map<String, dynamic>.from)
           .toList(growable: false),
     );
   }

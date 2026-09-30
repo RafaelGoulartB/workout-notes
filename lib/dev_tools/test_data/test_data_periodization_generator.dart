@@ -1,11 +1,11 @@
 import 'dart:math' as math;
 
+import 'package:workout_notes/dev_tools/test_data/test_data_context.dart';
 import 'package:workout_notes/models/periodization_checkin.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
-
-import 'test_data_context.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 class PeriodizationGenerationResult {
   final int plans;
@@ -31,7 +31,7 @@ class TestDataPeriodizationGenerator {
   TestDataPeriodizationGenerator(this.context);
 
   Future<PeriodizationGenerationResult> generate() async {
-    final today = _day(context.now);
+    final today = dayOf(context.now);
     final routineRows = await context.database.query(
       'routines',
       columns: ['id'],
@@ -310,8 +310,14 @@ class TestDataPeriodizationGenerator {
       );
       await context.database.insert('periodization_phases', phase.toMap());
 
+      final phaseRoutines = _routinesFor(phaseSeed, routineIds);
       final targets = <PeriodizationTarget>[
-        _materializeTarget(phase, phaseSeed.target, version: 1),
+        _materializeTarget(
+          phase,
+          phaseSeed.target,
+          version: 1,
+          routineIds: phaseRoutines,
+        ),
       ];
       if (phaseSeed.revisedTarget != null) {
         targets.add(
@@ -322,13 +328,13 @@ class TestDataPeriodizationGenerator {
             validFrom: phase.startDate.add(
               Duration(days: phaseSeed.revisionDay ?? 7),
             ),
+            routineIds: phaseRoutines,
           ),
         );
       }
       for (final target in targets) {
         await context.database.insert('phase_targets', target.toMap());
       }
-      await _linkRoutines(phase, phaseSeed, routineIds, createdAt);
       checkinCount += await _insertCheckins(phase, targets, today);
     }
     return (seed.phases.length, checkinCount);
@@ -339,7 +345,9 @@ class TestDataPeriodizationGenerator {
     PeriodizationTarget seed, {
     required int version,
     DateTime? validFrom,
+    List<String>? routineIds,
   }) => seed.copyWith(
+    routineIds: routineIds,
     id: context.id('periodization_target', '${phase.id}:$version'),
     phaseId: phase.id,
     version: version,
@@ -347,64 +355,19 @@ class TestDataPeriodizationGenerator {
     createdAt: (validFrom ?? phase.startDate).add(const Duration(hours: 8)),
   );
 
-  Future<void> _linkRoutines(
-    PeriodizationPhase phase,
-    _PhaseSeed seed,
-    List<String> routineIds,
-    DateTime createdAt,
-  ) async {
-    if (routineIds.isEmpty) return;
+  /// The routines a phase's weekly targets carry: both for a split phase,
+  /// else the seed's pick.
+  List<String>? _routinesFor(_PhaseSeed seed, List<String> routineIds) {
+    if (routineIds.isEmpty) return null;
     if (seed.splitRoutines && routineIds.length > 1) {
-      final split = phase.startDate.add(
-        Duration(days: math.max(1, phase.totalDays ~/ 2)),
-      );
-      await _insertRoutineLink(
-        phase,
-        routineIds[0],
-        phase.startDate,
-        split.subtract(const Duration(days: 1)),
-        createdAt,
-        'strength',
-      );
-      await _insertRoutineLink(
-        phase,
-        routineIds[1],
-        split,
-        phase.endDate,
-        createdAt,
-        'running',
-      );
-      return;
+      return [routineIds[0], routineIds[1]];
     }
     final routineIndex = (seed.routineIndex ?? 0).clamp(
       0,
       routineIds.length - 1,
     );
-    await _insertRoutineLink(
-      phase,
-      routineIds[routineIndex],
-      phase.startDate,
-      phase.endDate,
-      createdAt,
-      '$routineIndex',
-    );
+    return [routineIds[routineIndex]];
   }
-
-  Future<void> _insertRoutineLink(
-    PeriodizationPhase phase,
-    String routineId,
-    DateTime startsOn,
-    DateTime endsOn,
-    DateTime createdAt,
-    String suffix,
-  ) => context.database.insert('phase_routine_links', {
-    'id': context.id('periodization_routine', '${phase.id}:$suffix'),
-    'phase_id': phase.id,
-    'routine_id': routineId,
-    'starts_on': context.date(startsOn),
-    'ends_on': context.date(endsOn),
-    'created_at': createdAt.toIso8601String(),
-  });
 
   Future<int> _insertCheckins(
     PeriodizationPhase phase,
@@ -434,7 +397,7 @@ class TestDataPeriodizationGenerator {
       final checkin = PeriodizationCheckin(
         id: context.id(
           'periodization_checkin',
-          '${phase.id}:${context.date(weekStart)}',
+          '${phase.id}:${dateKey(weekStart)}',
         ),
         phaseId: phase.id,
         weekStart: weekStart,
@@ -449,8 +412,8 @@ class TestDataPeriodizationGenerator {
             ? 'Fome aumentou no fim da semana; ajuste pequeno para sustentar o treino.'
             : _checkinNote(phase.templateKey, count),
         metricsSnapshot: {
-          'start_date': context.date(weekStart),
-          'end_date': context.date(weekStart.add(const Duration(days: 6))),
+          'start_date': dateKey(weekStart),
+          'end_date': dateKey(weekStart.add(const Duration(days: 6))),
           'elapsed_days': 7,
           'workout_count': workouts,
           'completed_sets': sets,
@@ -501,11 +464,8 @@ class TestDataPeriodizationGenerator {
     _ => 'Semana consistente e metas mantidas.',
   };
 
-  static DateTime _day(DateTime value) =>
-      DateTime(value.year, value.month, value.day);
-
   static DateTime _mondayOnOrAfter(DateTime value) {
-    final day = _day(value);
+    final day = dayOf(value);
     final daysUntilMonday = (DateTime.monday - day.weekday) % 7;
     return day.add(Duration(days: daysUntilMonday));
   }

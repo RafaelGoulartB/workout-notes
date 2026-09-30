@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_format.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// The latest personal records: exercise, new estimated 1RM or load, the
 /// improvement over the previous best and the date.
@@ -24,11 +24,11 @@ class StrengthRecentRecords extends StatelessWidget {
     final colors = theme.colorScheme;
 
     if (records.isEmpty) {
-      return RunSectionCard(
+      return AppSectionCard(
         onTap: onOpen,
         child: Row(
           children: [
-            RunIconBadge(Icons.emoji_events_outlined, color: colors.tertiary),
+            AppIconBadge(Icons.emoji_events_outlined, color: colors.tertiary),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -66,13 +66,13 @@ class StrengthRecentRecords extends StatelessWidget {
         ? loc.strengthHomeRecordE1rm
         : loc.strengthHomeRecordWeight;
 
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: RunDividedList(
+      child: AppDividedList(
         children: [
           for (final event in rows.take(4))
-            RunListRow(
-              leading: RunIconBadge(
+            AppListRow(
+              leading: AppIconBadge(
                 Icons.emoji_events_outlined,
                 color: colors.tertiary,
                 size: 40,

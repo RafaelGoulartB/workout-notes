@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
+import 'package:workout_notes/services/run_native_voice_service.dart';
 import 'package:workout_notes/services/run_voice_settings_store.dart';
-import 'package:workout_notes/services/run_voice_coach.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class RunVoiceSettingsScreen extends StatefulWidget {
   const RunVoiceSettingsScreen({super.key});
@@ -77,9 +79,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
       ).showSnackBar(SnackBar(content: Text(loc.runVoiceTestDisabled)));
       return;
     }
-    final coach = RunVoiceCoach();
-    coach.settingsOverride = _settings;
-    final ok = await coach.speakTestAnnouncement();
+    final ok = await RunNativeVoiceService.instance.speakTest(_settings);
     if (!mounted) return;
     if (!ok) {
       ScaffoldMessenger.of(
@@ -165,7 +165,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                             for (var s = 0; s < 60; s += 5)
                               DropdownMenuItem(
                                 value: s,
-                                child: Text(s.toString().padLeft(2, '0')),
+                                child: Text(DurationFormat.twoDigits(s)),
                               ),
                           ],
                           onChanged: (v) {
@@ -397,7 +397,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                SettingsSectionHeader(text: loc.runVoiceSectionGeneral),
+                AppSectionHeader(loc.runVoiceSectionGeneral, padding: AppSectionHeader.compactPadding),
                 SettingsCard(
                   children: [
                     SettingsSwitchTile(
@@ -439,7 +439,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                     ),
                   ],
                 ),
-                SettingsSectionHeader(text: loc.runVoiceSectionRunning),
+                AppSectionHeader(loc.runVoiceSectionRunning, padding: AppSectionHeader.compactPadding),
                 SettingsCard(
                   children: [
                     SettingsSwitchTile(
@@ -459,7 +459,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                     ),
                   ],
                 ),
-                SettingsSectionHeader(text: loc.runVoiceSectionAnnouncements),
+                AppSectionHeader(loc.runVoiceSectionAnnouncements, padding: AppSectionHeader.compactPadding),
                 SettingsCard(
                   children: [
                     SettingsSwitchTile(
@@ -557,7 +557,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                     ),
                   ],
                 ),
-                SettingsSectionHeader(text: loc.runVoiceSectionIntervals),
+                AppSectionHeader(loc.runVoiceSectionIntervals, padding: AppSectionHeader.compactPadding),
                 SettingsCard(
                   children: [
                     SettingsSwitchTile(

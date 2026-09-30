@@ -1,18 +1,15 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
-import '../models/sleep_entry.dart';
-import '../models/sleep_monitor_segment.dart';
-import '../models/sleep_monitor_diagnostics.dart';
-import '../models/sleep_monitor_session.dart';
-import '../models/sleep_night_summary.dart';
-import '../models/sleep_stage_epoch.dart';
-import '../models/sleep_stage_type.dart';
-import 'base_repository.dart';
-import '../services/sleep_inference_service.dart';
-import '../services/sleep_stage_analysis_service.dart';
-import '../services/sleep_stage_engine.dart';
+import 'package:workout_notes/models/sleep_entry.dart';
+import 'package:workout_notes/models/sleep_monitor_segment.dart';
+import 'package:workout_notes/models/sleep_monitor_session.dart';
+import 'package:workout_notes/models/sleep_night_summary.dart';
+import 'package:workout_notes/models/sleep_stage_summary.dart';
+import 'package:workout_notes/repositories/base_repository.dart';
+import 'package:workout_notes/services/sleep_stage_analysis_service.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// SQLite persistence and native-spool import for sleep monitoring.
 class SleepMonitorRepository extends BaseRepository {
@@ -21,20 +18,8 @@ class SleepMonitorRepository extends BaseRepository {
   final SleepEntryRepositoryAdapter _sleepEntries =
       SleepEntryRepositoryAdapter();
 
-  Future<List<SleepMonitorSession>> getSessions({int? limit}) async {
-    final rows = await (await db).query(
-      'sleep_monitor_sessions',
-      orderBy: 'started_at DESC',
-      limit: limit,
-    );
-    return rows.map(SleepMonitorSession.fromMap).toList();
-  }
-
   Future<List<SleepMonitorSession>> getUnestimatedSessions() async {
     final database = await db;
-    if (!await _tableExists(database, 'sleep_monitor_sessions')) {
-      return const [];
-    }
     final rows = await database.query(
       'sleep_monitor_sessions',
       where:
@@ -50,23 +35,6 @@ class SleepMonitorRepository extends BaseRepository {
       limit: 5,
     );
     return rows.map(SleepMonitorSession.fromMap).toList();
-  }
-
-  /// Counts alarms completed through the emergency mission.
-  ///
-  /// Legacy methods remain included so changing the challenge to 500 taps
-  /// does not hide completions already stored on the device.
-  Future<int> getEmergencyDismissalCount() async {
-    final rows = await (await db).rawQuery(
-      'SELECT COUNT(*) AS count FROM sleep_monitor_sessions '
-      'WHERE alarm_dismiss_method IN (?, ?, ?)',
-      [
-        SleepMonitorSession.dismissEmergency500Taps,
-        SleepMonitorSession.dismissEmergency1000Taps,
-        SleepMonitorSession.dismissEmergency100Taps,
-      ],
-    );
-    return Sqflite.firstIntValue(rows) ?? 0;
   }
 
   Future<SleepMonitorSession?> getSession(String id) async {
@@ -88,39 +56,6 @@ class SleepMonitorRepository extends BaseRepository {
       limit: 1,
     );
     return rows.isEmpty ? null : SleepMonitorSession.fromMap(rows.first);
-  }
-
-  Future<List<SleepMonitorSegment>> getSegments(String sessionId) async {
-    final rows = await (await db).query(
-      'sleep_monitor_segments',
-      where: 'session_id = ?',
-      whereArgs: [sessionId],
-      orderBy: 'started_at ASC',
-    );
-    return rows.map(SleepMonitorSegment.fromMap).toList();
-  }
-
-  Future<List<SleepStageEpoch>> getStageEpochs(String sessionId) async {
-    final database = await db;
-    if (!await _tableExists(database, 'sleep_stage_epochs')) return const [];
-    final rows = await database.query(
-      'sleep_stage_epochs',
-      where: 'session_id = ?',
-      whereArgs: [sessionId],
-      orderBy: 'started_at ASC',
-    );
-    return rows.map(SleepStageEpoch.fromMap).toList(growable: false);
-  }
-
-  Future<SleepNightSummary?> getNightSummary(String entryId) async {
-    final database = await db;
-    final entry = await _sleepEntries.getById(database, entryId);
-    if (entry == null) return null;
-    final session = await getSessionForSleepEntry(entryId);
-    final stages = session == null
-        ? const <SleepStageEpoch>[]
-        : await getStageEpochs(session.id);
-    return SleepNightSummary(entry: entry, session: session, stages: stages);
   }
 
   Future<List<SleepNightSummary>> getNightSummaries({
@@ -152,60 +87,22 @@ class SleepMonitorRepository extends BaseRepository {
       if (entryId != null) sessionsByEntry.putIfAbsent(entryId, () => session);
     }
 
-    final stagesBySession = <String, List<SleepStageEpoch>>{};
-    if (sessionsByEntry.isNotEmpty &&
-        await _tableExists(database, 'sleep_stage_epochs')) {
-      final sessionIds = sessionsByEntry.values
-          .map((session) => session.id)
-          .toList(growable: false);
-      final stagePlaceholders = List.filled(sessionIds.length, '?').join(',');
-      final stageRows = await database.query(
-        'sleep_stage_epochs',
-        where: 'session_id IN ($stagePlaceholders)',
-        whereArgs: sessionIds,
-        orderBy: 'started_at ASC',
-      );
-      for (final row in stageRows) {
-        final stage = SleepStageEpoch.fromMap(row);
-        stagesBySession.putIfAbsent(stage.sessionId, () => []).add(stage);
-      }
-    }
-
     return entries
         .map((entry) {
-          final session = sessionsByEntry[entry.id];
           return SleepNightSummary(
             entry: entry,
-            session: session,
-            stages: session == null
-                ? const []
-                : List.unmodifiable(stagesBySession[session.id] ?? const []),
+            session: sessionsByEntry[entry.id],
           );
         })
         .toList(growable: false);
   }
 
   Future<void> deleteSession(String sessionId) async {
-    final database = await db;
-    await database.transaction((txn) async {
-      if (await _tableExists(txn, 'sleep_stage_epochs')) {
-        await txn.delete(
-          'sleep_stage_epochs',
-          where: 'session_id = ?',
-          whereArgs: [sessionId],
-        );
-      }
-      await txn.delete(
-        'sleep_monitor_segments',
-        where: 'session_id = ?',
-        whereArgs: [sessionId],
-      );
-      await txn.delete(
-        'sleep_monitor_sessions',
-        where: 'id = ?',
-        whereArgs: [sessionId],
-      );
-    });
+    await (await db).delete(
+      'sleep_monitor_sessions',
+      where: 'id = ?',
+      whereArgs: [sessionId],
+    );
   }
 
   Future<void> markAlarmDismissed(
@@ -239,98 +136,50 @@ class SleepMonitorRepository extends BaseRepository {
           (row) => SleepMonitorSegment.fromMap(Map<String, dynamic>.from(row)),
         )
         .toList();
-    final rawStages = (spool['stage_epochs'] as List? ?? const [])
-        .whereType<Map>()
-        .map((row) => SleepStageEpoch.fromMap(Map<String, dynamic>.from(row)))
-        .toList();
     final recovered = SleepMonitorSession.fromNative(rawSession, rawSegments);
     final bedside = SleepWakeEngine.supports(recovered);
-    final diagnostics = SleepMonitorDiagnostics.fromSession(
-      recovered,
-      rawSegments,
-    );
-    final inference = bedside
-        ? null
-        : const SleepInferenceService().analyze(
-            session: recovered,
-            segments: rawSegments,
-            diagnostics: diagnostics,
-          );
     final sessionEnd = recovered.endedAt ?? recovered.startedAt;
-    // Native stages win when a validated model produced them. Otherwise, for
-    // feature-carrying nights (audio-features-v2), the heuristic engine labels
-    // the windows and the same summarizer consumes them unchanged.
-    var stageEpochs = rawStages;
-    var stageSummary = const SleepStageAnalysisService().summarize(
-      sessionStart: recovered.startedAt,
-      sessionEnd: sessionEnd,
-      epochs: stageEpochs,
-    );
-    if (stageSummary == null &&
-        rawSegments.isNotEmpty &&
-        (bedside || diagnostics.isSuitableForInference) &&
-        rawSegments.any((segment) => segment.hasSpectralFeatures)) {
-      final engineResult = const SleepStageEngine().run(
+    // Only bedside feature nights (audio-features-v3/v4) are staged; older
+    // recordings keep the legacy status and no inference.
+    SleepStageSummary? stageSummary;
+    if (bedside && rawSegments.any((segment) => segment.hasSpectralFeatures)) {
+      final engineResult = const SleepWakeEngine().run(
         session: recovered,
         segments: rawSegments,
-        onset: inference?.sleepOnsetAt,
       );
-      if (engineResult.ran &&
-          (bedside ||
-              engineResult.epochs.any(
-                (epoch) => epoch.stage != SleepStageType.unknown,
-              ))) {
-        stageEpochs = engineResult.epochs;
+      if (engineResult.ran) {
         stageSummary = const SleepStageAnalysisService().summarize(
           sessionStart: recovered.startedAt,
           sessionEnd: sessionEnd,
-          epochs: stageEpochs,
+          epochs: engineResult.epochs,
         );
       }
     }
-    final inferredSleepMinutes = inference?.estimatedSleepSeconds == null
-        ? null
-        : (inference!.estimatedSleepSeconds! / 60).round();
     final sufficientlyClassified =
         stageSummary != null &&
         stageSummary.unknownMinutes <= (recovered.timeInBedMinutes ?? 0) * 0.2;
     final estimatedSleepMinutes = bedside
         ? (sufficientlyClassified ? stageSummary.estimatedSleepMinutes : null)
-        : stageSummary?.estimatedSleepMinutes ??
-              recovered.estimatedSleepMinutes ??
-              inferredSleepMinutes;
+        : recovered.estimatedSleepMinutes;
     final importedSession = recovered.copyWith(
       estimatedSleepMinutes: estimatedSleepMinutes,
       analysisStatus: stageSummary != null
           ? SleepMonitorSession.analysisAvailable
-          : bedside || rawSegments.any((segment) => segment.hasSpectralFeatures)
+          : bedside
           ? SleepMonitorSession.analysisInsufficient
-          : recovered.algorithmVersion == 'audio-noise-v1'
-          ? SleepMonitorSession.analysisLegacyUnavailable
-          : SleepMonitorSession.analysisModelUnavailable,
-      sleepOnsetAt: bedside
-          ? stageSummary?.sleepOnsetAt
-          : stageSummary?.sleepOnsetAt ?? inference?.sleepOnsetAt,
+          : SleepMonitorSession.analysisLegacyUnavailable,
+      sleepOnsetAt: stageSummary?.sleepOnsetAt,
       finalWakeAt: stageSummary?.finalWakeAt,
-      sleepLatencyMinutes: bedside
-          ? (stageSummary?.sleepOnsetAt == null
-                ? null
-                : stageSummary?.sleepLatencyMinutes)
-          : stageSummary?.sleepLatencyMinutes ??
-                (inference?.sleepOnsetAt
-                    ?.difference(recovered.startedAt)
-                    .inMinutes
-                    .clamp(0, 16 * 60)),
+      sleepLatencyMinutes: stageSummary?.sleepOnsetAt == null
+          ? null
+          : stageSummary?.sleepLatencyMinutes,
       awakeMinutes: stageSummary?.awakeMinutes,
       sleepingMinutes: stageSummary?.sleepingMinutes,
-      deepSleepMinutes: bedside ? null : stageSummary?.deepSleepMinutes,
       unknownMinutes: stageSummary?.unknownMinutes,
-      awakeningCount:
-          stageSummary?.awakeningCount ?? inference?.awakenings.length,
-      sleepEfficiency: bedside && !sufficientlyClassified
-          ? null
-          : stageSummary?.sleepEfficiency,
-      stageConfidence: bedside ? null : stageSummary?.stageConfidence,
+      awakeningCount: stageSummary?.awakeningCount,
+      sleepEfficiency: sufficientlyClassified
+          ? stageSummary.sleepEfficiency
+          : null,
       stageAlgorithmVersion: stageSummary?.algorithmVersion,
     );
     final database = await db;
@@ -357,11 +206,7 @@ class SleepMonitorRepository extends BaseRepository {
         Duration(minutes: importedSession.utcOffsetStartMinutes),
       );
       final wallClockEnd = end.toUtc().add(Duration(minutes: endOffsetMinutes));
-      final localDate = DateTime(
-        wallClockEnd.year,
-        wallClockEnd.month,
-        wallClockEnd.day,
-      );
+      final localDate = dayOf(wallClockEnd);
       final duration = end.difference(importedSession.startedAt);
       final canCreateSleepEntry =
           const {
@@ -434,14 +279,9 @@ class SleepMonitorRepository extends BaseRepository {
       final session = entry == null
           ? importedSession
           : importedSession.copyWith(sleepEntryId: entry.id);
-      final sessionColumns = (await txn.rawQuery(
-        'PRAGMA table_info(sleep_monitor_sessions)',
-      )).map((row) => row['name'] as String).toSet();
-      final sessionMap = session.toMap()
-        ..removeWhere((key, _) => !sessionColumns.contains(key));
       await txn.insert(
         'sleep_monitor_sessions',
-        sessionMap,
+        session.toMap(),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
       // Segments and stage epochs are transient calculation material. They
@@ -487,138 +327,8 @@ class SleepMonitorRepository extends BaseRepository {
     }, expectedStageVersion: current.stageAlgorithmVersion);
   }
 
-  /// Backfills dashboard fields for entries imported by older app versions.
-  ///
-  /// Older imports linked a monitor session but left bedtime and wake-up time
-  /// empty. When multiple sessions point to one date, the longest completed
-  /// session is used so a short test run cannot replace the overnight window.
-  Future<void> repairSleepEntriesFromSessions() async {
-    final database = await db;
-    await database.transaction((txn) async {
-      final sessionRows = await txn.query(
-        'sleep_monitor_sessions',
-        where: 'sleep_entry_id IS NOT NULL AND ended_at IS NOT NULL',
-      );
-      final byEntry = <String, List<SleepMonitorSession>>{};
-      for (final row in sessionRows) {
-        final session = SleepMonitorSession.fromMap(row);
-        if (!const {
-          SleepMonitorSession.completed,
-          SleepMonitorSession.interrupted,
-        }.contains(session.status)) {
-          continue;
-        }
-        final entryId = session.sleepEntryId;
-        if (entryId == null) continue;
-        byEntry.putIfAbsent(entryId, () => []).add(session);
-      }
-
-      for (final item in byEntry.entries) {
-        final rows = await txn.query(
-          'sleep_entries',
-          where: 'id = ?',
-          whereArgs: [item.key],
-          limit: 1,
-        );
-        if (rows.isEmpty) continue;
-        final entry = SleepEntry.fromMap(rows.first);
-        final candidates = item.value
-          ..sort((a, b) => _sessionDuration(b).compareTo(_sessionDuration(a)));
-        final best = candidates.first;
-        final end = best.endedAt ?? best.startedAt;
-        final startWallClock = best.startedAt.toUtc().add(
-          Duration(minutes: best.utcOffsetStartMinutes),
-        );
-        final endWallClock = end.toUtc().add(
-          Duration(
-            minutes: best.utcOffsetEndMinutes ?? best.utcOffsetStartMinutes,
-          ),
-        );
-        final duration = best.timeInBedMinutes ?? _sessionDuration(best);
-        final updates = <String, dynamic>{
-          'bedtime_minutes': startWallClock.hour * 60 + startWallClock.minute,
-          'wake_time_minutes': endWallClock.hour * 60 + endWallClock.minute,
-        };
-        if ((entry.timeInBedMinutes ?? 0) < duration) {
-          updates['time_in_bed_minutes'] = duration;
-        }
-        final segmentRows = await txn.query(
-          'sleep_monitor_segments',
-          where: 'session_id = ?',
-          whereArgs: [best.id],
-          orderBy: 'started_at ASC',
-        );
-        final segments = segmentRows
-            .map(SleepMonitorSegment.fromMap)
-            .toList(growable: false);
-        final diagnostics = SleepMonitorDiagnostics.fromSession(best, segments);
-        final inference = const SleepInferenceService().analyze(
-          session: best,
-          segments: segments,
-          diagnostics: diagnostics,
-        );
-        final inferredMinutes = inference.estimatedSleepSeconds == null
-            ? best.estimatedSleepMinutes
-            : (inference.estimatedSleepSeconds! / 60).round();
-        if (inferredMinutes != null) {
-          updates['estimated_sleep_minutes'] = inferredMinutes;
-          if (entry.source == 'monitored') {
-            updates['sleep_minutes'] = inferredMinutes;
-          }
-        }
-        await txn.update(
-          'sleep_entries',
-          updates,
-          where: 'id = ?',
-          whereArgs: [entry.id],
-        );
-
-        final sessionUpdates = <String, dynamic>{
-          'estimated_sleep_minutes': ?inferredMinutes,
-          if (inference.sleepOnsetAt != null)
-            'sleep_onset_at': inference.sleepOnsetAt!.toIso8601String(),
-          if (inference.sleepOnsetAt != null)
-            'sleep_latency_minutes': inference.sleepOnsetAt!
-                .difference(best.startedAt)
-                .inMinutes
-                .clamp(0, 16 * 60),
-          'awakening_count': inference.awakenings.length,
-          'analysis_status': SleepMonitorSession.analysisLegacyUnavailable,
-        };
-        final sessionColumns = (await txn.rawQuery(
-          'PRAGMA table_info(sleep_monitor_sessions)',
-        )).map((row) => row['name'] as String).toSet();
-        sessionUpdates.removeWhere((key, _) => !sessionColumns.contains(key));
-        if (sessionUpdates.isNotEmpty) {
-          await txn.update(
-            'sleep_monitor_sessions',
-            sessionUpdates,
-            where: 'id = ?',
-            whereArgs: [best.id],
-          );
-        }
-      }
-    });
-  }
-
-  static int _sessionDuration(SleepMonitorSession session) {
-    final end = session.endedAt ?? session.startedAt;
-    return end.difference(session.startedAt).inMinutes;
-  }
-
   Future<SleepEntry?> getSleepEntry(String id) async =>
       _sleepEntries.getById(await db, id);
-
-  static Future<bool> _tableExists(
-    DatabaseExecutor database,
-    String table,
-  ) async {
-    final rows = await database.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
-      [table],
-    );
-    return rows.isNotEmpty;
-  }
 }
 
 /// Small transaction-aware adapter that keeps sleep merging inside the same
@@ -628,7 +338,7 @@ class SleepEntryRepositoryAdapter {
     DatabaseExecutor database,
     DateTime date,
   ) async {
-    final value = date.toIso8601String().substring(0, 10);
+    final value = dateKey(date);
     final rows = await database.query(
       'sleep_entries',
       where: 'date = ?',

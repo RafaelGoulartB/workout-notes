@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 
 /// One line of identity (goal, length), the race date with its countdown and
@@ -26,7 +26,7 @@ class RunPlanIdentity extends StatelessWidget {
         race.year,
         race.month,
         race.day,
-      ).difference(DateTime(today.year, today.month, today.day)).inDays;
+      ).difference(dayOf(today)).inDays;
       countdown = days < 0 ? null : days;
     }
     return Padding(

@@ -10,22 +10,24 @@ import 'package:workout_notes/database/database_schema.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_data_field.dart';
+import 'package:workout_notes/models/run_interval_snapshot.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_session_goal.dart';
+import 'package:workout_notes/models/run_step_snapshot.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
-import 'package:workout_notes/services/run_tracking_service.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
-import 'package:workout_notes/services/run_interval_engine.dart';
-import 'package:workout_notes/services/run_workout_step_engine.dart';
-import 'package:workout_notes/services/stationary_bike_tracking_service.dart';
+import 'package:workout_notes/services/indoor_tracking_service.dart';
+import 'package:workout_notes/services/run_tracking_service.dart';
 import 'package:workout_notes/widgets/run/record/run_data_fields_grid.dart';
 import 'package:workout_notes/widgets/run/record/run_goal_sheet.dart';
 import 'package:workout_notes/widgets/run/record/run_record_countdown.dart';
 import 'package:workout_notes/widgets/run/record/run_record_sheet.dart';
 import 'package:workout_notes/widgets/run/record/run_record_step_card.dart';
+
+import 'support/run_plan_fixtures.dart';
 
 RunTrackingState _recording({bool autoPaused = false}) => RunTrackingState(
   supported: true,
@@ -600,11 +602,11 @@ void main() {
       try {
         await service.startDebugSimulation();
         await tester.pumpWidget(
-          MaterialApp(
-            locale: const Locale('pt'),
+          const MaterialApp(
+            locale: Locale('pt'),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
-            home: const RunRecordScreen(),
+            home: RunRecordScreen(),
           ),
         );
         await tester.pump(const Duration(seconds: 4));
@@ -643,7 +645,7 @@ void main() {
     });
 
     tearDown(() async {
-      await StationaryBikeTrackingService.instance.discard();
+      await IndoorTrackingService.instance.discard();
       DatabaseHelper.overrideDatabase = null;
       await database.close();
     });
@@ -741,7 +743,7 @@ void main() {
         ),
       );
       await tester.runAsync(
-        () => repo.scheduleRun(
+        () => scheduleRunFixture(repo, 
           date: DateTime.now(),
           runPlanId: plan!.id,
           runPlanWorkoutId: workout!.id,

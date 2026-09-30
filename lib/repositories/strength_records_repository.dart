@@ -1,4 +1,5 @@
 import 'package:workout_notes/repositories/base_repository.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Estimated one-rep max (Epley). Sets above [maxReps] reps are too far from
 /// a single to predict it reliably and return null.
@@ -171,7 +172,6 @@ class StrengthRecordsRepository extends BaseRepository {
     bool includeUnweighted = false,
   }) async {
     final database = await db;
-    String day(DateTime d) => d.toIso8601String().substring(0, 10);
     final rows = await database.rawQuery(
       '''
       SELECT w.id AS workout_id, w.date AS date, w.start_time AS start_time,
@@ -193,7 +193,7 @@ class StrengthRecordsRepository extends BaseRepository {
         ${exerciseId == null ? '' : 'AND e.id = ?'}
       ORDER BY w.date ASC, w.start_time ASC, ee.order_index ASC, s.order_index ASC
       ''',
-      [if (from != null) day(from), if (to != null) day(to), ?exerciseId],
+      [if (from != null) dateKey(from), if (to != null) dateKey(to), ?exerciseId],
     );
     return [
       for (final r in rows)
@@ -218,7 +218,6 @@ class StrengthRecordsRepository extends BaseRepository {
     DateTime? to,
   }) async {
     final database = await db;
-    String day(DateTime d) => d.toIso8601String().substring(0, 10);
     final rows = await database.rawQuery(
       '''
       SELECT w.id AS id, w.date AS date, w.start_time AS start_time,
@@ -238,7 +237,7 @@ class StrengthRecordsRepository extends BaseRepository {
             AND IFNULL(c.energy_system, 'anaerobic') = 'anaerobic')
       ORDER BY w.date ASC, w.start_time ASC
       ''',
-      [if (from != null) day(from), if (to != null) day(to)],
+      [if (from != null) dateKey(from), if (to != null) dateKey(to)],
     );
     return [
       for (final r in rows)

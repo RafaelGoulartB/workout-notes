@@ -1,22 +1,25 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
-
-import 'database_nutrition_schema.dart';
-import 'database_periodization_schema.dart';
-import 'database_medication_schema.dart';
-import 'database_run_extras_schema.dart';
-import 'database_run_plan_schema.dart';
-import 'database_run_route_schema.dart';
-import 'database_seed.dart';
-import 'migrations/database_migrations_catalog_v11.dart';
-import 'migrations/database_migrations_catalog_v12.dart';
-import 'migrations/database_migrations_features.dart';
-import 'migrations/database_migrations_legacy.dart';
-import 'migrations/database_migrations_wellness.dart';
-import 'migrations/database_migrations_periodization.dart';
+import 'package:workout_notes/database/database_medication_schema.dart';
+import 'package:workout_notes/database/database_nutrition_schema.dart';
+import 'package:workout_notes/database/database_periodization_schema.dart';
+import 'package:workout_notes/database/database_run_extras_schema.dart';
+import 'package:workout_notes/database/database_run_plan_schema.dart';
+import 'package:workout_notes/database/database_run_route_schema.dart';
+import 'package:workout_notes/database/database_seed.dart';
+import 'package:workout_notes/database/migrations/database_migrations.dart';
 
 /// Owns database creation and coordinates incremental schema upgrades.
 abstract final class DatabaseSchema {
   static Future<void> onCreate(Database db, int version) async {
+    await createSchema(db);
+    await DatabaseSeed.seedMealTypes(db);
+    await DatabaseSeed.seedInitialData(db);
+  }
+
+  /// Creates every table and index of the current schema without seeding
+  /// catalog rows. Tests use it to get the real schema on an empty database.
+  static Future<void> createSchema(Database db) async {
     // Exercise categories
     await db.execute('''
       CREATE TABLE exercise_categories (
@@ -225,49 +228,6 @@ abstract final class DatabaseSchema {
         FOREIGN KEY (sleep_entry_id) REFERENCES sleep_entries(id) ON DELETE CASCADE
       )
     ''');
-    await db.execute('''
-      CREATE TABLE sleep_monitor_segments (
-        id TEXT PRIMARY KEY,
-        session_id TEXT NOT NULL,
-        started_at TEXT NOT NULL,
-        duration_seconds INTEGER NOT NULL,
-        audio_rms_dbfs REAL,
-        audio_peak_dbfs REAL,
-        noise_score REAL,
-        classification TEXT NOT NULL,
-        valid_fraction REAL NOT NULL,
-        noise_burst_count INTEGER NOT NULL DEFAULT 0,
-        spectral_band_energy_0 REAL,
-        spectral_band_energy_1 REAL,
-        spectral_band_energy_2 REAL,
-        spectral_band_energy_3 REAL,
-        spectral_band_energy_4 REAL,
-        spectral_flatness REAL,
-        spectral_centroid_hz REAL,
-        breathing_regularity REAL,
-        breathing_rate_hz REAL,
-        motion_active_seconds REAL,
-        motion_mean_deviation_g REAL,
-        motion_max_deviation_g REAL,
-        FOREIGN KEY (session_id) REFERENCES sleep_monitor_sessions(id) ON DELETE CASCADE
-      )
-    ''');
-    await db.execute('''
-      CREATE TABLE sleep_stage_epochs (
-        id TEXT PRIMARY KEY,
-        session_id TEXT NOT NULL,
-        started_at TEXT NOT NULL,
-        duration_seconds INTEGER NOT NULL,
-        stage TEXT NOT NULL,
-        confidence REAL NOT NULL,
-        awake_probability REAL,
-        sleeping_probability REAL,
-        deep_probability REAL,
-        algorithm_version TEXT NOT NULL,
-        source TEXT NOT NULL DEFAULT 'acoustic_model',
-        FOREIGN KEY (session_id) REFERENCES sleep_monitor_sessions(id) ON DELETE CASCADE
-      )
-    ''');
 
     // Standalone wake-up alarms.
     await db.execute('''
@@ -413,20 +373,6 @@ abstract final class DatabaseSchema {
         gear_id TEXT
       )
     ''');
-    await db.execute('''
-      CREATE TABLE run_track_points (
-        id TEXT PRIMARY KEY,
-        activity_id TEXT NOT NULL,
-        seq INTEGER NOT NULL,
-        lat REAL NOT NULL,
-        lng REAL NOT NULL,
-        altitude REAL,
-        accuracy REAL,
-        speed REAL,
-        recorded_at TEXT NOT NULL,
-        FOREIGN KEY (activity_id) REFERENCES run_activities(id) ON DELETE CASCADE
-      )
-    ''');
     await DatabaseRunRouteSchema.create(db);
     await DatabaseRunExtrasSchema.create(db);
     await DatabaseMedicationSchema.create(db);
@@ -439,14 +385,12 @@ abstract final class DatabaseSchema {
     await DatabaseRunPlanSchema.create(db);
 
     // Indexes
-    await db.execute('CREATE INDEX idx_workouts_date ON workouts(date)');
     await db.execute(
       'CREATE INDEX idx_workouts_date_end ON workouts(date, end_time)',
     );
     await db.execute(
       'CREATE INDEX idx_exercise_entries_workout ON exercise_entries(workout_id)',
     );
-    await db.execute('CREATE INDEX idx_sets_entry ON sets(exercise_entry_id)');
     await db.execute(
       'CREATE INDEX idx_sets_entry_state ON sets(exercise_entry_id, is_complete, is_warmup)',
     );
@@ -454,25 +398,13 @@ abstract final class DatabaseSchema {
       'CREATE INDEX idx_measurements_date ON body_measurements(date)',
     );
     await db.execute(
-      'CREATE INDEX idx_measurements_type ON body_measurements(type)',
-    );
-    await db.execute(
       'CREATE INDEX idx_measurements_type_date ON body_measurements(type, date DESC, created_at DESC)',
-    );
-    await db.execute(
-      'CREATE INDEX idx_sleep_entries_date ON sleep_entries(date DESC)',
     );
     await db.execute(
       'CREATE INDEX idx_sleep_monitor_sessions_status_started ON sleep_monitor_sessions(status, started_at DESC)',
     );
     await db.execute(
       'CREATE INDEX idx_sleep_monitor_sessions_entry ON sleep_monitor_sessions(sleep_entry_id)',
-    );
-    await db.execute(
-      'CREATE INDEX idx_sleep_monitor_segments_session_started ON sleep_monitor_segments(session_id, started_at ASC)',
-    );
-    await db.execute(
-      'CREATE UNIQUE INDEX idx_sleep_stage_epochs_session_started ON sleep_stage_epochs(session_id, started_at ASC)',
     );
     await db.execute(
       'CREATE INDEX idx_ai_chat_messages_thread ON ai_chat_messages(thread_id, created_at ASC)',
@@ -495,13 +427,10 @@ abstract final class DatabaseSchema {
     await db.execute(
       'CREATE INDEX idx_run_activities_type_started ON run_activities(activity_type, started_at DESC)',
     );
-    await db.execute(
-      'CREATE INDEX idx_run_track_points_activity_seq ON run_track_points(activity_id, seq ASC)',
-    );
-
-    // Seed data
-    await DatabaseSeed.seedMealTypes(db);
-    await DatabaseSeed.seedInitialData(db);
+    // Foreign-key lookups added in v56 (shared with the upgrade).
+    for (final statement in DatabaseMigrations.v56Indexes) {
+      await db.execute(statement);
+    }
   }
 
   static Future<void> onUpgrade(
@@ -509,12 +438,48 @@ abstract final class DatabaseSchema {
     int oldVersion,
     int newVersion,
   ) async {
-    await DatabaseLegacyMigrations.upgrade(db, oldVersion);
-    // Versions 12 and 11 intentionally retain their historical order.
-    await DatabaseCatalogV12Migrations.upgrade(db, oldVersion);
-    await DatabaseCatalogV11Migrations.upgrade(db, oldVersion);
-    await DatabaseFeatureMigrations.upgrade(db, oldVersion);
-    await DatabaseWellnessMigrations.upgrade(db, oldVersion);
-    await DatabasePeriodizationMigrations.upgrade(db, oldVersion);
+    if (oldVersion < DatabaseMigrations.floorVersion) {
+      // No installs exist below the migration floor, so rebuilding is safe and
+      // keeps the migration history short.
+      debugPrint(
+        'Database v$oldVersion is below the migration floor '
+        '(v${DatabaseMigrations.floorVersion}); recreating the schema.',
+      );
+      await _dropEverything(db);
+      await onCreate(db, newVersion);
+      return;
+    }
+    await DatabaseMigrations.upgrade(db, oldVersion, newVersion);
+  }
+
+  /// Drops every table, children before the tables they reference, so the
+  /// implicit `DELETE` of `DROP TABLE` never trips a foreign key check.
+  static Future<void> _dropEverything(Database db) async {
+    final rows = await db.rawQuery(
+      "SELECT name FROM sqlite_master "
+      "WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+    );
+    final remaining = {for (final row in rows) row['name'] as String};
+    final references = <String, Set<String>>{};
+    for (final table in remaining) {
+      final keys = await db.rawQuery('PRAGMA foreign_key_list("$table")');
+      references[table] = {for (final key in keys) key['table'] as String}
+        ..remove(table);
+    }
+    while (remaining.isNotEmpty) {
+      final droppable = remaining
+          .where(
+            (table) =>
+                !remaining.any((other) => references[other]!.contains(table)),
+          )
+          .toList();
+      // A reference cycle cannot occur in this schema; drop the rest anyway
+      // rather than loop forever.
+      final batch = droppable.isEmpty ? remaining.toList() : droppable;
+      for (final table in batch) {
+        await db.execute('DROP TABLE IF EXISTS "$table"');
+        remaining.remove(table);
+      }
+    }
   }
 }

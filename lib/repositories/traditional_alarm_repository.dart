@@ -1,7 +1,7 @@
 import 'package:uuid/uuid.dart';
 
-import '../models/traditional_alarm.dart';
-import 'base_repository.dart';
+import 'package:workout_notes/models/traditional_alarm.dart';
+import 'package:workout_notes/repositories/base_repository.dart';
 
 class TraditionalAlarmRepository extends BaseRepository {
   static const _uuid = Uuid();

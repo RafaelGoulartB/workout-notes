@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/sleep/sleep_duration_chart.dart';
 import 'package:workout_notes/widgets/sleep/sleep_schedule_chart.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 enum SleepWeekView { schedule, duration }
 
@@ -40,7 +40,7 @@ class _SleepWeekCardState extends State<SleepWeekCard> {
     final first = widget.days.first;
     final last = widget.days.last;
     final inWeek = widget.entries.where((entry) {
-      final date = DateTime(entry.date.year, entry.date.month, entry.date.day);
+      final date = dayOf(entry.date);
       return !date.isBefore(first) && !date.isAfter(last);
     }).toList();
     final average = inWeek.isEmpty
@@ -51,14 +51,14 @@ class _SleepWeekCardState extends State<SleepWeekCard> {
                   inWeek.length)
               .round();
 
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.fromLTRB(12, 16, 12, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          RunStatRow(
+          AppStatRow(
             children: [
-              RunStatTile(
+              AppStatTile(
                 label: loc.sleepAverageSleep,
                 value: SleepUi.duration(loc, average),
               ),
@@ -66,28 +66,28 @@ class _SleepWeekCardState extends State<SleepWeekCard> {
                 message: loc.sleepRegularityInfo,
                 triggerMode: TooltipTriggerMode.tap,
                 showDuration: const Duration(seconds: 5),
-                child: RunStatTile(
+                child: AppStatTile(
                   label: loc.sleepRegularity,
                   value: stats.regularity7Days == null
                       ? '--'
                       : '${stats.regularity7Days!.round()}%',
                 ),
               ),
-              RunStatTile(
+              AppStatTile(
                 label: loc.sleepEfficiency,
                 value: stats.efficiency7Days == null
                     ? '--'
                     : '${stats.efficiency7Days!.round()}%',
                 color: SleepUi.efficiencyColor(colors, stats.efficiency7Days),
               ),
-              RunStatTile(
+              AppStatTile(
                 label: loc.sleepNightsShort,
                 value: '${stats.recordedDays7Days}/7',
               ),
             ],
           ),
           const SizedBox(height: 16),
-          RunSegmentedTabs<SleepWeekView>(
+          AppSegmentedTabs<SleepWeekView>(
             values: SleepWeekView.values,
             selected: _view,
             labelOf: (view) => switch (view) {

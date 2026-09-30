@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/run_interval_snapshot.dart';
+import 'package:workout_notes/models/run_step_snapshot.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
-import 'package:workout_notes/services/run_interval_engine.dart';
-import 'package:workout_notes/services/run_workout_step_engine.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/run/record/run_record_option_tile.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Live progress of a structured workout (or the quick interval set) with a
 /// preview of the next step and a "Skip step" button.
@@ -132,7 +132,7 @@ class RunRecordStepCard extends StatelessWidget {
       canSkip = false;
     }
 
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.fromLTRB(12, 10, 8, 6),
       color: tint.withAlpha(18),
       child: Column(
@@ -140,7 +140,7 @@ class RunRecordStepCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              RunIconBadge(icon, color: tint),
+              AppIconBadge(icon, color: tint),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -173,7 +173,7 @@ class RunRecordStepCard extends StatelessWidget {
                     _remaining(metric, remaining),
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
-                      fontFeatures: RunUi.tabular,
+                      fontFeatures: AppUi.tabular,
                     ),
                   ),
                 ),

@@ -2,15 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_insights_calculator.dart';
 import 'package:workout_notes/utils/strength_insights_format.dart';
 import 'package:workout_notes/widgets/progress/body_section_charts.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_charts.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_insights_data.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Weekly average feeling (1 to 5) after workouts.
 class StrengthFeelingCard extends StatelessWidget {
@@ -116,7 +115,7 @@ class StrengthFeelingVolumeCard extends StatelessWidget {
                             textAlign: TextAlign.end,
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontWeight: FontWeight.w600,
-                              fontFeatures: RunUi.tabular,
+                              fontFeatures: AppUi.tabular,
                             ),
                           ),
                         ),
@@ -160,7 +159,7 @@ class _StrengthBodyCardState extends State<StrengthBodyCard> {
 
   Future<void> _load() async {
     try {
-      final body = BodyMeasurementRepository();
+      final body = DatabaseHelper.instance.bodyMeasurementRepo;
       final results = await Future.wait([
         body.getBodyMeasurementsSummary(),
         body.getBodyCompositionTrend(),

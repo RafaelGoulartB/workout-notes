@@ -403,6 +403,12 @@ void main() {
 
   test('get_workout_detail returns exercise with sets', () async {
     final now = DateTime.now().toIso8601String();
+    await db.insert('exercise_categories', {
+      'id': 'legs',
+      'name': 'Legs',
+      'color': 0xFF2196F3,
+      'order_index': 0,
+    });
     await db.insert('exercises', {
       'id': 'sq',
       'name': 'Agachamento',
@@ -608,7 +614,7 @@ void main() {
       expect(magnesium['averageOnReportedDays'], 29.0);
       expect(magnesium['dayCoveragePct'], 100.0);
       expect(
-        (magnesium['topFoodSources'] as List).single['name'],
+        ((magnesium['topFoodSources'] as List).single as Map)['name'],
         'Peito de frango grelhado',
       );
       expect((nutrients['vitaminDUg'] as Map)['dayCoveragePct'], 0.0);
@@ -632,7 +638,7 @@ void main() {
     );
     final variant = ((detailed.data as Map)['variants'] as List).single as Map;
     expect((variant['extraNutrients'] as Map)['selenium_ug'], 27.6);
-    expect((variant['servings'] as List).single['gramsEquivalent'], 120.0);
+    expect(((variant['servings'] as List).single as Map)['gramsEquivalent'], 120.0);
   });
 
   test(
@@ -666,7 +672,7 @@ void main() {
         (profileData['goalSuggestionProfile'] as Map)['activityLevel'],
         'moderate',
       );
-      expect((profileData['mealTypes'] as List).single['key'], 'lunch');
+      expect(((profileData['mealTypes'] as List).single as Map)['key'], 'lunch');
       expect((profileData['libraryCounts'] as Map)['savedMeals'], 1);
     },
   );

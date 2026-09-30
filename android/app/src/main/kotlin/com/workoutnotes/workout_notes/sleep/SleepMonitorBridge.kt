@@ -22,7 +22,6 @@ class SleepMonitorBridge(private val context: Context) :
     EventChannel.StreamHandler {
     companion object {
         const val PERMISSION_REQUEST_CODE = 8451
-        const val CAMERA_PERMISSION_REQUEST_CODE = 8452
         const val SCAN_REQUEST_CODE = 8453
         private const val MIN_ALARM_LEAD_MILLIS = 60_000L
         private const val MAX_ALARM_LEAD_MILLIS = 16L * 60L * 60L * 1_000L
@@ -30,7 +29,6 @@ class SleepMonitorBridge(private val context: Context) :
 
     private var activity: Activity? = null
     private val pendingPermission = AtomicReference<MethodChannel.Result?>(null)
-    private val pendingCameraPermission = AtomicReference<MethodChannel.Result?>(null)
     private val pendingScan = AtomicReference<MethodChannel.Result?>(null)
     private val spool by lazy { SleepSessionSpool(context.applicationContext) }
 
@@ -51,15 +49,12 @@ class SleepMonitorBridge(private val context: Context) :
                     "exact_alarm_granted" to SleepAlarmScheduler.canScheduleExact(context),
                     "full_screen_intent_granted" to
                         SleepAlarmScheduler.canUseFullScreenIntent(context),
-                ) + SleepStageModelGate.capabilities(context),
+                ),
             )
             "getAlarmCapabilities" -> result.success(alarmCapabilities())
             "getState" -> result.success(SleepMonitoringService.currentState(context))
+            "getLiveLevel" -> result.success(SleepMonitoringService.liveLevel())
             "requestMicrophonePermission" -> requestMicrophonePermission(result)
-            "requestCameraPermission" -> requestCameraPermission(result)
-            "getMissionCapabilities" -> result.success(
-                mapOf("camera_granted" to cameraGranted()),
-            )
             "openCameraSettings" -> {
                 val visibleActivity = activity
                 if (visibleActivity == null) {
@@ -95,7 +90,7 @@ class SleepMonitorBridge(private val context: Context) :
             }
             "startMonitoring" -> startMonitoring(call, result)
             "updateAlarm" -> updateAlarm(call, result)
-            "openSnoozedAlarmMission" -> openSnoozedAlarmMission(result)
+            "openAlarmScreen" -> openAlarmScreen(result)
             "dismissSnoozedAlarm" -> dismissSnoozedAlarm(result)
             "stopMonitoring" -> result.success(SleepMonitoringService.stopCurrent("user"))
             "discardSession" -> {
@@ -148,11 +143,6 @@ class SleepMonitorBridge(private val context: Context) :
             result?.success(grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED)
             return true
         }
-        if (requestCode == CAMERA_PERMISSION_REQUEST_CODE) {
-            val result = pendingCameraPermission.getAndSet(null)
-            result?.success(grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED)
-            return true
-        }
         return false
     }
 
@@ -173,26 +163,6 @@ class SleepMonitorBridge(private val context: Context) :
             ),
         )
         return true
-    }
-
-    private fun requestCameraPermission(result: MethodChannel.Result) {
-        if (cameraGranted()) {
-            result.success(true)
-            return
-        }
-        val visibleActivity = activity
-        if (visibleActivity == null) {
-            result.error("activity_unavailable", "A visible Activity is required", null)
-            return
-        }
-        if (!pendingCameraPermission.compareAndSet(null, result)) {
-            result.error("permission_pending", "Permission request already pending", null)
-            return
-        }
-        visibleActivity.requestPermissions(
-            arrayOf(Manifest.permission.CAMERA),
-            CAMERA_PERMISSION_REQUEST_CODE,
-        )
     }
 
     private fun scanBarcodeForMission(result: MethodChannel.Result) {
@@ -307,31 +277,25 @@ class SleepMonitorBridge(private val context: Context) :
         }
     }
 
-    private fun openSnoozedAlarmMission(result: MethodChannel.Result) {
-        val current = SleepAlarmScheduler.read(context)
-        val snapshot = if (current != null &&
-            current.state == SleepAlarmScheduler.STATE_RINGING &&
-            current.requiresMission
+    /**
+     * Opens the native alarm screen for a ringing alarm or a snoozed one. A
+     * snoozed alarm stays silent: its mission can be completed early, and
+     * backing out keeps the snooze exactly as it was.
+     */
+    private fun openAlarmScreen(result: MethodChannel.Result) {
+        val snapshot = SleepAlarmScheduler.read(context)
+        if (snapshot == null ||
+            (snapshot.state != SleepAlarmScheduler.STATE_RINGING && !snapshot.isSnoozed)
         ) {
-            current
-        } else {
-            SleepAlarmScheduler.resumeSnoozedMission(context)
-        }
-        if (snapshot == null) {
-            result.error("invalid_alarm_state", "No monitored mission is currently snoozing", null)
+            result.error("invalid_alarm_state", "No monitored alarm is ringing or snoozed", null)
             return
         }
-        SleepMonitoringService.publishAlarmRinging(context)
-        SleepAlarmRingingService.start(context, snapshot.alarmAtMillis)
-        val alarmIntent = Intent(context, SleepAlarmActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra(SleepAlarmScheduler.EXTRA_ALARM_AT, snapshot.alarmAtMillis)
-        }
+        val alarmIntent = SleepSnoozeNotification.alarmScreenIntent(context, snapshot.alarmAtMillis)
         val visibleActivity = activity
         if (visibleActivity != null) {
+            alarmIntent.flags = alarmIntent.flags and Intent.FLAG_ACTIVITY_NEW_TASK.inv()
             visibleActivity.startActivity(alarmIntent)
         } else {
-            alarmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(alarmIntent)
         }
         result.success(SleepMonitoringService.currentState(context))
@@ -405,11 +369,6 @@ class SleepMonitorBridge(private val context: Context) :
     private fun microphoneGranted(): Boolean = ContextCompat.checkSelfPermission(
         context,
         Manifest.permission.RECORD_AUDIO,
-    ) == PackageManager.PERMISSION_GRANTED
-
-    private fun cameraGranted(): Boolean = ContextCompat.checkSelfPermission(
-        context,
-        Manifest.permission.CAMERA,
     ) == PackageManager.PERMISSION_GRANTED
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {

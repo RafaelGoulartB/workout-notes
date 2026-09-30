@@ -6,12 +6,12 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import com.workoutnotes.workout_notes.MainActivity
 import com.workoutnotes.workout_notes.sleep.SleepAlarmScheduler
 import java.util.UUID
 import org.json.JSONArray
 import org.json.JSONObject
+import com.workoutnotes.workout_notes.common.PendingIntentFlags
 
 /**
  * Durable medication reminders. Each slot is one medication at one time of
@@ -346,7 +346,7 @@ object MedicationReminderScheduler {
                 context,
                 requestCode(slot.id, 3),
                 Intent(context, MainActivity::class.java),
-                PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag(),
+                PendingIntentFlags.UPDATE_IMMUTABLE,
             )
             manager.setAlarmClock(AlarmManager.AlarmClockInfo(slot.escalationAt, show), operation)
         } else {
@@ -363,7 +363,7 @@ object MedicationReminderScheduler {
             putExtra(EXTRA_SLOT_ID, id)
             putExtra(EXTRA_DUE_AT, dueAt)
         },
-        PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag(),
+        PendingIntentFlags.UPDATE_IMMUTABLE,
     )
 
     private fun escalationIntent(context: Context, id: String, doseKey: String?) = PendingIntent.getBroadcast(
@@ -375,7 +375,7 @@ object MedicationReminderScheduler {
             putExtra(EXTRA_SLOT_ID, id)
             putExtra(EXTRA_DOSE_KEY, doseKey)
         },
-        PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag(),
+        PendingIntentFlags.UPDATE_IMMUTABLE,
     )
 
     fun notificationId(id: String): Int = requestCode(id, 4)
@@ -386,7 +386,5 @@ object MedicationReminderScheduler {
     private fun index(context: Context) = storage(context).getSharedPreferences(INDEX_PREFS, Context.MODE_PRIVATE)
     private fun preferences(context: Context, id: String) =
         storage(context).getSharedPreferences("medication_slot_${id.replace(Regex("[^A-Za-z0-9_-]"), "_")}", Context.MODE_PRIVATE)
-    private fun storage(context: Context): Context =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) context.createDeviceProtectedStorageContext() else context
-    fun immutableFlag() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+    private fun storage(context: Context): Context = context.createDeviceProtectedStorageContext()
 }

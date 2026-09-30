@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'notification_service.dart';
+import 'package:workout_notes/services/notification_service.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 
 class RestTimerService extends ChangeNotifier {
   static final RestTimerService _instance = RestTimerService._();
@@ -24,18 +25,11 @@ class RestTimerService extends ChangeNotifier {
   double get progress =>
       _totalSeconds > 0 ? _remainingSeconds / _totalSeconds : 0;
 
-  String get formattedTime {
-    final min = _remainingSeconds ~/ 60;
-    final sec = _remainingSeconds % 60;
-    return '${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
-  }
+  String get formattedTime => DurationFormat.mmss(_remainingSeconds);
 
   String get shortTime {
     if (_remainingSeconds <= 0) return '';
-    if (_remainingSeconds >= 60) {
-      return '${_remainingSeconds ~/ 60}:${(_remainingSeconds % 60).toString().padLeft(2, '0')}';
-    }
-    return '${_remainingSeconds}s';
+    return DurationFormat.minSecOrSeconds(_remainingSeconds);
   }
 
   void start(int seconds) {
@@ -48,6 +42,13 @@ class RestTimerService extends ChangeNotifier {
     notifyListeners();
     _showInitialNotification();
 
+    _startTicker();
+  }
+
+  /// Replaces any running ticker with one that syncs the remaining time every
+  /// second and finishes the timer at zero.
+  void _startTicker() {
+    _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       _syncRemainingTime();
       if (_remainingSeconds <= 0) {
@@ -88,20 +89,7 @@ class RestTimerService extends ChangeNotifier {
     _endsAt = DateTime.now().add(Duration(seconds: _remainingSeconds));
     notifyListeners();
     _updateNotification();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      _syncRemainingTime();
-      if (_remainingSeconds <= 0) {
-        timer.cancel();
-        _isRunning = false;
-        _isPaused = false;
-        _endsAt = null;
-        notifyListeners();
-        _longVibrate();
-        _showCompleteNotification();
-        return;
-      }
-      notifyListeners();
-    });
+    _startTicker();
   }
 
   void stop() {
@@ -145,7 +133,9 @@ class RestTimerService extends ChangeNotifier {
       Future.delayed(Duration(milliseconds: 500 * i), () {
         try {
           HapticFeedback.heavyImpact();
-        } catch (_) {}
+        } catch (_) {
+          // Haptics are optional (unsupported on some devices).
+        }
       });
     }
   }

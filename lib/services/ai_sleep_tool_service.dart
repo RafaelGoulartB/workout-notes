@@ -1,6 +1,10 @@
+// Read-only queries built for the AI Coach may run SQL directly (a documented
+// exception to the repository-only rule); writes never happen in this file.
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
+import 'package:workout_notes/services/ai_tool_math.dart';
 import 'package:workout_notes/services/sleep_goal_service.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Read-only sleep queries exposed to the AI Coach.
 ///
@@ -16,7 +20,9 @@ class AiSleepToolService {
       _now = now ?? DateTime.now;
 
   Future<Map<String, dynamic>> nightDetail({String? date}) async {
-    final resolvedDate = _validatedDate(date ?? _date(_now()));
+    final resolvedDate = AiToolMath.validatedIsoDate(
+      date ?? dateKey(_now()),
+    );
     final database = await db.database;
     final entries = await database.query(
       'sleep_entries',
@@ -35,9 +41,6 @@ class AiSleepToolService {
 
     final entry = entries.first;
     final session = await _sessionForEntry(entry['id'] as String);
-    final epochSummary = session == null
-        ? null
-        : await _stageEpochSummary(session['id'] as String);
     final duration = _duration(entry, session);
     final timeInBed =
         (entry['time_in_bed_minutes'] ?? session?['time_in_bed_minutes'])
@@ -74,7 +77,7 @@ class AiSleepToolService {
         'deepSleepMinutes': session?['deep_sleep_minutes'],
         'unknownMinutes': session?['unknown_minutes'],
         'awakeningCount': session?['awakening_count'],
-        'efficiencyPct': _roundOrNull(
+        'efficiencyPct': AiToolMath.round1OrNull(
           (session?['sleep_efficiency'] as num?)?.toDouble() ??
               computedEfficiency,
         ),
@@ -85,7 +88,6 @@ class AiSleepToolService {
             : null,
         'confidence': session?['stage_confidence'],
         'algorithmVersion': session?['stage_algorithm_version'],
-        'epochSummary': epochSummary,
       },
       'monitoring': session == null
           ? null
@@ -123,9 +125,11 @@ class AiSleepToolService {
   Future<Map<String, dynamic>> history({int days = 30, String? endDate}) async {
     days = days.clamp(1, 31);
     final database = await db.database;
-    final end = _validatedDate(endDate ?? _date(_now()));
+    final end = AiToolMath.validatedIsoDate(
+      endDate ?? dateKey(_now()),
+    );
     final endDay = DateTime.parse(end);
-    final start = _date(endDay.subtract(Duration(days: days - 1)));
+    final start = dateKey(endDay.subtract(Duration(days: days - 1)));
     final entries = await database.query(
       'sleep_entries',
       where: 'date BETWEEN ? AND ?',
@@ -144,9 +148,9 @@ class AiSleepToolService {
       'endDate': end,
       'windowDays': days,
       'recordedNights': nights.length,
-      'coveragePct': _round(nights.length / days * 100),
+      'coveragePct': AiToolMath.round1(nights.length / days * 100),
       'nights': nights,
-      'previousEndDate': _date(
+      'previousEndDate': dateKey(
         DateTime.parse(start).subtract(const Duration(days: 1)),
       ),
       'dataSemantics':
@@ -169,7 +173,9 @@ class AiSleepToolService {
     final goalMinutes = SleepGoalService.normalize(
       rawGoal ?? SleepGoalService.defaultGoalMinutes,
     );
-    final start30 = _date(_now().subtract(const Duration(days: 29)));
+    final start30 = dateKey(
+      _now().subtract(const Duration(days: 29)),
+    );
 
     return {
       'dailyGoalMinutes': goalMinutes,
@@ -198,45 +204,6 @@ class AiSleepToolService {
     return rows.isEmpty ? null : rows.first;
   }
 
-  Future<Map<String, dynamic>> _stageEpochSummary(String sessionId) async {
-    final database = await db.database;
-    final rows = await database.rawQuery(
-      '''
-      SELECT
-        COUNT(*) epoch_count,
-        SUM(CASE WHEN stage != 'unknown' THEN 1 ELSE 0 END) known_epoch_count,
-        SUM(CASE WHEN stage = 'awake' THEN duration_seconds ELSE 0 END) awake_seconds,
-        SUM(CASE WHEN stage = 'sleeping' THEN duration_seconds ELSE 0 END) sleeping_seconds,
-        SUM(CASE WHEN stage = 'deep' THEN duration_seconds ELSE 0 END) deep_seconds,
-        SUM(CASE WHEN stage = 'unknown' THEN duration_seconds ELSE 0 END) unknown_seconds,
-        AVG(CASE WHEN stage != 'unknown' THEN confidence END) average_confidence
-      FROM sleep_stage_epochs
-      WHERE session_id = ?
-      ''',
-      [sessionId],
-    );
-    final row = rows.first;
-    final total = (row['epoch_count'] as num?)?.toInt() ?? 0;
-    final known = (row['known_epoch_count'] as num?)?.toInt() ?? 0;
-    double? minutes(String key) {
-      final seconds = (row[key] as num?)?.toDouble();
-      return seconds == null ? null : _round(seconds / 60);
-    }
-
-    return {
-      'epochCount': total,
-      'knownEpochCount': known,
-      'coveragePct': total == 0 ? 0.0 : _round(known / total * 100),
-      'awakeMinutes': minutes('awake_seconds'),
-      'sleepingMinutes': minutes('sleeping_seconds'),
-      'deepSleepMinutes': minutes('deep_seconds'),
-      'unknownMinutes': minutes('unknown_seconds'),
-      'averageConfidence': _roundOrNull(
-        (row['average_confidence'] as num?)?.toDouble(),
-      ),
-    };
-  }
-
   Map<String, dynamic> _historyNight(
     Map<String, dynamic> entry,
     Map<String, dynamic>? session,
@@ -255,7 +222,7 @@ class AiSleepToolService {
       'wakeTimeMinutesAfterMidnight': entry['wake_time_minutes'],
       'wakeTimeLocal': _clock(entry['wake_time_minutes']),
       'timeInBedMinutes': timeInBed?.toInt(),
-      'efficiencyPct': _roundOrNull(
+      'efficiencyPct': AiToolMath.round1OrNull(
         (session?['sleep_efficiency'] as num?)?.toDouble() ??
             _efficiency(duration.effectiveMinutes, timeInBed?.toDouble()),
       ),
@@ -310,14 +277,14 @@ class AiSleepToolService {
       'stageAvailableNights': stageAvailable,
       'stageCoveragePct': monitored == 0
           ? 0.0
-          : _round(stageAvailable / monitored * 100),
-      'averageSleepMinutes': _roundOrNull(average),
+          : AiToolMath.round1(stageAvailable / monitored * 100),
+      'averageSleepMinutes': AiToolMath.round1OrNull(average),
       'differenceFromGoalMinutes': average == null
           ? null
-          : _round(average - goalMinutes),
+          : AiToolMath.round1(average - goalMinutes),
       'goalAchievementPct': average == null
           ? null
-          : _round(average / goalMinutes * 100),
+          : AiToolMath.round1(average / goalMinutes * 100),
       'nightsMeetingGoal': (row['nights_meeting_goal'] as num?)?.toInt() ?? 0,
     };
   }
@@ -384,25 +351,6 @@ class AiSleepToolService {
     final minute = normalized % 60;
     return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
   }
-
-  static String _validatedDate(String value) {
-    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)) {
-      throw const FormatException('date must use YYYY-MM-DD');
-    }
-    final parsed = DateTime.tryParse(value);
-    if (parsed == null || _date(parsed) != value) {
-      throw const FormatException('date is invalid');
-    }
-    return value;
-  }
-
-  static String _date(DateTime value) =>
-      value.toIso8601String().substring(0, 10);
-
-  static double _round(double value) => (value * 10).round() / 10;
-
-  static double? _roundOrNull(double? value) =>
-      value == null ? null : _round(value);
 }
 
 class _ResolvedDuration {

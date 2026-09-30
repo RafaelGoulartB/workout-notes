@@ -49,6 +49,8 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Keep in sync with validate.yml; bump both in an explicit change.
+          flutter-version: "3.47.5"
           cache: true
 
       - name: Install dependencies
@@ -129,6 +131,8 @@ jobs:
         run: >-
           flutter build appbundle
           --release
+          --obfuscate
+          --split-debug-info=build/symbols/aab
           --build-name=${{ steps.version.outputs.version }}
           --build-number=${{ steps.version.outputs.build_number }}
 
@@ -137,6 +141,9 @@ jobs:
           flutter build apk
           --release
           --split-per-abi
+          --target-platform android-arm,android-arm64
+          --obfuscate
+          --split-debug-info=build/symbols/apk
           --build-name=${{ steps.version.outputs.version }}
           --build-number=${{ steps.version.outputs.build_number }}
 
@@ -145,13 +152,27 @@ jobs:
         run: |
           set -euo pipefail
           max_bytes=$((50 * 1024 * 1024))
-          for apk in build/app/outputs/flutter-apk/*-release.apk; do
+          shopt -s nullglob
+          apks=(build/app/outputs/flutter-apk/*-release.apk)
+          if (( ${#apks[@]} == 0 )); then
+            echo "No release APKs found" >&2
+            exit 1
+          fi
+          for apk in "${apks[@]}"; do
             size="$(stat -c%s "$apk")"
             if (( size > max_bytes )); then
               echo "APK exceeds 50 MB budget: $apk ($size bytes)" >&2
               exit 1
             fi
           done
+
+      - name: Upload debug symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-symbols-${{ steps.version.outputs.version }}
+          path: build/symbols
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Prepare release asset
         id: asset

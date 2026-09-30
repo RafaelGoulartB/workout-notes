@@ -2,7 +2,7 @@ package com.workoutnotes.workout_notes.run
 
 import kotlin.math.roundToInt
 
-/** Native mirror of the Dart voice phrases used while the screen is off. */
+/** Spoken run phrases, localized independently from the app UI. */
 class RunVoicePhrases(private val language: RunVoiceLanguage) {
 
     private val pt: Boolean get() = language == RunVoiceLanguage.pt

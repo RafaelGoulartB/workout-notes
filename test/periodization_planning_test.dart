@@ -1,8 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:workout_notes/database/database_helper.dart';
-import 'package:workout_notes/database/database_periodization_schema.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_schedule.dart';
 import 'package:workout_notes/models/periodization_target.dart';
@@ -12,6 +10,7 @@ import 'package:workout_notes/periodization/phase_seed.dart';
 import 'package:workout_notes/periodization/phase_week_plan.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
+import 'support/test_db.dart';
 
 /// The planning redesign: chained phases, template week (training vs rest
 /// days), per-week adjustments and the editor controller.
@@ -22,65 +21,14 @@ void main() {
   // A Monday, so phase weeks line up with calendar weeks.
   final start = DateTime(2026, 1, 5);
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 1,
-        onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-        onCreate: (db, version) async {
-          await db.execute(
-            'CREATE TABLE routines (id TEXT PRIMARY KEY, name TEXT NOT NULL, notes TEXT, created_at TEXT NOT NULL)',
-          );
-          await db.execute(
-            'CREATE TABLE routine_days (id TEXT PRIMARY KEY, routine_id TEXT NOT NULL, name TEXT NOT NULL, order_index INTEGER NOT NULL DEFAULT 0)',
-          );
-          await db.execute(
-            'CREATE TABLE workouts (id TEXT PRIMARY KEY, date TEXT NOT NULL, start_time TEXT, end_time TEXT, routine_id TEXT, created_at TEXT NOT NULL)',
-          );
-          await db.execute(
-            'CREATE TABLE exercise_entries (id TEXT PRIMARY KEY, workout_id TEXT NOT NULL, exercise_id TEXT NOT NULL, order_index INTEGER)',
-          );
-          await db.execute(
-            'CREATE TABLE sets (id TEXT PRIMARY KEY, exercise_entry_id TEXT NOT NULL, weight REAL, reps INTEGER, rpe REAL, is_complete INTEGER DEFAULT 0, is_warmup INTEGER DEFAULT 0, order_index INTEGER)',
-          );
-          await db.execute(
-            'CREATE TABLE body_measurements (id TEXT PRIMARY KEY, type TEXT, value REAL, unit TEXT, date TEXT, created_at TEXT)',
-          );
-          await db.execute(
-            'CREATE TABLE sleep_entries (id TEXT PRIMARY KEY, date TEXT, sleep_minutes INTEGER, actual_sleep_minutes INTEGER, estimated_sleep_minutes INTEGER)',
-          );
-          await db.execute(
-            'CREATE TABLE meal_logs (id TEXT PRIMARY KEY, date TEXT, meal_type TEXT)',
-          );
-          await db.execute(
-            'CREATE TABLE meal_log_items (id TEXT PRIMARY KEY, meal_log_id TEXT, calories REAL, protein_g REAL, carbs_g REAL, fat_g REAL)',
-          );
-          await db.execute('''
-            CREATE TABLE nutrition_goals (
-              id TEXT PRIMARY KEY, calories REAL, protein_g REAL, carbs_g REAL,
-              fat_g REAL, tdee REAL, adjustment_kind TEXT,
-              adjustment_percent REAL, created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1
-            )
-          ''');
-          await DatabasePeriodizationSchema.create(db);
-        },
-      ),
-    );
-    DatabaseHelper.overrideDatabase = database;
+    database = await installTestDb();
     repository = PeriodizationRepository();
   });
 
-  tearDown(() async {
-    DatabaseHelper.overrideDatabase = null;
-    await database.close();
-  });
+  tearDown(uninstallTestDb);
 
   PeriodizationTarget target({
     double calories = 2400,
@@ -166,13 +114,6 @@ void main() {
         expect(PhaseWeekPlan.averageCalories(week), closeTo(2228.6, 0.1));
       },
     );
-
-    test('no template week means no training/rest distinction', () {
-      expect(
-        PhaseWeekPlan.isTrainingDay(target: target(rest: 2000), weekday: 2),
-        isNull,
-      );
-    });
   });
 
   group('chained plans', () {
@@ -338,10 +279,16 @@ void main() {
         'id': 'm1',
         'date': '2026-01-06',
         'meal_type': 'lunch',
+        'created_at': '2026-01-01T08:00:00',
       });
       await database.insert('meal_log_items', {
         'id': 'i1',
         'meal_log_id': 'm1',
+        'food_name_snapshot': 'Food',
+        'quantity': 1,
+        'unit': 'serving',
+        'nutrition_snapshot_json': '{}',
+        'created_at': '2026-01-01T08:00:00',
         'calories': 1900,
         'protein_g': 160,
         'carbs_g': remainingCarbsG(calories: 1900, proteinG: 160, fatG: 70),

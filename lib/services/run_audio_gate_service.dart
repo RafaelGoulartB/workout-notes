@@ -22,8 +22,7 @@ class RunAudioGateService {
 
   static const _methods = MethodChannel('workout_notes/run_audio/methods');
 
-  bool get _isAndroid =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  bool get _isAndroid => defaultTargetPlatform == TargetPlatform.android;
 
   Future<RunAudioCapabilities> getCapabilities() async {
     if (!_isAndroid) {

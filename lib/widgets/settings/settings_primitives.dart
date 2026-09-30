@@ -1,31 +1,5 @@
 import 'package:flutter/material.dart';
-
-/// Section header rendered above a group of settings.
-///
-/// Uses an uppercase tracked label in the muted [onSurfaceVariant]
-/// color so it reads as a divider/category marker rather than a heading.
-/// Matches the canonical pattern used across all settings screens.
-class SettingsSectionHeader extends StatelessWidget {
-  final String text;
-
-  const SettingsSectionHeader({super.key, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
-      child: Text(
-        text,
-        style: theme.textTheme.labelSmall?.copyWith(
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.5,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-}
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Grouped card container used to gather related settings tiles.
 ///
@@ -46,42 +20,16 @@ class SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withAlpha(80),
-        ),
-      ),
+    return AppSectionCard(
+      margin: const EdgeInsets.all(4),
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (title != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-              child: Row(
-                children: [
-                  if (icon != null) ...[
-                    Icon(
-                      icon,
-                      size: 18,
-                      color: theme.colorScheme.primary,
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  Flexible(
-                    child: Text(
-                      title!,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              child: AppCardTitle(icon: icon, title: title!),
             ),
           ...children,
         ],

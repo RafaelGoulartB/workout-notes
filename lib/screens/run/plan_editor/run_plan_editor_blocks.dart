@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Shown instead of the step list while a session has no steps.
 class RunPlanEditorStepsEmpty extends StatelessWidget {
@@ -16,7 +16,7 @@ class RunPlanEditorStepsEmpty extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(RunUi.tileRadius),
+        borderRadius: BorderRadius.circular(AppUi.tileRadius),
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withAlpha(70),
         ),
@@ -67,7 +67,7 @@ class RunPlanEditorBlockTile extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
         color: scheme.surfaceContainerHighest.withAlpha(70),
-        borderRadius: BorderRadius.circular(RunUi.tileRadius),
+        borderRadius: BorderRadius.circular(AppUi.tileRadius),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(8, 4, 4, 4),
           child: Row(

@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_insights_format.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// One workout of the exercise, from `AnalyticsRepository.getExerciseHistory`.
 class ExerciseSession {
@@ -118,7 +118,7 @@ class _SessionCard extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
     final s = session;
 
-    return RunSectionCard(
+    return AppSectionCard(
       onTap: onTap,
       padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
       child: Column(
@@ -135,7 +135,7 @@ class _SessionCard extends StatelessWidget {
                 ),
               ),
               if (isRecord) ...[
-                RunPill(
+                AppPill(
                   label: loc.exerciseDetailRecordBadge,
                   icon: Icons.emoji_events_rounded,
                   color: colors.tertiary,
@@ -201,7 +201,7 @@ class _SetChip extends StatelessWidget {
         style: theme.textTheme.labelMedium?.copyWith(
           fontWeight: best ? FontWeight.w700 : FontWeight.w500,
           color: best ? colors.primary : colors.onSurface,
-          fontFeatures: RunUi.tabular,
+          fontFeatures: AppUi.tabular,
         ),
       ),
     );

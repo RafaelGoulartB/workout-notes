@@ -8,7 +8,7 @@ import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
 import 'package:workout_notes/widgets/run/run_achievements_section.dart';
 import 'package:workout_notes/widgets/run/run_medal_badge.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// One card with the period highlights (longest run, best pace, best km) and
 /// the most recent all-time medals that are not already listed above.
@@ -58,8 +58,8 @@ class RunRecordsSection extends StatelessWidget {
       required RunAchievementKind kind,
     }) {
       final medal = _medal(board, run, kind);
-      return RunListRow(
-        leading: RunIconBadge(icon),
+      return AppListRow(
+        leading: AppIconBadge(icon),
         title: label,
         titleTrailing: medal == null
             ? null
@@ -109,7 +109,7 @@ class RunRecordsSection extends StatelessWidget {
     ].take(3).toList();
 
     if (highlights.isEmpty && recent.isEmpty) {
-      return RunSectionCard(
+      return AppSectionCard(
         child: Text(
           loc.runAchievementEmpty,
           style: theme.textTheme.bodyMedium?.copyWith(
@@ -119,23 +119,23 @@ class RunRecordsSection extends StatelessWidget {
       );
     }
 
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (highlights.isNotEmpty) ...[
             _GroupLabel(loc.runHomeRecordsPeriodTag),
-            RunDividedList(children: highlights),
+            AppDividedList(children: highlights),
           ],
           if (recent.isNotEmpty) ...[
             if (highlights.isNotEmpty)
-              Divider(height: 1, color: RunUi.divider(colors)),
+              Divider(height: 1, color: AppUi.divider(colors)),
             _GroupLabel(loc.runHomeRecordsRecentTag),
-            RunDividedList(
+            AppDividedList(
               children: [
                 for (final placement in recent)
-                  RunListRow(
+                  AppListRow(
                     leading: RunMedalDot(tier: placement.tier, size: 30),
                     title: runAchievementKindLabel(loc, placement.kind),
                     subtitle: dateFormat.format(

@@ -1,5 +1,8 @@
-import '../database/database_helper.dart';
-import '../models/ai_provider.dart';
+// Read-only queries built for the AI Coach may run SQL directly (a documented
+// exception to the repository-only rule); writes never happen in this file.
+import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/models/ai_provider.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Builds a JSON snapshot of the user's data to inject into the system prompt.
 /// Read-only, in-memory. Same role as `ai_context_service.dart` in `gastos`.
@@ -33,7 +36,7 @@ class AiContextService {
     required DateTime now,
   }) async {
     final parts = await Future.wait<Map<String, dynamic>>([
-      _safeMap(() => db.getWorkoutOverviewStats()),
+      _safeMap(() => db.analyticsRepo.getWorkoutOverviewStats()),
       _loadBaseCounts(),
       if (mode != AiContextMode.minimal) _loadDataAvailability(now),
     ]);
@@ -85,7 +88,7 @@ class AiContextService {
       'metadata': {
         'app': 'workout_notes',
         'locale': 'pt_BR',
-        'today': now.toIso8601String().substring(0, 10),
+        'today': dateKey(now),
         'mode': mode.storageKey,
       },
       'summary': summary,
@@ -95,14 +98,8 @@ class AiContextService {
   Future<Map<String, dynamic>> _loadDataAvailability(DateTime now) async {
     try {
       final rawDb = await db.database;
-      final start7 = now
-          .subtract(const Duration(days: 6))
-          .toIso8601String()
-          .substring(0, 10);
-      final start30 = now
-          .subtract(const Duration(days: 29))
-          .toIso8601String()
-          .substring(0, 10);
+      final start7 = dateKey(now.subtract(const Duration(days: 6)));
+      final start30 = dateKey(now.subtract(const Duration(days: 29)));
       final rows = await rawDb.rawQuery(
         '''
         SELECT
@@ -126,7 +123,7 @@ class AiContextService {
           start7,
           start7,
           start30,
-          now.toIso8601String().substring(0, 10),
+          dateKey(now),
           'weight',
           start30,
           '${start30}T00:00:00',

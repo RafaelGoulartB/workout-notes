@@ -1,67 +1,25 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:workout_notes/database/database_helper.dart';
-import 'package:workout_notes/database/database_periodization_schema.dart';
 import 'package:workout_notes/models/periodization_phase_draft.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
+import 'support/test_db.dart';
 
 void main() {
-  late Database database;
   late PeriodizationRepository periodization;
   late NutritionRepository nutrition;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 39,
-        onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-        onCreate: (db, version) async {
-          await db.execute('''
-            CREATE TABLE nutrition_goals (
-              id TEXT PRIMARY KEY,
-              calories REAL,
-              protein_g REAL,
-              carbs_g REAL,
-              fat_g REAL,
-              tdee REAL,
-              adjustment_kind TEXT,
-              adjustment_percent REAL,
-              created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL,
-              is_active INTEGER NOT NULL DEFAULT 1
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE routines (
-              id TEXT PRIMARY KEY,
-              name TEXT NOT NULL,
-              notes TEXT,
-              created_at TEXT NOT NULL
-            )
-          ''');
-          await DatabasePeriodizationSchema.create(db);
-        },
-      ),
-    );
-    DatabaseHelper.overrideDatabase = database;
+    await installTestDb();
     periodization = PeriodizationRepository();
     nutrition = NutritionRepository();
   });
 
-  tearDown(() async {
-    DatabaseHelper.overrideDatabase = null;
-    await database.close();
-  });
+  tearDown(uninstallTestDb);
 
   PeriodizationTarget weekTarget({
     required DateTime validFrom,

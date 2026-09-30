@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Lookback windows offered by the body stats screen.
 enum BodyStatsPeriod {
@@ -189,11 +190,7 @@ class BodyGoalProgress {
   DateTime? etaFrom(DateTime now) {
     final weeks = weeksToTarget;
     if (weeks == null) return null;
-    return DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).add(Duration(days: (weeks * 7).ceil()));
+    return addDays(now, (weeks * 7).ceil());
   }
 }
 
@@ -284,7 +281,7 @@ class BodyProgressAnalytics {
   int? get daysSinceLast {
     final last = lastDate;
     if (last == null) return null;
-    return _dateOnly(now).difference(last).inDays;
+    return dayOf(now).difference(last).inDays;
   }
 
   /// Entries per week across the weeks covered by the period.
@@ -329,13 +326,13 @@ class BodyProgressAnalytics {
     DateTime? now,
   }) {
     final clock = now ?? DateTime.now();
-    final today = _dateOnly(clock);
+    final today = dayOf(clock);
     // The window is week-aligned so the daily series, the weekly buckets and
     // the monthly summary all cover exactly the same Sundays.
     final weekCount = period.weekCount;
     final cutoff = weekCount == null
         ? null
-        : _sundayOf(today).subtract(Duration(days: 7 * (weekCount - 1)));
+        : sundayOf(today).subtract(Duration(days: 7 * (weekCount - 1)));
 
     // ── Collapse raw rows into daily averages ──────────────────────────
     final sums = <DateTime, double>{};
@@ -374,7 +371,7 @@ class BodyProgressAnalytics {
 
     final weeks = _buildWeeks(daily: daily, today: today, cutoff: cutoff);
 
-    final currentWeekStart = _sundayOf(today);
+    final currentWeekStart = sundayOf(today);
     final currentWeek = weeks.isEmpty
         ? BodyWeekBucket(
             weekStart: currentWeekStart,
@@ -423,19 +420,11 @@ class BodyProgressAnalytics {
 
   // ── Helpers ─────────────────────────────────────────────────────────
 
-  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
-
-  /// Sunday that opens the week containing [d]. `DateTime.sunday` is 7, so it
-  /// wraps to 0 to keep Sunday as the first day.
-  static DateTime _sundayOf(DateTime d) {
-    final day = _dateOnly(d);
-    return day.subtract(Duration(days: day.weekday % 7));
-  }
 
   static DateTime? _parseDate(Object? raw) {
     if (raw is! String || raw.length < 10) return null;
     try {
-      return _dateOnly(DateTime.parse(raw.substring(0, 10)));
+      return dayOf(DateTime.parse(raw.substring(0, 10)));
     } catch (_) {
       return null;
     }
@@ -489,12 +478,12 @@ class BodyProgressAnalytics {
     required DateTime today,
     required DateTime? cutoff,
   }) {
-    final currentWeekStart = _sundayOf(today);
+    final currentWeekStart = sundayOf(today);
     final DateTime firstWeekStart;
     if (cutoff != null) {
-      firstWeekStart = _sundayOf(cutoff);
+      firstWeekStart = sundayOf(cutoff);
     } else if (daily.isNotEmpty) {
-      firstWeekStart = _sundayOf(daily.first.date);
+      firstWeekStart = sundayOf(daily.first.date);
     } else {
       firstWeekStart = currentWeekStart;
     }
@@ -511,7 +500,7 @@ class BodyProgressAnalytics {
 
     final grouped = <DateTime, List<BodyDailyPoint>>{};
     for (final p in daily) {
-      grouped.putIfAbsent(_sundayOf(p.date), () => []).add(p);
+      grouped.putIfAbsent(sundayOf(p.date), () => []).add(p);
     }
 
     final buckets = <BodyWeekBucket>[];
@@ -588,7 +577,7 @@ class BodyProgressAnalytics {
 
   static int _weekStreak(List<BodyDailyPoint> daily, DateTime currentWeekStart) {
     if (daily.isEmpty) return 0;
-    final weeksWithData = <DateTime>{for (final p in daily) _sundayOf(p.date)};
+    final weeksWithData = <DateTime>{for (final p in daily) sundayOf(p.date)};
     var cursor = weeksWithData.contains(currentWeekStart)
         ? currentWeekStart
         : currentWeekStart.subtract(const Duration(days: 7));

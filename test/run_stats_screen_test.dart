@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:workout_notes/database/database_helper.dart';
-import 'package:workout_notes/database/database_periodization_schema.dart';
-import 'package:workout_notes/database/database_run_plan_schema.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
@@ -12,6 +9,8 @@ import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/screens/run/run_achievements_screen.dart';
 import 'package:workout_notes/screens/run/run_insights_screen.dart';
 import 'package:workout_notes/screens/run/run_stats_screen.dart';
+
+import 'support/test_db.dart';
 
 Widget _app(Widget child) => MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -35,71 +34,17 @@ void main() {
   late Database database;
 
   setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    initSqfliteFfiForTests();
     Intl.defaultLocale = 'pt_BR';
   });
 
   tearDownAll(() => Intl.defaultLocale = null);
 
   setUp(() async {
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 1,
-        onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-        onCreate: (db, version) async {
-          await db.execute(
-            'CREATE TABLE routines (id TEXT PRIMARY KEY, name TEXT NOT NULL, notes TEXT, created_at TEXT NOT NULL)',
-          );
-          await db.execute('''
-            CREATE TABLE run_activities (
-              id TEXT PRIMARY KEY,
-              activity_type TEXT NOT NULL DEFAULT 'running',
-              started_at TEXT NOT NULL,
-              ended_at TEXT,
-              duration_seconds INTEGER NOT NULL DEFAULT 0,
-              moving_time_seconds INTEGER NOT NULL DEFAULT 0,
-              distance_meters REAL NOT NULL DEFAULT 0,
-              avg_pace_sec_per_km REAL,
-              max_pace_sec_per_km REAL,
-              calories INTEGER,
-              title TEXT,
-              notes TEXT,
-              rpe REAL,
-              feeling_rating INTEGER,
-              status TEXT NOT NULL DEFAULT 'completed',
-              polyline_summary TEXT,
-              created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL,
-              best_split_pace_sec_per_km REAL,
-              best_effort_1k_sec INTEGER,
-              best_effort_3k_sec INTEGER,
-              best_effort_5k_sec INTEGER,
-              best_effort_10k_sec INTEGER,
-              best_effort_half_sec INTEGER,
-              best_effort_marathon_sec INTEGER,
-              efforts_computed INTEGER NOT NULL DEFAULT 0,
-              elevation_gain_meters REAL,
-              plan_workout_id TEXT,
-              gear_id TEXT
-            )
-          ''');
-          await db.execute(
-            'CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
-          );
-          await DatabasePeriodizationSchema.create(db);
-          await DatabaseRunPlanSchema.create(db);
-        },
-      ),
-    );
-    DatabaseHelper.overrideDatabase = database;
+    database = await installTestDb();
   });
 
-  tearDown(() async {
-    DatabaseHelper.overrideDatabase = null;
-    await database.close();
-  });
+  tearDown(uninstallTestDb);
 
   /// Eight easy/tempo runs over the last four weeks, two with a 5K effort.
   Future<void> seedRuns() async {

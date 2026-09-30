@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/navigation/ai_coach_navigation.dart';
-import 'package:workout_notes/repositories/periodization_repository.dart';
-import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/screens/workout/active_workout_screen.dart';
 import 'package:workout_notes/screens/workout/routine_day_editor_screen.dart';
 import 'package:workout_notes/utils/strength_routine_summary.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_day_card.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_muscle_widgets.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_sheets.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// One routine: summary hero, sets per muscle against the recommended range
 /// and its training days.
@@ -22,7 +20,7 @@ class RoutineFormScreen extends StatefulWidget {
 }
 
 class _RoutineFormScreenState extends State<RoutineFormScreen> {
-  final _repo = RoutineRepository();
+  final _repo = DatabaseHelper.instance.routineRepo;
   RoutineSummary? _routine;
   String? _nextDayId;
   bool _loading = true;
@@ -43,7 +41,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
     String? nextDayId;
     if (routine != null) {
       try {
-        final suggestion = await PeriodizationRepository().getRoutineSuggestion(
+        final suggestion = await DatabaseHelper.instance.periodizationRepo.getRoutineSuggestion(
           DateTime.now(),
         );
         if (suggestion?.routineId == widget.routineId) {
@@ -73,7 +71,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
     );
     if (details == null) return;
     await _repo.addRoutineDay(widget.routineId, details.name);
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _editDetails() async {
@@ -97,7 +95,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
       name: details.name,
       notes: details.notes,
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _deleteRoutine() async {
@@ -119,8 +117,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
     final loc = AppLocalizations.of(context)!;
     await Navigator.push(
       context,
-      AiCoachNavigation.route(
-        kind: AiCoachRouteKind.normalWithFab,
+      MaterialPageRoute(
         builder: (_) => RoutineDayEditorScreen(
           routineDayId: day.id,
           routineId: widget.routineId,
@@ -132,7 +129,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
       ),
     );
     // Exercises and sets may have changed inside the editor.
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _startDay(RoutineDaySummary day) async {
@@ -145,7 +142,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
         ),
       ),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   @override
@@ -198,12 +195,12 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
-                padding: RunUi.screenPadding.copyWith(top: 8),
+                padding: AppUi.screenPadding.copyWith(top: 8),
                 children: [
                   RoutineHero(routine: routine),
                   const SizedBox(height: 12),
                   RoutineWeeklyMusclesCard(muscles: routine.muscles),
-                  RunSectionHeader(
+                  AppSectionHeader(
                     loc.routineDaysSection,
                     padding: const EdgeInsets.fromLTRB(4, 20, 0, 10),
                   ),

@@ -1,3 +1,4 @@
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
@@ -55,8 +56,8 @@ class EffectiveNutritionGoalService {
     DateTime? date,
   }) async {
     final day = date ?? DateTime.now();
-    final nutrition = nutritionRepository ?? NutritionRepository();
-    final periodization = periodizationRepository ?? PeriodizationRepository();
+    final nutrition = nutritionRepository ?? DatabaseHelper.instance.nutritionRepo;
+    final periodization = periodizationRepository ?? DatabaseHelper.instance.periodizationRepo;
     final base = await nutrition.getActiveGoal();
     try {
       final phase = await periodization.getEffectivePhase(day);

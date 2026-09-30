@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
+import 'package:workout_notes/models/run_plan_template.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/screens/run/run_plan_customize_screen.dart';
-import 'package:workout_notes/services/run_plan_templates.dart';
 import 'package:workout_notes/widgets/run/plans/run_plan_template_picker.dart';
 
 /// Picks a template (or a blank plan) and creates the plan: templates open the

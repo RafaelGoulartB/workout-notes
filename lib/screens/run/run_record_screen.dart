@@ -1,28 +1,29 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_data_field.dart';
+import 'package:workout_notes/models/run_interval_snapshot.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/models/run_session_context.dart';
 import 'package:workout_notes/models/run_session_goal.dart';
+import 'package:workout_notes/models/run_step_snapshot.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
-import 'package:workout_notes/repositories/body_measurement_repository.dart';
-import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/screens/run/run_post_run_review_screen.dart';
 import 'package:workout_notes/screens/run/run_voice_settings_screen.dart';
+import 'package:workout_notes/services/indoor_tracking_service.dart';
 import 'package:workout_notes/services/run_audio_gate_service.dart';
 import 'package:workout_notes/services/run_data_fields_store.dart';
+import 'package:workout_notes/services/run_session_coach.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
-import 'package:workout_notes/services/run_voice_coach.dart';
-import 'package:workout_notes/services/run_workout_step_engine.dart';
-import 'package:workout_notes/services/stationary_bike_tracking_service.dart';
 import 'package:workout_notes/widgets/run/record/run_data_fields_grid.dart';
 import 'package:workout_notes/widgets/run/record/run_goal_sheet.dart';
 import 'package:workout_notes/widgets/run/record/run_record_countdown.dart';
@@ -31,6 +32,7 @@ import 'package:workout_notes/widgets/run/record/run_record_map.dart';
 import 'package:workout_notes/widgets/run/record/run_record_sheet.dart';
 import 'package:workout_notes/widgets/run/record/run_record_top_bar.dart';
 import 'package:workout_notes/widgets/run/run_permission_onboarding_sheet.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class RunRecordScreen extends StatefulWidget {
   /// Structured session to execute. When set, the step engine drives the cues
@@ -60,10 +62,10 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   static const _maxSheetSize = 0.90;
 
   final _service = RunTrackingService.instance;
-  final _indoorService = StationaryBikeTrackingService.instance;
+  final _indoorService = IndoorTrackingService.instance;
   final _mapController = MapController();
-  final _coach = RunVoiceCoach();
-  final _planRepo = RunPlanRepository();
+  final _coach = RunSessionCoach();
+  final _planRepo = DatabaseHelper.instance.runPlanRepo;
 
   bool _busy = false;
   bool _sheetExpanded = false;
@@ -131,7 +133,6 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     _service.addListener(_onChanged);
     _indoorService.addListener(_onIndoorChanged);
     _coach.addListener(_onCoachChanged);
-    _service.initialize();
     _prepareCoach();
     _loadPreferences();
     _loadTodayWorkout();
@@ -148,7 +149,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     final fields = await RunDataFieldsStore.instance.load();
     var weight = 70.0;
     try {
-      weight = await BodyMeasurementRepository().getLatestWeightKg() ?? 70;
+      weight = await DatabaseHelper.instance.bodyMeasurementRepo.getLatestWeightKg() ?? 70;
     } catch (_) {
       // Optional table on partially migrated databases: keep the default.
     }
@@ -316,7 +317,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
       intervalsOn: _intervalsOn,
       goal: _goal,
       planWorkout: _planWorkout,
-      bypassHeadphonesGate: debugSim,
+      nativeVoice: !debugSim,
     );
   }
 
@@ -372,7 +373,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
       onChanged: (next) {
         if (!mounted) return;
         setState(() => _fields = RunDataFieldLayout.sanitize(next));
-        RunDataFieldsStore.instance.save(next);
+        unawaited(RunDataFieldsStore.instance.save(next));
       },
     );
   }
@@ -387,7 +388,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     if (picked == null || !mounted) return;
     final next = [..._fields]..[index] = picked;
     setState(() => _fields = next);
-    RunDataFieldsStore.instance.save(next);
+    await RunDataFieldsStore.instance.save(next);
   }
 
   Future<RunGpsFix?> _prepareGps() async {
@@ -436,22 +437,12 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
 
   Future<bool> _confirmStartWithoutGps() async {
     final loc = AppLocalizations.of(context)!;
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.runRecordGpsNotReadyTitle),
-        content: Text(loc.runRecordGpsNotReadyBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.runRecordWaitForGps),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.runRecordStartAnyway),
-          ),
-        ],
-      ),
+    final result = await showConfirmDialog(
+      context,
+      title: loc.runRecordGpsNotReadyTitle,
+      message: loc.runRecordGpsNotReadyBody,
+      confirmLabel: loc.runRecordStartAnyway,
+      cancelLabel: loc.runRecordWaitForGps,
     );
     return result == true;
   }
@@ -520,7 +511,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
       );
       if (ok) {
         await _beginVoiceSession(debugSim: true);
-        await _coach.onTrackingUpdate(_service.state);
+        _coach.onTrackingUpdate(_service.state);
         if (mounted) {
           final loc = AppLocalizations.of(context)!;
           ScaffoldMessenger.of(
@@ -576,7 +567,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
         ).showSnackBar(SnackBar(content: Text(msg)));
       } else if (ok) {
         await _beginVoiceSession();
-        await _coach.onTrackingUpdate(_service.state);
+        _coach.onTrackingUpdate(_service.state);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -613,8 +604,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     final loc = AppLocalizations.of(context)!;
     final lap = await _service.lap();
     if (lap == null || !mounted) return;
-    HapticFeedback.mediumImpact();
-    // Confirm on screen right away; the spoken summary can take a while.
+    unawaited(HapticFeedback.mediumImpact());
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -624,7 +614,6 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
           content: Text(loc.runLapMarked(lap.index)),
         ),
       );
-    await _coach.announceLap(lap);
   }
 
   Future<void> _skipStep() async {
@@ -643,22 +632,12 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
 
   Future<void> _finish() async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(_finishTitle(loc)),
-        content: Text(_finishBody(loc)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.runRecordFinish),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: _finishTitle(loc),
+      message: _finishBody(loc),
+      confirmLabel: loc.runRecordFinish,
+      cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
     );
     if (confirmed != true || !mounted) return;
 
@@ -696,31 +675,17 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     final bike = _activityType == CardioActivityType.stationaryBike;
     final confirmed = !confirm
         ? true
-        : await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: Text(
-                bike
+        : await showConfirmDialog(
+          context,
+          title: bike
                     ? loc.stationaryBikeReviewDiscardTitle
                     : loc.runRecordDiscardConfirm,
-              ),
-              content: Text(
-                _isIndoor
+          message: _isIndoor
                     ? loc.stationaryBikeReviewDiscardBody
                     : loc.runRecordDiscardConfirmBody,
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: Text(loc.runRecordDiscard),
-                ),
-              ],
-            ),
-          );
+          confirmLabel: loc.runRecordDiscard,
+          cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
+        );
     if (confirmed != true || !mounted) return;
     setState(() => _busy = true);
     try {
@@ -879,7 +844,8 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
           onCustomizeFields: _customizeFields,
           onFieldLongPress: _replaceField,
           intervalsOn: !_isIndoor && _intervalsOn,
-          intervalSnapshot: _coach.intervalSnapshot,
+          intervalSnapshot:
+              state.intervalSnapshot ?? const RunIntervalSnapshot.idle(),
           intervalPreset: _coach.settings.interval,
           planWorkout: _planWorkout,
           onDetachPlan: _attachedFromSuggestion ? _detachPlan : null,
@@ -924,10 +890,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
         .map((p) => LatLng(p.lat, p.lng))
         .toList(growable: false);
     final goalSnapshot = _coach.goalSnapshotFor(state);
-    final nativeStep = state.nativeStepSnapshot;
-    final stepSnapshot = nativeStep == null
-        ? _coach.stepSnapshot
-        : RunStepSnapshot.fromMap(nativeStep);
+    final stepSnapshot = state.stepSnapshot ?? const RunStepSnapshot.idle();
 
     return PopScope(
       canPop: !state.isActive || _allowPop,

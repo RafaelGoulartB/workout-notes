@@ -12,10 +12,6 @@ class MealType {
   static const String lunch = 'lunch';
   static const String dinner = 'dinner';
   static const String snacks = 'snacks';
-
-  /// Whether [value] is one of the legacy fixed meal type keys.
-  static bool isLegacy(String value) =>
-      value == breakfast || value == lunch || value == dinner || value == snacks;
 }
 
 /// A meal of a day. There is at most one [MealLog] for each pair

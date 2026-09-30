@@ -1,20 +1,12 @@
 import 'package:flutter/material.dart';
-
-import '../../screens/workout/ai_settings_screen.dart';
-import '../../navigation/ai_coach_navigation.dart';
-import '../../l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/screens/settings/ai_settings_screen.dart';
 
 class AiEmptyState extends StatelessWidget {
   final String title;
   final String subtitle;
-  final IconData icon;
 
-  const AiEmptyState({
-    super.key,
-    required this.title,
-    required this.subtitle,
-    this.icon = Icons.smart_toy_rounded,
-  });
+  const AiEmptyState({super.key, required this.title, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +19,7 @@ class AiEmptyState extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              icon,
+              Icons.smart_toy_rounded,
               size: 80,
               color: theme.colorScheme.primary.withAlpha(80),
             ),
@@ -56,8 +48,7 @@ class AiEmptyState extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: () {
                     Navigator.of(context).push(
-                      AiCoachNavigation.route(
-                        kind: AiCoachRouteKind.aiFlow,
+                      MaterialPageRoute(
                         builder: (_) => const AiSettingsScreen(),
                       ),
                     );

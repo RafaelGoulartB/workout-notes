@@ -1,10 +1,11 @@
 import 'dart:math' as math;
 
+import 'package:workout_notes/dev_tools/test_data/test_data_context.dart';
 import 'package:workout_notes/models/run_track_point.dart';
+import 'package:workout_notes/services/run_route_codec.dart';
 import 'package:workout_notes/utils/run_effort_analytics.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
-
-import 'test_data_context.dart';
 
 class RunGenerationResult {
   final int runs;
@@ -143,7 +144,7 @@ class TestDataRunGenerator {
     final durationSeconds =
         (elapsedSeconds * (1.01 + context.random.nextDouble() * 0.02)).round();
     final avgPace = distanceMeters > 0
-        ? elapsedSeconds / (distanceMeters / 1000.0)
+        ? RunFormatters.paceSecondsPerKm(distanceMeters, elapsedSeconds)
         : null;
     final endedAt = startedAt.add(Duration(seconds: elapsedSeconds));
     final trackPoints = [
@@ -161,6 +162,7 @@ class TestDataRunGenerator {
         ),
     ];
     final efforts = RunEffortAnalytics.fromTrackPoints(trackPoints);
+    final route = RunRouteCodec.encode(trackPoints);
 
     await context.database.insert('run_activities', {
       'id': activityId,
@@ -188,16 +190,21 @@ class TestDataRunGenerator {
       'best_effort_half_sec': efforts.bestEffortHalfSec,
       'best_effort_marathon_sec': efforts.bestEffortMarathonSec,
       'efforts_computed': 1,
+      'raw_point_count': route.originalPointCount,
+      'stored_point_count': route.storedPointCount,
+      'route_quality': route.quality.databaseValue,
+      'route_codec_version': RunRouteCodec.version,
     });
-
-    // One awaited insert per point is far too slow for the volume generated
-    // here (tens of thousands of rows); a batch keeps generation fast enough
-    // for debug tools and their tests.
-    final batch = context.database.batch();
-    for (final point in points) {
-      batch.insert('run_track_points', point);
-    }
-    await batch.commit(noResult: true);
+    await context.database.insert('run_route_data', {
+      'activity_id': activityId,
+      'codec_version': RunRouteCodec.version,
+      'quality': route.quality.databaseValue,
+      'point_count': route.storedPointCount,
+      'original_point_count': route.originalPointCount,
+      'payload': route.payload,
+      'checksum': route.checksum,
+      'compacted_at': endedAt.toIso8601String(),
+    });
     return true;
   }
 

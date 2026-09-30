@@ -3,7 +3,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_lap.dart';
 import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Collapsed sheet summary: last and best completed kilometer.
 class RunSplitSummary extends StatelessWidget {
@@ -25,7 +25,7 @@ class RunSplitSummary extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        RunSectionCard(
+        AppSectionCard(
           padding: EdgeInsets.zero,
           color: theme.colorScheme.surfaceContainerHighest.withValues(
             alpha: 0.45,
@@ -37,7 +37,7 @@ class RunSplitSummary extends StatelessWidget {
                 height: 1,
                 indent: 12,
                 endIndent: 12,
-                color: RunUi.divider(theme.colorScheme),
+                color: AppUi.divider(theme.colorScheme),
               ),
               _SummaryRow(
                 title: loc.runRecordSplitBest,
@@ -109,7 +109,7 @@ class _SummaryRow extends StatelessWidget {
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w800,
                 color: accent,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
             const SizedBox(width: 10),
@@ -117,7 +117,7 @@ class _SummaryRow extends StatelessWidget {
               RunFormatters.duration(split.durationSeconds),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
           ],
@@ -196,7 +196,7 @@ class RunSplitsTable extends StatelessWidget {
                     RunFormatters.duration(split.durationSeconds),
                     textAlign: TextAlign.end,
                     style: theme.textTheme.bodyLarge?.copyWith(
-                      fontFeatures: RunUi.tabular,
+                      fontFeatures: AppUi.tabular,
                     ),
                   ),
                 ),
@@ -206,7 +206,7 @@ class RunSplitsTable extends StatelessWidget {
                     textAlign: TextAlign.end,
                     style: theme.textTheme.bodyLarge?.copyWith(
                       fontWeight: FontWeight.w600,
-                      fontFeatures: RunUi.tabular,
+                      fontFeatures: AppUi.tabular,
                     ),
                   ),
                 ),
@@ -259,7 +259,7 @@ class RunLapsTable extends StatelessWidget {
               RunFormatters.distanceKm(lap.distanceMeters),
               textAlign: TextAlign.end,
               style: theme.textTheme.bodyLarge?.copyWith(
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
           ),
@@ -268,7 +268,7 @@ class RunLapsTable extends StatelessWidget {
               RunFormatters.duration(lap.durationSeconds),
               textAlign: TextAlign.end,
               style: theme.textTheme.bodyLarge?.copyWith(
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
           ),
@@ -278,7 +278,7 @@ class RunLapsTable extends StatelessWidget {
               textAlign: TextAlign.end,
               style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w600,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
           ),

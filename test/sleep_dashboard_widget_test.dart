@@ -280,7 +280,7 @@ void main() {
   });
 }
 
-SleepDashboardStats _stats() => SleepDashboardStats(
+SleepDashboardStats _stats() => const SleepDashboardStats(
   latest: null,
   average7Days: 450,
   average30Days: 440,

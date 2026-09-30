@@ -1,4 +1,5 @@
-import 'test_data_context.dart';
+import 'package:workout_notes/dev_tools/test_data/test_data_context.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 class RunPlanGenerationResult {
   final int plans;
@@ -62,11 +63,7 @@ class TestDataRunPlanGenerator {
     final db = context.database;
     final planId = context.id('run_plan', key);
     final nowIso = context.now.toIso8601String();
-    final monday = DateTime(
-      context.now.year,
-      context.now.month,
-      context.now.day,
-    ).subtract(Duration(days: context.now.weekday - 1));
+    final monday = mondayOf(context.now);
 
     await db.insert('run_plans', {
       'id': planId,
@@ -79,7 +76,7 @@ class TestDataRunPlanGenerator {
       'weeks': weeks,
       'status': 'active',
       'completion_count': completionCount,
-      'activated_at': active ? context.date(context.now) : null,
+      'activated_at': active ? dateKey(context.now) : null,
       'created_at': context.start.toIso8601String(),
       'updated_at': nowIso,
     });
@@ -115,7 +112,7 @@ class TestDataRunPlanGenerator {
               );
         await db.insert('scheduled_runs', {
           'id': context.id('scheduled_run', '$key:$week:$session'),
-          'date': context.date(date),
+          'date': dateKey(date),
           'run_plan_id': planId,
           'run_plan_workout_id': workoutId,
           'status': completed ? 'completed' : 'planned',

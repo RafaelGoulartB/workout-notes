@@ -6,7 +6,7 @@ import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/run/run_medal_badge.dart';
 import 'package:workout_notes/widgets/run/run_route_sketch.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Latest runs, each with a route thumbnail (icon for treadmill or runs
 /// without a usable route), title, date, distance and pace.
@@ -29,12 +29,12 @@ class RunRecentRuns extends StatelessWidget {
       Localizations.localeOf(context).toString(),
     ).add_Hm();
 
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: RunDividedList(
+      child: AppDividedList(
         children: [
           for (final activity in activities)
-            RunListRow(
+            AppListRow(
               leading: RunRunThumbnail(activity: activity),
               title: activity.title?.trim().isNotEmpty == true
                   ? activity.title!.trim()

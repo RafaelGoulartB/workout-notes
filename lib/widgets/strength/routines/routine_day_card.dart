@@ -3,8 +3,8 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/strength_routine_format.dart';
 import 'package:workout_notes/utils/strength_routine_summary.dart';
 import 'package:workout_notes/utils/workout_estimator.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_muscle_widgets.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Hero of the routine screen: description and the numbers that size the
 /// routine (days, weekly sets, session time, volume) plus its muscle split.
@@ -24,7 +24,7 @@ class RoutineHero extends StatelessWidget {
     );
     final volume = routine.weeklyVolumeKg;
 
-    return RunHeroCard(
+    return AppHeroCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -37,25 +37,25 @@ class RoutineHero extends StatelessWidget {
             ),
             const SizedBox(height: 14),
           ],
-          RunStatRow(
+          AppStatRow(
             children: [
-              RunStatTile(
+              AppStatTile(
                 icon: Icons.calendar_view_week_rounded,
                 label: loc.routineStatDays,
                 value: '${routine.dayCount}',
               ),
-              RunStatTile(
+              AppStatTile(
                 icon: Icons.stacked_bar_chart_rounded,
                 label: loc.routineStatWeeklySets,
                 value: '${routine.weeklySets}',
               ),
-              RunStatTile(
+              AppStatTile(
                 icon: Icons.timer_outlined,
                 label: loc.routineStatSession,
                 value: duration ?? '--',
               ),
               if (volume > 0)
-                RunStatTile(
+                AppStatTile(
                   icon: Icons.scale_rounded,
                   label: loc.routineStatVolume,
                   value: StrengthRoutineFormat.volume(volume),
@@ -104,7 +104,7 @@ class RoutineDayCard extends StatelessWidget {
         ? loc.routineDayDefaultName(index + 1)
         : day.name;
 
-    return RunSectionCard(
+    return AppSectionCard(
       onTap: onOpen,
       padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
       child: Row(
@@ -144,7 +144,7 @@ class RoutineDayCard extends StatelessWidget {
                     ),
                     if (isNext) ...[
                       const SizedBox(width: 6),
-                      RunPill(label: loc.routinesNextBadge),
+                      AppPill(label: loc.routinesNextBadge),
                     ],
                   ],
                 ),

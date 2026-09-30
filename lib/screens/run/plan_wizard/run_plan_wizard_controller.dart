@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
-import 'package:workout_notes/repositories/run_repository.dart';
+import 'package:workout_notes/models/run_plan_template.dart';
 import 'package:workout_notes/screens/run/plan_wizard/run_plan_wizard_time.dart';
 import 'package:workout_notes/services/run_pace_calculator.dart';
 import 'package:workout_notes/services/run_plan_composer.dart';
 import 'package:workout_notes/services/run_plan_history.dart';
-import 'package:workout_notes/services/run_plan_templates.dart';
 import 'package:workout_notes/services/run_plan_text.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
@@ -26,7 +25,7 @@ class RunPlanWizardController extends ChangeNotifier {
   /// Clock for race-date maths (tests).
   final DateTime? todayOverride;
 
-  final _runRepo = RunRepository();
+  final _runRepo = DatabaseHelper.instance.runRepo;
   final currentCtl = TextEditingController();
   final goalCtl = TextEditingController();
   final weeklyKmCtl = TextEditingController();

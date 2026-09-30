@@ -6,6 +6,7 @@ import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// `app_settings` key of the weekly distance goal the runner set by hand.
 const String kRunWeeklyGoalSettingKey = 'run_weekly_goal_km';
@@ -169,11 +170,6 @@ class RunWeekGoal {
 /// Pure decision logic, kept apart from the repositories so it can be tested
 /// with plain fixtures.
 abstract final class RunTodayResolver {
-  static DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
-
-  static bool _sameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
-
   /// Decides what today looks like.
   ///
   /// Priority: a pending scheduled session; a completed one; skipped rows
@@ -190,11 +186,11 @@ abstract final class RunTodayResolver {
     RunPlannedSession? nextFromSuggestions,
     String? Function(String? planId)? planNameOf,
   }) {
-    final day = _day(today);
+    final day = dayOf(today);
     final rows = scheduledToday.where((s) => s.workout != null).toList();
     final ranToday =
         todayActivities
-            .where((a) => a.isCompleted && _sameDay(a.startedAt.toLocal(), day))
+            .where((a) => a.isCompleted && isSameDay(a.startedAt.toLocal(), day))
             .toList()
           ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
 
@@ -323,7 +319,7 @@ abstract final class RunTodayResolver {
     RunPlannedSession? fromSuggestions,
     String? Function(String? planId)? planNameOf,
   }) {
-    final day = _day(today);
+    final day = dayOf(today);
     return _nextFromUpcoming(day, upcoming, planNameOf) ??
         _nextFromPlan(day, followedPlan) ??
         fromSuggestions;
@@ -338,14 +334,14 @@ abstract final class RunTodayResolver {
         upcoming
             .where(
               (s) =>
-                  s.isPlanned && s.workout != null && _day(s.date).isAfter(day),
+                  s.isPlanned && s.workout != null && dayOf(s.date).isAfter(day),
             )
             .toList()
           ..sort((a, b) => a.date.compareTo(b.date));
     if (future.isEmpty) return null;
     final row = future.first;
     return RunPlannedSession(
-      date: _day(row.date),
+      date: dayOf(row.date),
       workout: row.workout!,
       scheduled: row,
       planName: planNameOf?.call(row.runPlanId),
@@ -374,13 +370,13 @@ abstract final class RunTodayResolver {
     required List<ScheduledRun> scheduledThisWeek,
     RunPlan? followedPlan,
   }) {
-    final day = _day(today);
+    final day = dayOf(today);
     final rows = scheduledThisWeek.where((s) => s.workout != null).toList();
     if (rows.isNotEmpty) {
       return [
         for (final row in rows)
           RunPlannedDay(
-            date: _day(row.date),
+            date: dayOf(row.date),
             kind: row.workout!.kind,
             name: row.workout!.name,
             plannedMeters: row.workout!.plannedDistanceMeters,
@@ -388,7 +384,7 @@ abstract final class RunTodayResolver {
               ScheduledRunStatus.completed => RunPlannedDayState.done,
               ScheduledRunStatus.skipped => RunPlannedDayState.skipped,
               ScheduledRunStatus.planned =>
-                _day(row.date).isBefore(day)
+                dayOf(row.date).isBefore(day)
                     ? RunPlannedDayState.missed
                     : RunPlannedDayState.pending,
             },
@@ -398,7 +394,7 @@ abstract final class RunTodayResolver {
     final plan = followedPlan;
     final week = plan?.activeWeekIndexOn(day);
     if (plan == null || week == null) return const [];
-    final monday = day.subtract(Duration(days: day.weekday - 1));
+    final monday = mondayOf(day);
     return [
       for (final workout in plan.workoutsForWeek(week))
         if (workout.dayOfWeek != null)
@@ -426,7 +422,7 @@ abstract final class RunTodayResolver {
     return [
       for (final p in plan)
         if (p.state == RunPlannedDayState.missed &&
-            runsByDay.any((r) => _sameDay(r.date, p.date) && r.count > 0))
+            runsByDay.any((r) => isSameDay(r.date, p.date) && r.count > 0))
           RunPlannedDay(
             date: p.date,
             kind: p.kind,
@@ -454,8 +450,8 @@ class RunTodayService {
   final RunRepository _runRepo;
 
   RunTodayService({RunPlanRepository? planRepo, RunRepository? runRepo})
-    : _planRepo = planRepo ?? RunPlanRepository(),
-      _runRepo = runRepo ?? RunRepository();
+    : _planRepo = planRepo ?? DatabaseHelper.instance.runPlanRepo,
+      _runRepo = runRepo ?? DatabaseHelper.instance.runRepo;
 
   Future<RunHomeSnapshot> load({
     DateTime? now,
@@ -467,7 +463,7 @@ class RunTodayService {
       (now ?? today).month,
       (now ?? today).day,
     );
-    final monday = day.subtract(Duration(days: day.weekday - 1));
+    final monday = mondayOf(day);
     final helper = DatabaseHelper.instance;
 
     final followed = await _safe(_planRepo.getActivatedPlan());

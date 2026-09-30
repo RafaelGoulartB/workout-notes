@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Values chosen in the plan edit sheet.
 class RunPlanEditResult {
@@ -154,22 +155,11 @@ Future<RunPlanEditResult?> showRunPlanEditSheet(
         .where((workout) => workout.weekIndex >= weeks)
         .length;
     if (dropped > 0 && context.mounted) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(loc.commonConfirmDelete),
-          content: Text(loc.commonActionCannotBeUndone),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(loc.commonCancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(loc.commonSave),
-            ),
-          ],
-        ),
+      final confirmed = await showConfirmDialog(
+        context,
+        title: loc.commonConfirmDelete,
+        message: loc.commonActionCannotBeUndone,
+        confirmLabel: loc.commonSave,
       );
       if (confirmed != true) return null;
     }

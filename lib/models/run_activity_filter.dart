@@ -1,4 +1,5 @@
 import 'package:workout_notes/models/cardio_activity_type.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Row-level criteria for querying completed cardio activities in SQL.
 class RunActivityFilter {
@@ -65,8 +66,8 @@ enum RunHistoryPeriod {
 
   DateTime? startFor(DateTime now) => switch (this) {
     RunHistoryPeriod.all => null,
-    RunHistoryPeriod.last30Days => DateTime(now.year, now.month, now.day - 29),
-    RunHistoryPeriod.last90Days => DateTime(now.year, now.month, now.day - 89),
+    RunHistoryPeriod.last30Days => addDays(now, -29),
+    RunHistoryPeriod.last90Days => addDays(now, -89),
     RunHistoryPeriod.thisYear => DateTime(now.year, 1, 1),
   };
 }
@@ -113,13 +114,6 @@ class RunHistoryFilter {
       distance != RunHistoryDistance.any ||
       onlyPlan ||
       query.trim().isNotEmpty;
-
-  /// Number of narrowing options excluding the free-text search.
-  int get activeOptionCount =>
-      (type != RunHistoryType.all ? 1 : 0) +
-      (period != RunHistoryPeriod.all ? 1 : 0) +
-      (distance != RunHistoryDistance.any ? 1 : 0) +
-      (onlyPlan ? 1 : 0);
 
   RunHistoryFilter copyWith({
     RunHistoryType? type,

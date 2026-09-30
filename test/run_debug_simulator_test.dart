@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:workout_notes/services/run_debug_simulator.dart';
+import 'package:workout_notes/dev_tools/run_debug_simulator.dart';
 
 void main() {
   test('debug simulator accumulates distance and emits km splits', () {

@@ -6,8 +6,10 @@ import 'package:workout_notes/database/database_schema.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
+import 'package:workout_notes/services/indoor_tracking_service.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
-import 'package:workout_notes/services/stationary_bike_tracking_service.dart';
+
+import 'support/test_db.dart';
 
 Map<String, dynamic> _treadmillSpool({
   String id = 'treadmill-1',
@@ -30,10 +32,7 @@ Map<String, dynamic> _treadmillSpool({
 void main() {
   late Database database;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(
@@ -48,14 +47,14 @@ void main() {
   });
 
   tearDown(() async {
-    await StationaryBikeTrackingService.instance.discard();
+    await IndoorTrackingService.instance.discard();
     DatabaseHelper.overrideDatabase = null;
     await database.close();
   });
 
   group('indoor timer service', () {
     test('times a treadmill session without GPS', () async {
-      final service = StationaryBikeTrackingService.instance;
+      final service = IndoorTrackingService.instance;
       expect(await service.start(type: CardioActivityType.treadmill), isTrue);
       expect(service.activityType, CardioActivityType.treadmill);
       expect(service.isActive, isTrue);
@@ -77,7 +76,7 @@ void main() {
     });
 
     test('a bike session is still a bike session', () async {
-      final service = StationaryBikeTrackingService.instance;
+      final service = IndoorTrackingService.instance;
       await service.start();
       final draft = await service.stopForReview();
       expect(draft!.activity.activityType, CardioActivityType.stationaryBike);

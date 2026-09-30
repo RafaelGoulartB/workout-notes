@@ -1,4 +1,5 @@
-import 'test_data_context.dart';
+import 'package:workout_notes/dev_tools/test_data/test_data_context.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 class FitnessGenerationResult {
   final int workouts;
@@ -79,7 +80,7 @@ class TestDataFitnessGenerator {
       final workoutId = context.id('workout', '$day:${planned.$1}');
       await context.database.insert('workouts', {
         'id': workoutId,
-        'date': context.date(date),
+        'date': dateKey(date),
         'start_time': start.toIso8601String(),
         'end_time': start.add(Duration(minutes: duration)).toIso8601String(),
         'duration_seconds': duration * 60,
@@ -325,7 +326,7 @@ class TestDataFitnessGenerator {
               (value + (side == 'right' ? 0.2 : 0)).toStringAsFixed(1),
             ),
             'unit': definition.$4,
-            'date': context.date(date),
+            'date': dateKey(date),
             'comment':
                 definition.$1 == 'weight' && context.random.nextDouble() < 0.2
                 ? 'Em jejum'

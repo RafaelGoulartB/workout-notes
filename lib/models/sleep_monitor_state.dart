@@ -1,5 +1,5 @@
-import 'sleep_monitor_segment.dart';
-import 'sleep_monitor_mode.dart';
+import 'package:workout_notes/models/sleep_monitor_mode.dart';
+import 'package:workout_notes/models/sleep_monitor_segment.dart';
 
 class SleepMonitorState {
   static const idle = 'idle';
@@ -97,6 +97,13 @@ class SleepMonitorState {
       !alarmDismissed &&
       snoozeCount > 0 &&
       (alarmSnoozing || alarmState == 'scheduled');
+
+  /// The wake-up alarm of the night is ringing right now.
+  bool get isAlarmRinging =>
+      !alarmDismissed && (alarmRinging || alarmState == 'ringing');
+
+  /// Ringing or snoozed: the night ended and its alarm still needs an answer.
+  bool get isAlarmPending => isAlarmRinging || isAlarmSnoozing;
 
   Duration get elapsed {
     if (startedAt == null) return Duration.zero;

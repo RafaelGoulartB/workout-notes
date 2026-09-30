@@ -1,4 +1,4 @@
-import 'sleep_stage_type.dart';
+import 'package:workout_notes/models/sleep_stage_type.dart';
 
 /// A privacy-preserving 30-second sleep-stage prediction.
 ///

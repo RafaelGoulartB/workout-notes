@@ -2,14 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-
-import '../models/sleep_monitor_state.dart';
-import '../models/sleep_monitor_mode.dart';
-import '../repositories/sleep_monitor_repository.dart';
+import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/models/sleep_monitor_mode.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
-import 'package:workout_notes/services/sleep_wake_engine.dart';
+import 'package:workout_notes/models/sleep_monitor_state.dart';
+import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/services/sleep_diagnostic_store.dart';
+import 'package:workout_notes/services/sleep_wake_engine.dart';
+import 'package:workout_notes/utils/sleep_live_level.dart';
 
 /// Flutter facade for the Android foreground sleep monitor.
 ///
@@ -24,12 +25,12 @@ class SleepMonitorService extends ChangeNotifier {
   static const methods = MethodChannel('workout_notes/sleep_monitor/methods');
   static const events = EventChannel('workout_notes/sleep_monitor/events');
 
-  final SleepMonitorRepository _repository = SleepMonitorRepository();
+  final SleepMonitorRepository _repository = DatabaseHelper.instance.sleepMonitorRepo;
   SleepMonitorState _state = SleepMonitorState.initial(
-    supported: !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
+    supported: defaultTargetPlatform == TargetPlatform.android,
   );
   StreamSubscription<dynamic>? _eventSubscription;
-  bool _initialized = false;
+  Future<void>? _initFuture;
   bool _recovering = false;
   int _recoveredCount = 0;
   SleepWakeCursor? _liveCursor;
@@ -37,32 +38,62 @@ class SleepMonitorService extends ChangeNotifier {
   SleepWakeDecision? _liveDecision;
   SleepWakeDecision? get liveDecision => _liveDecision;
   String? _restoredLiveSession;
+  // Alarm nights whose result already opened in this process; the native
+  // state reports the dismissal until the next night starts.
+  final Set<String> _shownAlarmResults = {};
 
   SleepMonitorState get state => _state;
   bool get isSupported => _state.supported;
   bool get isMonitoring => _state.isActive;
   int get recoveredCount => _recoveredCount;
 
-  Future<void> initialize() async {
-    if (!_isAndroid) {
-      _initialized = true;
-      return;
-    }
-    if (!_initialized) {
-      _initialized = true;
-      _eventSubscription = events.receiveBroadcastStream().listen(
-        _onEvent,
-        onError: (Object error, StackTrace stack) {
-          _state = _state.copyWith(
-            errorCode: 'event_channel',
-            errorMessage: error.toString(),
-          );
-          notifyListeners();
-        },
-      );
-    }
+  /// Subscribes to the native events, reads capabilities/state and imports
+  /// pending spools. Concurrent and later callers share the same run; a failed
+  /// run can be retried by calling it again. Use [refresh] for a light re-read.
+  Future<void> initialize() {
+    final running = _initFuture;
+    if (running != null) return running;
+    final future = _initialize();
+    _initFuture = future;
+    future.catchError((Object _) {
+      if (identical(_initFuture, future)) _initFuture = null;
+    });
+    return future;
+  }
+
+  Future<void> _initialize() async {
+    if (!_isAndroid) return;
+    _eventSubscription ??= events.receiveBroadcastStream().listen(
+      _onEvent,
+      onError: (Object error, StackTrace stack) {
+        _state = _state.copyWith(
+          errorCode: 'event_channel',
+          errorMessage: error.toString(),
+        );
+        notifyListeners();
+      },
+    );
+    await refresh();
+    await recoverPendingSessions();
+  }
+
+  /// Forgets the shared initialisation so the next [initialize] runs again
+  /// (tests share the singleton across cases).
+  @visibleForTesting
+  void resetInitializationForTest() => _initFuture = null;
+
+  /// Light re-read of the native capabilities and state (no spool import).
+  Future<void> refresh() async {
     await getCapabilities();
     await getState();
+  }
+
+  /// The app came back to the foreground (or the user pulled to refresh):
+  /// re-read the native state and import what finished meanwhile.
+  Future<void> resync() async {
+    if (!_isAndroid) return;
+    await initialize();
+    await refresh();
     await recoverPendingSessions();
   }
 
@@ -94,6 +125,36 @@ class SleepMonitorService extends ChangeNotifier {
     } catch (error) {
       _setError('capabilities_error', error.toString());
       return {'supported': true, 'error': error.toString()};
+    }
+  }
+
+  /// Claims the result of a night ended by its alarm for display. False when
+  /// it was already shown, so reopening the monitor never jumps to it again.
+  bool claimAlarmResult(String sessionId) => _shownAlarmResults.add(sessionId);
+
+  /// Whether the monitored night [sessionId] is stored (imported and not
+  /// deleted).
+  Future<bool> hasSession(String sessionId) async =>
+      await _repository.getSession(sessionId) != null;
+
+  /// Latest microphone level while recording, from 0 (room baseline) to 1
+  /// (loud), or null when nothing is being captured. It only drives the live
+  /// waveform of the visible monitor screen and is never persisted.
+  Future<double?> getLiveLevel() async {
+    if (!_isAndroid || !_state.isActive) return null;
+    try {
+      final result = await methods.invokeMapMethod<String, dynamic>(
+        'getLiveLevel',
+      );
+      final level = (result?['level_dbfs'] as num?)?.toDouble();
+      final baseline = (result?['baseline_dbfs'] as num?)?.toDouble();
+      if (level == null || baseline == null) return null;
+      return SleepLiveLevel.normalize(levelDbfs: level, baselineDbfs: baseline);
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      // Best effort: a missed sample only holds the waveform for a frame.
+      return null;
     }
   }
 
@@ -253,23 +314,22 @@ class SleepMonitorService extends ChangeNotifier {
     }
   }
 
-  Future<bool> openSnoozedAlarmMission() async {
-    if (!_isAndroid ||
-        !_state.isAlarmSnoozing ||
-        !_state.mode.requiresMission) {
-      return false;
-    }
+  /// Opens the native alarm screen of a ringing or snoozed alarm. A snoozed
+  /// alarm stays silent there: its mission can be completed early, and
+  /// leaving keeps the snooze as it was.
+  Future<bool> openAlarmScreen() async {
+    if (!_isAndroid || !_state.isAlarmPending) return false;
     try {
       final result = await methods.invokeMapMethod<String, dynamic>(
-        'openSnoozedAlarmMission',
+        'openAlarmScreen',
       );
       if (result != null) _onEvent(result);
-      return _state.alarmRinging;
+      return true;
     } on PlatformException catch (error) {
       _setError(error.code, error.message ?? error.toString());
       return false;
     } catch (error) {
-      _setError('alarm_resume_failed', error.toString());
+      _setError('alarm_open_failed', error.toString());
       return false;
     }
   }
@@ -308,33 +368,6 @@ class SleepMonitorService extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, bool>> getMissionCapabilities() async {
-    if (!_isAndroid) return {'cameraGranted': false};
-    try {
-      final result = await methods.invokeMapMethod<String, dynamic>(
-        'getMissionCapabilities',
-      );
-      return {'cameraGranted': result?['camera_granted'] as bool? ?? false};
-    } catch (error) {
-      _setError('mission_capabilities', error.toString());
-      return {'cameraGranted': false};
-    }
-  }
-
-  Future<bool> requestCameraPermission() async {
-    if (!_isAndroid) return false;
-    try {
-      return await methods.invokeMethod<bool>('requestCameraPermission') ??
-          false;
-    } on PlatformException catch (error) {
-      _setError(error.code, error.message ?? error.toString());
-      return false;
-    } catch (error) {
-      _setError('camera_permission', error.toString());
-      return false;
-    }
-  }
-
   Future<bool> openCameraSettings() async {
     if (!_isAndroid) return false;
     try {
@@ -365,7 +398,9 @@ class SleepMonitorService extends ChangeNotifier {
     if (_isAndroid && sessionId != null) {
       try {
         await methods.invokeMethod<void>('discardSession', sessionId);
-      } catch (_) {}
+      } catch (_) {
+        // The native session may already be gone; the SQLite row is removed below.
+      }
     }
     if (sessionId != null) {
       await _repository.deleteSession(sessionId);
@@ -556,8 +591,7 @@ class SleepMonitorService extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool get _isAndroid =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  bool get _isAndroid => defaultTargetPlatform == TargetPlatform.android;
 
   @override
   void dispose() {

@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/services/run_today_service.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Active plan summary: name, week X of Y, progress and the next session.
 /// Tapping opens the plan; "All plans" opens the library.
@@ -62,14 +62,14 @@ class RunActivePlanCard extends StatelessWidget {
       );
     }
 
-    return RunSectionCard(
+    return AppSectionCard(
       onTap: onOpenPlan,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              const RunIconBadge(Icons.route_outlined),
+              const AppIconBadge(Icons.route_outlined),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -142,7 +142,7 @@ class RunActivePlanCard extends StatelessWidget {
                     ),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colors.onSurfaceVariant,
-                      fontFeatures: RunUi.tabular,
+                      fontFeatures: AppUi.tabular,
                     ),
                   ),
                 )

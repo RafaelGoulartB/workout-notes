@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Card used by every analysis block: icon + title (+ short subtitle) in one
 /// header row, an optional "how it works" button that moves long
@@ -35,7 +35,7 @@ class RunInsightCard extends StatelessWidget {
     final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
 
-    return RunSectionCard(
+    return AppSectionCard(
       onTap: onTap,
       padding: const EdgeInsets.fromLTRB(16, 14, 8, 16),
       child: Column(
@@ -43,7 +43,7 @@ class RunInsightCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              RunIconBadge(icon, color: color),
+              AppIconBadge(icon, color: color),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

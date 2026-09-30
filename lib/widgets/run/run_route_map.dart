@@ -7,7 +7,7 @@ import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_route_geometry.dart';
 import 'package:workout_notes/utils/run_route_pace_style.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Pace-coloured GPS route on an OpenStreetMap base with start / finish
 /// markers, an optional legend and a marker that follows [selectedDistance]
@@ -22,7 +22,6 @@ class RunRouteMap extends StatefulWidget {
   /// When false the map is a static preview: pans/zooms are ignored so it
   /// can sit inside a scroll view and react to [onTap] instead.
   final bool interactive;
-  final bool showLegend;
   final bool showKmMarkers;
   final bool showMapTiles;
   final VoidCallback? onTap;
@@ -34,7 +33,6 @@ class RunRouteMap extends StatefulWidget {
     required this.averagePaceSecPerKm,
     this.selectedDistance,
     this.interactive = false,
-    this.showLegend = true,
     this.showKmMarkers = false,
     this.showMapTiles = true,
     this.onTap,
@@ -256,7 +254,7 @@ class _RunRouteMapState extends State<RunRouteMap> {
               onTap: widget.onTap,
             ),
           ),
-        if (widget.showLegend && _polylines.isNotEmpty)
+        if (_polylines.isNotEmpty)
           Positioned(
             left: 10,
             bottom: 10,
@@ -314,7 +312,7 @@ class RunRoutePaceLegend extends StatelessWidget {
     final value = theme.textTheme.labelSmall?.copyWith(
       color: theme.colorScheme.onSurface,
       fontWeight: FontWeight.w700,
-      fontFeatures: RunUi.tabular,
+      fontFeatures: AppUi.tabular,
     );
     return DecoratedBox(
       decoration: BoxDecoration(

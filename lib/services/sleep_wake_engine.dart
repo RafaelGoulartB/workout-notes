@@ -2,8 +2,6 @@ import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/models/sleep_stage_epoch.dart';
 import 'package:workout_notes/models/sleep_stage_type.dart';
-import 'package:workout_notes/services/sleep_stage_engine.dart'
-    show SleepStageEngineResult, SleepWindow;
 
 /// Audio-only estimate for a phone on a bedside table.
 /// Sustained low activity is a fallback when breathing is not audible; quiet
@@ -70,9 +68,6 @@ class SleepWakeEngine {
 
   static bool supports(SleepMonitorSession session) =>
       featureVersions.contains(session.algorithmVersion);
-
-  static bool supportsVersion(Object? algorithmVersion) =>
-      featureVersions.contains(algorithmVersion);
 
   /// [refine] applies the offline pass; `false` returns the causal labels
   /// exactly as the live cursor emitted them.
@@ -554,4 +549,35 @@ class SleepWakeCursor {
     algorithmVersion: SleepWakeEngine.algorithmVersion,
     source: SleepWakeEngine.source,
   );
+}
+
+/// Result of a staging pass: the labelled epochs plus coverage counters.
+class SleepStageEngineResult {
+  final Map<String, String> decisionReasons;
+  final bool ran;
+  final List<SleepStageEpoch> epochs;
+  final List<String> blockers;
+  final int validEpochs;
+  final int unknownEpochs;
+  final double coverage;
+  final SleepWindow window;
+
+  const SleepStageEngineResult({
+    this.decisionReasons = const {},
+    required this.ran,
+    this.epochs = const [],
+    this.blockers = const [],
+    this.validEpochs = 0,
+    this.unknownEpochs = 0,
+    this.coverage = 0,
+    this.window = const SleepWindow(),
+  });
+}
+
+/// The detected sleep period: [onsetAt] is the start of the first confirmed
+/// sleep stretch.
+class SleepWindow {
+  final DateTime? onsetAt;
+
+  const SleepWindow({this.onsetAt});
 }

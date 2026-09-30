@@ -10,7 +10,6 @@ class AudioSignalProcessorTest {
         val samples = shortArrayOf(0, 16_383, -16_383, 16_383)
         val rms = AudioSignalProcessor.rms(samples)
         assertEquals(-7.27, AudioSignalProcessor.dbfs(rms), 0.15)
-        assertEquals(-6.02, AudioSignalProcessor.peakDbfs(samples), 0.15)
     }
 
     @Test
@@ -21,15 +20,8 @@ class AudioSignalProcessorTest {
     }
 
     @Test
-    fun aggregatesThirtySecondWindowsAndGroupsEvents() {
+    fun usesThirtySecondWindowsAndBoundedReadRetries() {
         assertEquals(30, AudioSignalProcessor.WINDOW_SECONDS)
-        assertEquals(
-            2,
-            AudioSignalProcessor.countEvents(
-                listOf("quiet", "noise", "noise", "quiet", "noise"),
-            ),
-        )
-        assertTrue(AudioSignalProcessor.MAX_SESSION_SECONDS >= 16 * 60 * 60)
         assertTrue(AudioSignalProcessor.MAX_CONSECUTIVE_READ_ERRORS <= 3)
         assertTrue(AudioSignalProcessor.NO_DATA_TIMEOUT_MILLIS <= 5_000)
     }

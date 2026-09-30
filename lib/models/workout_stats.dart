@@ -19,64 +19,16 @@ class WorkoutStatsSetInput {
 }
 
 class WorkoutStatsExerciseInput {
-  final String exerciseId;
-  final String name;
-  final String? localeKey;
   final String? categoryId;
   final String categoryName;
   final Color categoryColor;
   final List<WorkoutStatsSetInput> sets;
 
   const WorkoutStatsExerciseInput({
-    required this.exerciseId,
-    required this.name,
-    this.localeKey,
     this.categoryId,
     required this.categoryName,
     required this.categoryColor,
     required this.sets,
-  });
-}
-
-class WorkoutTopSet {
-  final String exerciseId;
-  final String exerciseName;
-  final String? exerciseLocaleKey;
-  final double weight;
-  final int reps;
-  final double volume;
-
-  const WorkoutTopSet({
-    required this.exerciseId,
-    required this.exerciseName,
-    this.exerciseLocaleKey,
-    required this.weight,
-    required this.reps,
-    required this.volume,
-  });
-}
-
-class ExerciseWorkoutStats {
-  final String exerciseId;
-  final String name;
-  final String? localeKey;
-  final String? categoryId;
-  final String categoryName;
-  final Color categoryColor;
-  final double volume;
-  final int completedSets;
-  final WorkoutTopSet? topSet;
-
-  const ExerciseWorkoutStats({
-    required this.exerciseId,
-    required this.name,
-    this.localeKey,
-    this.categoryId,
-    required this.categoryName,
-    required this.categoryColor,
-    required this.volume,
-    required this.completedSets,
-    this.topSet,
   });
 }
 
@@ -104,9 +56,6 @@ class WorkoutStats {
   final int completedSets;
   final int totalSets;
   final double? averageRpe;
-  final WorkoutTopSet? topSet;
-  final ExerciseWorkoutStats? highestVolumeExercise;
-  final List<ExerciseWorkoutStats> exercises;
   final List<CategoryWorkoutStats> categories;
 
   const WorkoutStats({
@@ -117,9 +66,6 @@ class WorkoutStats {
     required this.completedSets,
     required this.totalSets,
     this.averageRpe,
-    this.topSet,
-    this.highestVolumeExercise,
-    this.exercises = const [],
     this.categories = const [],
   });
 
@@ -140,14 +86,11 @@ class WorkoutStats {
     var completedSets = 0;
     var totalSets = 0;
     final rpes = <double>[];
-    WorkoutTopSet? workoutTopSet;
-    final exerciseStats = <ExerciseWorkoutStats>[];
     final categoryAccumulators = <String, _CategoryAccumulator>{};
 
     for (final exercise in exercises) {
       var exerciseVolume = 0.0;
       var exerciseCompletedSets = 0;
-      WorkoutTopSet? exerciseTopSet;
 
       for (final set in exercise.sets) {
         if (set.isWarmup) continue;
@@ -159,41 +102,9 @@ class WorkoutStats {
         totalVolume += set.volume;
         exerciseVolume += set.volume;
         if (set.rpe != null) rpes.add(set.rpe!);
-
-        if (set.volume > 0 &&
-            (exerciseTopSet == null || set.volume > exerciseTopSet.volume)) {
-          exerciseTopSet = WorkoutTopSet(
-            exerciseId: exercise.exerciseId,
-            exerciseName: exercise.name,
-            exerciseLocaleKey: exercise.localeKey,
-            weight: set.weight,
-            reps: set.reps,
-            volume: set.volume,
-          );
-        }
       }
 
       if (exerciseCompletedSets > 0 || exerciseVolume > 0) {
-        if (exerciseTopSet != null &&
-            (workoutTopSet == null ||
-                exerciseTopSet.volume > workoutTopSet.volume)) {
-          workoutTopSet = exerciseTopSet;
-        }
-
-        exerciseStats.add(
-          ExerciseWorkoutStats(
-            exerciseId: exercise.exerciseId,
-            name: exercise.name,
-            localeKey: exercise.localeKey,
-            categoryId: exercise.categoryId,
-            categoryName: exercise.categoryName,
-            categoryColor: exercise.categoryColor,
-            volume: exerciseVolume,
-            completedSets: exerciseCompletedSets,
-            topSet: exerciseTopSet,
-          ),
-        );
-
         final categoryKey = exercise.categoryId ?? exercise.categoryName;
         final category = categoryAccumulators.putIfAbsent(
           categoryKey,
@@ -208,7 +119,6 @@ class WorkoutStats {
       }
     }
 
-    exerciseStats.sort((a, b) => b.volume.compareTo(a.volume));
     final categoryStats =
         categoryAccumulators.values
             .map(
@@ -233,9 +143,6 @@ class WorkoutStats {
       averageRpe: rpes.isEmpty
           ? null
           : rpes.fold<double>(0, (sum, rpe) => sum + rpe) / rpes.length,
-      topSet: workoutTopSet,
-      highestVolumeExercise: exerciseStats.isEmpty ? null : exerciseStats.first,
-      exercises: exerciseStats,
       categories: categoryStats,
     );
   }

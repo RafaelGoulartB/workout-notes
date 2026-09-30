@@ -15,7 +15,7 @@ class RunVoiceSettingsStore {
     if (_cache != null) return _cache!;
     try {
       final raw =
-          await DatabaseHelper.instance.getSetting(RunVoiceSettings.storageKey);
+          await DatabaseHelper.instance.settingsRepo.getSetting(RunVoiceSettings.storageKey);
       if (raw == null || raw.isEmpty) {
         _cache = const RunVoiceSettings.defaults();
         return _cache!;
@@ -35,7 +35,7 @@ class RunVoiceSettingsStore {
   Future<void> save(RunVoiceSettings settings) async {
     _cache = settings;
     final encoded = jsonEncode(settings.toJson());
-    await DatabaseHelper.instance.setSetting(
+    await DatabaseHelper.instance.settingsRepo.setSetting(
       RunVoiceSettings.storageKey,
       encoded,
     );
@@ -44,10 +44,6 @@ class RunVoiceSettingsStore {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(RunVoiceSettings.storageKey, encoded);
-      await prefs.setString(
-        'flutter.${RunVoiceSettings.storageKey}',
-        encoded,
-      );
     } catch (e) {
       if (kDebugMode) debugPrint('RunVoiceSettingsStore mirror failed: $e');
     }

@@ -114,10 +114,9 @@ abstract final class RunPlanUi {
           : '${hours}h${rest.toString().padLeft(2, '0')}';
     }
     if (minutes == 0) return '${seconds}s';
-    final rest = seconds % 60;
-    return rest == 0
+    return seconds % 60 == 0
         ? '$minutes min'
-        : '$minutes:${rest.toString().padLeft(2, '0')}';
+        : RunFormatters.minSec(seconds);
   }
 
   /// Rounded duration for estimates — `38 min`, `1h05`. The exact form
@@ -137,8 +136,7 @@ abstract final class RunPlanUi {
   /// `4:35` for 275 s/km.
   static String paceLabel(double? secPerKm) {
     if (secPerKm == null || secPerKm <= 0 || !secPerKm.isFinite) return '—';
-    final total = secPerKm.round();
-    return '${total ~/ 60}:${(total % 60).toString().padLeft(2, '0')}';
+    return RunFormatters.minSec(secPerKm.round());
   }
 
   /// `4:20–4:35` (or a single value when only one bound is set).
@@ -265,7 +263,7 @@ abstract final class RunPlanUi {
   /// `2:30`, so a 20-minute warm-up is not typed as `1200`.
   static String secondsInput(int seconds) {
     if (seconds < 60) return seconds.toString();
-    return '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
+    return RunFormatters.minSec(seconds);
   }
 
   /// Parses a step duration: `90` (seconds) or `1:30` (minutes and seconds).
@@ -353,17 +351,9 @@ class RunStepBlock {
 /// of week chips hides it completely.
 class RunPlanVolumeBars extends StatelessWidget {
   final RunPlan plan;
-  final int? selectedWeek;
-  final ValueChanged<int>? onWeekSelected;
   final double height;
 
-  const RunPlanVolumeBars({
-    super.key,
-    required this.plan,
-    this.selectedWeek,
-    this.onWeekSelected,
-    this.height = 44,
-  });
+  const RunPlanVolumeBars({super.key, required this.plan, this.height = 44});
 
   @override
   Widget build(BuildContext context) {
@@ -384,32 +374,24 @@ class RunPlanVolumeBars extends StatelessWidget {
         children: [
           for (var week = 0; week < volumes.length; week++)
             Expanded(
-              child: GestureDetector(
-                onTap: onWeekSelected == null
-                    ? null
-                    : () => onWeekSelected!(week),
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: DecoratedBox(
-                    // A faint track behind every bar: a plan with equal weeks
-                    // would otherwise render as one solid rectangle.
-                    decoration: BoxDecoration(
-                      color: scheme.onSurfaceVariant.withAlpha(28),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                    child: Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Container(
-                        height: peak <= 0
-                            ? 3
-                            : (3 + (height - 3) * (volumes[week] / peak)),
-                        decoration: BoxDecoration(
-                          color: week == selectedWeek
-                              ? scheme.primary
-                              : scheme.primary.withAlpha(120),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: DecoratedBox(
+                  // A faint track behind every bar: a plan with equal weeks
+                  // would otherwise render as one solid rectangle.
+                  decoration: BoxDecoration(
+                    color: scheme.onSurfaceVariant.withAlpha(28),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Container(
+                      height: peak <= 0
+                          ? 3
+                          : (3 + (height - 3) * (volumes[week] / peak)),
+                      decoration: BoxDecoration(
+                        color: scheme.primary.withAlpha(120),
+                        borderRadius: BorderRadius.circular(3),
                       ),
                     ),
                   ),
@@ -474,39 +456,6 @@ class RunWorkoutProfileBar extends StatelessWidget {
                 ),
               ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Compact chip describing a step inside the session editor.
-class RunStepChip extends StatelessWidget {
-  final RunWorkoutStep step;
-  final int? repeats;
-
-  const RunStepChip({super.key, required this.step, this.repeats});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final loc = AppLocalizations.of(context)!;
-    final color = RunPlanUi.roleColor(theme.colorScheme, step.role);
-    final amount = RunPlanUi.stepAmountLabel(step);
-    final label = repeats != null && repeats! > 1
-        ? '${repeats}x $amount'
-        : amount;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withAlpha(28),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        '${RunPlanUi.roleLabel(loc, step.role)} · $label',
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w700,
         ),
       ),
     );

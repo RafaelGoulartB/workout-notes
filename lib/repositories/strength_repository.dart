@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:workout_notes/repositories/base_repository.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/workout_estimator.dart';
 
 /// The routine (and day) a workout was last trained from.
@@ -20,19 +21,8 @@ class StrengthLastRoutineUse {
 /// (`end_time` set) and completed, non-warm-up sets of anaerobic exercises
 /// are counted, so planned or abandoned sessions never inflate the numbers.
 class StrengthRepository extends BaseRepository {
-  static String _day(DateTime d) => d.toIso8601String().substring(0, 10);
-
   static const String _anaerobic =
       "IFNULL(c.energy_system, 'anaerobic') = 'anaerobic'";
-
-  Future<bool> _hasColumn(
-    DatabaseExecutor database,
-    String table,
-    String column,
-  ) async {
-    final columns = await database.rawQuery('PRAGMA table_info($table)');
-    return columns.any((c) => c['name'] == column);
-  }
 
   /// Finished workouts with at least one completed working set, newest
   /// first. [from]/[to] bound the workout date (inclusive).
@@ -42,22 +32,17 @@ class StrengthRepository extends BaseRepository {
     int? limit,
   }) async {
     final database = await db;
-    final hasDayColumn = await _hasColumn(
-      database,
-      'workouts',
-      'routine_day_id',
-    );
     final dateFilter =
         '${from == null ? '' : 'AND w.date >= ?'} '
         '${to == null ? '' : 'AND w.date <= ?'}';
-    final dateArgs = [if (from != null) _day(from), if (to != null) _day(to)];
+    final dateArgs = [if (from != null) dateKey(from), if (to != null) dateKey(to)];
 
     final rows = await database.rawQuery(
       '''
       SELECT w.id AS id, w.date AS date, w.start_time AS start_time,
         w.end_time AS end_time, w.duration_seconds AS duration_seconds,
         w.feeling_rating AS feeling_rating, w.routine_id AS routine_id,
-        ${hasDayColumn ? 'w.routine_day_id' : 'NULL'} AS routine_day_id,
+        w.routine_day_id AS routine_day_id,
         rd.name AS routine_day_name, r.name AS routine_name,
         a.volume AS volume, a.sets AS sets, a.exercises AS exercises
       FROM workouts w
@@ -75,7 +60,7 @@ class StrengthRepository extends BaseRepository {
           AND w.end_time IS NOT NULL AND $_anaerobic $dateFilter
         GROUP BY ee.workout_id
       ) a ON a.workout_id = w.id
-      ${hasDayColumn ? 'LEFT JOIN routine_days rd ON rd.id = w.routine_day_id' : 'LEFT JOIN routine_days rd ON 1 = 0'}
+      LEFT JOIN routine_days rd ON rd.id = w.routine_day_id
       LEFT JOIN routines r ON r.id = COALESCE(w.routine_id, rd.routine_id)
       WHERE w.end_time IS NOT NULL $dateFilter
       ORDER BY w.date DESC, w.start_time DESC
@@ -124,7 +109,7 @@ class StrengthRepository extends BaseRepository {
     }
     return StrengthWorkoutSummary(
       id: row['id'] as String,
-      date: DateTime(date.year, date.month, date.day),
+      date: dayOf(date),
       startTime: start,
       endTime: end,
       durationSeconds: duration,
@@ -162,7 +147,7 @@ class StrengthRepository extends BaseRepository {
         )
       ORDER BY w.date ASC
       ''',
-      [if (from != null) _day(from)],
+      [if (from != null) dateKey(from)],
     );
     return [
       for (final row in rows)
@@ -175,7 +160,7 @@ class StrengthRepository extends BaseRepository {
             duration = end.difference(start).inSeconds.clamp(0, 86400);
           }
           return StrengthWorkoutStamp(
-            date: DateTime(date.year, date.month, date.day),
+            date: dayOf(date),
             durationSeconds: duration,
           );
         }(),
@@ -207,7 +192,7 @@ class StrengthRepository extends BaseRepository {
       GROUP BY e.category_id
       ORDER BY sets DESC, volume DESC
       ''',
-      [if (from != null) _day(from), if (to != null) _day(to)],
+      [if (from != null) dateKey(from), if (to != null) dateKey(to)],
     );
     return [
       for (final row in rows)
@@ -246,11 +231,6 @@ class StrengthRepository extends BaseRepository {
     int limit = 5,
   }) async {
     final database = await db;
-    final hasDayColumn = await _hasColumn(
-      database,
-      'workouts',
-      'routine_day_id',
-    );
     final rows = await database.rawQuery(
       '''
       SELECT w.id AS id, w.date AS date,
@@ -258,13 +238,13 @@ class StrengthRepository extends BaseRepository {
         (SELECT COUNT(*) FROM exercise_entries ee
           WHERE ee.workout_id = w.id) AS exercises
       FROM workouts w
-      ${hasDayColumn ? 'LEFT JOIN routine_days rd ON rd.id = w.routine_day_id' : 'LEFT JOIN routine_days rd ON 1 = 0'}
+      LEFT JOIN routine_days rd ON rd.id = w.routine_day_id
       LEFT JOIN routines r ON r.id = COALESCE(w.routine_id, rd.routine_id)
       WHERE w.date > ? AND w.end_time IS NULL
       ORDER BY w.date ASC, w.created_at ASC
       LIMIT ?
       ''',
-      [_day(after), limit],
+      [dateKey(after), limit],
     );
     return [
       for (final row in rows)
@@ -290,15 +270,10 @@ class StrengthRepository extends BaseRepository {
   /// today or before), for the "what's next" fallback.
   Future<StrengthLastRoutineUse?> lastRoutineUse({DateTime? upTo}) async {
     final database = await db;
-    final hasDayColumn = await _hasColumn(
-      database,
-      'workouts',
-      'routine_day_id',
-    );
     final rows = await database.rawQuery(
       '''
       SELECT w.routine_id AS routine_id,
-        ${hasDayColumn ? 'w.routine_day_id' : 'NULL'} AS routine_day_id,
+        w.routine_day_id AS routine_day_id,
         w.date AS date
       FROM workouts w
       JOIN routines r ON r.id = w.routine_id
@@ -307,7 +282,7 @@ class StrengthRepository extends BaseRepository {
       ORDER BY w.date DESC, w.start_time DESC
       LIMIT 1
       ''',
-      [if (upTo != null) _day(upTo)],
+      [if (upTo != null) dateKey(upTo)],
     );
     if (rows.isEmpty) return null;
     final row = rows.first;

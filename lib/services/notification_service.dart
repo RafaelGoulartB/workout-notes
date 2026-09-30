@@ -1,18 +1,20 @@
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/app_localizations_en.dart';
 import 'package:workout_notes/l10n/app_localizations_pt.dart';
-import '../repositories/settings_repository.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 
 /// Centralized notification service for timer notifications.
 ///
 /// Uses `flutter_local_notifications` to show and update local notifications
 /// for the rest timer (countdown) and workout timer (elapsed time).
 ///
-/// Settings are cached from [DatabaseHelper] on init and can be refreshed
-/// via [loadSettings].
+/// The plugin is initialised lazily, on the first notification (or when the
+/// settings screen asks for the permission). Settings are cached from the
+/// database at that point and can be refreshed via [loadSettings].
 class NotificationService {
   static final NotificationService _instance = NotificationService._();
   static NotificationService get instance => _instance;
@@ -22,6 +24,7 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+  Future<void>? _initFuture;
   bool? _notificationsAllowed;
   String _localeCode = 'en';
 
@@ -29,9 +32,30 @@ class NotificationService {
   static const int _restTimerId = 1001;
   static const int _workoutTimerId = 1002;
 
-  // Android Channels
-  static const String _restChannelId = 'rest_timer';
-  static const String _workoutChannelId = 'workout_timer';
+  // Android channels. Sound and vibration are frozen when a channel is
+  // created (Android ignores later changes), so the ids carry the settings and
+  // a change moves to a new channel instead of re-creating the old one.
+  static const String _restChannelPrefix = 'rest_timer';
+  static const String _workoutChannelPrefix = 'workout_timer';
+
+  String get _restChannelId => channelId(
+    _restChannelPrefix,
+    sound: _restSound,
+    vibration: _restVibration,
+  );
+  String get _workoutChannelId => channelId(
+    _workoutChannelPrefix,
+    sound: _workoutSound,
+    vibration: _workoutVibration,
+  );
+
+  /// `<prefix>_v<n>`, where `n` encodes sound (1) and vibration (2).
+  @visibleForTesting
+  static String channelId(
+    String prefix, {
+    required bool sound,
+    required bool vibration,
+  }) => '${prefix}_v${(sound ? 1 : 0) | (vibration ? 2 : 0)}';
 
   // Cached settings
   bool _restEnabled = true;
@@ -41,16 +65,25 @@ class NotificationService {
   bool _workoutSound = true;
   bool _workoutVibration = true;
 
-  /// Whether the plugin has been initialized.
-  bool get isInitialized => _initialized;
-
   AppLocalizations get _loc =>
       _localeCode == 'pt' ? AppLocalizationsPt() : AppLocalizationsEn();
 
   // Initialization
 
-  /// Initialize the plugin and create notification channels.
-  Future<void> init() async {
+  /// Initialize the plugin and create notification channels. Concurrent
+  /// callers share one run; a failed run can be retried.
+  Future<void> init() {
+    final running = _initFuture;
+    if (running != null) return running;
+    final future = _initialize();
+    _initFuture = future;
+    future.catchError((Object _) {
+      if (identical(_initFuture, future)) _initFuture = null;
+    });
+    return future;
+  }
+
+  Future<void> _initialize() async {
     if (_initialized) return;
 
     const androidSettings = AndroidInitializationSettings(
@@ -68,18 +101,31 @@ class NotificationService {
     );
 
     await _plugin.initialize(settings: initSettings);
-    await _loadLocale();
-
-    // Create/update channels with current settings
-    await _updateRestChannel();
-    await _updateWorkoutChannel();
+    await _readSettings();
+    await _syncChannels();
 
     _initialized = true;
   }
 
-  /// Load notification settings from the database and update channels.
+  /// Initialises on demand; false when that fails (the caller just skips the
+  /// notification).
+  Future<bool> _ready() async {
+    try {
+      await init();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Reload the cached notification settings and move the channels to match.
   Future<void> loadSettings() async {
-    final settingsRepo = SettingsRepository();
+    await _readSettings();
+    if (_initialized) await _syncChannels();
+  }
+
+  Future<void> _readSettings() async {
+    final settingsRepo = DatabaseHelper.instance.settingsRepo;
     final settings = await settingsRepo.getAllSettings();
 
     _restEnabled = settings['notification_rest_timer_enabled'] != 'false';
@@ -90,16 +136,12 @@ class NotificationService {
     _workoutVibration =
         settings['notification_workout_timer_vibration'] == 'true';
     await _loadLocale();
-
-    if (_initialized) {
-      await _updateRestChannel();
-      await _updateWorkoutChannel();
-    }
   }
 
   /// Request the POST_NOTIFICATIONS permission on Android 13+.
   /// Returns `true` if already granted or permission was granted.
   Future<bool> requestPermission() async {
+    await _ready();
     final android = _plugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
@@ -125,16 +167,20 @@ class NotificationService {
 
   // Channel updates
 
-  Future<void> _updateRestChannel() async {
+  /// Creates the channels for the current settings and deletes the ones left
+  /// by earlier settings (and the pre-versioning ids).
+  Future<void> _syncChannels() async {
     final android = _plugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >();
     if (android == null) return;
 
+    final restId = _restChannelId;
+    final workoutId = _workoutChannelId;
     await android.createNotificationChannel(
       AndroidNotificationChannel(
-        _restChannelId,
+        restId,
         _loc.notificationRestChannelName,
         description: _loc.notificationRestChannelDesc,
         importance: Importance.high,
@@ -142,18 +188,9 @@ class NotificationService {
         enableVibration: _restVibration,
       ),
     );
-  }
-
-  Future<void> _updateWorkoutChannel() async {
-    final android = _plugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
-    if (android == null) return;
-
     await android.createNotificationChannel(
       AndroidNotificationChannel(
-        _workoutChannelId,
+        workoutId,
         _loc.notificationWorkoutChannelName,
         description: _loc.notificationWorkoutChannelDesc,
         importance: Importance.defaultImportance,
@@ -161,13 +198,25 @@ class NotificationService {
         enableVibration: _workoutVibration,
       ),
     );
+
+    final existing = await android.getNotificationChannels() ?? const [];
+    for (final channel in existing) {
+      final id = channel.id;
+      final stale =
+          (_isChannelOf(id, _restChannelPrefix) && id != restId) ||
+          (_isChannelOf(id, _workoutChannelPrefix) && id != workoutId);
+      if (stale) await android.deleteNotificationChannel(channelId: id);
+    }
   }
+
+  static bool _isChannelOf(String id, String prefix) =>
+      id == prefix || id.startsWith('${prefix}_v');
 
   // Rest Timer Notifications
 
   /// Show or update the rest timer countdown notification.
   Future<void> showRestTimer(int remainingSeconds) async {
-    if (!_initialized || !_restEnabled) return;
+    if (!await _ready() || !_restEnabled) return;
     if (!await _ensureNotificationPermission()) return;
 
     await _plugin.show(
@@ -197,7 +246,7 @@ class NotificationService {
 
   /// Show the rest timer completion notification (with sound/vibration).
   Future<void> showRestTimerComplete() async {
-    if (!_initialized || !_restEnabled) return;
+    if (!await _ready() || !_restEnabled) return;
     if (!await _ensureNotificationPermission()) return;
 
     // Cancel the ongoing first so a fresh notification alert plays
@@ -229,22 +278,27 @@ class NotificationService {
   }
 
   /// Cancel the rest timer notification.
-  Future<void> cancelRestTimer() async {
-    await _plugin.cancel(id: _restTimerId);
-  }
+  Future<void> cancelRestTimer() => _cancel(_restTimerId);
 
   // Workout Timer Notifications
 
   /// Show or update the workout timer notification.
-  /// The elapsed time is shown in the notification body only (no header timer).
-  Future<void> showWorkoutTimer(String elapsedFormatted) async {
-    if (!_initialized || !_workoutEnabled) return;
+  ///
+  /// While running, the system chronometer counts up from [startedAt], so the
+  /// notification never has to be refreshed to keep the time live. A paused
+  /// workout ([pausedElapsed]) shows the frozen time as static text.
+  Future<void> showWorkoutTimer({
+    required DateTime startedAt,
+    String? pausedElapsed,
+  }) async {
+    if (!await _ready() || !_workoutEnabled) return;
     if (!await _ensureNotificationPermission()) return;
 
+    final paused = pausedElapsed != null;
     await _plugin.show(
       id: _workoutTimerId,
       title: _loc.notificationWorkoutTimerTitle,
-      body: elapsedFormatted,
+      body: pausedElapsed,
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _workoutChannelId,
@@ -255,30 +309,30 @@ class NotificationService {
           ongoing: true,
           autoCancel: false,
           onlyAlertOnce: true,
-          showWhen: false,
+          showWhen: !paused,
+          when: paused ? null : startedAt.millisecondsSinceEpoch,
+          usesChronometer: !paused,
         ),
       ),
     );
   }
 
   /// Cancel the workout timer notification.
-  Future<void> cancelWorkoutTimer() async {
-    await _plugin.cancel(id: _workoutTimerId);
-  }
+  Future<void> cancelWorkoutTimer() => _cancel(_workoutTimerId);
 
-  /// Cancel all timer notifications.
-  Future<void> cancelAll() async {
-    await _plugin.cancel(id: _restTimerId);
-    await _plugin.cancel(id: _workoutTimerId);
+  /// Cancelling never throws: without the platform plugin (tests, desktop)
+  /// there is nothing to cancel.
+  Future<void> _cancel(int id) async {
+    try {
+      await _plugin.cancel(id: id);
+    } catch (_) {
+      // Cancelling a notification that is gone or unsupported is harmless.
+    }
   }
 
   // Helpers
 
-  String _formatCountdown(int seconds) {
-    final min = seconds ~/ 60;
-    final sec = seconds % 60;
-    return '${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
-  }
+  String _formatCountdown(int seconds) => DurationFormat.mmss(seconds);
 
   @override
   String toString() => 'NotificationService(initialized: $_initialized)';

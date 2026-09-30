@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_format.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Latest finished gym workouts: routine day, date, duration, volume, sets
 /// and how the session felt. Runs are not listed here.
@@ -24,13 +24,13 @@ class StrengthRecentWorkouts extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
     final colors = Theme.of(context).colorScheme;
 
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: RunDividedList(
+      child: AppDividedList(
         children: [
           for (final workout in workouts)
-            RunListRow(
-              leading: RunIconBadge(
+            AppListRow(
+              leading: AppIconBadge(
                 Icons.fitness_center,
                 size: 40,
                 color: workout.dominantCategoryId == null
@@ -94,13 +94,13 @@ class StrengthUpcomingWorkouts extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
 
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: RunDividedList(
+      child: AppDividedList(
         children: [
           for (final workout in workouts)
-            RunListRow(
-              leading: const RunIconBadge(Icons.event_outlined, size: 40),
+            AppListRow(
+              leading: const AppIconBadge(Icons.event_outlined, size: 40),
               title: workout.label ?? loc.strengthHomeFreeWorkout,
               subtitle: [
                 StrengthHomeFormat.dayLabel(context, workout.date),

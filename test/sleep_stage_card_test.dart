@@ -4,8 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
-import 'package:workout_notes/models/sleep_stage_epoch.dart';
-import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/widgets/sleep/sleep_stage_card.dart';
 import 'support/sleep_bedside_fixture.dart';
 
@@ -19,9 +17,7 @@ void main() {
         sleepingMinutes: 0,
         unknownMinutes: 60,
       );
-      await tester.pumpWidget(
-        _app(SleepStageCard(session: session, stages: const [])),
-      );
+      await tester.pumpWidget(_app(SleepStageCard(session: session)));
       await tester.pumpAndSettle();
       final loc = AppLocalizations.of(
         tester.element(find.byType(SleepStageCard)),
@@ -33,7 +29,7 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
-  testWidgets('renders the three estimated stage labels at 320 px', (
+  testWidgets('renders the three estimated stage aggregates at 320 px', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(320, 640);
@@ -46,26 +42,7 @@ void main() {
       start,
       analysisStatus: SleepMonitorSession.analysisAvailable,
     );
-    await tester.pumpWidget(
-      _app(
-        SleepStageCard(
-          session: session,
-          stages: [
-            _epoch(start, SleepStageType.awake, 'awake'),
-            _epoch(
-              start.add(const Duration(seconds: 30)),
-              SleepStageType.sleeping,
-              'sleeping',
-            ),
-            _epoch(
-              start.add(const Duration(seconds: 60)),
-              SleepStageType.deep,
-              'deep',
-            ),
-          ],
-        ),
-      ),
-    );
+    await tester.pumpWidget(_app(SleepStageCard(session: session)));
     await tester.pumpAndSettle();
 
     expect(find.text('Fases do sono'), findsOneWidget);
@@ -84,7 +61,6 @@ void main() {
             start,
             analysisStatus: SleepMonitorSession.analysisLegacyUnavailable,
           ),
-          stages: const [],
         ),
       ),
     );
@@ -138,17 +114,3 @@ SleepMonitorSession _session(
   unknownMinutes: 0,
   stageConfidence: 0.82,
 );
-
-SleepStageEpoch _epoch(DateTime startedAt, SleepStageType stage, String id) =>
-    SleepStageEpoch(
-      id: id,
-      sessionId: 'session-1',
-      startedAt: startedAt,
-      durationSeconds: 30,
-      stage: stage,
-      confidence: 0.8,
-      awakeProbability: stage == SleepStageType.awake ? 0.8 : 0.1,
-      sleepingProbability: stage == SleepStageType.sleeping ? 0.8 : 0.1,
-      deepProbability: stage == SleepStageType.deep ? 0.8 : 0.1,
-      algorithmVersion: 'acoustic-staging-test',
-    );

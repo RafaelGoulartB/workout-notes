@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:workout_notes/models/run_plan_template.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/services/run_pace_calculator.dart';
@@ -308,9 +309,9 @@ void main() {
       );
       final built = RunPlanComposer.compose(
         RunPlanTemplates.fiveK,
-        RunPlanBuildConfig(
+        const RunPlanBuildConfig(
           sessionsPerWeek: 4,
-          availableDays: const [2, 4, 5, 7],
+          availableDays: [2, 4, 5, 7],
           intent: RunPlanIntent.pb,
           calibration: goal,
           paceSource: RunPlanPaceSource.goal,
@@ -346,9 +347,9 @@ void main() {
       expect(racePace, greaterThan(goalRace + 20));
       final readiness = RunPlanComposer.assess(
         RunPlanTemplates.fiveK,
-        RunPlanBuildConfig(
+        const RunPlanBuildConfig(
           sessionsPerWeek: 4,
-          availableDays: const [2, 4, 5, 7],
+          availableDays: [2, 4, 5, 7],
           intent: RunPlanIntent.pb,
           calibration: goal,
           paceSource: RunPlanPaceSource.goal,

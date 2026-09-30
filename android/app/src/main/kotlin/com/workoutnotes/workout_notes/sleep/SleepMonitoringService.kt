@@ -163,6 +163,9 @@ class SleepMonitoringService : Service() {
             eventSink?.invoke(updated)
         }
 
+        /** Live microphone level while recording; a UI signal, never spooled. */
+        fun liveLevel(): Map<String, Any?>? = activeInstance?.processor?.liveLevel()
+
         fun currentState(context: android.content.Context): Map<String, Any?> {
             val service = activeInstance
             if (service != null) return service.stateMap()
@@ -449,11 +452,16 @@ class SleepMonitoringService : Service() {
     } catch (_: Throwable) { emptyMap() }
 
     private fun acquireWakeLock() {
+        // Never orphan a previous lock if this is ever called twice.
+        wakeLock?.let { if (it.isHeld) it.release() }
         val manager = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = manager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
             "WorkoutNotes:SleepMonitoring",
-        ).apply { acquire(MAX_SESSION_MILLIS) }
+        ).apply {
+            setReferenceCounted(false)
+            acquire(MAX_SESSION_MILLIS)
+        }
     }
 
     private fun hasMicrophonePermission(): Boolean =

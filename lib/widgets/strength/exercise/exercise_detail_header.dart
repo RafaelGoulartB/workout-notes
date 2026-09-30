@@ -3,8 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/utils/strength_insights_format.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/strength/exercise/exercise_equipment_label.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Muscle group, equipment and notes of the exercise.
 class ExerciseDetailHeader extends StatelessWidget {
@@ -34,11 +34,11 @@ class ExerciseDetailHeader extends StatelessWidget {
         ? null
         : exerciseEquipmentLabel(loc, equipment!);
 
-    return RunHeroCard(
+    return AppHeroCard(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          RunIconBadge(
+          AppIconBadge(
             Icons.fitness_center_rounded,
             color: categoryColor,
             size: 44,
@@ -60,15 +60,15 @@ class ExerciseDetailHeader extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 6,
                   children: [
-                    RunPill(label: categoryName, color: categoryColor),
+                    AppPill(label: categoryName, color: categoryColor),
                     if (equipmentLabel != null)
-                      RunPill(
+                      AppPill(
                         label: equipmentLabel,
                         icon: Icons.build_outlined,
                         color: colors.onSurfaceVariant,
                       ),
                     if (sessions > 0)
-                      RunPill(
+                      AppPill(
                         label: loc.exerciseDetailSessionsSubtitle(sessions),
                         icon: Icons.history_rounded,
                         color: colors.onSurfaceVariant,
@@ -107,7 +107,7 @@ class ExerciseRecordsRow extends StatelessWidget {
     final date = DateFormat('dd/MM/yy');
     final r = record;
 
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       child: r == null
           ? Center(
@@ -121,9 +121,9 @@ class ExerciseRecordsRow extends StatelessWidget {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                RunStatRow(
+                AppStatRow(
                   children: [
-                    RunStatTile(
+                    AppStatTile(
                       icon: Icons.emoji_events_rounded,
                       color: Theme.of(context).colorScheme.tertiary,
                       label: loc.exerciseDetailBestE1rm,
@@ -132,12 +132,12 @@ class ExerciseRecordsRow extends StatelessWidget {
                           : StrengthFormat.weight(r.bestE1rm!),
                       unit: r.bestE1rm == null ? null : 'kg',
                     ),
-                    RunStatTile(
+                    AppStatTile(
                       label: loc.exerciseDetailMaxWeightShort,
                       value: StrengthFormat.weight(r.maxWeight),
                       unit: 'kg',
                     ),
-                    RunStatTile(
+                    AppStatTile(
                       label: loc.exerciseDetailBestVolume,
                       value: StrengthFormat.volume(r.bestSessionVolume),
                       unit: StrengthFormat.volumeUnit(r.bestSessionVolume),

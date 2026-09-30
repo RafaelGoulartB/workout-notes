@@ -31,28 +31,50 @@ class SleepAlarmStatePolicyTest {
     }
 
     @Test
-    fun `snoozed mission can resume only from a scheduled snooze`() {
+    fun `mission runs while ringing and at any time during a snooze`() {
         assertTrue(
-            SleepAlarmStatePolicy.canResumeSnoozedMission(
+            SleepAlarmStatePolicy.canRunMission(
+                state = "ringing",
+                snoozeCount = 0,
+                requiresMission = true,
+            ),
+        )
+        assertTrue(
+            SleepAlarmStatePolicy.canRunMission(
                 state = "scheduled",
                 snoozeCount = 1,
                 requiresMission = true,
             ),
         )
+        // Before the first ring there is nothing to wake up from yet.
         assertFalse(
-            SleepAlarmStatePolicy.canResumeSnoozedMission(
+            SleepAlarmStatePolicy.canRunMission(
                 state = "scheduled",
                 snoozeCount = 0,
                 requiresMission = true,
             ),
         )
         assertFalse(
-            SleepAlarmStatePolicy.canResumeSnoozedMission(
-                state = "ringing",
+            SleepAlarmStatePolicy.canRunMission(
+                state = "completed",
                 snoozeCount = 1,
                 requiresMission = true,
             ),
         )
+        assertFalse(
+            SleepAlarmStatePolicy.canRunMission(
+                state = "ringing",
+                snoozeCount = 0,
+                requiresMission = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `only a scheduled alarm after a snooze counts as snoozed`() {
+        assertTrue(SleepAlarmStatePolicy.isSnoozed(state = "scheduled", snoozeCount = 2))
+        assertFalse(SleepAlarmStatePolicy.isSnoozed(state = "scheduled", snoozeCount = 0))
+        assertFalse(SleepAlarmStatePolicy.isSnoozed(state = "ringing", snoozeCount = 2))
     }
 
     @Test

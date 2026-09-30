@@ -5,7 +5,7 @@ import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/utils/strength_insights_format.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Timeline of the latest personal bests, newest first.
 class StrengthRecentRecords extends StatefulWidget {
@@ -34,22 +34,22 @@ class _StrengthRecentRecordsState extends State<StrengthRecentRecords> {
     final now = DateTime.now();
 
     if (widget.events.isEmpty) {
-      return RunSectionCard(
+      return AppSectionCard(
         child: RunInsightsNote(loc.strengthRecordsRecentEmpty),
       );
     }
 
     final visible = widget.events.take(_shown).toList();
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          RunDividedList(
+          AppDividedList(
             children: [
               for (final e in visible)
-                RunListRow(
-                  leading: RunIconBadge(
+                AppListRow(
+                  leading: AppIconBadge(
                     e.kind == StrengthRecordKind.e1rm
                         ? Icons.emoji_events_rounded
                         : Icons.fitness_center_rounded,

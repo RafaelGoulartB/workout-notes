@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/utils/strength_routine_summary.dart';
-import 'package:workout_notes/widgets/category_timeline_bar.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/strength/routines/category_timeline_bar.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Stacked bar with the share of working sets of each muscle group.
 class RoutineMuscleBar extends StatelessWidget {
@@ -172,7 +172,7 @@ class RoutineWeeklyMusclesCard extends StatelessWidget {
   /// fits with some headroom.
   static double _scaleFor(List<RoutineMuscleSets> muscles) {
     final maxSets = muscles.fold<int>(0, (m, e) => e.sets > m ? e.sets : m);
-    final base = kRecommendedWeeklySetsMax * 1.25;
+    const base = kRecommendedWeeklySetsMax * 1.25;
     return (maxSets > base ? maxSets * 1.05 : base).toDouble();
   }
 }
@@ -229,7 +229,7 @@ class _MuscleWeekRow extends StatelessWidget {
               loc.routinesSetsValue(muscle.sets),
               style: theme.textTheme.bodySmall?.copyWith(
                 fontWeight: FontWeight.w800,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
           ],

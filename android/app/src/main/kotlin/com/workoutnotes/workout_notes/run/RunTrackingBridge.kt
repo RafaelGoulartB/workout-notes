@@ -38,6 +38,24 @@ class RunTrackingBridge(private val context: Context) :
     private val pendingLocationPermission = AtomicReference<MethodChannel.Result?>(null)
     private val pendingNotificationPermission = AtomicReference<MethodChannel.Result?>(null)
     private val spool by lazy { RunActivitySpool(context.applicationContext) }
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /**
+     * Runs [work] on the sequential spool worker (ordered after queued
+     * writes) and delivers the outcome back on the main thread, so channel
+     * calls never do disk I/O on the UI thread.
+     */
+    private fun <T> onSpool(work: RunActivitySpool.() -> T, done: (Result<T>) -> Unit) {
+        spool.submit(work) { outcome -> mainHandler.post { done(outcome) } }
+    }
+
+    private fun isActiveStatus(status: String?): Boolean =
+        status == "starting" || status == "recording" || status == "paused" || status == "stopping"
+
+    private fun isAnotherRunActive(): Boolean {
+        val current = RunTrackingService.currentState(context)["status"] as? String
+        return current == "recording" || current == "paused" || current == "starting"
+    }
 
     fun attachActivity(value: Activity) {
         activity = value
@@ -70,7 +88,6 @@ class RunTrackingBridge(private val context: Context) :
             "setSessionContext" -> setSessionContext(call, result)
             "recoverActive" -> recoverActive(result)
             "start" -> start(result)
-            "startDebugSimulation" -> startDebugSimulation(call, result)
             "pause" -> result.success(RunTrackingService.pauseCurrent())
             "resume" -> result.success(RunTrackingService.resumeCurrent())
             "lap" -> result.success(RunTrackingService.lapCurrent())
@@ -78,24 +95,25 @@ class RunTrackingBridge(private val context: Context) :
             "discard" -> {
                 val id = call.arguments as? String
                 val state = RunTrackingService.discardCurrent(context)
-                if (id != null) {
-                    try {
-                        spool.delete(id)
-                    } catch (_: Throwable) {
-                    }
-                }
+                if (id != null) spool.deleteAsync(id)
                 result.success(state)
             }
-            "listPendingSpools" -> result.success(spool.listPending())
+            "listPendingSpools" -> onSpool({ listPending() }) { outcome ->
+                outcome.fold(
+                    onSuccess = { result.success(it) },
+                    onFailure = { result.error("list_failed", it.message, null) },
+                )
+            }
             "readSpool" -> {
                 val id = call.arguments as? String
                 if (id == null) {
                     result.error("invalid_id", "Missing activity id", null)
                 } else {
-                    try {
-                        result.success(spool.read(id))
-                    } catch (error: Throwable) {
-                        result.error("read_failed", error.message, null)
+                    onSpool({ read(id) }) { outcome ->
+                        outcome.fold(
+                            onSuccess = { result.success(it) },
+                            onFailure = { result.error("read_failed", it.message, null) },
+                        )
                     }
                 }
             }
@@ -104,24 +122,28 @@ class RunTrackingBridge(private val context: Context) :
                 if (id == null) {
                     result.error("invalid_id", "Missing activity id", null)
                 } else {
-                    try {
-                        val raw = spool.read(id)
+                    val markReview: RunActivitySpool.() -> Map<String, Any?> = {
+                        val raw = read(id)
                         @Suppress("UNCHECKED_CAST")
                         val activity = (raw["activity"] as? Map<String, Any?>)
                             ?.toMutableMap()
                             ?: mutableMapOf()
                         activity["id"] = id
                         activity["status"] = "pending_review"
-                        spool.updateActivity(activity)
-                        result.success(mapOf("activity" to activity, "points" to raw["points"]))
-                    } catch (error: Throwable) {
-                        result.error("review_failed", error.message, null)
+                        updateActivity(activity)
+                        mapOf("activity" to activity, "points" to raw["points"])
+                    }
+                    onSpool(markReview) { outcome ->
+                        outcome.fold(
+                            onSuccess = { result.success(it) },
+                            onFailure = { result.error("review_failed", it.message, null) },
+                        )
                     }
                 }
             }
             "deleteSpool" -> {
                 val id = call.arguments as? String
-                if (id != null) spool.delete(id)
+                if (id != null) spool.deleteAsync(id)
                 result.success(null)
             }
             else -> result.notImplemented()
@@ -143,16 +165,16 @@ class RunTrackingBridge(private val context: Context) :
             result.success(true)
             return
         }
-        val hasActiveSpool = spool.listPending().any {
-            when (it["status"] as? String) {
-                "starting", "recording", "paused", "stopping" -> true
-                else -> false
+        onSpool({ listPending().any { isActiveStatus(it["status"] as? String) } }) { outcome ->
+            if (outcome.getOrDefault(false)) {
+                startRestore(result)
+            } else {
+                result.success(false)
             }
         }
-        if (!hasActiveSpool) {
-            result.success(false)
-            return
-        }
+    }
+
+    private fun startRestore(result: MethodChannel.Result) {
         val intent = Intent(context, RunTrackingService::class.java).apply {
             action = RunTrackingService.ACTION_RESTORE
         }
@@ -256,41 +278,6 @@ class RunTrackingBridge(private val context: Context) :
         }
     }
 
-    private fun startDebugSimulation(call: MethodCall, result: MethodChannel.Result) {
-        @Suppress("UNCHECKED_CAST")
-        val args = call.arguments as? Map<String, Any?> ?: emptyMap()
-        val startLat = (args["startLat"] as? Number)?.toDouble() ?: -23.5505
-        val startLng = (args["startLng"] as? Number)?.toDouble() ?: -46.6333
-        val active = spool.listPending().any {
-            val status = it["status"] as? String
-            status == "starting" || status == "recording" || status == "paused" || status == "stopping"
-        }
-        val current = RunTrackingService.currentState(context)["status"] as? String
-        if (active || current == "recording" || current == "paused" || current == "starting") {
-            result.error("already_active", "A run is already active", null)
-            return
-        }
-        // Debug sim bypasses location permission — uses synthetic GPS.
-        val service = RunTrackingService.activeInstanceForVoice()
-        if (service != null) {
-            val ok = service.startNativeDebugSimulation(startLat, startLng)
-            result.success(ok)
-            return
-        }
-        // No active service — start via intent with debug extras.
-        val intent = Intent(context, RunTrackingService::class.java).apply {
-            action = "com.workoutnotes.workout_notes.run.START_DEBUG"
-            putExtra("debug_start_lat", startLat)
-            putExtra("debug_start_lng", startLng)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent)
-        } else {
-            context.startService(intent)
-        }
-        result.success(true)
-    }
-
     private fun start(result: MethodChannel.Result) {
         if (!RunTrackingService.locationGranted(context)) {
             result.error(
@@ -300,33 +287,30 @@ class RunTrackingBridge(private val context: Context) :
             )
             return
         }
-        val active = spool.listPending().any {
-            val status = it["status"] as? String
-            status == "starting" || status == "recording" || status == "paused" || status == "stopping"
+        onSpool({ listPending().any { isActiveStatus(it["status"] as? String) } }) { outcome ->
+            if (outcome.getOrDefault(false) || isAnotherRunActive()) {
+                result.error("already_active", "A run is already active", null)
+                return@onSpool
+            }
+            val activityId = UUID.randomUUID().toString()
+            val intent = Intent(context, RunTrackingService::class.java).apply {
+                action = RunTrackingService.ACTION_START
+                putExtra(RunTrackingService.EXTRA_ACTIVITY_ID, activityId)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+            result.success(
+                mapOf(
+                    "supported" to true,
+                    "location_granted" to true,
+                    "status" to "starting",
+                    "activity_id" to activityId,
+                ),
+            )
         }
-        val current = RunTrackingService.currentState(context)["status"] as? String
-        if (active || current == "recording" || current == "paused" || current == "starting") {
-            result.error("already_active", "A run is already active", null)
-            return
-        }
-        val activityId = UUID.randomUUID().toString()
-        val intent = Intent(context, RunTrackingService::class.java).apply {
-            action = RunTrackingService.ACTION_START
-            putExtra(RunTrackingService.EXTRA_ACTIVITY_ID, activityId)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent)
-        } else {
-            context.startService(intent)
-        }
-        result.success(
-            mapOf(
-                "supported" to true,
-                "location_granted" to true,
-                "status" to "starting",
-                "activity_id" to activityId,
-            ),
-        )
     }
 
     private fun requestLocationPermission(result: MethodChannel.Result) {
@@ -417,7 +401,6 @@ class RunTrackingBridge(private val context: Context) :
     }
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-        val mainHandler = Handler(Looper.getMainLooper())
         RunTrackingService.eventSink = { event ->
             mainHandler.post { events?.success(event) }
         }

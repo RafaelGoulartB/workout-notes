@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/models/run_track_point.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
 
 /// Converts GPS pace into a route color relative to the activity's average.
@@ -55,7 +56,10 @@ class RunRoutePaceStyle {
           1000;
       double? pace;
       if (distance >= _minimumWindowMeters && elapsedSeconds > 0) {
-        final candidate = elapsedSeconds / (distance / 1000);
+        final candidate = RunFormatters.paceSecondsPerKm(
+          distance,
+          elapsedSeconds,
+        );
         if (candidate.isFinite &&
             candidate >= RunPaceAnalytics.minPaceSecPerKm) {
           pace = candidate;

@@ -3,8 +3,8 @@ import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
-import 'package:workout_notes/models/sleep_stage_type.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/utils/duration_format.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Formatting and colours shared by the sleep screens.
 abstract final class SleepUi {
@@ -13,12 +13,8 @@ abstract final class SleepUi {
   static const Color deep = Colors.indigo;
   static const Color unknown = Colors.grey;
 
-  static Color stageColor(SleepStageType stage) => switch (stage) {
-    SleepStageType.awake => awake,
-    SleepStageType.sleeping => sleeping,
-    SleepStageType.deep => deep,
-    SleepStageType.unknown => unknown,
-  };
+  /// Inner padding of the sleep cards (an [AppSoftCard]).
+  static const EdgeInsets cardPadding = EdgeInsets.fromLTRB(20, 18, 16, 16);
 
   /// "7h 30min", "25min" under an hour, or "--" when unknown.
   static String duration(AppLocalizations loc, int? minutes) {
@@ -32,8 +28,7 @@ abstract final class SleepUi {
   static String clock(int? minutes) {
     if (minutes == null) return '--';
     final wrapped = minutes % 1440;
-    return '${(wrapped ~/ 60).toString().padLeft(2, '0')}:'
-        '${(wrapped % 60).toString().padLeft(2, '0')}';
+    return DurationFormat.hhmm(wrapped);
   }
 
   /// "23:40 → 07:05" when both ends are known.
@@ -45,8 +40,7 @@ abstract final class SleepUi {
   /// Wall-clock time of a monitored instant, in the offset it was recorded.
   static String wallTime(DateTime value, int offsetMinutes) {
     final wall = value.toUtc().add(Duration(minutes: offsetMinutes));
-    return '${wall.hour.toString().padLeft(2, '0')}:'
-        '${wall.minute.toString().padLeft(2, '0')}';
+    return DurationFormat.hhmm(wall.hour * 60 + wall.minute);
   }
 
   static String dayMonth(DateTime date) =>
@@ -113,7 +107,7 @@ class SleepDateBadge extends StatelessWidget {
       height: 44,
       decoration: BoxDecoration(
         color: colors.primary.withAlpha(24),
-        borderRadius: BorderRadius.circular(RunUi.tileRadius),
+        borderRadius: BorderRadius.circular(AppUi.tileRadius),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -123,7 +117,7 @@ class SleepDateBadge extends StatelessWidget {
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w800,
               height: 1.1,
-              fontFeatures: RunUi.tabular,
+              fontFeatures: AppUi.tabular,
             ),
           ),
           Text(
@@ -138,46 +132,6 @@ class SleepDateBadge extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Card surface used across the sleep screens. It matches the nutrition
-/// "day summary" card: soft diagonal gradient, no border, 20 px radius.
-class SleepCard extends StatelessWidget {
-  final Widget child;
-  final EdgeInsetsGeometry padding;
-  final VoidCallback? onTap;
-
-  const SleepCard({
-    super.key,
-    required this.child,
-    this.padding = const EdgeInsets.fromLTRB(20, 18, 16, 16),
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final body = Padding(padding: padding, child: child);
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(20),
-      clipBehavior: Clip.antiAlias,
-      child: Ink(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              colors.surfaceContainerHighest.withAlpha(200),
-              colors.surfaceContainerLow,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: onTap == null ? body : InkWell(onTap: onTap, child: body),
       ),
     );
   }
@@ -234,102 +188,6 @@ class SleepCardHeader extends StatelessWidget {
   );
 }
 
-/// Left-aligned stat (value, label, optional thin progress bar) laid out in
-/// a row separated by [SleepStatDivider]s, as in the nutrition macro row.
-class SleepStat extends StatelessWidget {
-  final String value;
-  final String label;
-  final double? progress;
-  final Color? color;
-
-  const SleepStat({
-    super.key,
-    required this.value,
-    required this.label,
-    this.progress,
-    this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final tint = color ?? colors.primary;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            value,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              height: 1.0,
-              fontFeatures: RunUi.tabular,
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: colors.onSurfaceVariant,
-          ),
-        ),
-        if (progress != null) ...[
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: progress!.clamp(0.0, 1.0),
-              minHeight: 3,
-              backgroundColor: tint.withAlpha(35),
-              color: tint,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class SleepStatDivider extends StatelessWidget {
-  const SleepStatDivider({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 36,
-      margin: const EdgeInsets.symmetric(horizontal: 6),
-      color: Theme.of(context).colorScheme.outlineVariant.withAlpha(70),
-    );
-  }
-}
-
-/// Row of [SleepStat]s with thin dividers between them.
-class SleepStatRow extends StatelessWidget {
-  final List<Widget> children;
-
-  const SleepStatRow({super.key, required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (var i = 0; i < children.length; i++) ...[
-          if (i > 0) const SleepStatDivider(),
-          Expanded(child: children[i]),
-        ],
-      ],
-    );
-  }
-}
-
 /// Large duration ("7h 30min") with the unit letters set smaller, like the
 /// kcal headline of the nutrition summary.
 class SleepBigDuration extends StatelessWidget {
@@ -344,7 +202,7 @@ class SleepBigDuration extends StatelessWidget {
       fontWeight: FontWeight.bold,
       fontSize: 38,
       height: 1.0,
-      fontFeatures: RunUi.tabular,
+      fontFeatures: AppUi.tabular,
     );
     final unit = theme.textTheme.titleSmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
@@ -409,7 +267,7 @@ class SleepBadge extends StatelessWidget {
               style: theme.textTheme.labelSmall?.copyWith(
                 color: tint,
                 fontWeight: FontWeight.w700,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
           ),

@@ -5,7 +5,7 @@ import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/repositories/strength_history_repository.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Month section header: month name on the left, totals on the right.
 class StrengthHistoryMonthHeader extends StatelessWidget {
@@ -48,7 +48,7 @@ class StrengthHistoryMonthHeader extends StatelessWidget {
               ),
               style: theme.textTheme.labelMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
         ],
@@ -88,13 +88,13 @@ class StrengthHistoryRow extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(RunUi.tileRadius),
+      borderRadius: BorderRadius.circular(AppUi.tileRadius),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            RunIconBadge(
+            AppIconBadge(
               Icons.fitness_center_rounded,
               size: 44,
               iconSize: 22,
@@ -156,7 +156,7 @@ class StrengthHistoryRow extends StatelessWidget {
                   StrengthWorkoutFormat.volume(workout.volume),
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w800,
-                    fontFeatures: RunUi.tabular,
+                    fontFeatures: AppUi.tabular,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -164,7 +164,7 @@ class StrengthHistoryRow extends StatelessWidget {
                   loc.strengthHistorySets(workout.workingSets),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colors.onSurfaceVariant,
-                    fontFeatures: RunUi.tabular,
+                    fontFeatures: AppUi.tabular,
                   ),
                 ),
               ],

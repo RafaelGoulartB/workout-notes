@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_gear.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
-import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_route_map_screen.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/run_completion_policy.dart';
 import 'package:workout_notes/utils/run_elevation_analytics.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
@@ -21,7 +22,7 @@ import 'package:workout_notes/widgets/run/run_review_widgets.dart';
 import 'package:workout_notes/widgets/run/run_route_map.dart';
 import 'package:workout_notes/widgets/run/run_route_sketch.dart';
 import 'package:workout_notes/widgets/run/run_splits_list.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// What to do when the runner leaves the review with back / gesture.
 enum _LeaveChoice { save, discard, keepEditing }
@@ -43,8 +44,8 @@ class RunPostRunReviewScreen extends StatefulWidget {
 }
 
 class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
-  final _runRepository = RunRepository();
-  final _planRepository = RunPlanRepository();
+  final _runRepository = DatabaseHelper.instance.runRepo;
+  final _planRepository = DatabaseHelper.instance.runPlanRepo;
   final _trackingService = RunTrackingService.instance;
   final _selectedDistance = ValueNotifier<double?>(null);
   late final TextEditingController _titleController;
@@ -113,11 +114,16 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
     _completePlannedWorkout = _hasPlannedWorkout && !_isTooShort;
     _route = RunRouteSketch.parse(activity.polylineSummary);
     _points = activity.isRun ? _draft.trackPoints : const [];
+    final profile = RunTrackProfile.fromPoints(_points);
     _analytics = RunPaceAnalytics.fromTrackPoints(
       _points,
       activityAvgPaceSecPerKm: activity.avgPaceSecPerKm,
+      profile: profile,
     );
-    _elevation = RunElevationProfile.fromTrackPoints(_points);
+    _elevation = RunElevationProfile.fromTrackPoints(
+      _points,
+      profile: profile,
+    );
     _loadContext();
   }
 
@@ -138,50 +144,25 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
 
   Future<void> _loadContext() async {
     final activity = _draft.activity;
-    ScheduledRun? scheduled;
-    RunPlanWorkout? workout;
     final scheduledId = _draft.scheduledRunId;
-    if (scheduledId != null) {
-      scheduled = await _planRepository.getScheduledRun(scheduledId);
-      workout = scheduled?.workout;
-    }
     final workoutId = _draft.planWorkoutId;
-    if (workout == null && workoutId != null) {
-      workout = await _planRepository.getWorkout(workoutId);
-    }
 
-    var insights = RunReviewInsights.empty;
-    ScheduledRun? next;
-    RunGearUsage? gear;
-    if (!_isStationaryBike) {
-      final ranking = activity.isRun
-          ? await _runRepository.listActivitiesForRanking()
-          : const <dynamic>[];
-      // The week and the month of the run, with a day of slack; the pure
-      // function does the exact filtering.
-      final since = RunReviewInsights.weekStart(
-        activity.startedAt,
-      ).subtract(const Duration(days: 40));
-      final recent = await _runRepository.listActivities(
-        limit: null,
-        activityType: null,
-        activityTypes: RunRepository.runningTypes,
-        startedFrom: since,
-      );
-      insights = RunReviewInsights.compute(
-        draft: activity,
-        ranking: ranking.cast(),
-        recent: recent,
-      );
-      next = await _nextPlannedSession(exclude: scheduledId);
-      final defaultGear = await DatabaseHelper.instance.runGearRepo
-          .getDefaultGear();
-      if (defaultGear != null) {
-        gear = await DatabaseHelper.instance.runGearRepo.getUsage(
-          defaultGear.id,
-        );
-      }
-    }
+    // The plan context and the run history are independent reads, so they
+    // run together (SQLite still serialises the statements).
+    final scheduledFuture = scheduledId == null
+        ? Future<ScheduledRun?>.value(null)
+        : _planRepository.getScheduledRun(scheduledId);
+    final workoutFuture = scheduledFuture.then((scheduled) async {
+      final fromSchedule = scheduled?.workout;
+      if (fromSchedule != null || workoutId == null) return fromSchedule;
+      return _planRepository.getWorkout(workoutId);
+    });
+    final historyFuture = _isStationaryBike
+        ? Future.value((RunReviewInsights.empty, null, null))
+        : _loadHistory(activity, scheduledId);
+
+    final RunPlanWorkout? workout = await workoutFuture;
+    final (insights, next, gear) = await historyFuture;
     if (!mounted) return;
     setState(() {
       _planWorkout = workout;
@@ -195,12 +176,48 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
     });
   }
 
+  Future<(RunReviewInsights, ScheduledRun?, RunGearUsage?)> _loadHistory(
+    RunActivity activity,
+    String? scheduledId,
+  ) async {
+    // The week and the month of the run, with a day of slack; the pure
+    // function does the exact filtering.
+    final since = RunReviewInsights.weekStart(
+      activity.startedAt,
+    ).subtract(const Duration(days: 40));
+    final (ranking, recent, next, gear) = await (
+      activity.isRun
+          ? _runRepository.listActivitiesForRanking()
+          : Future.value(const <RunActivity>[]),
+      _runRepository.listActivities(
+        limit: null,
+        activityType: null,
+        activityTypes: RunRepository.runningTypes,
+        startedFrom: since,
+      ),
+      _nextPlannedSession(exclude: scheduledId),
+      _defaultGearUsage(),
+    ).wait;
+    final insights = RunReviewInsights.compute(
+      draft: activity,
+      ranking: ranking,
+      recent: recent,
+    );
+    return (insights, next, gear);
+  }
+
+  Future<RunGearUsage?> _defaultGearUsage() async {
+    final gearRepo = DatabaseHelper.instance.runGearRepo;
+    final defaultGear = await gearRepo.getDefaultGear();
+    return defaultGear == null ? null : gearRepo.getUsage(defaultGear.id);
+  }
+
   /// The next session of the followed plan, if any (light: one date range).
   Future<ScheduledRun?> _nextPlannedSession({String? exclude}) async {
     final plan = await _planRepository.getActivatedPlan(hydrate: false);
     if (plan == null) return null;
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = dayOf(now);
     final upcoming = await _planRepository.getScheduledRuns(
       today,
       today.add(const Duration(days: 28)),
@@ -283,30 +300,16 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
 
   Future<bool> _confirmDiscard() async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          _isStationaryBike
+    final confirmed = await showConfirmDialog(
+      context,
+      title: _isStationaryBike
               ? loc.stationaryBikeReviewDiscardTitle
               : loc.runReviewDiscardTitle,
-        ),
-        content: Text(
-          _isStationaryBike
+      message: _isStationaryBike
               ? loc.stationaryBikeReviewDiscardBody
               : loc.runReviewDiscardBody,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(loc.runReviewDiscard),
-          ),
-        ],
-      ),
+      confirmLabel: loc.runReviewDiscard,
+      cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
     );
     return confirmed == true;
   }
@@ -373,7 +376,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
   Widget _routeSection(AppLocalizations loc) {
     if (_points.length >= 2) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(RunUi.cardRadius),
+        borderRadius: BorderRadius.circular(AppUi.cardRadius),
         child: SizedBox(
           height: 220,
           child: RunRouteMap(
@@ -386,7 +389,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
         ),
       );
     }
-    return RunSectionCard(
+    return AppSectionCard(
       child: Center(
         child: RunRouteSketch(points: _route, width: 260, height: 170),
       ),
@@ -432,7 +435,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
               route: _route,
             ),
             if (_needsManualDistance) ...[
-              RunSectionHeader(
+              AppSectionHeader(
                 _isStationaryBike
                     ? loc.stationaryBikeReviewDistanceSection
                     : loc.runReviewTreadmillSection,
@@ -448,7 +451,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
               ),
             ],
             if (showRoute) ...[
-              RunSectionHeader(loc.runReviewRoute),
+              AppSectionHeader(loc.runReviewRoute),
               _routeSection(loc),
             ],
             // Pace only: the elevation profile lives on the run detail.
@@ -462,7 +465,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
                     : null,
               ),
             if (_hasPlannedWorkout && _planWorkout != null) ...[
-              RunSectionHeader(loc.runReviewPlanComparison),
+              AppSectionHeader(loc.runReviewPlanComparison),
               RunReviewPlanCard(
                 workout: _planWorkout!,
                 activity: activity,
@@ -474,8 +477,8 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
               ),
             ],
             if (_draft.splits.isNotEmpty) ...[
-              RunSectionHeader(loc.runReviewSplits),
-              RunSectionCard(
+              AppSectionHeader(loc.runReviewSplits),
+              AppSectionCard(
                 child: RunSplitsList(
                   splits: _draft.splits,
                   averagePaceSecPerKm: activity.avgPaceSecPerKm,
@@ -483,18 +486,18 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
                 ),
               ),
             ],
-            RunSectionHeader(loc.runReviewEffortTitle),
+            AppSectionHeader(loc.runReviewEffortTitle),
             RunEffortSelector(
               rpe: _rpe,
               onChanged: (value) => setState(() => _rpe = value),
             ),
-            RunSectionHeader(loc.runReviewFeelingTitle),
+            AppSectionHeader(loc.runReviewFeelingTitle),
             RunFeelingSelector(
               rating: _feelingRating,
               onChanged: (value) => setState(() => _feelingRating = value),
             ),
-            RunSectionHeader(loc.runReviewDetailsTitle),
-            RunSectionCard(
+            AppSectionHeader(loc.runReviewDetailsTitle),
+            AppSectionCard(
               child: Column(
                 children: [
                   TextField(
@@ -525,7 +528,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
               ),
             ),
             if (!_isStationaryBike) ...[
-              RunSectionHeader(loc.runReviewMeaningTitle),
+              AppSectionHeader(loc.runReviewMeaningTitle),
               RunReviewMeaningCard(
                 loading: _loading,
                 insights: _insights,
@@ -573,7 +576,7 @@ class _ReviewActionBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         border: Border(
-          top: BorderSide(color: RunUi.divider(theme.colorScheme)),
+          top: BorderSide(color: AppUi.divider(theme.colorScheme)),
         ),
       ),
       child: SafeArea(

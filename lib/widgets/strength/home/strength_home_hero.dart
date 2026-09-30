@@ -3,8 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_week_analytics.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_format.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Headline numbers of the selected period: volume with its trend against the
 /// previous period, and workouts, sets, total time and average duration.
@@ -28,13 +28,13 @@ class StrengthPeriodHero extends StatelessWidget {
               '${DateFormat.MMMd(locale).format(analytics.now)}';
     final volume = StrengthVolumeValue.of(totals.volumeKg);
 
-    return RunHeroCard(
+    return AppHeroCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const RunIconBadge(Icons.fitness_center),
+              const AppIconBadge(Icons.fitness_center),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -54,7 +54,7 @@ class StrengthPeriodHero extends StatelessWidget {
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: RunValueUnit(
+                  child: AppValueUnit(
                     value: RunFormatters.decimal(volume.value, volume.digits),
                     unit: volume.unit,
                     valueStyle: theme.textTheme.displaySmall?.copyWith(
@@ -72,7 +72,7 @@ class StrengthPeriodHero extends StatelessWidget {
               if (ratio != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4),
-                  child: RunPill.trend(
+                  child: AppPill.trend(
                     context: context,
                     label:
                         '${ratio >= 0 ? '+' : '-'}'
@@ -94,29 +94,29 @@ class StrengthPeriodHero extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          Divider(height: 1, color: RunUi.divider(colors)),
+          Divider(height: 1, color: AppUi.divider(colors)),
           const SizedBox(height: 12),
-          RunStatRow(
+          AppStatRow(
             children: [
-              RunStatTile(
+              AppStatTile(
                 icon: Icons.flag_outlined,
                 color: colors.primary,
                 label: loc.strengthHomeStatWorkouts,
                 value: '${totals.sessions}',
               ),
-              RunStatTile(
+              AppStatTile(
                 icon: Icons.layers_outlined,
                 color: colors.tertiary,
                 label: loc.strengthHomeStatSets,
                 value: '${totals.workingSets}',
               ),
-              RunStatTile(
+              AppStatTile(
                 icon: Icons.timer_outlined,
                 color: colors.secondary,
                 label: loc.strengthHomeStatTime,
                 value: StrengthHomeFormat.duration(totals.durationSeconds),
               ),
-              RunStatTile(
+              AppStatTile(
                 icon: Icons.hourglass_bottom_rounded,
                 color: colors.secondary,
                 label: loc.strengthHomeStatAvgDurationShort,

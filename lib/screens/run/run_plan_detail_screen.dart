@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_ledger.dart';
+import 'package:workout_notes/models/run_plan_template.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
@@ -22,6 +23,7 @@ import 'package:workout_notes/services/run_plan_week_view.dart';
 import 'package:workout_notes/services/run_strength_planner.dart';
 import 'package:workout_notes/services/run_week_balance.dart';
 import 'package:workout_notes/services/runner_strength_routine.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/run/plan_detail/run_plan_adaptation_card.dart';
 import 'package:workout_notes/widgets/run/plan_detail/run_plan_day_row.dart';
 import 'package:workout_notes/widgets/run/plan_detail/run_plan_identity.dart';
@@ -32,6 +34,7 @@ import 'package:workout_notes/widgets/run/plan_detail/run_plan_week_header.dart'
 import 'package:workout_notes/widgets/run/plan_detail/run_plan_week_strip.dart';
 import 'package:workout_notes/widgets/run/run_balance_dialog.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Plan detail: identity header, status, week picker and the training week
 /// laid out by weekday. A running week is read by day ("longão no domingo"),
@@ -49,7 +52,7 @@ class RunPlanDetailScreen extends StatefulWidget {
 }
 
 class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
-  final _repo = RunPlanRepository();
+  final _repo = DatabaseHelper.instance.runPlanRepo;
   final _weekStrip = ScrollController();
   RunPlan? _plan;
   Set<int> _scheduledWeeks = const {};
@@ -68,7 +71,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
   Set<DateTime> _strengthDone = const {};
   bool _applying = false;
 
-  DateTime get _today => RunPlanWeekView.day(widget.today ?? DateTime.now());
+  DateTime get _today => dayOf(widget.today ?? DateTime.now());
 
   @override
   void initState() {
@@ -89,26 +92,36 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
       Navigator.pop(context);
       return;
     }
-    final scheduled = await _repo.getScheduledWeeks(plan.id);
-    final progress = await _repo.getPlanProgress(plan.id);
-    final ledger = await _repo.getPlanLedger(plan.id);
-    final linked = await _repo.isLinkedToPeriodization(plan.id);
-    final adaptations = await _repo.listAdaptations(plan.id);
-    RunPlanAdaptationProposal? proposal;
-    Set<DateTime> strengthDone = const {};
-    try {
-      // The weekly review reads the run history; a failure there must not
-      // keep the plan from opening.
-      proposal = linked ? null : await RunPlanCoach().review(plan);
-      final anchor = plan.activatedAt;
-      if (anchor != null && _includesStrength(plan)) {
-        final start = RunPlanWeekView.monday(anchor);
-        strengthDone = await RunnerStrengthRoutine().completedDays(
-          start,
-          start.add(Duration(days: 7 * plan.weeks)),
-        );
-      }
-    } catch (_) {}
+    // Independent reads run together (SQLite still serialises them).
+    final (scheduled, progress, ledger, linked, adaptations) = await (
+      _repo.getScheduledWeeks(plan.id),
+      _repo.getPlanProgress(plan.id),
+      _repo.getPlanLedger(plan.id),
+      _repo.isLinkedToPeriodization(plan.id),
+      _repo.listAdaptations(plan.id),
+    ).wait;
+    // The weekly review reads the run history; a failure there must not keep
+    // the plan from opening.
+    final proposalFuture = linked
+        ? Future<RunPlanAdaptationProposal?>.value(null)
+        : RunPlanCoach()
+              .review(plan)
+              .then<RunPlanAdaptationProposal?>((value) => value)
+              .catchError((Object _) => null);
+    final anchor = plan.activatedAt;
+    final strengthFuture = anchor != null && _includesStrength(plan)
+        ? () {
+            final start = mondayOf(anchor);
+            return RunnerStrengthRoutine()
+                .completedDays(
+                  start,
+                  start.add(Duration(days: 7 * plan.weeks)),
+                )
+                .catchError((Object _) => <DateTime>{});
+          }()
+        : Future<Set<DateTime>>.value(const {});
+    final proposal = await proposalFuture;
+    final strengthDone = await strengthFuture;
     if (!mounted) return;
     final firstLoad = _loading;
     setState(() {
@@ -212,7 +225,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
         builder: (_) => ActiveWorkoutScreen(workoutId: workoutId),
       ),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   /// Follows this plan from today, or stops following it. Only one plan is
@@ -232,23 +245,12 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     final plan = _plan;
     if (plan == null) return;
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.restart_alt_rounded),
-        title: Text(loc.runPlanResetTitle),
-        content: Text(loc.runPlanResetBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.runPlanResetConfirm),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.runPlanResetTitle,
+      message: loc.runPlanResetBody,
+      confirmLabel: loc.runPlanResetConfirm,
+      icon: Icons.restart_alt_rounded,
     );
     if (confirmed != true) return;
     await _repo.resetPlanProgress(plan.id);
@@ -272,7 +274,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
       raceDate: result.raceDate,
       weeks: result.weeks,
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   // --- week ------------------------------------------------------------------
@@ -317,7 +319,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(loc.runPlanCopyWeekApplied(applied))),
     );
-    _load();
+    await _load();
   }
 
   Future<void> _scheduleWeek() async {
@@ -343,7 +345,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(loc.runPlanScheduleWeekDone(createdIds.length))),
     );
-    _load();
+    await _load();
   }
 
   // --- sessions --------------------------------------------------------------
@@ -373,7 +375,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
         RunPlanDraft.isUntouched(current, defaultName: defaultName)) {
       await _repo.deleteWorkout(created.id);
     }
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _openSession(RunPlanWorkout workout) async {
@@ -383,12 +385,12 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
         builder: (_) => RunPlanWorkoutEditorScreen(workoutId: workout.id),
       ),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _startSession(RunPlanSessionView view) async {
     await startRunPlanSession(context, _repo, view);
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _openRun(RunPlanSessionView view) async {
@@ -398,7 +400,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
       context,
       MaterialPageRoute(builder: (_) => RunDetailScreen(activityId: id)),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _duplicateSession(RunPlanWorkout workout) async {
@@ -408,34 +410,21 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(loc.runPlanSessionDuplicated)));
-    _load();
+    await _load();
   }
 
   Future<void> _deleteSession(RunPlanWorkout workout) async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.runWorkoutDeleteConfirm(workout.name)),
-        content: Text(loc.commonActionCannotBeUndone),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.runWorkoutDeleteConfirm(workout.name),
+      message: loc.commonActionCannotBeUndone,
+      confirmLabel: loc.commonDelete,
+      destructive: true,
     );
     if (confirmed != true) return;
     await _repo.deleteWorkout(workout.id);
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _moveSession(RunPlanWorkout workout) async {
@@ -453,7 +442,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(loc.runPlanMoveWeekDone(target + 1))),
     );
-    _load();
+    await _load();
   }
 
   Future<void> _moveSessionToDay(RunPlanWorkout workout, int dayOfWeek) async {

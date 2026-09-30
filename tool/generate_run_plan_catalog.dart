@@ -1,8 +1,15 @@
+// Generates docs/run-plan-catalog.html: a browsable page with every run-plan
+// template, frequency and hills variant composed by RunPlanComposer. It is a
+// manual documentation tool (the output is not committed and the file lives
+// outside test/ so `flutter test` never runs it). Run it with:
+//
+//   flutter test tool/generate_run_plan_catalog.dart
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/models/run_plan.dart';
+import 'package:workout_notes/models/run_plan_template.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/services/run_plan_composer.dart';

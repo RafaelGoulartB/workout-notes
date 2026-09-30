@@ -1,4 +1,5 @@
 import 'package:workout_notes/models/strength_workout_summary.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
 
 /// One bar of the gym trend charts: a calendar week, or a calendar month when
@@ -200,18 +201,13 @@ class StrengthWeekAnalytics {
     return totals.volumeKg / previous.volumeKg - 1;
   }
 
-  double? get sessionsRatioVsPreviousPeriod {
-    if (!hasPreviousPeriod || previous.sessions <= 0) return null;
-    return totals.sessions / previous.sessions - 1;
-  }
-
   factory StrengthWeekAnalytics.fromWorkouts(
     List<StrengthWorkoutSummary> all, {
     required RunStatsPeriod period,
     DateTime? now,
   }) {
     final clock = now ?? DateTime.now();
-    final today = _dateOnly(clock);
+    final today = dayOf(clock);
     final thisWeekStart = mondayOf(today);
     final nextWeekStart = thisWeekStart.add(const Duration(days: 7));
     final lastWeekStart = thisWeekStart.subtract(const Duration(days: 7));
@@ -325,14 +321,6 @@ class StrengthWeekAnalytics {
     );
   }
 
-  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
-
-  /// Monday (00:00) of the calendar week of [d].
-  static DateTime mondayOf(DateTime d) {
-    final day = _dateOnly(d);
-    return day.subtract(Duration(days: day.weekday - DateTime.monday));
-  }
-
   static StrengthPeriodTotals _totals(
     List<StrengthWorkoutSummary> workouts, {
     DateTime? start,
@@ -359,13 +347,13 @@ class StrengthWeekAnalytics {
   }
 
   /// Counts back week by week while every week has at least one activity in
-  /// [dates]. A week still in progress with none yet does not break the
+  /// [days]. A week still in progress with none yet does not break the
   /// streak.
   static int weekStreakOfDates(
-    Iterable<DateTime> dates,
+    Iterable<DateTime> days,
     DateTime thisWeekStart,
   ) {
-    final weeks = <DateTime>{for (final d in dates) mondayOf(d)};
+    final weeks = <DateTime>{for (final d in days) mondayOf(d)};
     if (weeks.isEmpty) return 0;
     var cursor = weeks.contains(thisWeekStart)
         ? thisWeekStart
@@ -501,8 +489,8 @@ class WorkoutWeekOverview {
     DateTime? now,
   }) {
     final clock = now ?? DateTime.now();
-    final today = DateTime(clock.year, clock.month, clock.day);
-    final monday = StrengthWeekAnalytics.mondayOf(today);
+    final today = dayOf(clock);
+    final monday = mondayOf(today);
     final nextMonday = monday.add(const Duration(days: 7));
     bool thisWeek(DateTime d) => !d.isBefore(monday) && d.isBefore(nextMonday);
 

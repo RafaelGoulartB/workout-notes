@@ -7,13 +7,14 @@ import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_activity_filter.dart';
 import 'package:workout_notes/models/run_lap.dart';
-import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/models/run_split.dart';
+import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/repositories/base_repository.dart';
-import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/services/run_route_codec.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/run_effort_analytics.dart';
 import 'package:workout_notes/utils/run_elevation_analytics.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
 
 class RunRepository extends BaseRepository {
@@ -82,70 +83,51 @@ class RunRepository extends BaseRepository {
 
   Future<List<RunTrackPoint>> getTrackPoints(String activityId) async {
     final database = await db;
-    if (await _tableExists(database, 'run_route_data')) {
-      final compact = await database.query(
-        'run_route_data',
-        columns: ['payload', 'checksum'],
-        where: 'activity_id = ?',
-        whereArgs: [activityId],
-        limit: 1,
-      );
-      if (compact.isNotEmpty) {
-        try {
-          final rawPayload = compact.first['payload'];
-          final payload = rawPayload is Uint8List
-              ? rawPayload
-              : Uint8List.fromList((rawPayload as List).cast<int>());
-          return RunRouteCodec.decode(
-            activityId: activityId,
-            payload: payload,
-            expectedChecksum: (compact.first['checksum'] as num).toInt(),
-          );
-        } on FormatException {
-          // A legacy copy is deliberately retained until compact persistence
-          // succeeds. If an externally-restored blob is corrupt, fall back to
-          // those rows rather than hiding the route.
-        }
-      }
-    }
-    return _getLegacyTrackPoints(database, activityId);
-  }
-
-  Future<List<RunTrackPoint>> _getLegacyTrackPoints(
-    DatabaseExecutor database,
-    String activityId,
-  ) async {
     final rows = await database.query(
-      'run_track_points',
+      'run_route_data',
+      columns: ['payload', 'checksum'],
       where: 'activity_id = ?',
       whereArgs: [activityId],
-      orderBy: 'seq ASC',
+      limit: 1,
     );
-    return rows.map(RunTrackPoint.fromMap).toList();
+    if (rows.isEmpty) return const [];
+    try {
+      final rawPayload = rows.first['payload'];
+      final payload = rawPayload is Uint8List
+          ? rawPayload
+          : Uint8List.fromList((rawPayload as List).cast<int>());
+      return RunRouteCodec.decode(
+        activityId: activityId,
+        payload: payload,
+        expectedChecksum: (rows.first['checksum'] as num).toInt(),
+      );
+    } on FormatException {
+      // An externally-restored blob can be corrupt. The activity summary
+      // stays usable; only the route is unavailable.
+      return const [];
+    }
   }
 
   Future<List<RunSplit>> getSplits(String activityId) async {
     final database = await db;
-    if (await _tableExists(database, 'run_splits')) {
-      final rows = await database.query(
-        'run_splits',
-        where: 'activity_id = ?',
-        whereArgs: [activityId],
-        orderBy: 'split_index ASC',
-      );
-      if (rows.isNotEmpty) {
-        return rows
-            .map(
-              (row) => RunSplit(
-                km: (row['split_index'] as num).toInt(),
-                distanceMeters: (row['distance_meters'] as num).toDouble(),
-                durationSeconds: (row['duration_seconds'] as num).toInt(),
-                paceSecPerKm: (row['pace_sec_per_km'] as num?)?.toDouble(),
-                isPartial: (row['is_partial'] as num).toInt() == 1,
-              ),
-            )
-            .toList();
-      }
+    final rows = await database.query(
+      'run_splits',
+      where: 'activity_id = ?',
+      whereArgs: [activityId],
+      orderBy: 'split_index ASC',
+    );
+    if (rows.isNotEmpty) {
+      return rows
+          .map(
+            (row) => RunSplit(
+              km: (row['split_index'] as num).toInt(),
+              distanceMeters: (row['distance_meters'] as num).toDouble(),
+              durationSeconds: (row['duration_seconds'] as num).toInt(),
+              paceSecPerKm: (row['pace_sec_per_km'] as num?)?.toDouble(),
+              isPartial: (row['is_partial'] as num).toInt() == 1,
+            ),
+          )
+          .toList();
     }
     final points = await getTrackPoints(activityId);
     return RunPaceAnalytics.fromTrackPoints(points).splits;
@@ -178,62 +160,17 @@ class RunRepository extends BaseRepository {
     // The FK only nulls `run_activity_id`, which would leave a plan session
     // counted as completed with no run behind it. Put it back to planned so
     // the plan's progress keeps matching reality.
-    if (await _tableExists(database, 'scheduled_runs')) {
-      await database.update(
-        'scheduled_runs',
-        {
-          'status': 'planned',
-          'run_activity_id': null,
-          'updated_at': DateTime.now().toIso8601String(),
-        },
-        where: 'run_activity_id = ?',
-        whereArgs: [id],
-      );
-    }
+    await database.update(
+      'scheduled_runs',
+      {
+        'status': 'planned',
+        'run_activity_id': null,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'run_activity_id = ?',
+      whereArgs: [id],
+    );
     await database.delete('run_activities', where: 'id = ?', whereArgs: [id]);
-  }
-
-  static Future<bool> _tableExists(
-    DatabaseExecutor database,
-    String table,
-  ) async {
-    final rows = await database.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
-      [table],
-    );
-    return rows.isNotEmpty;
-  }
-
-  /// Monthly aggregation for the home hero card — pure run data.
-  /// Returns `total_distance_meters`, `total_moving_time`, `total_duration`
-  /// and `run_count` for the calendar month of [month].
-  /// Uses `started_at` range so it matches the `run_activities` storage
-  /// format (ISO-8601 with `T` separator).
-  Future<Map<String, dynamic>> getMonthlyRunSummary(
-    DateTime month, {
-    CardioActivityType? activityType = CardioActivityType.running,
-  }) async {
-    final database = await db;
-    final start = DateTime(month.year, month.month, 1);
-    final end = DateTime(month.year, month.month + 1, 1);
-    final rows = await database.rawQuery(
-      '''
-      SELECT
-        COALESCE(SUM(distance_meters), 0) AS total_distance_meters,
-        COALESCE(SUM(moving_time_seconds), 0) AS total_moving_time,
-        COALESCE(SUM(duration_seconds), 0) AS total_duration,
-        COUNT(*) AS run_count
-      FROM run_activities
-      WHERE status = 'completed' AND started_at >= ? AND started_at < ?
-        ${activityType == null ? '' : 'AND activity_type = ?'}
-      ''',
-      [
-        start.toIso8601String(),
-        end.toIso8601String(),
-        if (activityType != null) activityType.databaseValue,
-      ],
-    );
-    return rows.first;
   }
 
   /// Completed runs of a calendar month, for the calendar view.
@@ -254,7 +191,7 @@ class RunRepository extends BaseRepository {
     final grouped = <String, List<RunActivity>>{};
     for (final row in rows) {
       final activity = RunActivity.fromMap(row);
-      final key = activity.startedAt.toIso8601String().substring(0, 10);
+      final key = dateKey(activity.startedAt);
       grouped.putIfAbsent(key, () => []).add(activity);
     }
     return grouped;
@@ -362,14 +299,12 @@ class RunRepository extends BaseRepository {
     );
     final activity = decoded.activity;
     final points = decoded.points;
-    final hasCompactRoutes = await _tableExists(await db, 'run_route_data');
-    final encoded = hasCompactRoutes && points.isNotEmpty
-        ? RunRouteCodec.encode(points)
-        : null;
+    final encoded = points.isNotEmpty ? RunRouteCodec.encode(points) : null;
     if (encoded != null) _validateEncoding(activity.id, points, encoded);
     final pace = RunPaceAnalytics.fromTrackPoints(
       points,
       activityAvgPaceSecPerKm: activity.avgPaceSecPerKm,
+      profile: decoded.profile,
     );
     final summary = _RouteSummary.fromPoints(points);
 
@@ -394,10 +329,6 @@ class RunRepository extends BaseRepository {
           splits: pace.splits,
           summary: summary,
         );
-      } else {
-        for (final point in points) {
-          await txn.insert('run_track_points', point.toMap());
-        }
       }
     });
 
@@ -420,13 +351,13 @@ class RunRepository extends BaseRepository {
     return laps;
   }
 
-  /// Converts a bounded number of legacy point-row activities. Each activity
-  /// is independently transactional, so process death can only postpone work.
-  Future<int> migrateLegacyRoutes({int limit = 5}) async {
-    final database = await db;
-    if (!await _tableExists(database, 'run_route_data')) return 0;
-    final rows = await database.rawQuery(
-      '''
+  /// One-time conversion of legacy point-row activities (`run_track_points`)
+  /// into the compact route format. Called by the v56 migration, which then
+  /// drops the legacy table; [executor] is the migration's database handle, so
+  /// no nested transaction is opened. Routes whose encoding fails validation
+  /// are skipped (the activity summary is kept, only its map is lost).
+  static Future<int> compactLegacyRoutes(DatabaseExecutor executor) async {
+    final rows = await executor.rawQuery('''
       SELECT a.id
       FROM run_activities a
       WHERE EXISTS (
@@ -436,49 +367,53 @@ class RunRepository extends BaseRepository {
         SELECT 1 FROM run_route_data r WHERE r.activity_id = a.id
       )
       ORDER BY a.started_at DESC
-      LIMIT ?
-      ''',
-      [limit.clamp(1, 50)],
-    );
+    ''');
     var migrated = 0;
     for (final row in rows) {
       final activityId = row['id'] as String;
-      final points = await _getLegacyTrackPoints(database, activityId);
+      final pointRows = await executor.query(
+        'run_track_points',
+        where: 'activity_id = ?',
+        whereArgs: [activityId],
+        orderBy: 'seq ASC',
+      );
+      final points = pointRows.map(RunTrackPoint.fromMap).toList();
       if (points.isEmpty) continue;
-      final encoded = RunRouteCodec.encode(points);
-      _validateEncoding(activityId, points, encoded);
-      final pace = RunPaceAnalytics.fromTrackPoints(points);
-      final efforts = RunEffortAnalytics.fromTrackPoints(points);
-      final summary = _RouteSummary.fromPoints(points);
-      await database.transaction((txn) async {
-        await _storeCompactRoute(
-          txn,
-          activityId: activityId,
-          encoded: encoded,
-          splits: pace.splits,
-          summary: summary,
-        );
-        await txn.update(
-          'run_activities',
-          {
-            'best_split_pace_sec_per_km': efforts.bestSplitPaceSecPerKm,
-            'best_effort_1k_sec': efforts.bestEffort1kSec,
-            'best_effort_3k_sec': efforts.bestEffort3kSec,
-            'best_effort_5k_sec': efforts.bestEffort5kSec,
-            'best_effort_10k_sec': efforts.bestEffort10kSec,
-            'best_effort_half_sec': efforts.bestEffortHalfSec,
-            'best_effort_marathon_sec': efforts.bestEffortMarathonSec,
-            'efforts_computed': 1,
-          },
-          where: 'id = ?',
-          whereArgs: [activityId],
-        );
-        await txn.delete(
-          'run_track_points',
-          where: 'activity_id = ?',
-          whereArgs: [activityId],
-        );
-      });
+      final EncodedRunRoute encoded;
+      try {
+        encoded = RunRouteCodec.encode(points);
+        _validateEncoding(activityId, points, encoded);
+      } on FormatException {
+        continue;
+      }
+      final profile = RunTrackProfile.fromPoints(points);
+      final pace = RunPaceAnalytics.fromTrackPoints(points, profile: profile);
+      final efforts = RunEffortAnalytics.fromTrackPoints(
+        points,
+        profile: profile,
+      );
+      await _storeCompactRoute(
+        executor,
+        activityId: activityId,
+        encoded: encoded,
+        splits: pace.splits,
+        summary: _RouteSummary.fromPoints(points),
+      );
+      await executor.update(
+        'run_activities',
+        {
+          'best_split_pace_sec_per_km': efforts.bestSplitPaceSecPerKm,
+          'best_effort_1k_sec': efforts.bestEffort1kSec,
+          'best_effort_3k_sec': efforts.bestEffort3kSec,
+          'best_effort_5k_sec': efforts.bestEffort5kSec,
+          'best_effort_10k_sec': efforts.bestEffort10kSec,
+          'best_effort_half_sec': efforts.bestEffortHalfSec,
+          'best_effort_marathon_sec': efforts.bestEffortMarathonSec,
+          'efforts_computed': 1,
+        },
+        where: 'id = ?',
+        whereArgs: [activityId],
+      );
       migrated++;
     }
     return migrated;
@@ -493,7 +428,6 @@ class RunRepository extends BaseRepository {
     bool force = false,
   }) async {
     final database = await db;
-    if (!await _tableExists(database, 'run_route_data')) return 0;
     final sizeRows = await database.rawQuery(
       'SELECT COALESCE(SUM(length(payload)), 0) AS bytes FROM run_route_data',
     );
@@ -562,6 +496,39 @@ class RunRepository extends BaseRepository {
     return optimized;
   }
 
+  static const _routeMaintenanceKey = 'run_route_maintenance_at';
+  static const _routeMaintenanceInterval = Duration(days: 7);
+
+  /// Opportunistic route-storage upkeep (archival profile for old routes when
+  /// payloads grow large, then returning free pages to the OS). Throttled to
+  /// once per [_routeMaintenanceInterval] instead of running on every launch.
+  /// Returns `false` when it was skipped because it ran recently.
+  Future<bool> runRouteMaintenance({DateTime? now}) async {
+    final database = await db;
+    final current = now ?? DateTime.now();
+    final last = await database.query(
+      'app_settings',
+      columns: ['value'],
+      where: 'key = ?',
+      whereArgs: [_routeMaintenanceKey],
+      limit: 1,
+    );
+    if (last.isNotEmpty) {
+      final lastRun = DateTime.tryParse(last.first['value'] as String? ?? '');
+      if (lastRun != null &&
+          current.difference(lastRun).abs() < _routeMaintenanceInterval) {
+        return false;
+      }
+    }
+    await optimizeOldRoutes(limit: 5);
+    await reclaimIncrementalVacuumPages();
+    await database.insert('app_settings', {
+      'key': _routeMaintenanceKey,
+      'value': current.toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    return true;
+  }
+
   Future<void> reclaimIncrementalVacuumPages({int pages = 256}) async {
     final database = await db;
     final modeRows = await database.rawQuery('PRAGMA auto_vacuum');
@@ -576,7 +543,7 @@ class RunRepository extends BaseRepository {
   }
 
   static Future<void> _storeCompactRoute(
-    Transaction txn, {
+    DatabaseExecutor txn, {
     required String activityId,
     required EncodedRunRoute encoded,
     required List<RunSplit> splits,
@@ -694,7 +661,12 @@ class RunRepository extends BaseRepository {
     ).activity;
   }
 
-  ({RunActivity activity, List<RunTrackPoint> points}) _decodeNativeSpool(
+  ({
+    RunActivity activity,
+    List<RunTrackPoint> points,
+    RunTrackProfile profile,
+  })
+  _decodeNativeSpool(
     Map<String, dynamic> spool, {
     required String id,
     double bodyWeightKg = 70,
@@ -704,13 +676,20 @@ class RunRepository extends BaseRepository {
     );
     final rawPoints = (spool['points'] as List? ?? const [])
         .whereType<Map>()
-        .map((row) => Map<String, dynamic>.from(row))
+        .map(Map<String, dynamic>.from)
         .toList();
 
     final now = DateTime.now();
+    // Native spools carry UTC instants (`...Z`); everything stored or
+    // displayed by the app is local wall-clock time.
     final startedAt =
-        DateTime.tryParse(rawActivity['started_at'] as String? ?? '') ?? now;
-    final endedAt = DateTime.tryParse(rawActivity['ended_at'] as String? ?? '');
+        DateTime.tryParse(
+          rawActivity['started_at'] as String? ?? '',
+        )?.toLocal() ??
+        now;
+    final endedAt = DateTime.tryParse(
+      rawActivity['ended_at'] as String? ?? '',
+    )?.toLocal();
     final status = rawActivity['status'] as String? ?? 'completed';
     final activityType = CardioActivityType.fromDatabase(
       rawActivity['activity_type'],
@@ -761,14 +740,17 @@ class RunRepository extends BaseRepository {
           accuracy: (row['accuracy'] as num?)?.toDouble(),
           speed: (row['speed'] as num?)?.toDouble(),
           recordedAt:
-              DateTime.tryParse(row['recorded_at'] as String? ?? '') ??
+              DateTime.tryParse(
+                row['recorded_at'] as String? ?? '',
+              )?.toLocal() ??
               startedAt.add(Duration(seconds: i)),
         ),
       );
     }
 
+    final profile = RunTrackProfile.fromPoints(points);
     final efforts = activityType.usesGps
-        ? RunEffortAnalytics.fromTrackPoints(points)
+        ? RunEffortAnalytics.fromTrackPoints(points, profile: profile)
         : const RunEffortMetrics();
 
     final activity = RunActivity(
@@ -782,7 +764,8 @@ class RunRepository extends BaseRepository {
       // Treadmill runs get a pace once the distance typed on the review
       // screen is known; the bike never has one.
       avgPaceSecPerKm: activityType.isRunning
-          ? avgPace ?? _avgPace(distanceMeters, movingTimeSeconds)
+          ? avgPace ??
+                RunFormatters.paceOrNull(distanceMeters, movingTimeSeconds)
           : null,
       maxPaceSecPerKm: activityType.usesGps ? maxPace : null,
       calories: calories,
@@ -804,12 +787,12 @@ class RunRepository extends BaseRepository {
       effortsComputed: true,
     );
 
-    return (activity: activity, points: points);
+    return (activity: activity, points: points, profile: profile);
   }
 
   Future<double> _latestBodyWeightKg() async {
     try {
-      final latest = await BodyMeasurementRepository().getLatestWeightKg();
+      final latest = await DatabaseHelper.instance.bodyMeasurementRepo.getLatestWeightKg();
       return latest ?? 70;
     } catch (_) {
       // Lightweight repository tests and partially recovered databases may not
@@ -859,11 +842,6 @@ class RunRepository extends BaseRepository {
     // Running costs approximately 1 kcal per kg per kilometer.
     final km = distanceMeters / 1000.0;
     return (km * bodyWeightKg).round().clamp(0, 100000);
-  }
-
-  static double? _avgPace(double distanceMeters, int movingTimeSeconds) {
-    if (distanceMeters < 1 || movingTimeSeconds <= 0) return null;
-    return movingTimeSeconds / (distanceMeters / 1000.0);
   }
 
   static String? _buildPolylineSummary(List<Map<String, dynamic>> points) {
@@ -1028,19 +1006,13 @@ class RunRepository extends BaseRepository {
   /// activities were updated (0 once done).
   Future<int> backfillSmoothedElevation() async {
     final database = await db;
-    try {
-      final done = await database.query(
-        'app_settings',
-        where: 'key = ?',
-        whereArgs: [_elevationBackfillKey],
-        limit: 1,
-      );
-      if (done.isNotEmpty) return 0;
-    } catch (_) {
-      return 0;
-    }
-    // Lightweight schemas (tests, partial restores) may lack the route tables.
-    if (!await _tableExists(database, 'run_track_points')) return 0;
+    final done = await database.query(
+      'app_settings',
+      where: 'key = ?',
+      whereArgs: [_elevationBackfillKey],
+      limit: 1,
+    );
+    if (done.isNotEmpty) return 0;
     final rows = await database.query(
       'run_activities',
       columns: ['id'],
@@ -1075,6 +1047,54 @@ class RunRepository extends BaseRepository {
       'value': DateTime.now().toIso8601String(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
     return updated;
+  }
+
+  /// Every completed cardio session since [startedFrom], newest first, with
+  /// only the columns weekly totals and calendars need.
+  Future<List<CardioStamp>> listCardioStamps({DateTime? startedFrom}) async {
+    final database = await db;
+    final rows = await database.query(
+      'run_activities',
+      columns: const [
+        'started_at',
+        'activity_type',
+        'duration_seconds',
+        'moving_time_seconds',
+        'distance_meters',
+      ],
+      where: startedFrom == null
+          ? 'status = ?'
+          : 'status = ? AND started_at >= ?',
+      whereArgs: [
+        'completed',
+        if (startedFrom != null) startedFrom.toIso8601String(),
+      ],
+      orderBy: 'started_at DESC',
+    );
+    return rows.map(CardioStamp.fromMap).toList();
+  }
+
+  /// The newest completed cardio sessions that are more than an aborted
+  /// start (a minute or 100 m), for "recent" lists.
+  Future<List<RunActivity>> listRecentCardio({
+    int limit = 3,
+    DateTime? startedFrom,
+  }) async {
+    final database = await db;
+    final rows = await database.query(
+      'run_activities',
+      where: startedFrom == null
+          ? 'status = ? AND (duration_seconds >= 60 OR distance_meters >= 100)'
+          : 'status = ? AND (duration_seconds >= 60 OR distance_meters >= 100) '
+                'AND started_at >= ?',
+      whereArgs: [
+        'completed',
+        if (startedFrom != null) startedFrom.toIso8601String(),
+      ],
+      orderBy: 'started_at DESC',
+      limit: limit,
+    );
+    return rows.map(RunActivity.fromMap).toList();
   }
 }
 

@@ -110,22 +110,6 @@ void main() {
         'r1',
       );
     });
-
-    test('works on a workouts table without routine_day_id', () async {
-      await db.execute('ALTER TABLE workouts RENAME TO workouts_old');
-      await db.execute(
-        'CREATE TABLE workouts (id TEXT PRIMARY KEY, date TEXT, end_time TEXT, routine_id TEXT)',
-      );
-      await db.insert('workouts', {
-        'id': 'w',
-        'date': '2026-09-01',
-        'end_time': '2026-09-01T11:00:00',
-        'routine_id': 'r1',
-      });
-      final ppl = await RoutineRepository().getRoutineSummary('r1');
-      expect(ppl?.lastTrainedAt, DateTime(2026, 9, 1));
-      expect(ppl?.days.first.lastTrainedAt, isNull);
-    });
   });
 
   test('getPredefinedSetsForDay groups sets per exercise in order', () async {

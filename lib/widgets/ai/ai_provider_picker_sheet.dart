@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../l10n/app_localizations.dart';
-import '../../models/ai_provider.dart';
-import '../../state/ai_settings_notifier.dart';
-import '../../utils/ai_error_localizer.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/ai_provider.dart';
+import 'package:workout_notes/state/ai_settings_notifier.dart';
+import 'package:workout_notes/utils/ai_error_localizer.dart';
 
 class AiProviderPickerSheet extends StatefulWidget {
   final AiSettingsNotifier notifier;

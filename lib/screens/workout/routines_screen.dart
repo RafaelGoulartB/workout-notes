@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/navigation/ai_coach_navigation.dart';
-import 'package:workout_notes/repositories/periodization_repository.dart';
-import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/screens/workout/active_workout_screen.dart';
 import 'package:workout_notes/screens/workout/routine_day_editor_screen.dart';
 import 'package:workout_notes/screens/workout/routine_form_screen.dart';
 import 'package:workout_notes/utils/strength_routine_summary.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_list_cards.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_sheets.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 export 'package:workout_notes/screens/workout/routine_form_screen.dart';
 
@@ -23,7 +21,7 @@ class RoutinesScreen extends StatefulWidget {
 }
 
 class _RoutinesScreenState extends State<RoutinesScreen> {
-  final _repo = RoutineRepository();
+  final _repo = DatabaseHelper.instance.routineRepo;
   List<RoutineSummary> _routines = const [];
   String? _activeId;
   RoutineInUseReason _reason = RoutineInUseReason.recent;
@@ -41,7 +39,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
     String? plannedRoutineId;
     String? plannedDayId;
     try {
-      final suggestion = await PeriodizationRepository().getRoutineSuggestion(
+      final suggestion = await DatabaseHelper.instance.periodizationRepo.getRoutineSuggestion(
         DateTime.now(),
       );
       plannedRoutineId = suggestion?.routineId;
@@ -76,15 +74,14 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
         builder: (_) => RoutineFormScreen(routineId: routine.id),
       ),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _openDay(RoutineSummary routine, RoutineDaySummary day) async {
     final loc = AppLocalizations.of(context)!;
     await Navigator.push(
       context,
-      AiCoachNavigation.route(
-        kind: AiCoachRouteKind.normalWithFab,
+      MaterialPageRoute(
         builder: (_) => RoutineDayEditorScreen(
           routineDayId: day.id,
           routineId: routine.id,
@@ -95,7 +92,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
         ),
       ),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _startDay(RoutineSummary routine, RoutineDaySummary day) async {
@@ -106,7 +103,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
             ActiveWorkoutScreen(routineId: routine.id, routineDayId: day.id),
       ),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _createRoutine() async {
@@ -131,7 +128,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
       context,
       MaterialPageRoute(builder: (_) => RoutineFormScreen(routineId: id)),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _duplicate(RoutineSummary routine) async {
@@ -140,7 +137,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
       routine.id,
       loc.routinesDuplicateSuffix(routine.name),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _delete(RoutineSummary routine) async {
@@ -152,7 +149,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
     );
     if (!confirmed) return;
     await _repo.deleteRoutine(routine.id);
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   RoutineCardActions _actionsFor(RoutineSummary routine) => RoutineCardActions(
@@ -187,10 +184,10 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
-                padding: RunUi.screenPadding.copyWith(top: 8),
+                padding: AppUi.screenPadding.copyWith(top: 8),
                 children: [
                   if (active != null) ...[
-                    RunSectionHeader(
+                    AppSectionHeader(
                       loc.routinesInUseSection,
                       padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
                       trailing: Text(
@@ -211,7 +208,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
                     ),
                   ],
                   if (others.isNotEmpty) ...[
-                    RunSectionHeader(
+                    AppSectionHeader(
                       loc.routinesOthersSection,
                       padding: EdgeInsets.fromLTRB(
                         4,

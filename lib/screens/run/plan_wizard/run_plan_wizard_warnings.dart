@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/run_plan_template.dart';
 import 'package:workout_notes/screens/run/plan_wizard/run_plan_wizard_controller.dart';
 import 'package:workout_notes/screens/run/plan_wizard/run_plan_wizard_widgets.dart';
 import 'package:workout_notes/services/run_plan_composer.dart';
 import 'package:workout_notes/services/run_plan_templates.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Coach warnings for the current step. Days step: only the schedule smell;
 /// preview step: everything, so the athlete sees it right before creating.
@@ -129,7 +130,7 @@ class RunPlanWizardWarnings extends StatelessWidget {
         : scheme.onTertiaryContainer;
     return Padding(
       padding: const EdgeInsets.only(top: 16),
-      child: RunSectionCard(
+      child: AppSectionCard(
         color: background,
         padding: const EdgeInsets.all(12),
         child: Column(

@@ -1,15 +1,16 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/screens/workout/exercise_detail_tabs_screen.dart';
 import 'package:workout_notes/utils/strength_routine_summary.dart';
-import 'package:workout_notes/widgets/exercise_picker_sheet.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/strength/exercises/exercise_picker_sheet.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_exercise_card.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_set_sheets.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_sheets.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Full-screen editor for a routine day.
 /// Allows adding/removing exercises and managing predefined sets,
@@ -33,7 +34,7 @@ class RoutineDayEditorScreen extends StatefulWidget {
 }
 
 class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
-  final _routineRepo = RoutineRepository();
+  final _routineRepo = DatabaseHelper.instance.routineRepo;
   List<Map<String, dynamic>> _exercises = [];
   Map<String, List<Map<String, dynamic>>> _predefinedSets = {};
   bool _isLoading = true;
@@ -128,7 +129,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
           elevation: 8 * t,
           color: Colors.transparent,
           shadowColor: Colors.black.withAlpha(80),
-          borderRadius: BorderRadius.circular(RunUi.cardRadius),
+          borderRadius: BorderRadius.circular(AppUi.cardRadius),
           child: child,
         );
       },
@@ -164,7 +165,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
             exercise['id'] as String,
             restTimeSeconds: (exercise['default_rest_time'] as int?),
           );
-          _load();
+          await _load();
         },
         onExerciseRemoved: (exercise) async {
           final exerciseId = exercise['id'] as String;
@@ -176,7 +177,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
             await _routineRepo.removeRoutineExercise(
               routineExercise['id'] as String,
             );
-            _load();
+            unawaited(_load());
           }
         },
       ),
@@ -192,7 +193,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     );
     if (!confirmed) return;
     await _routineRepo.removeRoutineExercise(ex['id'] as String);
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   void _openExerciseDetails(Map<String, dynamic> ex) {
@@ -263,7 +264,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
       exercise['id'] as String,
       seconds,
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   // ===================== PREDEFINED SET MANAGEMENT =====================
@@ -283,7 +284,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
         timeSeconds: (last['time_seconds'] as int?),
         isWarmup: (last['is_warmup'] as int?) == 1,
       );
-      if (mounted) _load();
+      if (mounted) unawaited(_load());
       return;
     }
 
@@ -304,7 +305,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
       timeSeconds: result.timeSeconds,
       isWarmup: result.isWarmup,
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _editPredefinedSet(
@@ -333,12 +334,12 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
       timeSeconds: result.timeSeconds,
       isWarmup: result.isWarmup,
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _deletePredefinedSet(String setId) async {
     await _routineRepo.deletePredefinedSet(setId);
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   // ===================== BUILD =====================
@@ -360,10 +361,8 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
               switch (value) {
                 case 'edit_day':
                   _editDay();
-                  break;
                 case 'delete_day':
                   _deleteDay();
-                  break;
               }
             },
             itemBuilder: (ctx) => [

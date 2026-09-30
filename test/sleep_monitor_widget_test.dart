@@ -5,12 +5,11 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/models/sleep_monitor_diagnostics.dart';
-import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/models/sleep_monitor_state.dart';
-import 'package:workout_notes/screens/workout/sleep_monitor_result_screen.dart';
-import 'package:workout_notes/screens/workout/sleep_monitor_screen.dart';
+import 'package:workout_notes/screens/sleep/sleep_monitor_result_screen.dart';
+import 'package:workout_notes/screens/sleep/sleep_monitor_screen.dart';
+import 'support/test_db.dart';
 
 Widget _localized(Widget child) => MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -19,87 +18,7 @@ Widget _localized(Widget child) => MaterialApp(
 );
 
 void main() {
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
-
-  test(
-    'diagnostics accepts a four-hour session with complete valid coverage',
-    () {
-      final start = DateTime.utc(2026, 7, 26, 22);
-      final segments = List.generate(
-        4,
-        (index) => SleepMonitorSegment(
-          id: '$index',
-          sessionId: 'session',
-          startedAt: start.add(Duration(hours: index)),
-          durationSeconds: 3600,
-          audioRmsDbfs: -40,
-          audioPeakDbfs: -20,
-          noiseScore: index.isEven ? 2 : 12,
-          classification: index.isEven ? 'quiet' : 'noise',
-          validFraction: 1,
-          noiseBurstCount: index.isEven ? 0 : 1,
-        ),
-      );
-      final session = SleepMonitorSession(
-        id: 'session',
-        sleepEntryId: 'entry',
-        status: SleepMonitorSession.completed,
-        startedAt: start,
-        endedAt: start.add(const Duration(hours: 4)),
-        utcOffsetStartMinutes: -180,
-        utcOffsetEndMinutes: -180,
-        sensorMode: 'audio',
-        algorithmVersion: 'test',
-        timeInBedMinutes: 240,
-        quietMinutes: 120,
-        noisyMinutes: 120,
-        estimatedSleepMinutes: null,
-        noiseEventCount: 2,
-        signalQualityScore: 1,
-        endReason: SleepMonitorSession.endUser,
-        createdAt: start,
-      );
-
-      final diagnostics = SleepMonitorDiagnostics.fromSession(
-        session,
-        segments,
-      );
-      expect(diagnostics.timelineCoverage, 1);
-      expect(diagnostics.signalCoverage, 1);
-      expect(diagnostics.averageNoiseScore, 7);
-      expect(diagnostics.isAcceptableForNextPhase, isTrue);
-    },
-  );
-
-  test('diagnostics rejects a completed night without segments', () {
-    final start = DateTime.utc(2026, 7, 26, 22);
-    final session = SleepMonitorSession(
-      id: 'empty',
-      sleepEntryId: null,
-      status: SleepMonitorSession.completed,
-      startedAt: start,
-      endedAt: start.add(const Duration(hours: 8)),
-      utcOffsetStartMinutes: -180,
-      utcOffsetEndMinutes: -180,
-      sensorMode: 'audio',
-      algorithmVersion: 'test',
-      timeInBedMinutes: 480,
-      quietMinutes: 0,
-      noisyMinutes: 0,
-      estimatedSleepMinutes: null,
-      noiseEventCount: 0,
-      signalQualityScore: 0,
-      endReason: SleepMonitorSession.endUser,
-      createdAt: start,
-    );
-
-    final diagnostics = SleepMonitorDiagnostics.fromSession(session, const []);
-    expect(diagnostics.hasData, isFalse);
-    expect(diagnostics.isAcceptableForNextPhase, isFalse);
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   test('active elapsed time keeps advancing after the last native event', () {
     final now = DateTime.now();
@@ -143,7 +62,6 @@ void main() {
       final database = (await tester.runAsync(
         () => _resultDatabase(session),
       ))!;
-      DatabaseHelper.overrideDatabase = database;
       addTearDown(() async {
         DatabaseHelper.overrideDatabase = null;
         await database.close();
@@ -177,48 +95,7 @@ Future<void> _pumpUntilLoaded(WidgetTester tester) async {
 }
 
 Future<Database> _resultDatabase(SleepMonitorSession session) async {
-  final database = await databaseFactory.openDatabase(
-    inMemoryDatabasePath,
-    options: OpenDatabaseOptions(
-      version: 1,
-      onCreate: (db, version) async {
-        await db.execute('''
-          CREATE TABLE sleep_monitor_sessions (
-            id TEXT PRIMARY KEY,
-            sleep_entry_id TEXT,
-            status TEXT NOT NULL,
-            started_at TEXT NOT NULL,
-            ended_at TEXT,
-            alarm_at TEXT,
-            utc_offset_start_minutes INTEGER NOT NULL,
-            utc_offset_end_minutes INTEGER,
-            sensor_mode TEXT NOT NULL,
-            algorithm_version TEXT NOT NULL,
-            time_in_bed_minutes INTEGER,
-            quiet_minutes INTEGER,
-            noisy_minutes INTEGER,
-            estimated_sleep_minutes INTEGER,
-            noise_event_count INTEGER NOT NULL,
-            signal_quality_score REAL,
-            analysis_status TEXT,
-            sleep_onset_at TEXT,
-            final_wake_at TEXT,
-            sleep_latency_minutes INTEGER,
-            awake_minutes INTEGER,
-            sleeping_minutes INTEGER,
-            deep_sleep_minutes INTEGER,
-            unknown_minutes INTEGER,
-            awakening_count INTEGER,
-            sleep_efficiency REAL,
-            stage_confidence REAL,
-            stage_algorithm_version TEXT,
-            end_reason TEXT,
-            created_at TEXT NOT NULL
-          )
-        ''');
-      },
-    ),
-  );
+  final database = await installTestDb();
   await database.insert('sleep_monitor_sessions', session.toMap());
   return database;
 }

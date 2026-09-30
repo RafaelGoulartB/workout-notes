@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Headline numbers of the records screen: exercises with marks and how many
 /// records were broken this month and this year.
@@ -20,10 +20,10 @@ class StrengthRecordsHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final colors = Theme.of(context).colorScheme;
-    return RunHeroCard(
+    return AppHeroCard(
       child: Row(
         children: [
-          RunIconBadge(
+          AppIconBadge(
             Icons.emoji_events_rounded,
             color: colors.tertiary,
             size: 44,
@@ -31,18 +31,18 @@ class StrengthRecordsHero extends StatelessWidget {
           ),
           const SizedBox(width: 14),
           Expanded(
-            child: RunStatRow(
+            child: AppStatRow(
               children: [
-                RunStatTile(
+                AppStatTile(
                   label: loc.strengthRecordsHeroExercises,
                   value: '$exercises',
                 ),
-                RunStatTile(
+                AppStatTile(
                   label: loc.strengthRecordsHeroThisMonth,
                   value: '$thisMonth',
                   color: colors.tertiary,
                 ),
-                RunStatTile(
+                AppStatTile(
                   label: loc.strengthRecordsHeroThisYear,
                   value: '$thisYear',
                 ),

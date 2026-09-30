@@ -1,16 +1,16 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/repositories/exercise_repository.dart';
-import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/screens/workout/exercise_detail_tabs_screen.dart';
 import 'package:workout_notes/screens/workout/exercise_form_screen.dart';
 import 'package:workout_notes/utils/exercise_equipment.dart';
 import 'package:workout_notes/utils/strength_exercise_library.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/strength/exercises/exercise_library_widgets.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Every exercise, dense and searchable. Grouped by muscle when "All" is
 /// selected and sorted A-Z; other sorts give one flat ranking.
@@ -22,7 +22,7 @@ class ExerciseLibraryScreen extends StatefulWidget {
 }
 
 class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
-  final _exerciseRepo = ExerciseRepository();
+  final _exerciseRepo = DatabaseHelper.instance.exerciseRepo;
   final _searchController = TextEditingController();
   List<Map<String, dynamic>> _categories = [];
   List<Map<String, dynamic>> _exercises = [];
@@ -35,10 +35,28 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
   ExerciseLibrarySort _sort = ExerciseLibrarySort.az;
   Timer? _searchDebounce;
 
+  // What the list shows. Filtering and sorting run when their inputs change
+  // (a search, a chip, a sort, a load), not on every rebuild.
+  AppLocalizations? _loc;
+  List<ExerciseLibraryEntry> _entries = const [];
+  List<ExerciseLibrarySection> _sections = const [];
+
+  bool get _grouped =>
+      _selectedCategoryId == null && _sort == ExerciseLibrarySort.az;
+
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final loc = AppLocalizations.of(context)!;
+    final localeChanged = _loc != null && _loc!.localeName != loc.localeName;
+    _loc = loc;
+    if (localeChanged) _recompute();
   }
 
   @override
@@ -59,7 +77,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
     var e1rm = const <String, double>{};
     try {
       usage = await _exerciseRepo.getExerciseUsage();
-      final records = await StrengthRecordsRepository().listRecords();
+      final records = await DatabaseHelper.instance.strengthRecordsRepo.listRecords();
       e1rm = {
         for (final record in records)
           if (record.bestE1rm != null) record.exerciseId: record.bestE1rm!,
@@ -74,10 +92,24 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
       _usage = usage;
       _bestE1rm = e1rm;
       _isLoading = false;
+      _recompute();
     });
   }
 
-  List<ExerciseLibraryEntry> _entries(AppLocalizations loc) {
+  /// Filters and sorts the exercises into [_entries] (and [_sections] for the
+  /// grouped view). Call inside `setState` whenever an input changed.
+  void _recompute() {
+    final loc = _loc;
+    if (loc == null) return;
+    _entries = _filterAndSort(loc);
+    _sections = _grouped
+        ? StrengthExerciseLibrary.grouped(_entries, [
+            for (final c in _categories) c['id'] as String,
+          ])
+        : const [];
+  }
+
+  List<ExerciseLibraryEntry> _filterAndSort(AppLocalizations loc) {
     final query = _search.trim();
     final result = <ExerciseLibraryEntry>[];
     for (final row in _exercises) {
@@ -111,12 +143,18 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
   Future<void> _toggleFavorite(ExerciseLibraryEntry entry) async {
     // Update in place so the list does not jump while the user is scrolling.
     final wasFavorite = entry.isFavorite;
-    setState(() => entry.row['is_favorite'] = wasFavorite ? 0 : 1);
+    setState(() {
+      entry.row['is_favorite'] = wasFavorite ? 0 : 1;
+      _recompute();
+    });
     try {
       await _exerciseRepo.toggleFavorite(entry.id);
     } catch (_) {
       if (mounted) {
-        setState(() => entry.row['is_favorite'] = wasFavorite ? 1 : 0);
+        setState(() {
+          entry.row['is_favorite'] = wasFavorite ? 1 : 0;
+          _recompute();
+        });
       }
     }
   }
@@ -131,7 +169,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
         ),
       ),
     );
-    if (result == true || mounted) _load();
+    if (result == true || mounted) await _load();
   }
 
   Future<void> _createExercise() async {
@@ -139,7 +177,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
       context,
       MaterialPageRoute(builder: (_) => const ExerciseFormScreen()),
     );
-    if (result == true && mounted) _load();
+    if (result == true && mounted) await _load();
   }
 
   void _clearFilters() {
@@ -148,6 +186,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
       _search = '';
       _selectedCategoryId = null;
       _favoritesOnly = false;
+      _recompute();
     });
   }
 
@@ -155,9 +194,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
-    final entries = _isLoading ? const <ExerciseLibraryEntry>[] : _entries(loc);
-    final grouped =
-        _selectedCategoryId == null && _sort == ExerciseLibrarySort.az;
+    final entries = _isLoading ? const <ExerciseLibraryEntry>[] : _entries;
     final categoryById = {for (final c in _categories) c['id'] as String: c};
 
     return Scaffold(
@@ -169,15 +206,24 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
             onSearchChanged: (value) {
               _searchDebounce?.cancel();
               _searchDebounce = Timer(const Duration(milliseconds: 200), () {
-                if (mounted) setState(() => _search = value);
+                if (!mounted) return;
+                setState(() {
+                  _search = value;
+                  _recompute();
+                });
               });
             },
             categories: _categories,
             selectedCategoryId: _selectedCategoryId,
-            onCategoryChanged: (id) => setState(() => _selectedCategoryId = id),
+            onCategoryChanged: (id) => setState(() {
+              _selectedCategoryId = id;
+              _recompute();
+            }),
             favoritesOnly: _favoritesOnly,
-            onFavoritesChanged: (value) =>
-                setState(() => _favoritesOnly = value),
+            onFavoritesChanged: (value) => setState(() {
+              _favoritesOnly = value;
+              _recompute();
+            }),
           ),
           Expanded(
             child: _isLoading
@@ -186,22 +232,47 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                 ? _buildEmptyState(theme, loc)
                 : RefreshIndicator(
                     onRefresh: _load,
-                    child: ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
-                      children: [
-                        ExerciseLibraryListHeader(
-                          count: entries.length,
-                          sort: _sort,
-                          onSortChanged: (value) =>
-                              setState(() => _sort = value),
-                        ),
-                        if (grouped)
-                          ..._buildSections(entries, categoryById)
-                        else
-                          RunSectionCard(
-                            padding: EdgeInsets.zero,
-                            child: _rows(entries, showCategory: true),
+                    // Rows are built lazily: the "All" view has ~130 of them.
+                    child: CustomScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      slivers: [
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
+                          sliver: SliverMainAxisGroup(
+                            slivers: [
+                              SliverToBoxAdapter(
+                                child: ExerciseLibraryListHeader(
+                                  count: entries.length,
+                                  sort: _sort,
+                                  onSortChanged: (value) => setState(() {
+                                    _sort = value;
+                                    _recompute();
+                                  }),
+                                ),
+                              ),
+                              if (_grouped)
+                                for (final section in _sections) ...[
+                                  SliverToBoxAdapter(
+                                    child: ExerciseLibrarySectionHeader(
+                                      category:
+                                          categoryById[section.categoryId] ??
+                                          {
+                                            'id': section.categoryId,
+                                            'name': section.categoryId,
+                                          },
+                                      count: section.entries.length,
+                                    ),
+                                  ),
+                                  _rowsSliver(
+                                    section.entries,
+                                    showCategory: false,
+                                  ),
+                                ]
+                              else
+                                _rowsSliver(entries, showCategory: true),
+                            ],
                           ),
+                        ),
                       ],
                     ),
                   ),
@@ -216,44 +287,51 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
     );
   }
 
-  List<Widget> _buildSections(
-    List<ExerciseLibraryEntry> entries,
-    Map<String, Map<String, dynamic>> categoryById,
-  ) {
-    final sections = StrengthExerciseLibrary.grouped(entries, [
-      for (final c in _categories) c['id'] as String,
-    ]);
-    return [
-      for (final section in sections) ...[
-        ExerciseLibrarySectionHeader(
-          category:
-              categoryById[section.categoryId] ??
-              {'id': section.categoryId, 'name': section.categoryId},
-          count: section.entries.length,
-        ),
-        RunSectionCard(
-          padding: EdgeInsets.zero,
-          child: _rows(section.entries, showCategory: false),
-        ),
-      ],
-    ];
-  }
-
-  Widget _rows(
+  /// The rows of one card (a muscle group, or the flat ranking) as a lazy
+  /// list drawn on the same bordered surface as `AppSectionCard`.
+  Widget _rowsSliver(
     List<ExerciseLibraryEntry> entries, {
     required bool showCategory,
-  }) => RunDividedList(
-    children: [
-      for (final entry in entries)
-        ExerciseLibraryRow(
-          key: ValueKey(entry.id),
-          entry: entry,
-          showCategory: showCategory,
-          onTap: () => _openExercise(entry),
-          onToggleFavorite: () => _toggleFavorite(entry),
-        ),
-    ],
-  );
+  }) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final dividerColor = colors.outlineVariant.withAlpha(70);
+    const radius = Radius.circular(AppUi.cardRadius);
+    return DecoratedSliver(
+      decoration: BoxDecoration(
+        color: theme.cardTheme.color ?? colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppUi.cardRadius),
+        border: Border.all(color: AppUi.divider(colors)),
+      ),
+      sliver: SliverList.separated(
+        itemCount: entries.length,
+        separatorBuilder: (_, _) => Divider(height: 1, color: dividerColor),
+        itemBuilder: (context, index) {
+          final entry = entries[index];
+          Widget row = ExerciseLibraryRow(
+            key: ValueKey(entry.id),
+            entry: entry,
+            showCategory: showCategory,
+            onTap: () => _openExercise(entry),
+            onToggleFavorite: () => _toggleFavorite(entry),
+          );
+          // The card clips its rows to the rounded corners.
+          final first = index == 0;
+          final last = index == entries.length - 1;
+          if (first || last) {
+            row = ClipRRect(
+              borderRadius: BorderRadius.vertical(
+                top: first ? radius : Radius.zero,
+                bottom: last ? radius : Radius.zero,
+              ),
+              child: row,
+            );
+          }
+          return row;
+        },
+      ),
+    );
+  }
 
   Widget _buildEmptyState(ThemeData theme, AppLocalizations loc) {
     final onlyFavorites =

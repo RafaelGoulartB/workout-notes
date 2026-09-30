@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:workout_notes/models/run_plan_workout.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Target of a running plan. Drives the suggested templates and the plan card.
 enum RunPlanGoalKind {
@@ -38,10 +39,6 @@ class RunPlanProgress {
     this.skippedSessions = 0,
     this.plannedSessions = 0,
   });
-
-  /// Sessions settled one way or the other — the denominator users think in is
-  /// still [totalSessions], but skipping should not stall the bar forever.
-  int get resolvedSessions => completedSessions + skippedSessions;
 
   /// 0..1 completion against the whole plan. 0 when the plan has no sessions.
   double get fraction => totalSessions < 1
@@ -150,12 +147,7 @@ class RunPlan {
   int? _elapsedWeeks(DateTime date) {
     final anchor = activatedAt;
     if (anchor == null || weeks < 1) return null;
-    return _weekStart(date).difference(_weekStart(anchor)).inDays ~/ 7;
-  }
-
-  static DateTime _weekStart(DateTime date) {
-    final day = DateTime(date.year, date.month, date.day);
-    return day.subtract(Duration(days: day.weekday - 1));
+    return mondayOf(date).difference(mondayOf(anchor)).inDays ~/ 7;
   }
 
   /// Sessions of [weekIndex] (zero-based), ordered by weekday then order.
@@ -228,11 +220,11 @@ class RunPlan {
     'name': name,
     'notes': notes,
     'goal_kind': goalKind.value,
-    'race_date': raceDate == null ? null : _date(raceDate!),
+    'race_date': raceDate == null ? null : dateKey(raceDate!),
     'weeks': weeks,
     'status': status.value,
     'completion_count': completionCount,
-    'activated_at': activatedAt == null ? null : _date(activatedAt!),
+    'activated_at': activatedAt == null ? null : dateKey(activatedAt!),
     'created_at': createdAt.toIso8601String(),
     'updated_at': updatedAt.toIso8601String(),
     'template_key': templateKey,
@@ -277,11 +269,6 @@ class RunPlan {
     }
   }
 
-  static String _date(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
 }
 
 const Object _sentinel = Object();

@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
-import 'package:workout_notes/repositories/routine_repository.dart';
-import 'package:workout_notes/repositories/run_plan_repository.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// A plan with its phases and, per phase, the target that best describes it
 /// (today's for the running phase, the first week's for future phases, the
@@ -35,7 +36,7 @@ class PlanOverviewData {
     DateTime? today,
   }) async {
     final now = today ?? DateTime.now();
-    final day = DateTime(now.year, now.month, now.day);
+    final day = dayOf(now);
     final phases = await repository.getPhases(plan.id);
     final targets = await Future.wait([
       for (final phase in phases)
@@ -48,8 +49,10 @@ class PlanOverviewData {
               : phase.startDate,
         ),
     ]);
-    final routines = await RoutineRepository().getRoutines();
-    final runPlans = await RunPlanRepository().listPlans(includeArchived: true);
+    final routines = await DatabaseHelper.instance.routineRepo.getRoutines();
+    final runPlans = await DatabaseHelper.instance.runPlanRepo.listPlans(
+      includeArchived: true,
+    );
     return PlanOverviewData(
       plan: plan,
       phases: phases,
@@ -260,10 +263,25 @@ class PhaseSummaryCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                _StatusChip(
+                AppPill(
                   label: phaseStatusLabel(loc, phase, today),
-                  color: current ? color : null,
-                  done: done,
+                  icon: done ? Icons.check_rounded : null,
+                  iconSize: 12,
+                  color: current
+                      ? color
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                  background:
+                      (current
+                              ? color
+                              : Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerHighest)
+                          .withAlpha(current ? 40 : 140),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  fontWeight: FontWeight.w800,
                 ),
                 const Icon(Icons.chevron_right_rounded),
               ],
@@ -295,45 +313,6 @@ class PhaseSummaryCard extends StatelessWidget {
             ],
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  final String label;
-  final Color? color;
-  final bool done;
-
-  const _StatusChip({required this.label, this.color, this.done = false});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: (color ?? scheme.surfaceContainerHighest).withAlpha(
-          color == null ? 140 : 40,
-        ),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (done) ...[
-            Icon(Icons.check_rounded, size: 12, color: scheme.onSurfaceVariant),
-            const SizedBox(width: 3),
-          ],
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: color ?? scheme.onSurfaceVariant,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
       ),
     );
   }

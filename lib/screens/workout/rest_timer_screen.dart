@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import '../../services/rest_timer_service.dart';
+import 'package:workout_notes/services/rest_timer_service.dart';
 
 class RestTimerScreen extends StatefulWidget {
   const RestTimerScreen({super.key});

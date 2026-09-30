@@ -7,6 +7,7 @@ import 'package:workout_notes/database/database_schema.dart';
 import 'package:workout_notes/models/medication.dart';
 import 'package:workout_notes/repositories/medication_repository.dart';
 import 'package:workout_notes/services/medication_reminder_service.dart';
+import 'support/test_db.dart';
 
 const _channel = MethodChannel('workout_notes/medication/methods');
 
@@ -15,10 +16,7 @@ void main() {
   late Database database;
   late MedicationRepository repository;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(

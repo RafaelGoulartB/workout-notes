@@ -3,9 +3,6 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:workout_notes/database/database_helper.dart';
-import 'package:workout_notes/database/database_periodization_schema.dart';
-import 'package:workout_notes/database/database_run_plan_schema.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
@@ -13,46 +10,21 @@ import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
+import 'support/run_plan_fixtures.dart';
+import 'support/test_db.dart';
 
 void main() {
   late Database database;
   late RunPlanRepository repository;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 45,
-        onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-        onCreate: (db, version) async {
-          await db.execute(
-            'CREATE TABLE routines (id TEXT PRIMARY KEY, name TEXT NOT NULL, notes TEXT, created_at TEXT NOT NULL)',
-          );
-          await db.execute(
-            'CREATE TABLE run_activities (id TEXT PRIMARY KEY, started_at TEXT NOT NULL, ended_at TEXT, '
-            'duration_seconds INTEGER NOT NULL DEFAULT 0, moving_time_seconds INTEGER NOT NULL DEFAULT 0, '
-            'distance_meters REAL NOT NULL DEFAULT 0, avg_pace_sec_per_km REAL, max_pace_sec_per_km REAL, '
-            'calories INTEGER, title TEXT, notes TEXT, status TEXT NOT NULL DEFAULT \'completed\', '
-            'polyline_summary TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, plan_workout_id TEXT)',
-          );
-          await DatabasePeriodizationSchema.create(db);
-          await DatabaseRunPlanSchema.create(db);
-        },
-      ),
-    );
-    DatabaseHelper.overrideDatabase = database;
+    database = await installTestDb();
     repository = RunPlanRepository();
   });
 
-  tearDown(() async {
-    DatabaseHelper.overrideDatabase = null;
-    await database.close();
-  });
+  tearDown(uninstallTestDb);
 
   Future<RunPlan> seedPlan({int weeks = 4}) => repository.createPlan(
     name: '10 km em 12 semanas',
@@ -341,26 +313,6 @@ void main() {
       expect(steps.last.role, RunStepRole.warmup);
     });
 
-    test('replaceSteps swaps the whole block and renumbers', () async {
-      final plan = await seedPlan();
-      final session = await seedIntervalSession(plan.id);
-      await repository.replaceSteps(session.id, [
-        RunWorkoutStep(
-          id: '',
-          runPlanWorkoutId: session.id,
-          orderIndex: 9,
-          role: RunStepRole.steady,
-          metric: RunIntervalMetric.time,
-          value: 1800,
-        ),
-      ]);
-
-      final steps = await repository.getSteps(session.id);
-      expect(steps.length, 1);
-      expect(steps.single.orderIndex, 0);
-      expect(steps.single.value, 1800);
-    });
-
     test('deleting a step leaves the rest intact', () async {
       final plan = await seedPlan();
       final session = await seedIntervalSession(plan.id);
@@ -425,7 +377,7 @@ void main() {
     test('attaching an activity marks the scheduled run completed', () async {
       final plan = await seedPlan();
       final session = await seedIntervalSession(plan.id);
-      final scheduled = await repository.scheduleRun(
+      final scheduled = await scheduleRunFixture(repository, 
         date: DateTime(2026, 1, 6),
         runPlanId: plan.id,
         runPlanWorkoutId: session.id,
@@ -454,7 +406,7 @@ void main() {
       'deleting the activity clears the link but keeps the schedule',
       () async {
         final plan = await seedPlan();
-        final scheduled = await repository.scheduleRun(
+        final scheduled = await scheduleRunFixture(repository, 
           date: DateTime(2026, 1, 6),
           runPlanId: plan.id,
         );
@@ -484,7 +436,7 @@ void main() {
 
     test('a skipped run keeps its status', () async {
       final plan = await seedPlan();
-      final scheduled = await repository.scheduleRun(
+      final scheduled = await scheduleRunFixture(repository, 
         date: DateTime(2026, 1, 6),
         runPlanId: plan.id,
       );
@@ -501,7 +453,7 @@ void main() {
     test('deleting a plan cascades its scheduled runs', () async {
       final plan = await seedPlan();
       final session = await seedIntervalSession(plan.id);
-      await repository.scheduleRun(
+      await scheduleRunFixture(repository, 
         date: DateTime(2026, 1, 6),
         runPlanId: plan.id,
         runPlanWorkoutId: session.id,
@@ -716,7 +668,7 @@ void main() {
           dayOfWeek: 2,
         );
         // Planned three weeks out: running today is a different session.
-        await repository.scheduleRun(
+        await scheduleRunFixture(repository, 
           date: DateTime.now().add(const Duration(days: 21)),
           runPlanId: plan.id,
           runPlanWorkoutId: session.id,

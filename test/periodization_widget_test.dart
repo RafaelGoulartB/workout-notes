@@ -2,16 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:workout_notes/database/database_helper.dart';
-import 'package:workout_notes/database/database_periodization_schema.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_schedule.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
-import 'package:workout_notes/screens/workout/periodization_home_screen.dart';
-import 'package:workout_notes/screens/workout/periodization_phase_editor_screen.dart';
-import 'package:workout_notes/screens/workout/periodization_plan_editor_screen.dart';
+import 'package:workout_notes/screens/planning/periodization_home_screen.dart';
+import 'package:workout_notes/screens/planning/periodization_phase_editor_screen.dart';
+import 'package:workout_notes/screens/planning/periodization_plan_editor_screen.dart';
+import 'support/test_db.dart';
 
 Widget _app(Widget home) => MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -23,136 +22,13 @@ Widget _app(Widget home) => MaterialApp(
 void main() {
   late Database database;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 37,
-        onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-        onCreate: (db, version) async {
-          await db.execute('''
-            CREATE TABLE routines (
-              id TEXT PRIMARY KEY,
-              name TEXT NOT NULL,
-              notes TEXT,
-              created_at TEXT NOT NULL
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE routine_days (
-              id TEXT PRIMARY KEY,
-              routine_id TEXT NOT NULL,
-              name TEXT NOT NULL,
-              order_index INTEGER NOT NULL DEFAULT 0,
-              FOREIGN KEY (routine_id) REFERENCES routines(id) ON DELETE CASCADE
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE workouts (
-              id TEXT PRIMARY KEY,
-              date TEXT NOT NULL,
-              start_time TEXT,
-              end_time TEXT,
-              routine_id TEXT
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE exercise_entries (
-              id TEXT PRIMARY KEY,
-              workout_id TEXT NOT NULL,
-              exercise_id TEXT NOT NULL,
-              order_index INTEGER,
-              FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE sets (
-              id TEXT PRIMARY KEY,
-              exercise_entry_id TEXT NOT NULL,
-              weight REAL,
-              reps INTEGER,
-              rpe REAL,
-              is_complete INTEGER DEFAULT 0,
-              is_warmup INTEGER DEFAULT 0,
-              order_index INTEGER,
-              FOREIGN KEY (exercise_entry_id) REFERENCES exercise_entries(id)
-                ON DELETE CASCADE
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE sleep_entries (
-              id TEXT PRIMARY KEY,
-              date TEXT,
-              sleep_minutes INTEGER,
-              actual_sleep_minutes INTEGER,
-              estimated_sleep_minutes INTEGER
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE meal_logs (
-              id TEXT PRIMARY KEY,
-              date TEXT,
-              meal_type TEXT
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE meal_log_items (
-              id TEXT PRIMARY KEY,
-              meal_log_id TEXT,
-              calories REAL,
-              protein_g REAL,
-              carbs_g REAL,
-              fat_g REAL,
-              FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE body_measurements (
-              id TEXT PRIMARY KEY,
-              type TEXT NOT NULL,
-              value REAL NOT NULL,
-              unit TEXT NOT NULL DEFAULT 'kg',
-              date TEXT NOT NULL,
-              created_at TEXT NOT NULL
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE app_settings (
-              key TEXT PRIMARY KEY,
-              value TEXT NOT NULL
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE nutrition_goals (
-              id TEXT PRIMARY KEY,
-              calories REAL,
-              protein_g REAL,
-              carbs_g REAL,
-              fat_g REAL,
-              tdee REAL,
-              adjustment_kind TEXT,
-              adjustment_percent REAL,
-              created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL,
-              is_active INTEGER NOT NULL DEFAULT 1
-            )
-          ''');
-          await DatabasePeriodizationSchema.create(db);
-        },
-      ),
-    );
-    DatabaseHelper.overrideDatabase = database;
+    database = await installTestDb();
   });
 
-  tearDown(() async {
-    DatabaseHelper.overrideDatabase = null;
-    await database.close();
-  });
+  tearDown(uninstallTestDb);
 
   // ignore: unused_element
   Future<void> seedTdeeGoal({required double tdee}) async {

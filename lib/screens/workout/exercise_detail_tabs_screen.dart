@@ -1,16 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import 'package:workout_notes/repositories/analytics_repository.dart';
-import 'package:workout_notes/repositories/exercise_repository.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/screens/workout/exercise_form_screen.dart';
 import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/strength/exercise/exercise_charts_card.dart';
 import 'package:workout_notes/widgets/strength/exercise/exercise_detail_header.dart';
 import 'package:workout_notes/widgets/strength/exercise/exercise_history_list.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 enum _DetailTab { history, charts }
 
@@ -34,9 +33,9 @@ class ExerciseDetailTabsScreen extends StatefulWidget {
 }
 
 class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen> {
-  final _exerciseRepo = ExerciseRepository();
-  final _analyticsRepo = AnalyticsRepository();
-  final _recordsRepo = StrengthRecordsRepository();
+  final _exerciseRepo = DatabaseHelper.instance.exerciseRepo;
+  final _analyticsRepo = DatabaseHelper.instance.analyticsRepo;
+  final _recordsRepo = DatabaseHelper.instance.strengthRecordsRepo;
 
   bool _loading = true;
   bool _failed = false;
@@ -97,32 +96,19 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen> {
     );
     if (saved == true && mounted) {
       _changed = true;
-      _load();
+      unawaited(_load());
     }
   }
 
   Future<void> _delete() async {
     final loc = AppLocalizations.of(context)!;
     final name = _displayName(loc);
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.exerciseDetailDeleteTitle),
-        content: Text(loc.exerciseDetailDeleteBody(name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.commonCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: loc.exerciseDetailDeleteTitle,
+      message: loc.exerciseDetailDeleteBody(name),
+      confirmLabel: loc.commonDelete,
+      destructive: true,
     );
     if (confirm != true) return;
     await _exerciseRepo.deleteExercise(widget.exerciseId);
@@ -143,7 +129,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen> {
         builder: (_) => WorkoutDetailScreen(workoutId: session.workoutId),
       ),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   @override
@@ -174,7 +160,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen> {
             preferredSize: const Size.fromHeight(60),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: RunSegmentedTabs<_DetailTab>(
+              child: AppSegmentedTabs<_DetailTab>(
                 values: _DetailTab.values,
                 selected: _tab,
                 labelOf: (tab) => tab == _DetailTab.history
@@ -188,7 +174,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _failed || _exercise == null
-            ? EmptyStatePlaceholder(
+            ? AppEmptyState(
                 icon: Icons.error_outline_rounded,
                 title: loc.strengthInsightsLoadError,
                 subtitle: '',
@@ -244,7 +230,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: RunUi.screenPadding.copyWith(top: 8, bottom: 40),
+        padding: AppUi.screenPadding.copyWith(top: 8, bottom: 40),
         children: [
           ExerciseDetailHeader(
             name: _displayName(loc),

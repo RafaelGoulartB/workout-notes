@@ -1,4 +1,4 @@
-import 'ai_food_label_draft.dart';
+import 'package:workout_notes/models/nutrition/ai_food_label_draft.dart';
 
 enum AiManualFoodProposalStatus {
   awaitingApproval,

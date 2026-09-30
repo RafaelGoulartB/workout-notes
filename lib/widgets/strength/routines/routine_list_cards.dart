@@ -3,8 +3,8 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/strength_routine_format.dart';
 import 'package:workout_notes/utils/strength_routine_summary.dart';
 import 'package:workout_notes/utils/workout_estimator.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_muscle_widgets.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Callbacks shared by every routine card of the library.
 class RoutineCardActions {
@@ -78,9 +78,9 @@ class RoutineLibraryList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.fromLTRB(12, 2, 0, 2),
-      child: RunDividedList(
+      child: AppDividedList(
         children: [
           for (final routine in routines)
             RoutineLibraryRow(routine: routine, actions: actionsFor(routine)),
@@ -197,7 +197,7 @@ class RoutineInUseCard extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
     final scheme = theme.colorScheme;
 
-    return RunSectionCard(
+    return AppSectionCard(
       onTap: actions.onOpen,
       padding: const EdgeInsets.fromLTRB(16, 10, 0, 4),
       child: Column(
@@ -249,7 +249,7 @@ class RoutineInUseCard extends StatelessWidget {
             const SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.only(right: 16),
-              child: Divider(height: 1, color: RunUi.divider(scheme)),
+              child: Divider(height: 1, color: AppUi.divider(scheme)),
             ),
             for (final day in routine.days)
               _InUseDayRow(
@@ -323,7 +323,7 @@ class _InUseDayRow extends StatelessWidget {
                       ),
                       if (isNext) ...[
                         const SizedBox(width: 6),
-                        RunPill(label: loc.routinesNextBadge),
+                        AppPill(label: loc.routinesNextBadge),
                       ],
                     ],
                   ),

@@ -8,8 +8,6 @@ import 'package:workout_notes/models/run_lap.dart';
 import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
-import 'package:workout_notes/repositories/run_plan_repository.dart';
-import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_replay_screen.dart';
 import 'package:workout_notes/screens/run/run_route_map_screen.dart';
 import 'package:workout_notes/services/run_export_service.dart';
@@ -25,7 +23,7 @@ import 'package:workout_notes/widgets/run/run_gear_row.dart';
 import 'package:workout_notes/widgets/run/run_route_map.dart';
 import 'package:workout_notes/widgets/run/run_share_card.dart';
 import 'package:workout_notes/widgets/run/run_splits_list.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 enum _MenuAction { exportGpx, delete }
 
@@ -46,8 +44,8 @@ class RunDetailScreen extends StatefulWidget {
 }
 
 class _RunDetailScreenState extends State<RunDetailScreen> {
-  final _repo = RunRepository();
-  final _planRepo = RunPlanRepository();
+  final _repo = DatabaseHelper.instance.runRepo;
+  final _planRepo = DatabaseHelper.instance.runPlanRepo;
   final _exportService = RunExportService();
 
   /// Distance highlighted by the charts, followed by the map marker.
@@ -110,9 +108,11 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     final laps = results[3] as List<RunLap>;
     final gear = results[4] as RunGearUsage?;
 
+    final profile = RunTrackProfile.fromPoints(points);
     final derived = RunPaceAnalytics.fromTrackPoints(
       points,
       activityAvgPaceSecPerKm: activity.avgPaceSecPerKm,
+      profile: profile,
     );
     final analytics = storedSplits.isEmpty
         ? derived
@@ -138,7 +138,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
       _gear = gear;
       _analytics = analytics;
       _elevation = activity.isRun
-          ? RunElevationProfile.fromTrackPoints(points)
+          ? RunElevationProfile.fromTrackPoints(points, profile: profile)
           : RunElevationProfile.empty;
       _medals = medals;
       _loading = false;
@@ -210,34 +210,18 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     final activity = _activity;
     if (activity == null) return;
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          activity.isStationaryBike
+    final confirmed = await showConfirmDialog(
+      context,
+      title: activity.isStationaryBike
               ? loc.stationaryBikeDeleteConfirm
               : loc.runDetailDeleteConfirm,
-        ),
-        content: Text(
-          activity.isStationaryBike
+      message: activity.isStationaryBike
               ? loc.stationaryBikeDeleteConfirmBody
               : loc.runDetailDeleteConfirmBody,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              activity.isStationaryBike
+      confirmLabel: activity.isStationaryBike
                   ? loc.stationaryBikeDelete
                   : loc.runDetailDelete,
-            ),
-          ),
-        ],
-      ),
+      cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
     );
     if (confirmed != true || !mounted) return;
     await _repo.deleteActivity(widget.activityId);
@@ -329,7 +313,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
   Widget _buildMap(RunActivity activity, AppLocalizations loc) {
     final theme = Theme.of(context);
     return ClipRRect(
-      borderRadius: BorderRadius.circular(RunUi.cardRadius),
+      borderRadius: BorderRadius.circular(AppUi.cardRadius),
       child: SizedBox(
         height: 260,
         child: Stack(
@@ -485,7 +469,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
           ],
           if (activity.isRun && _medals.isNotEmpty) ...[
             const SizedBox(height: 12),
-            RunSectionCard(
+            AppSectionCard(
               child: RunActivityAchievementsBlock(placements: _medals),
             ),
           ],
@@ -499,11 +483,11 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
               selectedDistance: hasRoute ? _selectedDistance : null,
             ),
           if (activity.isRunning && _planSteps.isNotEmpty) ...[
-            RunSectionHeader(
+            AppSectionHeader(
               AppLocalizations.of(context)!.runDetailPlanComparison,
             ),
-            RunSectionCard(
-              child: RunDividedList(
+            AppSectionCard(
+              child: AppDividedList(
                 children: [
                   for (final step in _planSteps) RunActivityStepRow(step: step),
                 ],
@@ -511,8 +495,8 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
             ),
           ],
           if (activity.isRun && _analytics.hasSplits) ...[
-            RunSectionHeader(loc.runDetailSplitsSection),
-            RunSectionCard(
+            AppSectionHeader(loc.runDetailSplitsSection),
+            AppSectionCard(
               child: RunSplitsList(
                 splits: _analytics.splits,
                 averagePaceSecPerKm: avgPace,
@@ -521,11 +505,11 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
             ),
           ],
           if (_laps.isNotEmpty) ...[
-            RunSectionHeader(loc.runDetailLapsSection),
-            RunSectionCard(child: RunLapsList(laps: _laps)),
+            AppSectionHeader(loc.runDetailLapsSection),
+            AppSectionCard(child: RunLapsList(laps: _laps)),
           ],
           if (efforts.isNotEmpty) ...[
-            RunSectionHeader(loc.runDetailEffortsSection),
+            AppSectionHeader(loc.runDetailEffortsSection),
             RunBestEffortsCard(efforts: efforts, medals: _medals),
           ],
         ],

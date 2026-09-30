@@ -6,7 +6,7 @@ import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/services/run_today_service.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// "Today" card at the top of the running home: what the plan expects today
 /// (with a one-tap start), what was already run, a rest day, or a nudge to
@@ -31,11 +31,11 @@ class RunTodayCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
 
-    return RunSoftCard(
+    return AppSoftCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          RunTodayHeader(title: loc.runHomeTodayTitle),
+          AppTodayHeader(title: loc.runHomeTodayTitle),
           const SizedBox(height: 14),
           switch (info.status) {
             RunTodayStatus.planned => _Planned(
@@ -87,7 +87,7 @@ class _Planned extends StatelessWidget {
       children: [
         Row(
           children: [
-            RunIconBadge(
+            AppIconBadge(
               RunPlanUi.kindIcon(workout.kind),
               color: tint,
               size: 48,
@@ -122,9 +122,9 @@ class _Planned extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 14),
-        Divider(height: 1, color: RunUi.divider(colors)),
+        Divider(height: 1, color: AppUi.divider(colors)),
         const SizedBox(height: 12),
-        RunTodayFooter(
+        AppTodayFooter(
           caption: session.planName == null
               ? null
               : loc.runHomeTodayFromPlan(session.planName!),
@@ -156,7 +156,7 @@ class _Done extends StatelessWidget {
       children: [
         Row(
           children: [
-            RunIconBadge(
+            AppIconBadge(
               Icons.check_circle_rounded,
               color: colors.primary,
               size: 44,
@@ -205,17 +205,17 @@ class _DoneRun extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(RunUi.tileRadius),
+      borderRadius: BorderRadius.circular(AppUi.tileRadius),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: colors.surfaceContainerHighest.withValues(alpha: 0.45),
-          borderRadius: BorderRadius.circular(RunUi.tileRadius),
+          borderRadius: BorderRadius.circular(AppUi.tileRadius),
         ),
         child: Row(
           children: [
             Expanded(
-              child: RunValueUnit(
+              child: AppValueUnit(
                 value: RunFormatters.distanceKm(activity.distanceMeters),
                 unit: 'km',
                 valueStyle: theme.textTheme.titleLarge?.copyWith(
@@ -228,7 +228,7 @@ class _DoneRun extends StatelessWidget {
               '${RunFormatters.paceWithUnit(activity.avgPaceSecPerKm)}',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colors.onSurfaceVariant,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
             const SizedBox(width: 4),
@@ -262,7 +262,7 @@ class _Rest extends StatelessWidget {
       children: [
         Row(
           children: [
-            RunIconBadge(
+            AppIconBadge(
               Icons.self_improvement,
               color: colors.tertiary,
               size: 44,
@@ -320,7 +320,7 @@ class _NextSession extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: colors.surfaceContainerHighest.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(RunUi.tileRadius),
+        borderRadius: BorderRadius.circular(AppUi.tileRadius),
       ),
       child: Row(
         children: [
@@ -383,7 +383,7 @@ class _NoPlan extends StatelessWidget {
       children: [
         Row(
           children: [
-            const RunIconBadge(Icons.route_outlined, size: 44, iconSize: 24),
+            const AppIconBadge(Icons.route_outlined, size: 44, iconSize: 24),
             const SizedBox(width: 12),
             Expanded(
               child: Column(

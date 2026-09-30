@@ -5,6 +5,7 @@ import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/screens/run/run_post_run_review_screen.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Reminder for a finished run whose review was never saved or discarded
 /// (the app was closed or backgrounded on the review screen). Without it the
@@ -69,22 +70,12 @@ class _RunPendingReviewBannerState extends State<RunPendingReviewBanner> {
 
   Future<void> _discard(RunReviewDraft draft) async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(loc.runReviewDiscardTitle),
-        content: Text(loc.runReviewDiscardBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(loc.runReviewDiscard),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.runReviewDiscardTitle,
+      message: loc.runReviewDiscardBody,
+      confirmLabel: loc.runReviewDiscard,
+      cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
     );
     if (confirmed != true || !mounted) return;
     setState(() => _busy = true);

@@ -1,3 +1,5 @@
+import 'package:workout_notes/utils/date_utils.dart';
+
 /// A nightly sleep record.
 ///
 /// [sleepMinutes] is the user's primary duration (time recorded as sleep).
@@ -72,7 +74,7 @@ class SleepEntry {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'date': _dateString(date),
+      'date': dateKey(date),
       'sleep_minutes': sleepMinutes,
       'actual_sleep_minutes': actualSleepMinutes,
       'bedtime_minutes': bedtimeMinutes,
@@ -111,8 +113,6 @@ class SleepEntry {
     return (asleepMinutes / denominator * 100).clamp(0.0, 100.0);
   }
 
-  static String _dateString(DateTime value) =>
-      value.toIso8601String().substring(0, 10);
 }
 
 class SleepDashboardStats {

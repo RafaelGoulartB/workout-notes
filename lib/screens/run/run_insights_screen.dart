@@ -3,15 +3,16 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_gear.dart';
-import 'package:workout_notes/repositories/run_insights_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_gear_screen.dart';
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/run_calendar_stats.dart';
 import 'package:workout_notes/utils/run_fitness_analytics.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
+import 'package:workout_notes/utils/run_training_load_analytics.dart';
 import 'package:workout_notes/widgets/run/insights/run_insights_fitness_sections.dart';
 import 'package:workout_notes/widgets/run/insights/run_insights_year_sections.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Which group of analysis cards is showing.
 enum _InsightsTab { fitness, training, year }
@@ -28,8 +29,8 @@ class RunInsightsScreen extends StatefulWidget {
 }
 
 class _RunInsightsScreenState extends State<RunInsightsScreen> {
-  final _runRepo = RunRepository();
-  final _insightsRepo = RunInsightsRepository();
+  final _runRepo = DatabaseHelper.instance.runRepo;
+  final _insightsRepo = DatabaseHelper.instance.runInsightsRepo;
 
   bool _loading = true;
   _InsightsTab _tab = _InsightsTab.fitness;
@@ -69,11 +70,7 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
     final zones = estimate?.zones;
 
     // Splits only matter for the intensity mix, which needs zones.
-    final monday = DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).subtract(Duration(days: now.weekday - 1 + 7 * 11));
+    final monday = addDays(mondayOf(now), -7 * 11);
     var splits = const <String, List<RunSplitSample>>{};
     if (zones != null) {
       try {
@@ -92,23 +89,23 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
     }
     if (!mounted) return;
 
-    final years = RunFitnessAnalytics.availableYears(rows, now: now);
+    final years = RunCalendarStats.availableYears(rows, now: now);
     setState(() {
       _today = now;
       _activities = rows;
       _estimate = estimate;
       _evolution = RunFitnessAnalytics.vdotByMonth(rows, now: now);
-      _load = RunFitnessAnalytics.trainingLoad(rows, now: now, zones: zones);
+      _load = RunTrainingLoadAnalytics.trainingLoad(rows, now: now, zones: zones);
       _intensity = zones == null
           ? null
-          : RunFitnessAnalytics.intensityDistribution(
+          : RunTrainingLoadAnalytics.intensityDistribution(
               rows,
               zones: zones,
               splits: splits,
               now: now,
             );
-      _consistency = RunFitnessAnalytics.consistency(rows, now: now);
-      _effort = RunFitnessAnalytics.weeklyEffort(rows, now: now);
+      _consistency = RunCalendarStats.consistency(rows, now: now);
+      _effort = RunTrainingLoadAnalytics.weeklyEffort(rows, now: now);
       _shoes = shoes;
       _years = years;
       if (!years.contains(_year)) _year = years.first;
@@ -120,22 +117,22 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
   void _computeYear(int year) {
     _year = year;
     final rows = _activities;
-    _daily = RunFitnessAnalytics.dailyDistance(rows, year: year);
-    _months = RunFitnessAnalytics.monthlyTotals(
+    _daily = RunCalendarStats.dailyDistance(rows, year: year);
+    _months = RunCalendarStats.monthlyTotals(
       rows,
       now: year == _today.year ? _today : DateTime(year, 12, 31),
     );
-    _thisYearCumulative = RunFitnessAnalytics.cumulativeMonthly(
+    _thisYearCumulative = RunCalendarStats.cumulativeMonthly(
       rows,
       year,
       now: _today,
     );
-    _lastYearCumulative = RunFitnessAnalytics.cumulativeMonthly(
+    _lastYearCumulative = RunCalendarStats.cumulativeMonthly(
       rows,
       year - 1,
       now: _today,
     );
-    _review = RunFitnessAnalytics.yearReview(rows, year);
+    _review = RunCalendarStats.yearReview(rows, year);
   }
 
   Future<void> _openRun(String id) async {
@@ -143,7 +140,7 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
       context,
       MaterialPageRoute(builder: (_) => RunDetailScreen(activityId: id)),
     );
-    if (mounted) _loadAll();
+    if (mounted) await _loadAll();
   }
 
   Future<void> _openShoes() async {
@@ -151,7 +148,7 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
       context,
       MaterialPageRoute(builder: (_) => const RunGearScreen()),
     );
-    if (mounted) _loadAll();
+    if (mounted) await _loadAll();
   }
 
   @override
@@ -167,7 +164,7 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
                 preferredSize: const Size.fromHeight(60),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: RunSegmentedTabs<_InsightsTab>(
+                  child: AppSegmentedTabs<_InsightsTab>(
                     values: _InsightsTab.values,
                     selected: _tab,
                     labelOf: (tab) => switch (tab) {
@@ -184,7 +181,7 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _activities.isEmpty
-          ? EmptyStatePlaceholder(
+          ? AppEmptyState(
               icon: Icons.insights_outlined,
               title: loc.runInsightsEmptyTitle,
               subtitle: loc.runInsightsEmptySubtitle,
@@ -193,7 +190,7 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
               onRefresh: _loadAll,
               child: ListView(
                 key: PageStorageKey(_tab),
-                padding: RunUi.screenPadding.copyWith(top: 8, bottom: 40),
+                padding: AppUi.screenPadding.copyWith(top: 8, bottom: 40),
                 children: [
                   for (final (i, card) in _cards().indexed) ...[
                     if (i > 0) const SizedBox(height: 12),

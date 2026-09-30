@@ -6,7 +6,6 @@ import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/models/sleep_stage_epoch.dart';
 import 'package:workout_notes/models/sleep_stage_type.dart';
-import 'package:workout_notes/services/sleep_stage_engine.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
 
 /// dart run tool/replay_sleep.dart diagnostic.json [labels.json]
@@ -51,7 +50,13 @@ void main(List<String> args) {
       Map<String, dynamic>.from(diagnostic['session'] as Map),
       segments,
     );
-    final result = const SleepStageEngine().run(
+    if (!SleepWakeEngine.supports(session)) {
+      throw FormatException(
+        'Cannot replay ${session.algorithmVersion}: only '
+        '${SleepWakeEngine.featureVersions.join(', ')} are supported',
+      );
+    }
+    final result = const SleepWakeEngine().run(
       session: session,
       segments: segments,
     );
@@ -70,9 +75,7 @@ void main(List<String> args) {
       const JsonEncoder.withIndent('  ').convert({
         'engine_version': result.epochs.firstOrNull?.algorithmVersion,
         'recorded_engine_version': diagnostic['engine_version'],
-        'parameters': SleepWakeEngine.supports(session)
-            ? SleepWakeEngine.parameters
-            : SleepStageEngine.parameters,
+        'parameters': SleepWakeEngine.parameters,
         'coverage': result.coverage,
         'validation': validation,
         'epochs': [

@@ -1,12 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:workout_notes/database/database_helper.dart';
 
-import 'test_data_context.dart';
-import 'test_data_fitness_generator.dart';
-import 'test_data_periodization_generator.dart';
-import 'test_data_run_generator.dart';
-import 'test_data_run_plan_generator.dart';
-import 'test_data_wellness_generator.dart';
+import 'package:workout_notes/dev_tools/test_data/test_data_context.dart';
+import 'package:workout_notes/dev_tools/test_data/test_data_fitness_generator.dart';
+import 'package:workout_notes/dev_tools/test_data/test_data_periodization_generator.dart';
+import 'package:workout_notes/dev_tools/test_data/test_data_run_generator.dart';
+import 'package:workout_notes/dev_tools/test_data/test_data_run_plan_generator.dart';
+import 'package:workout_notes/dev_tools/test_data/test_data_wellness_generator.dart';
 
 /// Debug-only entry point for a complete, disposable usage scenario.
 ///
@@ -79,7 +79,7 @@ class TestDataGenerator {
 
   Future<void> _clearPreviousScenario(TestDataContext context) async {
     final db = context.database;
-    final like = '$devDataPrefix%';
+    const like = '$devDataPrefix%';
     // Delete children before parents so the clear works even when
     // foreign_keys is temporarily off or the DB is in a partially-migrated
     // state. Parents are still deleted for cascade coverage, but every
@@ -88,7 +88,6 @@ class TestDataGenerator {
     for (final table in <String>[
       // Periodization children -> parent
       'periodization_checkins',
-      'phase_routine_links',
       'phase_targets',
       'periodization_phases',
       'periodization_plans',
@@ -106,12 +105,11 @@ class TestDataGenerator {
       'run_workout_steps',
       'run_plan_workouts',
       'run_plans',
-      'run_track_points',
+      'run_route_data',
+      'run_splits',
       'run_activities',
-      // Sleep monitor tree (sessions/epochs/segments cascade from sleep_entries,
-      // but delete explicitly for FK-off safety)
-      'sleep_stage_epochs',
-      'sleep_monitor_segments',
+      // Sleep monitor tree (sessions cascade from sleep_entries, but delete
+      // explicitly for FK-off safety)
       'sleep_monitor_sessions',
       'sleep_entries',
       // Nutrition diary

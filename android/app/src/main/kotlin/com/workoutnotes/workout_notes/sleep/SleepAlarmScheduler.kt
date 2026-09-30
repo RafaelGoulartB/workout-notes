@@ -10,9 +10,11 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import com.workoutnotes.workout_notes.MainActivity
+import com.workoutnotes.workout_notes.common.PendingIntentFlags
 
 object SleepAlarmScheduler {
     const val ACTION_FIRE = "com.workoutnotes.workout_notes.sleep.ALARM_FIRE"
+    const val ACTION_DISMISS_SNOOZE = "com.workoutnotes.workout_notes.sleep.ALARM_DISMISS_SNOOZE"
     const val EXTRA_ALARM_AT = "alarm_at_epoch_ms"
     const val EXTRA_SESSION_ID = "session_id"
     const val EXTRA_MONITOR_MODE = "monitor_mode"
@@ -96,6 +98,9 @@ object SleepAlarmScheduler {
         val snoozeCount: Int,
     ) {
         val requiresMission: Boolean get() = monitorMode == "alarm_with_mission"
+        val isSnoozed: Boolean get() = SleepAlarmStatePolicy.isSnoozed(state, snoozeCount)
+        val canRunMission: Boolean
+            get() = SleepAlarmStatePolicy.canRunMission(state, snoozeCount, requiresMission)
     }
 
     fun schedule(
@@ -131,7 +136,7 @@ object SleepAlarmScheduler {
             Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             },
-            PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag(),
+            PendingIntentFlags.UPDATE_IMMUTABLE,
         )
         manager.setAlarmClock(
             AlarmManager.AlarmClockInfo(alarmAtMillis, showIntent),
@@ -165,6 +170,7 @@ object SleepAlarmScheduler {
                     stored.missionSalt, stored.missionFormat),
             )
         }
+        SleepSnoozeNotification.cancel(context)
         clear(context)
     }
 
@@ -177,19 +183,34 @@ object SleepAlarmScheduler {
                 expectedAlarmAtMillis,
             )
         ) return false
-        preferences(context).edit()
-            .putString(KEY_STATE, STATE_RINGING)
-            .putInt(KEY_EMERGENCY_TAPS, 0)
-            .remove(KEY_EMERGENCY_DEADLINE)
-            .remove(KEY_BARCODE_DEADLINE)
-            .remove(KEY_BARCODE_PAUSE_ATTEMPTS)
-            .remove(KEY_BARCODE_PAUSE_ACTIVE)
-            .apply()
+        val editor = preferences(context).edit().putString(KEY_STATE, STATE_RINGING)
+        // A mission started during the snooze keeps going when the snooze
+        // rings: the ringing service stays paused until its deadline.
+        if (!isEmergencyChallengeActive(context)) {
+            editor.putInt(KEY_EMERGENCY_TAPS, 0).remove(KEY_EMERGENCY_DEADLINE)
+        }
+        if (!isBarcodeChallengeActive(context)) {
+            editor.remove(KEY_BARCODE_DEADLINE)
+                .remove(KEY_BARCODE_PAUSE_ATTEMPTS)
+                .remove(KEY_BARCODE_PAUSE_ACTIVE)
+        }
+        editor.apply()
+        SleepSnoozeNotification.cancel(context)
         return true
     }
 
     @Synchronized
     fun complete(context: Context) {
+        val stored = read(context)
+        if (stored != null && stored.state == STATE_SCHEDULED) {
+            // Finished during a snooze: the next ring must not fire.
+            context.getSystemService(AlarmManager::class.java).cancel(
+                fireIntent(context, stored.alarmAtMillis, stored.sessionId,
+                    stored.monitorMode, stored.missionType, stored.missionHash,
+                    stored.missionSalt, stored.missionFormat),
+            )
+        }
+        SleepSnoozeNotification.cancel(context)
         // Keep the immutable snapshot long enough for Flutter to import the
         // dismissal metadata after a cold start. A later session overwrites it
         // when it schedules its own alarm.
@@ -223,40 +244,8 @@ object SleepAlarmScheduler {
             snapshot.maxSnoozes,
             snapshot.snoozeCount + 1,
         )
+        read(context)?.let { SleepSnoozeNotification.show(context, it) }
         return true
-    }
-
-    @Synchronized
-    fun resumeSnoozedMission(context: Context): Snapshot? {
-        val snapshot = read(context) ?: return null
-        if (!SleepAlarmStatePolicy.canResumeSnoozedMission(
-                snapshot.state,
-                snapshot.snoozeCount,
-                snapshot.requiresMission,
-            )
-        ) return null
-        context.getSystemService(AlarmManager::class.java).cancel(
-            fireIntent(
-                context,
-                snapshot.alarmAtMillis,
-                snapshot.sessionId,
-                snapshot.monitorMode,
-                snapshot.missionType,
-                snapshot.missionHash,
-                snapshot.missionSalt,
-                snapshot.missionFormat,
-            ),
-        )
-        preferences(context).edit()
-            .putLong(KEY_ALARM_AT, System.currentTimeMillis())
-            .putString(KEY_STATE, STATE_RINGING)
-            .putInt(KEY_EMERGENCY_TAPS, 0)
-            .remove(KEY_EMERGENCY_DEADLINE)
-            .remove(KEY_BARCODE_DEADLINE)
-            .remove(KEY_BARCODE_PAUSE_ATTEMPTS)
-            .remove(KEY_BARCODE_PAUSE_ACTIVE)
-            .apply()
-        return read(context)
     }
 
     @Synchronized
@@ -268,18 +257,6 @@ object SleepAlarmScheduler {
                 snapshot.requiresMission,
             )
         ) return null
-        context.getSystemService(AlarmManager::class.java).cancel(
-            fireIntent(
-                context,
-                snapshot.alarmAtMillis,
-                snapshot.sessionId,
-                snapshot.monitorMode,
-                snapshot.missionType,
-                snapshot.missionHash,
-                snapshot.missionSalt,
-                snapshot.missionFormat,
-            ),
-        )
         complete(context)
         return snapshot
     }
@@ -290,7 +267,7 @@ object SleepAlarmScheduler {
     /** Starts a fresh emergency attempt or continues one surviving recreation. */
     fun beginEmergencyChallenge(context: Context): Boolean {
         val snapshot = read(context) ?: return false
-        if (snapshot.state != STATE_RINGING || !snapshot.requiresMission) return false
+        if (!snapshot.canRunMission) return false
 
         val now = System.currentTimeMillis()
         val deadline = emergencyDeadline(context)
@@ -327,11 +304,21 @@ object SleepAlarmScheduler {
 
     fun beginBarcodeChallenge(context: Context): Boolean {
         val snapshot = read(context) ?: return false
-        if (snapshot.state != STATE_RINGING || !snapshot.requiresMission) return false
+        if (!snapshot.canRunMission) return false
 
         val now = System.currentTimeMillis()
         val deadline = barcodeDeadline(context)
         if (deadline > now) return true
+
+        if (snapshot.isSnoozed) {
+            // Nothing is ringing, so an early scan spends no pause attempt;
+            // if the snooze rings mid-scan it stays quiet until the deadline.
+            preferences(context).edit()
+                .putBoolean(KEY_BARCODE_PAUSE_ACTIVE, true)
+                .putLong(KEY_BARCODE_DEADLINE, now + BARCODE_CHALLENGE_DURATION_MILLIS)
+                .apply()
+            return true
+        }
 
         val previousAttempts = barcodePauseAttempts(context)
         preferences(context).edit()
@@ -403,6 +390,9 @@ object SleepAlarmScheduler {
                 stored.maxSnoozes,
                 stored.snoozeCount,
             )
+            read(context)?.takeIf { it.isSnoozed }?.let {
+                SleepSnoozeNotification.show(context, it)
+            }
         } catch (_: Throwable) {
             // Keep the durable schedule so a later boot or permission grant can retry.
         }
@@ -436,12 +426,8 @@ object SleepAlarmScheduler {
     }
 
     private fun preferences(context: Context) =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            context.createDeviceProtectedStorageContext()
-                .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        } else {
-            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        }
+        context.createDeviceProtectedStorageContext()
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private fun fireIntent(
         context: Context,
@@ -465,13 +451,6 @@ object SleepAlarmScheduler {
             putExtra(EXTRA_MISSION_SALT, missionSalt)
             putExtra(EXTRA_MISSION_FORMAT, missionFormat)
         },
-        PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag(),
+        PendingIntentFlags.UPDATE_IMMUTABLE,
     )
-
-    private fun immutableFlag(): Int =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_IMMUTABLE
-        } else {
-            0
-        }
 }

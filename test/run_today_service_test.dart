@@ -1,14 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:workout_notes/database/database_helper.dart';
-import 'package:workout_notes/database/database_periodization_schema.dart';
-import 'package:workout_notes/database/database_run_plan_schema.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/services/run_today_service.dart';
+import 'support/test_db.dart';
 
 // 2026-08-19 is a Wednesday.
 final _wednesday = DateTime(2026, 8, 19);
@@ -297,51 +295,15 @@ void main() {
     late RunPlanRepository plans;
     late RunTodayService service;
 
-    setUpAll(() {
-      sqfliteFfiInit();
-      databaseFactory = databaseFactoryFfi;
-    });
+    setUpAll(initSqfliteFfiForTests);
 
     setUp(() async {
-      database = await databaseFactory.openDatabase(
-        inMemoryDatabasePath,
-        options: OpenDatabaseOptions(
-          version: 1,
-          onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-          onCreate: (db, version) async {
-            await db.execute(
-              'CREATE TABLE routines (id TEXT PRIMARY KEY, name TEXT NOT NULL, notes TEXT, created_at TEXT NOT NULL)',
-            );
-            await db.execute(
-              'CREATE TABLE run_activities (id TEXT PRIMARY KEY, '
-              "activity_type TEXT NOT NULL DEFAULT 'running', "
-              'started_at TEXT NOT NULL, ended_at TEXT, '
-              'duration_seconds INTEGER NOT NULL DEFAULT 0, '
-              'moving_time_seconds INTEGER NOT NULL DEFAULT 0, '
-              'distance_meters REAL NOT NULL DEFAULT 0, '
-              'avg_pace_sec_per_km REAL, max_pace_sec_per_km REAL, '
-              'calories INTEGER, title TEXT, notes TEXT, '
-              "status TEXT NOT NULL DEFAULT 'completed', "
-              'polyline_summary TEXT, created_at TEXT NOT NULL, '
-              'updated_at TEXT NOT NULL, plan_workout_id TEXT)',
-            );
-            await db.execute(
-              'CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
-            );
-            await DatabasePeriodizationSchema.create(db);
-            await DatabaseRunPlanSchema.create(db);
-          },
-        ),
-      );
-      DatabaseHelper.overrideDatabase = database;
+      database = await installTestDb();
       plans = RunPlanRepository();
       service = RunTodayService();
     });
 
-    tearDown(() async {
-      DatabaseHelper.overrideDatabase = null;
-      await database.close();
-    });
+    tearDown(uninstallTestDb);
 
     test('no plan yields the no-plan state', () async {
       final snapshot = await service.load(now: _wednesday);

@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
-import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_achievement.dart';
+import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/utils/run_achievement_engine.dart';
 
 RunActivity _run({

@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/run_plan_template.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/screens/run/plan_wizard/run_plan_wizard_controller.dart';
 import 'package:workout_notes/screens/run/plan_wizard/run_plan_wizard_warnings.dart';
 import 'package:workout_notes/screens/run/plan_wizard/run_plan_wizard_widgets.dart';
 import 'package:workout_notes/services/run_plan_composer.dart';
-import 'package:workout_notes/services/run_plan_templates.dart';
 import 'package:workout_notes/services/run_strength_planner.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 import 'package:workout_notes/widgets/run/run_plan_volume_sparkline.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Step 4: name, coach warnings, volume curve and a week-by-week browser.
 class RunPlanWizardPreviewStep extends StatelessWidget {
@@ -197,6 +197,6 @@ class _PreviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 8),
-    child: RunSectionCard(padding: EdgeInsets.zero, child: child),
+    child: AppSectionCard(padding: EdgeInsets.zero, child: child),
   );
 }

@@ -1,4 +1,5 @@
 import 'package:workout_notes/repositories/strength_records_repository.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Window of the volume tab: last 4 weeks, 12 weeks or a year.
 enum StrengthPeriod {
@@ -24,7 +25,7 @@ class StrengthRange {
   double get weeks => days / 7;
 
   bool contains(DateTime date) {
-    final d = StrengthInsightsCalculator.day(date);
+    final d = dayOf(date);
     return !d.isBefore(from) && !d.isAfter(to);
   }
 }
@@ -215,15 +216,6 @@ abstract final class StrengthInsightsCalculator {
   /// Sessions kept in an exercise's sparkline.
   static const seriesLength = 12;
 
-  static DateTime day(DateTime d) => DateTime(d.year, d.month, d.day);
-
-  /// Monday of the week holding [d] (local, midnight).
-  static DateTime monday(DateTime d) =>
-      DateTime(d.year, d.month, d.day - (d.weekday - 1));
-
-  static DateTime addDays(DateTime d, int days) =>
-      DateTime(d.year, d.month, d.day + days);
-
   /// The range of [period] ending [today]; [previous] gives the one right
   /// before it (same length), used for deltas.
   static StrengthRange rangeFor(
@@ -231,7 +223,7 @@ abstract final class StrengthInsightsCalculator {
     DateTime today, {
     bool previous = false,
   }) {
-    final end = day(today);
+    final end = dayOf(today);
     final to = previous ? addDays(end, -period.days) : end;
     return StrengthRange(addDays(to, -(period.days - 1)), to);
   }
@@ -248,7 +240,7 @@ abstract final class StrengthInsightsCalculator {
       if (!range.contains(s.date)) continue;
       volume += s.volume;
       count++;
-      days.add(day(s.date));
+      days.add(dayOf(s.date));
     }
     final sessions = workouts.where((w) => range.contains(w.date)).length;
     return StrengthTotals(
@@ -266,7 +258,7 @@ abstract final class StrengthInsightsCalculator {
     DateTime today, {
     int count = 12,
   }) {
-    final current = monday(today);
+    final current = mondayOf(today);
     final starts = [
       for (var i = count - 1; i >= 0; i--) addDays(current, -7 * i),
     ];
@@ -293,7 +285,7 @@ abstract final class StrengthInsightsCalculator {
     List<DateTime> starts, {
     required bool monthly,
   }) {
-    DateTime key(DateTime d) => monthly ? DateTime(d.year, d.month) : monday(d);
+    DateTime key(DateTime d) => monthly ? DateTime(d.year, d.month) : mondayOf(d);
     final index = {for (var i = 0; i < starts.length; i++) starts[i]: i};
     final volume = List<double>.filled(starts.length, 0);
     final setCount = List<int>.filled(starts.length, 0);
@@ -451,7 +443,7 @@ abstract final class StrengthInsightsCalculator {
     final result = <DateTime, double>{};
     for (final s in sets) {
       if (s.date.year != year) continue;
-      final d = day(s.date);
+      final d = dayOf(s.date);
       result[d] = (result[d] ?? 0) + 1;
     }
     return result;
@@ -529,7 +521,7 @@ abstract final class StrengthInsightsCalculator {
     int count,
     double? Function(StrengthWorkoutInfo) valueOf,
   ) {
-    final current = monday(today);
+    final current = mondayOf(today);
     final starts = [
       for (var i = count - 1; i >= 0; i--) addDays(current, -7 * i),
     ];
@@ -537,7 +529,7 @@ abstract final class StrengthInsightsCalculator {
     final sum = List<double>.filled(count, 0);
     final n = List<int>.filled(count, 0);
     for (final w in workouts) {
-      final i = index[monday(w.date)];
+      final i = index[mondayOf(w.date)];
       final v = valueOf(w);
       if (i == null || v == null) continue;
       sum[i] += v;
@@ -581,8 +573,8 @@ abstract final class StrengthInsightsCalculator {
     DateTime today, {
     int weeks = 12,
   }) {
-    final trained = {for (final w in workouts) monday(w.date)};
-    final current = monday(today);
+    final trained = {for (final w in workouts) mondayOf(w.date)};
+    final current = mondayOf(today);
 
     var streak = 0;
     var cursor = trained.contains(current) ? current : addDays(current, -7);
@@ -613,7 +605,7 @@ abstract final class StrengthInsightsCalculator {
     ];
     final sessions = considered == 0
         ? 0
-        : workouts.where((w) => !day(w.date).isBefore(window.last)).length;
+        : workouts.where((w) => !dayOf(w.date).isBefore(window.last)).length;
     return StrengthConsistency(
       currentWeekStreak: streak,
       longestWeekStreak: longest,

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/navigation/ai_coach_navigation.dart';
-import 'package:workout_notes/screens/workout/ai_chat_screen.dart';
+import 'package:workout_notes/screens/ai/ai_chat_screen.dart';
 
 /// Compact AI Coach entry point for primary dashboard app bars.
 ///
@@ -21,12 +20,9 @@ class AiCoachHeaderButton extends StatelessWidget {
         tooltip: l10n.aiCoachHeaderTooltip,
         icon: const Icon(Icons.auto_awesome_rounded, size: 20),
         onPressed: () {
-          Navigator.of(context).push(
-            AiCoachNavigation.route(
-              kind: AiCoachRouteKind.aiFlow,
-              builder: (_) => const AiChatScreen(),
-            ),
-          );
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const AiChatScreen()));
         },
       ),
     );

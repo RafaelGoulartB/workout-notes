@@ -1,14 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:workout_notes/services/strength_routine_day_inference.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/goal.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
-import 'package:workout_notes/navigation/ai_coach_navigation.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
-import 'package:workout_notes/repositories/strength_repository.dart';
-import 'package:workout_notes/repositories/workout_repository.dart';
 import 'package:workout_notes/screens/strength/strength_history_screen.dart';
 import 'package:workout_notes/screens/strength/strength_insights_screen.dart';
 import 'package:workout_notes/screens/strength/strength_records_screen.dart';
@@ -18,12 +13,13 @@ import 'package:workout_notes/screens/workout/exercise_library_screen.dart';
 import 'package:workout_notes/screens/workout/future_workout_planner_screen.dart';
 import 'package:workout_notes/screens/workout/routines_screen.dart';
 import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
+import 'package:workout_notes/services/strength_routine_day_inference.dart';
 import 'package:workout_notes/services/strength_today_service.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
 import 'package:workout_notes/utils/strength_week_analytics.dart';
 import 'package:workout_notes/widgets/goals/goals_section.dart';
 import 'package:workout_notes/widgets/run/home/run_home_hero.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_active_banner.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_empty.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_hero.dart';
@@ -33,6 +29,7 @@ import 'package:workout_notes/widgets/strength/home/strength_home_records_sectio
 import 'package:workout_notes/widgets/strength/home/strength_home_today_card.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_trends_card.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_week_card.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 enum _HomeMenu { routines, exercises, history, records, calendar }
 
@@ -47,9 +44,9 @@ class StrengthHomeScreen extends StatefulWidget {
 }
 
 class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
-  final _repo = StrengthRepository();
-  final _recordsRepo = StrengthRecordsRepository();
-  final _workoutRepo = WorkoutRepository();
+  final _repo = DatabaseHelper.instance.strengthRepo;
+  final _recordsRepo = DatabaseHelper.instance.strengthRecordsRepo;
+  final _workoutRepo = DatabaseHelper.instance.workoutRepo;
   final _todayService = StrengthTodayService();
 
   List<StrengthWorkoutSummary> _finished = const [];
@@ -72,8 +69,8 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
     setState(() => _loading = _analytics == null);
     try {
       final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final monday = StrengthWeekAnalytics.mondayOf(today);
+      final today = dayOf(now);
+      final monday = mondayOf(today);
       // Name older workouts after the routine day they trained (one-off).
       await StrengthRoutineDayInference.runOnce();
       final finished = await _repo.loadFinishedWorkouts();
@@ -116,7 +113,7 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
 
   Future<void> _push(Widget screen) async {
     await Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
-    if (mounted) _reload();
+    if (mounted) await _reload();
   }
 
   Future<void> _openWorkoutScreen({
@@ -127,8 +124,7 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
   }) async {
     await Navigator.push(
       context,
-      AiCoachNavigation.route(
-        kind: AiCoachRouteKind.activeWorkout,
+      MaterialPageRoute(
         builder: (_) => ActiveWorkoutScreen(
           workoutId: workoutId,
           routineId: routineId,
@@ -137,7 +133,7 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
         ),
       ),
     );
-    if (mounted) _reload();
+    if (mounted) await _reload();
   }
 
   /// Resumes the unfinished workout of today when there is one; starting a
@@ -173,7 +169,7 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
     );
     if (edit == null) return;
     await _todayService.setWeeklyGoalSessions(edit.sessions);
-    if (mounted) _reload();
+    if (mounted) await _reload();
   }
 
   void _onMenu(_HomeMenu item) {
@@ -264,7 +260,7 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
               onRefresh: _reload,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: RunUi.screenPadding,
+                padding: AppUi.screenPadding,
                 children: [_buildContent(loc)],
               ),
             ),
@@ -280,20 +276,24 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (snapshot != null)
-          StrengthTodayCard(
-            info: snapshot.today,
-            onStartDay: _startDay,
-            onBlankWorkout: _startBlank,
-            onOpenRoutines: () => _push(const RoutinesScreen()),
-            onOpenWorkout: (id) => _push(WorkoutDetailScreen(workoutId: id)),
-          ).animate().fadeIn(duration: 300.ms),
+          FadeSlideIn(
+            child: StrengthTodayCard(
+              info: snapshot.today,
+              onStartDay: _startDay,
+              onBlankWorkout: _startBlank,
+              onOpenRoutines: () => _push(const RoutinesScreen()),
+              onOpenWorkout: (id) => _push(WorkoutDetailScreen(workoutId: id)),
+            ),
+          ),
         // The unfinished workout sits right under today's card.
         if (_active.isNotEmpty) ...[
           if (snapshot != null) const SizedBox(height: 12),
-          StrengthActiveBanner(
-            workout: _active.first,
-            onTap: _continueActive,
-          ).animate().fadeIn(duration: 300.ms),
+          FadeSlideIn(
+            child: StrengthActiveBanner(
+              workout: _active.first,
+              onTap: _continueActive,
+            ),
+          ),
         ],
         if (!hasWorkouts) ...[
           const SizedBox(height: 22),
@@ -315,7 +315,7 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
     final upcoming = snapshot?.upcoming ?? const [];
     if (upcoming.isEmpty) return const [];
     return [
-      RunSectionHeader(loc.strengthHomeUpcomingTitle),
+      AppSectionHeader(loc.strengthHomeUpcomingTitle),
       StrengthUpcomingWorkouts(
         workouts: upcoming,
         onOpen: (id) => _push(FutureWorkoutPlannerScreen(workoutId: id)),
@@ -331,27 +331,27 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
     final recent = _finished.take(5).toList();
 
     return [
-      RunSectionHeader(loc.runStatsSectionThisWeek),
+      AppSectionHeader(loc.runStatsSectionThisWeek),
       StrengthWeekCard(
         analytics: analytics,
         snapshot: snapshot,
         categories: _categories,
         onEditGoal: _editWeeklyGoal,
       ),
-      RunSectionHeader(loc.strengthHomeMusclesTitle),
+      AppSectionHeader(loc.strengthHomeMusclesTitle),
       StrengthMusclesCard(
         muscles: _muscles,
         onTap: () => _push(const StrengthInsightsScreen()),
       ),
-      RunSectionHeader(loc.runStatsOverview),
+      AppSectionHeader(loc.runStatsOverview),
       RunPeriodChips(selected: _period, onChanged: _setPeriod),
       const SizedBox(height: 14),
       StrengthPeriodHero(analytics: analytics),
-      RunSectionHeader(loc.runStatsSectionTrends),
+      AppSectionHeader(loc.runStatsSectionTrends),
       StrengthTrendsCard(analytics: analytics),
-      RunSectionHeader(
+      AppSectionHeader(
         loc.strengthHomeRecordsTitle,
-        trailing: RunHeaderAction(
+        trailing: AppHeaderAction(
           label: loc.strengthHomeSeeAll,
           onPressed: () => _push(const StrengthRecordsScreen()),
         ),
@@ -360,16 +360,16 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
         records: _records,
         onOpen: () => _push(const StrengthRecordsScreen()),
       ),
-      RunSectionHeader(loc.progressGoals),
+      AppSectionHeader(loc.progressGoals),
       GoalsSection(
         db: DatabaseHelper.instance,
         settingsRepo: DatabaseHelper.instance.settingsRepo,
         allowedScopes: const [GoalScope.anaerobic],
       ),
       ..._buildUpcoming(loc, snapshot),
-      RunSectionHeader(
+      AppSectionHeader(
         loc.strengthHomeRecentTitle,
-        trailing: RunHeaderAction(
+        trailing: AppHeaderAction(
           label: loc.strengthHomeSeeAll,
           onPressed: () => _push(const StrengthHistoryScreen()),
         ),

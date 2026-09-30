@@ -10,6 +10,9 @@ import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/base_repository.dart';
+import 'package:workout_notes/repositories/phase_target_training.dart';
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/sql_helpers.dart';
 
 /// Repository for structured running plans, their sessions, steps, the dated
 /// schedule and per-step results.
@@ -25,17 +28,14 @@ class RunPlanRepository extends BaseRepository {
     bool hydrate = false,
   }) async {
     final database = await db;
-    if (!await _tableExists(database, 'run_plans')) return const [];
     final rows = await database.query(
       'run_plans',
       where: includeArchived ? null : 'status = ?',
       whereArgs: includeArchived ? null : [RunPlanStatus.active.value],
       orderBy: 'updated_at DESC',
     );
-    if (!hydrate ||
-        rows.isEmpty ||
-        !await _tableExists(database, 'run_plan_workouts')) {
-      return rows.map((row) => RunPlan.fromMap(row)).toList();
+    if (!hydrate || rows.isEmpty) {
+      return rows.map(RunPlan.fromMap).toList();
     }
     final byPlan = await _loadWorkoutsByPlan(
       database,
@@ -50,7 +50,6 @@ class RunPlanRepository extends BaseRepository {
   /// Loads a plan with every session and step hydrated.
   Future<RunPlan?> getPlan(String id) async {
     final database = await db;
-    if (!await _tableExists(database, 'run_plans')) return null;
     final rows = await database.query(
       'run_plans',
       where: 'id = ?',
@@ -69,10 +68,6 @@ class RunPlanRepository extends BaseRepository {
   /// old activation date lingers.
   Future<RunPlan?> getActivatedPlan({bool hydrate = true}) async {
     final database = await db;
-    if (!await _tableExists(database, 'run_plans')) return null;
-    if (!await _columnExists(database, 'run_plans', 'activated_at')) {
-      return null;
-    }
     final rows = await database.query(
       'run_plans',
       where: 'activated_at IS NOT NULL AND status = ?',
@@ -98,16 +93,14 @@ class RunPlanRepository extends BaseRepository {
   /// back-filled).
   Future<int> activatePlan(String id, {DateTime? from}) async {
     final database = await db;
-    if (!await _tableExists(database, 'run_plans')) return 0;
-    if (!await _columnExists(database, 'run_plans', 'activated_at')) return 0;
-    final today = _day(from ?? DateTime.now());
+    final today = dayOf(from ?? DateTime.now());
     var start = today;
     if (from == null) {
       final existing = await getPlan(id);
       final race = existing?.raceDate;
       if (existing != null && race != null && existing.weeks > 0) {
-        final raceWeek = _weekStart(race);
-        if (!raceWeek.isBefore(_weekStart(today))) {
+        final raceWeek = mondayOf(race);
+        if (!raceWeek.isBefore(mondayOf(today))) {
           start = raceWeek.subtract(Duration(days: 7 * (existing.weeks - 1)));
         }
       }
@@ -122,7 +115,7 @@ class RunPlanRepository extends BaseRepository {
       );
       await txn.update(
         'run_plans',
-        {'activated_at': _date(start), 'updated_at': now},
+        {'activated_at': dateKey(start), 'updated_at': now},
         where: 'id = ?',
         whereArgs: [id],
       );
@@ -130,7 +123,7 @@ class RunPlanRepository extends BaseRepository {
     final plan = await getPlan(id);
     if (plan == null) return 0;
     var created = 0;
-    final anchorWeek = _weekStart(start);
+    final anchorWeek = mondayOf(start);
     // Only the weeks from here on: back-filling earlier weeks would invent
     // planned sessions the user never had a chance to run.
     final firstWeek = start.isBefore(today)
@@ -155,17 +148,13 @@ class RunPlanRepository extends BaseRepository {
   /// Returns how many were removed.
   Future<int> deactivatePlan(String id, {bool clearPlanned = true}) async {
     final database = await db;
-    if (!await _tableExists(database, 'run_plans')) return 0;
-    if (!await _columnExists(database, 'run_plans', 'activated_at')) return 0;
     await database.update(
       'run_plans',
       {'activated_at': null, 'updated_at': DateTime.now().toIso8601String()},
       where: 'id = ?',
       whereArgs: [id],
     );
-    if (!clearPlanned || !await _tableExists(database, 'scheduled_runs')) {
-      return 0;
-    }
+    if (!clearPlanned) return 0;
     return database.delete(
       'scheduled_runs',
       where: 'run_plan_id = ? AND status = ?',
@@ -177,9 +166,6 @@ class RunPlanRepository extends BaseRepository {
   /// ledger, plus how many sessions the plan defines in total.
   Future<RunPlanProgress> getPlanProgress(String planId) async {
     final database = await db;
-    if (!await _tableExists(database, 'run_plan_workouts')) {
-      return const RunPlanProgress();
-    }
     final total =
         Sqflite.firstIntValue(
           await database.rawQuery(
@@ -188,9 +174,6 @@ class RunPlanRepository extends BaseRepository {
           ),
         ) ??
         0;
-    if (!await _tableExists(database, 'scheduled_runs')) {
-      return RunPlanProgress(totalSessions: total);
-    }
     // Count logical plan sessions, not calendar rows. Pausing and resuming may
     // have scheduled the same session on different dates in older app versions.
     return _progressFrom(total, await getPlanWorkoutStatuses(planId));
@@ -202,7 +185,6 @@ class RunPlanRepository extends BaseRepository {
     String planId,
   ) async {
     final database = await db;
-    if (!await _tableExists(database, 'scheduled_runs')) return const {};
     final rows = await database.query(
       'scheduled_runs',
       columns: ['run_plan_workout_id', 'status'],
@@ -232,14 +214,10 @@ class RunPlanRepository extends BaseRepository {
   Future<int> resetPlanProgress(String planId) async {
     final database = await db;
     final plan = await getPlan(planId);
-    if (plan == null || !await _tableExists(database, 'scheduled_runs')) {
-      return 0;
-    }
+    if (plan == null) return 0;
     final wasActivated = plan.isActivated;
     final progress = await getPlanProgress(planId);
-    if (progress.isComplete &&
-        plan.completionCount == 0 &&
-        await _columnExists(database, 'run_plans', 'completion_count')) {
+    if (progress.isComplete && plan.completionCount == 0) {
       // A plan completed before v47 still deserves its first completion.
       await database.update(
         'run_plans',
@@ -272,11 +250,10 @@ class RunPlanRepository extends BaseRepository {
     required String runActivityId,
   }) async {
     final database = await db;
-    if (!await _tableExists(database, 'scheduled_runs')) return null;
     final planId = await _planIdForWorkout(database, planWorkoutId);
     if (planId == null) return null;
     final wasComplete = (await getPlanProgress(planId)).isComplete;
-    final day = _day(date);
+    final day = dayOf(date);
     // A plan session is one logical unit, so running Wednesday's workout on
     // Saturday must tick off that same row rather than spawn a twin and leave
     // the original planned forever. Exact date first, then the session's own
@@ -285,7 +262,7 @@ class RunPlanRepository extends BaseRepository {
       'scheduled_runs',
       columns: ['id'],
       where: 'run_plan_workout_id = ? AND date = ?',
-      whereArgs: [planWorkoutId, _date(day)],
+      whereArgs: [planWorkoutId, dateKey(day)],
       limit: 1,
     );
     var moved = false;
@@ -303,8 +280,8 @@ class RunPlanRepository extends BaseRepository {
         whereArgs: [
           planWorkoutId,
           ScheduledRunStatus.planned.value,
-          _date(from),
-          _date(to),
+          dateKey(from),
+          dateKey(to),
         ],
         orderBy: 'date ASC',
         limit: 1,
@@ -317,7 +294,7 @@ class RunPlanRepository extends BaseRepository {
       id = _uuid.v4();
       await database.insert('scheduled_runs', {
         'id': id,
-        'date': _date(day),
+        'date': dateKey(day),
         'run_plan_id': planId,
         'run_plan_workout_id': planWorkoutId,
         'status': ScheduledRunStatus.completed.value,
@@ -333,7 +310,7 @@ class RunPlanRepository extends BaseRepository {
         {
           'status': ScheduledRunStatus.completed.value,
           'run_activity_id': runActivityId,
-          if (moved) 'date': _date(day),
+          if (moved) 'date': dateKey(day),
           'updated_at': now,
         },
         where: 'id = ?',
@@ -342,9 +319,7 @@ class RunPlanRepository extends BaseRepository {
     }
     final scheduled = await getScheduledRun(id);
     final progress = await getPlanProgress(planId);
-    if (!wasComplete &&
-        progress.isComplete &&
-        await _columnExists(database, 'run_plans', 'completion_count')) {
+    if (!wasComplete && progress.isComplete) {
       await database.rawUpdate(
         'UPDATE run_plans '
         'SET completion_count = completion_count + 1, updated_at = ? '
@@ -352,8 +327,7 @@ class RunPlanRepository extends BaseRepository {
         [now, planId],
       );
     }
-    if (progress.isComplete &&
-        await _columnExists(database, 'run_plans', 'activated_at')) {
+    if (progress.isComplete) {
       // Completion is terminal. Do not let activeWeekIndexOn wrap back to week
       // one after the user has finished every session.
       await database.update(
@@ -371,7 +345,6 @@ class RunPlanRepository extends BaseRepository {
   /// the planning instead of offering its own activation.
   Future<bool> isLinkedToPeriodization(String planId) async {
     final database = await db;
-    if (!await _tableExists(database, 'phase_targets')) return false;
     final rows = await database.query(
       'phase_targets',
       columns: ['training_json'],
@@ -402,7 +375,7 @@ class RunPlanRepository extends BaseRepository {
     final plan = RunPlan(
       id: _uuid.v4(),
       name: name.trim(),
-      notes: _optional(notes),
+      notes: optionalText(notes),
       goalKind: goalKind,
       raceDate: raceDate,
       weeks: weeks < 1 ? 1 : weeks,
@@ -412,38 +385,8 @@ class RunPlanRepository extends BaseRepository {
       templateKey: templateKey,
       config: config,
     );
-    await database.insert('run_plans', await _planRow(database, plan));
+    await database.insert('run_plans', plan.toMap());
     return plan;
-  }
-
-  /// [plan] as a row, minus columns a device whose v52 upgrade failed does
-  /// not have — the plan still saves, it just cannot be re-planned later.
-  Future<Map<String, dynamic>> _planRow(
-    DatabaseExecutor database,
-    RunPlan plan,
-  ) async {
-    final row = plan.toMap();
-    if (!await _columnExists(database, 'run_plans', 'config_json')) {
-      row
-        ..remove('template_key')
-        ..remove('config_json');
-    }
-    return row;
-  }
-
-  /// Stores the inputs [planId] is (re)built from.
-  Future<void> saveConfig(String planId, Map<String, dynamic> config) async {
-    final database = await db;
-    if (!await _columnExists(database, 'run_plans', 'config_json')) return;
-    await database.update(
-      'run_plans',
-      {
-        'config_json': jsonEncode(config),
-        'updated_at': DateTime.now().toIso8601String(),
-      },
-      where: 'id = ?',
-      whereArgs: [planId],
-    );
   }
 
   Future<void> updatePlan(
@@ -461,12 +404,12 @@ class RunPlanRepository extends BaseRepository {
     };
     if (name != null) updates['name'] = name.trim();
     if (!identical(notes, _sentinel)) {
-      updates['notes'] = _optional(notes as String?);
+      updates['notes'] = optionalText(notes as String?);
     }
     if (goalKind != null) updates['goal_kind'] = goalKind.value;
     if (!identical(raceDate, _sentinel)) {
       final value = raceDate as DateTime?;
-      updates['race_date'] = value == null ? null : _date(value);
+      updates['race_date'] = value == null ? null : dateKey(value);
     }
     if (weeks != null) updates['weeks'] = weeks < 1 ? 1 : weeks;
     if (status != null) updates['status'] = status.value;
@@ -518,7 +461,7 @@ class RunPlanRepository extends BaseRepository {
       templateKey: source.templateKey,
       config: source.config,
     );
-    final row = await _planRow(database, copy);
+    final row = copy.toMap();
     await database.transaction((txn) async {
       await txn.insert('run_plans', row);
       for (final workout in source.workouts) {
@@ -569,10 +512,6 @@ class RunPlanRepository extends BaseRepository {
   /// not by scheduling again and reading the "already scheduled" snack.
   Future<Set<int>> getScheduledWeeks(String planId) async {
     final database = await db;
-    if (!await _tableExists(database, 'scheduled_runs') ||
-        !await _tableExists(database, 'run_plan_workouts')) {
-      return const {};
-    }
     final rows = await database.rawQuery(
       'SELECT DISTINCT w.week_index AS week_index '
       'FROM scheduled_runs s '
@@ -646,11 +585,11 @@ class RunPlanRepository extends BaseRepository {
       orderIndex: count,
       kind: kind,
       name: name.trim(),
-      notes: _optional(notes),
+      notes: optionalText(notes),
       targetDistanceMeters: targetDistanceMeters,
       targetDurationSeconds: targetDurationSeconds,
       targetPaceSecPerKm: targetPaceSecPerKm,
-      effortZone: _optional(effortZone),
+      effortZone: optionalText(effortZone),
       createdAt: DateTime.now(),
     );
     await database.insert('run_plan_workouts', workout.toMap());
@@ -678,7 +617,7 @@ class RunPlanRepository extends BaseRepository {
       updates['day_of_week'] = dayOfWeek as int?;
     }
     if (!identical(notes, _sentinel)) {
-      updates['notes'] = _optional(notes as String?);
+      updates['notes'] = optionalText(notes as String?);
     }
     if (!identical(targetDistanceMeters, _sentinel)) {
       updates['target_distance_meters'] = targetDistanceMeters as double?;
@@ -690,7 +629,7 @@ class RunPlanRepository extends BaseRepository {
       updates['target_pace_sec_per_km'] = targetPaceSecPerKm as double?;
     }
     if (!identical(effortZone, _sentinel)) {
-      updates['effort_zone'] = _optional(effortZone as String?);
+      updates['effort_zone'] = optionalText(effortZone as String?);
     }
     if (weekIndex != null) updates['week_index'] = weekIndex;
     if (updates.isEmpty) return;
@@ -713,26 +652,6 @@ class RunPlanRepository extends BaseRepository {
       whereArgs: [id],
     );
     if (planId != null) await _touchPlan(database, planId);
-  }
-
-  /// Persists a new ordering for the sessions of one week.
-  Future<void> reorderWorkouts(
-    String planId,
-    int weekIndex,
-    List<String> orderedIds,
-  ) async {
-    final database = await db;
-    final batch = database.batch();
-    for (var i = 0; i < orderedIds.length; i++) {
-      batch.update(
-        'run_plan_workouts',
-        {'order_index': i},
-        where: 'id = ? AND run_plan_id = ? AND week_index = ?',
-        whereArgs: [orderedIds[i], planId, weekIndex],
-      );
-    }
-    await batch.commit(noResult: true);
-    await _touchPlan(database, planId);
   }
 
   // ===================== STEPS =====================
@@ -779,7 +698,7 @@ class RunPlanRepository extends BaseRepository {
       repeatCount: repeatCount < 1 ? 1 : repeatCount,
       targetPaceMinSecPerKm: targetPaceMinSecPerKm,
       targetPaceMaxSecPerKm: targetPaceMaxSecPerKm,
-      notes: _optional(notes),
+      notes: optionalText(notes),
     );
     await database.insert('run_workout_steps', step.toMap());
     await _touchPlanForWorkout(database, workoutId);
@@ -832,31 +751,6 @@ class RunPlanRepository extends BaseRepository {
     await _touchPlanForWorkout(database, workoutId);
   }
 
-  /// Replaces every step of [workoutId] with [steps], renumbering order.
-  /// Used by the editor's "salvar bloco de tiros" flow.
-  Future<void> replaceSteps(
-    String workoutId,
-    List<RunWorkoutStep> steps,
-  ) async {
-    final database = await db;
-    await database.transaction((txn) async {
-      await txn.delete(
-        'run_workout_steps',
-        where: 'run_plan_workout_id = ?',
-        whereArgs: [workoutId],
-      );
-      for (var i = 0; i < steps.length; i++) {
-        final step = steps[i].copyWith(orderIndex: i);
-        await txn.insert('run_workout_steps', {
-          ...step.toMap(),
-          'id': step.id.isEmpty ? _uuid.v4() : step.id,
-          'run_plan_workout_id': workoutId,
-        });
-      }
-    });
-    await _touchPlanForWorkout(database, workoutId);
-  }
-
   // ===================== SCHEDULE =====================
 
   Future<List<ScheduledRun>> getScheduledRuns(
@@ -865,11 +759,10 @@ class RunPlanRepository extends BaseRepository {
     bool hydrate = true,
   }) async {
     final database = await db;
-    if (!await _tableExists(database, 'scheduled_runs')) return const [];
     final rows = await database.query(
       'scheduled_runs',
       where: 'date >= ? AND date <= ?',
-      whereArgs: [_date(from), _date(to)],
+      whereArgs: [dateKey(from), dateKey(to)],
       orderBy: 'date ASC',
     );
     return _hydrateScheduled(database, rows, hydrate: hydrate);
@@ -877,11 +770,10 @@ class RunPlanRepository extends BaseRepository {
 
   Future<List<ScheduledRun>> getScheduledRunsForDate(DateTime date) async {
     final database = await db;
-    if (!await _tableExists(database, 'scheduled_runs')) return const [];
     final rows = await database.query(
       'scheduled_runs',
       where: 'date = ?',
-      whereArgs: [_date(date)],
+      whereArgs: [dateKey(date)],
       orderBy: 'created_at ASC',
     );
     return _hydrateScheduled(database, rows);
@@ -900,28 +792,6 @@ class RunPlanRepository extends BaseRepository {
     return hydrated.first;
   }
 
-  Future<ScheduledRun> scheduleRun({
-    required DateTime date,
-    String? runPlanId,
-    String? runPlanWorkoutId,
-    String? notes,
-  }) async {
-    final database = await db;
-    final now = DateTime.now();
-    final scheduled = ScheduledRun(
-      id: _uuid.v4(),
-      date: DateTime(date.year, date.month, date.day),
-      runPlanId: runPlanId,
-      runPlanWorkoutId: runPlanWorkoutId,
-      status: ScheduledRunStatus.planned,
-      notes: _optional(notes),
-      createdAt: now,
-      updatedAt: now,
-    );
-    await database.insert('scheduled_runs', scheduled.toMap());
-    return scheduled;
-  }
-
   /// Materialises the sessions of [weekIndex] onto the calendar week starting
   /// at [weekStart]. Idempotent: rows already scheduled for the same
   /// plan session and date are left alone, so re-running never duplicates.
@@ -936,7 +806,7 @@ class RunPlanRepository extends BaseRepository {
     if (plan == null) return const [];
     final sessions = plan.workoutsForWeek(weekIndex);
     if (sessions.isEmpty) return const [];
-    final monday = _weekStart(weekStart);
+    final monday = mondayOf(weekStart);
     final database = await db;
     final created = <String>[];
     await database.transaction((txn) async {
@@ -951,7 +821,7 @@ class RunPlanRepository extends BaseRepository {
               '(date = ? OR status IN (?, ?))',
           whereArgs: [
             session.id,
-            _date(date),
+            dateKey(date),
             ScheduledRunStatus.completed.value,
             ScheduledRunStatus.skipped.value,
           ],
@@ -962,7 +832,7 @@ class RunPlanRepository extends BaseRepository {
         final id = _uuid.v4();
         await txn.insert('scheduled_runs', {
           'id': id,
-          'date': _date(date),
+          'date': dateKey(date),
           'run_plan_id': planId,
           'run_plan_workout_id': session.id,
           'status': ScheduledRunStatus.planned.value,
@@ -977,18 +847,6 @@ class RunPlanRepository extends BaseRepository {
     return created;
   }
 
-  /// Removes scheduled rows by id. Used to undo a bulk materialisation.
-  Future<int> deleteScheduledRuns(List<String> ids) async {
-    if (ids.isEmpty) return 0;
-    final database = await db;
-    if (!await _tableExists(database, 'scheduled_runs')) return 0;
-    return database.delete(
-      'scheduled_runs',
-      where: 'id IN (${List.filled(ids.length, '?').join(', ')})',
-      whereArgs: ids,
-    );
-  }
-
   Future<void> updateScheduledRun(
     String id, {
     DateTime? date,
@@ -1000,10 +858,10 @@ class RunPlanRepository extends BaseRepository {
     final updates = <String, dynamic>{
       'updated_at': DateTime.now().toIso8601String(),
     };
-    if (date != null) updates['date'] = _date(date);
+    if (date != null) updates['date'] = dateKey(date);
     if (status != null) updates['status'] = status.value;
     if (!identical(notes, _sentinel)) {
-      updates['notes'] = _optional(notes as String?);
+      updates['notes'] = optionalText(notes as String?);
     }
     if (!identical(runActivityId, _sentinel)) {
       updates['run_activity_id'] = runActivityId as String?;
@@ -1035,7 +893,6 @@ class RunPlanRepository extends BaseRepository {
 
   Future<List<RunActivityStep>> getActivitySteps(String activityId) async {
     final database = await db;
-    if (!await _tableExists(database, 'run_activity_steps')) return const [];
     final rows = await database.query(
       'run_activity_steps',
       where: 'run_activity_id = ?',
@@ -1090,7 +947,6 @@ class RunPlanRepository extends BaseRepository {
   /// Every calendar row of [planId], with its session hydrated.
   Future<List<ScheduledRun>> getScheduledRunsForPlan(String planId) async {
     final database = await db;
-    if (!await _tableExists(database, 'scheduled_runs')) return const [];
     final rows = await database.query(
       'scheduled_runs',
       where: 'run_plan_id = ?',
@@ -1125,7 +981,6 @@ class RunPlanRepository extends BaseRepository {
     if ((touched ?? 0) > 0) {
       throw StateError('run_plan_replan_over_history');
     }
-    final hasConfig = await _columnExists(database, 'run_plans', 'config_json');
     final now = DateTime.now();
     await database.transaction((txn) async {
       // Planned calendar rows of these sessions go with them (FK cascade).
@@ -1160,7 +1015,7 @@ class RunPlanRepository extends BaseRepository {
         'run_plans',
         {
           'weeks': math.max(1, fromWeek + weeks.length),
-          if (hasConfig && config != null) 'config_json': jsonEncode(config),
+          if (config != null) 'config_json': jsonEncode(config),
           'updated_at': now.toIso8601String(),
         },
         where: 'id = ?',
@@ -1170,9 +1025,9 @@ class RunPlanRepository extends BaseRepository {
     final plan = await getPlan(planId);
     final anchor = plan?.activatedAt;
     if (plan == null || !plan.isActivated || anchor == null) return;
-    final today = _weekStart(DateTime.now());
+    final today = mondayOf(DateTime.now());
     for (var week = fromWeek; week < plan.weeks; week++) {
-      final start = _weekStart(anchor).add(Duration(days: 7 * week));
+      final start = mondayOf(anchor).add(Duration(days: 7 * week));
       if (start.isBefore(today)) continue;
       await materializeWeek(planId: planId, weekIndex: week, weekStart: start);
     }
@@ -1189,7 +1044,6 @@ class RunPlanRepository extends BaseRepository {
     Map<String, dynamic>? payload,
   }) async {
     final database = await db;
-    if (!await _tableExists(database, 'run_plan_adaptations')) return;
     await database.insert('run_plan_adaptations', {
       'id': _uuid.v4(),
       'run_plan_id': planId,
@@ -1204,9 +1058,6 @@ class RunPlanRepository extends BaseRepository {
   /// Weekly reviews of [planId], newest first.
   Future<List<RunPlanAdaptationRecord>> listAdaptations(String planId) async {
     final database = await db;
-    if (!await _tableExists(database, 'run_plan_adaptations')) {
-      return const [];
-    }
     final rows = await database.query(
       'run_plan_adaptations',
       where: 'run_plan_id = ?',
@@ -1269,7 +1120,6 @@ class RunPlanRepository extends BaseRepository {
   Future<void> moveWorkoutToDay(String workoutId, int dayOfWeek) async {
     await updateWorkout(workoutId, dayOfWeek: dayOfWeek);
     final database = await db;
-    if (!await _tableExists(database, 'scheduled_runs')) return;
     final rows = await database.query(
       'scheduled_runs',
       columns: ['id', 'date'],
@@ -1278,10 +1128,13 @@ class RunPlanRepository extends BaseRepository {
     );
     for (final row in rows) {
       final date = DateTime.parse(row['date'] as String);
-      final moved = _weekStart(date).add(Duration(days: dayOfWeek - 1));
+      final moved = mondayOf(date).add(Duration(days: dayOfWeek - 1));
       await database.update(
         'scheduled_runs',
-        {'date': _date(moved), 'updated_at': DateTime.now().toIso8601String()},
+        {
+          'date': dateKey(moved),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
         where: 'id = ?',
         whereArgs: [row['id']],
       );
@@ -1301,25 +1154,13 @@ class RunPlanRepository extends BaseRepository {
   /// Sessions that were never scheduled have no entry.
   Future<Map<String, RunPlanLedgerEntry>> getPlanLedger(String planId) async {
     final database = await db;
-    if (!await _tableExists(database, 'scheduled_runs')) return const {};
-    // Older or minimal schemas may lack the activity columns.
-    final hasActivities =
-        await _tableExists(database, 'run_activities') &&
-        await _columnExists(database, 'run_activities', 'distance_meters') &&
-        await _columnExists(database, 'run_activities', 'avg_pace_sec_per_km');
-    final activityColumns = hasActivities
-        ? ', a.distance_meters AS distance, a.avg_pace_sec_per_km AS pace'
-        : '';
-    final activityJoin = hasActivities
-        ? 'LEFT JOIN run_activities a ON a.id = s.run_activity_id'
-        : '';
     final rows = await database.rawQuery(
       '''
       SELECT s.id AS id, s.run_plan_workout_id AS workout_id,
-        s.status AS status, s.date AS date, s.run_activity_id AS activity_id
-        $activityColumns
+        s.status AS status, s.date AS date, s.run_activity_id AS activity_id,
+        a.distance_meters AS distance, a.avg_pace_sec_per_km AS pace
       FROM scheduled_runs s
-      $activityJoin
+      LEFT JOIN run_activities a ON a.id = s.run_activity_id
       WHERE s.run_plan_id = ? AND s.run_plan_workout_id IS NOT NULL
       ORDER BY s.date ASC
       ''',
@@ -1354,9 +1195,6 @@ class RunPlanRepository extends BaseRepository {
   ) async {
     if (planIds.isEmpty) return const {};
     final database = await db;
-    if (!await _tableExists(database, 'run_plan_workouts')) {
-      return {for (final id in planIds) id: const RunPlanProgress()};
-    }
     final placeholders = List.filled(planIds.length, '?').join(', ');
     final totals = <String, int>{};
     for (final row in await database.rawQuery(
@@ -1368,25 +1206,23 @@ class RunPlanRepository extends BaseRepository {
       totals[row['plan_id'] as String] = (row['total'] as num).toInt();
     }
     final statusesByPlan = <String, Map<String, ScheduledRunStatus>>{};
-    if (await _tableExists(database, 'scheduled_runs')) {
-      final rows = await database.query(
-        'scheduled_runs',
-        columns: ['run_plan_id', 'run_plan_workout_id', 'status'],
-        where:
-            'run_plan_workout_id IS NOT NULL AND run_plan_id IN ($placeholders)',
-        whereArgs: planIds,
+    final rows = await database.query(
+      'scheduled_runs',
+      columns: ['run_plan_id', 'run_plan_workout_id', 'status'],
+      where:
+          'run_plan_workout_id IS NOT NULL AND run_plan_id IN ($placeholders)',
+      whereArgs: planIds,
+    );
+    for (final row in rows) {
+      final byWorkout = statusesByPlan.putIfAbsent(
+        row['run_plan_id'] as String,
+        () => {},
       );
-      for (final row in rows) {
-        final byWorkout = statusesByPlan.putIfAbsent(
-          row['run_plan_id'] as String,
-          () => {},
-        );
-        final workoutId = row['run_plan_workout_id'] as String;
-        final status = ScheduledRunStatus.fromString(row['status'] as String?);
-        final current = byWorkout[workoutId];
-        if (current == null || _statusRank[status]! > _statusRank[current]!) {
-          byWorkout[workoutId] = status;
-        }
+      final workoutId = row['run_plan_workout_id'] as String;
+      final status = ScheduledRunStatus.fromString(row['status'] as String?);
+      final current = byWorkout[workoutId];
+      if (current == null || _statusRank[status]! > _statusRank[current]!) {
+        byWorkout[workoutId] = status;
       }
     }
     return {
@@ -1415,7 +1251,6 @@ class RunPlanRepository extends BaseRepository {
     final wanted = planIds.toSet();
     if (wanted.isEmpty) return const {};
     final database = await db;
-    if (!await _tableExists(database, 'phase_targets')) return const {};
     final rows = await database.query(
       'phase_targets',
       columns: ['training_json'],
@@ -1555,40 +1390,8 @@ class RunPlanRepository extends BaseRepository {
   }
 
   /// Weekly periodization targets keep `run_plan_ids` inside `training_json`.
-  Future<void> _clearPlanFromTargets(
-    DatabaseExecutor txn,
-    String planId,
-  ) async {
-    final targets = await txn.query(
-      'phase_targets',
-      columns: ['id', 'training_json'],
-    );
-    for (final target in targets) {
-      final raw = target['training_json'] as String?;
-      if (raw == null || raw.isEmpty || !raw.contains(planId)) continue;
-      final training = _decodeJson(raw);
-      final run = training['run'];
-      if (run is! Map) continue;
-      final ids = (run['run_plan_ids'] as List?)
-          ?.whereType<String>()
-          .where((id) => id != planId)
-          .toList();
-      if (ids == null) continue;
-      final updatedRun = Map<String, dynamic>.from(run);
-      if (ids.isEmpty) {
-        updatedRun.remove('run_plan_ids');
-      } else {
-        updatedRun['run_plan_ids'] = ids;
-      }
-      training['run'] = updatedRun;
-      await txn.update(
-        'phase_targets',
-        {'training_json': _encodeJson(training)},
-        where: 'id = ?',
-        whereArgs: [target['id']],
-      );
-    }
-  }
+  Future<void> _clearPlanFromTargets(DatabaseExecutor txn, String planId) =>
+      PhaseTargetTraining.removeRunPlan(txn, planId);
 
   Future<String?> _planIdForWorkout(
     DatabaseExecutor database,
@@ -1619,58 +1422,12 @@ class RunPlanRepository extends BaseRepository {
         where: 'id = ?',
         whereArgs: [planId],
       );
-
-  /// Older databases (or a failed v45 migration) have no run-plan tables.
-  /// Reads that other modules depend on — the phase editor, the calendar, the
-  /// run detail screen — degrade to empty instead of throwing.
-  static Future<bool> _tableExists(
-    DatabaseExecutor database,
-    String table,
-  ) async {
-    final rows = await database.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
-      [table],
-    );
-    return rows.isNotEmpty;
-  }
-
-  static String? _optional(String? value) {
-    final trimmed = value?.trim();
-    return trimmed == null || trimmed.isEmpty ? null : trimmed;
-  }
-
-  static String _date(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
-
-  static DateTime _day(DateTime value) =>
-      DateTime(value.year, value.month, value.day);
-
-  static DateTime _weekStart(DateTime date) {
-    final day = DateTime(date.year, date.month, date.day);
-    return day.subtract(Duration(days: day.weekday - 1));
-  }
-
-  /// Guards reads of columns added by a later migration. A device whose
-  /// upgrade failed keeps working, minus the newer feature.
-  static Future<bool> _columnExists(
-    DatabaseExecutor database,
-    String table,
-    String column,
-  ) async {
-    final rows = await database.rawQuery('PRAGMA table_info($table)');
-    return rows.any((row) => row['name'] == column);
-  }
 }
 
 Map<String, dynamic> _decodeJson(String raw) {
   final decoded = jsonDecode(raw);
   return decoded is Map ? Map<String, dynamic>.from(decoded) : {};
 }
-
-String _encodeJson(Map<String, dynamic> value) => jsonEncode(value);
 
 const Object _sentinel = Object();
 

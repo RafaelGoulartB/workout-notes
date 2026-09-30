@@ -1,5 +1,5 @@
-import '../l10n/app_localizations.dart';
-import '../services/ai_service.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/services/ai_service.dart';
 
 /// Converts stable AI error codes into localized UI text.
 String localizeAiError(Object? error, AppLocalizations l10n) {
