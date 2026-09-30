@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
-import 'package:workout_notes/screens/workout/body_stats_screen.dart';
-import 'package:workout_notes/screens/workout/body_tracker_dialogs.dart';
+import 'package:workout_notes/screens/body/body_stats_screen.dart';
+import 'package:workout_notes/screens/body/body_tracker_dialogs.dart';
 import 'package:workout_notes/utils/body_tracker_utils.dart';
-import 'package:workout_notes/widgets/body_tracker_badges.dart';
+import 'package:workout_notes/widgets/body_tracker/body_tracker_badges.dart';
 import 'package:workout_notes/widgets/body_tracker/summary_card.dart';
 import 'package:workout_notes/widgets/body_tracker/quick_stats.dart';
 import 'package:workout_notes/widgets/body_tracker/bilateral_summary_card.dart';
 import 'package:workout_notes/widgets/body_tracker/chart_cards.dart';
 import 'package:workout_notes/widgets/body_tracker/derived_stats_card.dart';
 import 'package:workout_notes/widgets/body_tracker/measurement_card.dart';
-import 'package:workout_notes/widgets/body_tracker_type_selector.dart';
+import 'package:workout_notes/widgets/body_tracker/body_tracker_type_selector.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 

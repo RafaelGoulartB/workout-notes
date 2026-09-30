@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:workout_notes/widgets/second_ticker.dart';
+import 'package:workout_notes/widgets/ui/second_ticker.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Banner of a session in progress on the Treino tab (gym workout, run or

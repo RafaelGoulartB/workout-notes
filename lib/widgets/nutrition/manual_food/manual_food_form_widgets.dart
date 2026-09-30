@@ -1,4 +1,4 @@
-import 'package:workout_notes/screens/workout/manual_food_controller.dart';
+import 'package:workout_notes/screens/nutrition/manual_food_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';

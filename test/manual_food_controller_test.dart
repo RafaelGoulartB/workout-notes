@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
-import 'package:workout_notes/screens/workout/manual_food_controller.dart';
+import 'package:workout_notes/screens/nutrition/manual_food_controller.dart';
 
 void main() {
   group('parseDouble', () {

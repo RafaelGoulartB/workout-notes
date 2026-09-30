@@ -4,11 +4,11 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/goal.dart';
 import 'package:workout_notes/repositories/goal_repository.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
-import 'package:workout_notes/screens/workout/goal_detail_screen.dart';
+import 'package:workout_notes/screens/goals/goal_detail_screen.dart';
 import 'package:workout_notes/widgets/goals/goal_card.dart';
 import 'package:workout_notes/widgets/goals/goal_form_sheet.dart';
 import 'package:workout_notes/utils/load_generation.dart';
-import 'package:workout_notes/widgets/load_error_view.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Goals card: one divided row per goal and an add row at the end.

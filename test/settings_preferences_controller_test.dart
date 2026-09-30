@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:workout_notes/screens/workout/settings_preferences_controller.dart';
+import 'package:workout_notes/screens/settings/settings_preferences_controller.dart';
 
 void main() {
   test('rest time labels stay compact and locale agnostic', () {

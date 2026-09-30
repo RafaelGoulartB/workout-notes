@@ -27,9 +27,9 @@ import '../../widgets/ai/ai_provider_picker_sheet.dart';
 import '../../widgets/ai/ai_routine_proposal_card.dart';
 import '../../widgets/ai/ai_tool_result_bubble.dart';
 import 'ai_chat_history_screen.dart';
-import 'ai_settings_screen.dart';
-import 'manual_food_screen.dart';
-import 'routines_screen.dart';
+import '../settings/ai_settings_screen.dart';
+import '../nutrition/manual_food_screen.dart';
+import '../workout/routines_screen.dart';
 
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});

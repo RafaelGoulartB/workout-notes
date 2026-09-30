@@ -14,7 +14,7 @@ import 'package:workout_notes/services/strength_today_service.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/load_generation.dart';
 import 'package:workout_notes/utils/strength_week_analytics.dart';
-import 'package:workout_notes/widgets/strength/home/workout_home_widgets.dart';
+import 'package:workout_notes/widgets/workout/workout_home_widgets.dart';
 
 /// Everything one load of the hub reads.
 class WorkoutHomeData {

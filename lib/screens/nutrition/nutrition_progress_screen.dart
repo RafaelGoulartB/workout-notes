@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/nutrition_progress.dart';
-import 'package:workout_notes/screens/workout/nutrition_progress_controller.dart';
+import 'package:workout_notes/screens/nutrition/nutrition_progress_controller.dart';
 import 'package:workout_notes/widgets/nutrition/progress/average_nutrients_card.dart';
 import 'package:workout_notes/widgets/nutrition/progress/macro_balance_card.dart';
 import 'package:workout_notes/widgets/nutrition/progress/meal_and_contributors_cards.dart';

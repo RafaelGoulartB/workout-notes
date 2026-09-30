@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
-import 'package:workout_notes/screens/workout/body_stats_controller.dart';
+import 'package:workout_notes/screens/body/body_stats_controller.dart';
 import 'package:workout_notes/widgets/body_tracker/stats/body_stats_cards.dart';
 import 'package:workout_notes/widgets/body_tracker/stats/body_stats_primitives.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';

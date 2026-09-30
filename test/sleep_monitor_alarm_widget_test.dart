@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/screens/workout/sleep_monitor_screen.dart';
+import 'package:workout_notes/screens/sleep/sleep_monitor_screen.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'support/test_db.dart';
 

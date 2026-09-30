@@ -3,8 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/screens/workout/body_stats_controller.dart';
-import 'package:workout_notes/screens/workout/body_stats_screen.dart';
+import 'package:workout_notes/screens/body/body_stats_controller.dart';
+import 'package:workout_notes/screens/body/body_stats_screen.dart';
 
 Widget _app(Widget child) => MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,

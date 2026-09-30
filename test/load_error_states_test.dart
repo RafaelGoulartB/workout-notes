@@ -5,8 +5,8 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
-import 'package:workout_notes/screens/workout/periodization_home_screen.dart';
-import 'package:workout_notes/screens/workout/sleep_tracker_screen.dart';
+import 'package:workout_notes/screens/planning/periodization_home_screen.dart';
+import 'package:workout_notes/screens/sleep/sleep_tracker_screen.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'package:workout_notes/widgets/goals/goals_section.dart';
 

@@ -6,7 +6,7 @@ import 'package:workout_notes/models/nutrition/daily_nutrition_summary.dart';
 import 'package:workout_notes/models/nutrition/meal_log_item.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
-import 'package:workout_notes/screens/workout/periodization_home_screen.dart';
+import 'package:workout_notes/screens/planning/periodization_home_screen.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/food_search_result.dart';
 import 'package:workout_notes/models/nutrition/saved_meal.dart';
-import 'package:workout_notes/screens/workout/food_search_controller.dart';
+import 'package:workout_notes/screens/nutrition/food_search_controller.dart';
 import 'package:workout_notes/widgets/nutrition/food_search/food_search_cards.dart';
 import 'package:workout_notes/widgets/nutrition/food_search/food_search_headers.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';

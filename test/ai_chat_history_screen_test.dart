@@ -3,7 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/screens/workout/ai_chat_history_screen.dart';
+import 'package:workout_notes/screens/ai/ai_chat_history_screen.dart';
 import 'package:workout_notes/state/ai_chat_service.dart';
 
 import 'support/ai_test_db.dart';

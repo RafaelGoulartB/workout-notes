@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import 'package:workout_notes/widgets/exercise_picker_sheet.dart';
+import 'package:workout_notes/widgets/strength/exercises/exercise_picker_sheet.dart';
 import 'package:workout_notes/widgets/workout/set_editor_fields.dart';
 import '../../models/exercise_with_sets.dart';
 import 'active_workout_screen.dart';

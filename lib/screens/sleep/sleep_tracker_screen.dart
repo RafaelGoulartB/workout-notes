@@ -13,7 +13,7 @@ import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'package:workout_notes/services/sleep_goal_service.dart';
 
 import 'package:workout_notes/utils/load_generation.dart';
-import 'package:workout_notes/widgets/load_error_view.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_history_row.dart';
@@ -24,8 +24,8 @@ import 'package:workout_notes/widgets/sleep/sleep_week_card.dart';
 
 import 'sleep_monitor_result_screen.dart';
 import 'sleep_monitor_screen.dart';
-import 'traditional_alarms_screen.dart';
-import 'settings_screen.dart';
+import '../alarms/traditional_alarms_screen.dart';
+import '../settings/settings_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/database/database_helper.dart';

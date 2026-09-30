@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/screens/workout/periodization_home_screen.dart';
+import 'package:workout_notes/screens/planning/periodization_home_screen.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
 import 'package:workout_notes/utils/nutrition_goal_suggest.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';

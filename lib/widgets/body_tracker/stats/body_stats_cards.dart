@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/screens/workout/body_stats_controller.dart';
+import 'package:workout_notes/screens/body/body_stats_controller.dart';
 import 'package:workout_notes/utils/body_progress_analytics.dart';
 import 'package:workout_notes/widgets/body_tracker/body_stats_charts.dart';
 import 'package:workout_notes/widgets/body_tracker/stats/body_stats_primitives.dart';

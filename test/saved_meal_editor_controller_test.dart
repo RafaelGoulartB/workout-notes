@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
-import 'package:workout_notes/screens/workout/saved_meal_editor_controller.dart';
+import 'package:workout_notes/screens/nutrition/saved_meal_editor_controller.dart';
 
 void main() {
   SavedMealEditorController build({

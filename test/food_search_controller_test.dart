@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/models/nutrition/food_search_result.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
-import 'package:workout_notes/screens/workout/food_search_controller.dart';
+import 'package:workout_notes/screens/nutrition/food_search_controller.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 
 class _NoGateway implements NutritionGateway {

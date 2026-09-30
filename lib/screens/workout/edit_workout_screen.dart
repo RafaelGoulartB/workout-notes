@@ -4,7 +4,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import '../../repositories/workout_repository.dart';
 import '../../models/exercise_with_sets.dart';
-import '../../widgets/exercise_picker_sheet.dart';
+import '../../widgets/strength/exercises/exercise_picker_sheet.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/database/database_helper.dart';

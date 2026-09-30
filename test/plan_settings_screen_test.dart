@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/main.dart';
-import 'package:workout_notes/screens/workout/plan_settings_screen.dart';
+import 'package:workout_notes/screens/settings/plan_settings_screen.dart';
 import 'package:workout_notes/state/sections_notifier.dart';
 
 Widget _app(Widget child) => MaterialApp(

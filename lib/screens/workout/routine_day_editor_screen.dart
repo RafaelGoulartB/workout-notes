@@ -4,7 +4,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/screens/workout/exercise_detail_tabs_screen.dart';
 import 'package:workout_notes/utils/strength_routine_summary.dart';
-import 'package:workout_notes/widgets/exercise_picker_sheet.dart';
+import 'package:workout_notes/widgets/strength/exercises/exercise_picker_sheet.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_exercise_card.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_set_sheets.dart';

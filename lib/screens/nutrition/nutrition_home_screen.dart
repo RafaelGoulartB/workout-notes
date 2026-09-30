@@ -18,7 +18,7 @@ import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 import 'package:workout_notes/services/open_food_facts_gateway.dart';
 
-import 'package:workout_notes/widgets/load_error_view.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'food_quantity_sheet.dart';
 import 'food_library_screen.dart';
 import 'food_search_screen.dart';
@@ -27,7 +27,7 @@ export 'nutrition_day_detail_screen.dart';
 
 import 'nutrition_progress_screen.dart';
 import 'nutrition_settings_screen.dart';
-import 'settings_screen.dart';
+import '../settings/settings_screen.dart';
 import 'saved_meals_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/database/database_helper.dart';

@@ -5,7 +5,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import '../../services/rest_timer_service.dart';
 import '../../services/notification_service.dart';
-import '../../widgets/exercise_picker_sheet.dart';
+import '../../widgets/strength/exercises/exercise_picker_sheet.dart';
 import '../../widgets/workout/set_editor_fields.dart';
 import '../../widgets/workout/exercise_card.dart';
 import '../../widgets/workout/finish_workout_sheet.dart';

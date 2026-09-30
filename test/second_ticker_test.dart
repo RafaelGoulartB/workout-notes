@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:workout_notes/widgets/second_ticker.dart';
+import 'package:workout_notes/widgets/ui/second_ticker.dart';
 import 'package:workout_notes/widgets/workout/active_session_banner.dart';
 
 Widget _host(Widget child) => MaterialApp(home: Scaffold(body: child));

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/main.dart';
-import 'package:workout_notes/screens/workout/ai_chat_screen.dart';
-import 'package:workout_notes/screens/workout/ai_settings_screen.dart';
+import 'package:workout_notes/screens/ai/ai_chat_screen.dart';
+import 'package:workout_notes/screens/settings/ai_settings_screen.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 

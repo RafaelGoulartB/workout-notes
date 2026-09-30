@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/main.dart';
-import 'package:workout_notes/screens/workout/sleep_tracker_screen.dart';
+import 'package:workout_notes/screens/sleep/sleep_tracker_screen.dart';
 import 'package:workout_notes/screens/workout/workout_home_screen.dart';
-import 'package:workout_notes/screens/workout/nutrition_home_screen.dart';
-import 'package:workout_notes/screens/workout/periodization_home_screen.dart';
+import 'package:workout_notes/screens/nutrition/nutrition_home_screen.dart';
+import 'package:workout_notes/screens/planning/periodization_home_screen.dart';
 
 /// Primary application navigation. Each tab keeps its own navigation state
 /// while the user switches between workout, sleep, nutrition and progress

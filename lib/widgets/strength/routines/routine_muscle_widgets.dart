@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/utils/strength_routine_summary.dart';
-import 'package:workout_notes/widgets/category_timeline_bar.dart';
+import 'package:workout_notes/widgets/strength/routines/category_timeline_bar.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 

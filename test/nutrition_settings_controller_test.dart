@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:workout_notes/screens/workout/nutrition_settings_controller.dart';
+import 'package:workout_notes/screens/nutrition/nutrition_settings_controller.dart';
 import 'package:workout_notes/utils/nutrition_goal_suggest.dart';
 
 void main() {

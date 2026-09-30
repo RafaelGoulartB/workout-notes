@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/repositories/traditional_alarm_repository.dart';
-import 'package:workout_notes/screens/workout/traditional_alarms_screen.dart';
+import 'package:workout_notes/screens/alarms/traditional_alarms_screen.dart';
 import 'support/test_db.dart';
 
 void main() {

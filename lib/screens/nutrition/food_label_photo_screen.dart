@@ -13,7 +13,7 @@ import 'package:workout_notes/state/ai_settings_notifier.dart';
 import 'package:workout_notes/utils/ai_error_localizer.dart';
 import 'package:workout_notes/widgets/ai/ai_thumbnail.dart';
 
-import 'ai_settings_screen.dart';
+import '../settings/ai_settings_screen.dart';
 import 'manual_food_screen.dart';
 
 /// Photo flow for the nutrition module: the user takes/picks a photo

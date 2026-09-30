@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/models/sleep_monitor_mode.dart';
-import 'package:workout_notes/screens/workout/sleep_monitor_controller.dart';
+import 'package:workout_notes/screens/sleep/sleep_monitor_controller.dart';
 import 'package:workout_notes/widgets/sleep/monitor/sleep_monitor_texts.dart';
 
 void main() {
