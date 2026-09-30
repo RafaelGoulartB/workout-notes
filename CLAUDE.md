@@ -23,6 +23,8 @@ flutter build apk --release            # Build signed Android APK
 
 Android-native (Kotlin) unit tests live in `android/app/src/test/`:
 
+The Gradle Wrapper scripts and JAR in `android/` are committed so these commands also work in a fresh checkout and CI. Keep them in sync with `android/gradle/wrapper/gradle-wrapper.properties` by running `./gradlew wrapper` from `android/` when updating Gradle.
+
 ```bash
 cd android && ./gradlew test            # Run all Kotlin tests
 cd android && ./gradlew test --tests "*SleepSessionSpoolTest"   # Single class
