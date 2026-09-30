@@ -54,11 +54,11 @@ lib/
 ├── models/         Typed domain models
 ├── periodization/  Plan logic without widget state (shared by editor and wizard)
 ├── repositories/   All SQL, grouped by domain
-├── screens/        Screens grouped by feature (run/, strength/, workout/ ...)
+├── screens/        Screens grouped by feature: ai/ alarms/ body/ goals/ nutrition/ planning/ (periodization) run/ settings/ sleep/ strength/ workout/ (strength workout, routines, exercises, calendar, workout hub)
 ├── services/       Timers, notifications, exports, tracking, AI logic
 ├── state/          Shared ChangeNotifier coordinators (AI chat, AI settings, sections)
 ├── utils/          Pure helpers (formatting, calculations)
-└── widgets/        Reusable UI; shared UI components live in lib/widgets/ui/ (App*)
+└── widgets/        Feature widgets in the same feature folders as screens (body_tracker/, strength/, workout/ ...); shared UI components live in lib/widgets/ui/ (App*)
 android/app/src/main/kotlin/.../{run,sleep,medication,...}   Native services and bridges
 android/app/src/test/                                        Kotlin unit tests
 test/support/                                                Shared test DB and fixtures
@@ -145,7 +145,7 @@ All user-visible strings go in `lib/l10n/app_en.arb` + `app_pt.arb` (both, ident
 
 - Always `DatabaseHelper.instance.database` / `.xxxRepo`; never construct `DatabaseHelper()` or a repository directly.
 - Check `mounted` (or `context.mounted`) before `setState`/using `BuildContext` after any `await`; show useful UI feedback when an action can fail.
-- Use `package:workout_notes/...` imports across top-level `lib/` directories, not relative paths.
+- Use `package:workout_notes/...` imports for everything under `lib/` (relative imports are only for `part`/`part of` and `test/` fixtures); `always_use_package_imports` and `directives_ordering` enforce it. `unawaited_futures` is on: `await` a future the caller should wait for, otherwise wrap it in `unawaited(...)`. Swallowed errors need a `debugPrint` or a short comment saying why ignoring them is fine.
 - Prefer `const` constructors, `final` values and named parameters for APIs with several arguments; avoid unrelated cleanup in a focused change and preserve existing user changes in the working tree.
 - `sleep_entries` is the canonical sleep record; a monitor session is linked via `sleep_entry_id`. Import logic intentionally keeps a shorter test/recovery session from overwriting a longer night already recorded for the same local date.
 - Before finishing: implementation follows the feature's existing boundary, both ARB files updated, tests added or updated, schema changes verified for fresh creation *and* migration, `flutter analyze` and the relevant tests pass, and the diff has no unrelated edits, secrets or debug code.
