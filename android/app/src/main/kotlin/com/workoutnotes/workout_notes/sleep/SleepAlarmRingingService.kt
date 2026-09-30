@@ -16,6 +16,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.workoutnotes.workout_notes.R
 import com.workoutnotes.workout_notes.common.AlarmRinger
+import com.workoutnotes.workout_notes.common.AlarmWakePrefs
 import com.workoutnotes.workout_notes.common.NotificationChannels
 import com.workoutnotes.workout_notes.common.NotificationChannels.silent
 import com.workoutnotes.workout_notes.common.PendingIntentFlags
@@ -304,7 +305,7 @@ class SleepAlarmRingingService : Service() {
             resumeRinging()
         } else if (!ringer.hasPlayer) {
             acquireWakeLock()
-            ringer.start()
+            ringer.start(AlarmWakePrefs.ramp(this, snoozed = (snapshot?.snoozeCount ?: 0) > 0))
         }
         SleepMonitoringService.publishAlarmRinging(this)
         return START_STICKY

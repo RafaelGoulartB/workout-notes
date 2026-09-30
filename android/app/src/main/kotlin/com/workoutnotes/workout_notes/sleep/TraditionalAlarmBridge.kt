@@ -2,6 +2,7 @@ package com.workoutnotes.workout_notes.sleep
 
 import android.content.Context
 import android.content.Intent
+import com.workoutnotes.workout_notes.common.AlarmWakePrefs
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
@@ -23,6 +24,7 @@ class TraditionalAlarmBridge(private val context: Context) : MethodChannel.Metho
                         call.argument<Int>("snooze_minutes") ?: 5,
                         (call.argument<Int>("max_snoozes") ?: 3).coerceIn(0, 10), 0, requiresMission,
                         hash, salt, call.argument<String>("mission_format"), "scheduled", true,
+                        call.argument<Boolean>("gradual_volume") ?: false,
                     ))
                     result.success(null)
                 }
@@ -50,6 +52,14 @@ class TraditionalAlarmBridge(private val context: Context) : MethodChannel.Metho
                     if (!TraditionalAlarmScheduler.dismissSnooze(context, id)) {
                         return result.error("invalid_state", "This alarm is not snoozing without a mission", null)
                     }
+                    result.success(null)
+                }
+                "setWakeSettings" -> {
+                    AlarmWakePrefs.save(
+                        context,
+                        call.argument<Int>("ramp_seconds") ?: AlarmWakePrefs.DEFAULT_RAMP_SECONDS,
+                        call.argument<Boolean>("boost") ?: true,
+                    )
                     result.success(null)
                 }
                 "restore" -> { TraditionalAlarmScheduler.restore(context); result.success(null) }

@@ -32,6 +32,8 @@ object TraditionalAlarmScheduler {
         val missionFormat: String?,
         val state: String,
         val enabled: Boolean,
+        /** Starts soft and rises ([com.workoutnotes.workout_notes.common.AlarmWakePrefs]). */
+        val gradualVolume: Boolean = false,
     )
 
     fun schedule(context: Context, snapshot: Snapshot) {
@@ -164,6 +166,7 @@ object TraditionalAlarmScheduler {
             p.getBoolean("requires_mission", false), p.getString("mission_hash", null),
             p.getString("mission_salt", null), p.getString("mission_format", null),
             p.getString("state", "scheduled") ?: "scheduled", p.getBoolean("enabled", true),
+            p.getBoolean("gradual_volume", false),
         )
     }
 
@@ -176,7 +179,8 @@ object TraditionalAlarmScheduler {
             .putInt("max_snoozes", snapshot.maxSnoozes).putInt("snooze_count", snapshot.snoozeCount)
             .putBoolean("requires_mission", snapshot.requiresMission).putString("mission_hash", snapshot.missionHash)
             .putString("mission_salt", snapshot.missionSalt).putString("mission_format", snapshot.missionFormat)
-            .putString("state", snapshot.state).putBoolean("enabled", snapshot.enabled).apply()
+            .putString("state", snapshot.state).putBoolean("enabled", snapshot.enabled)
+            .putBoolean("gradual_volume", snapshot.gradualVolume).apply()
         index(context).edit().putStringSet(KEY_IDS, (ids(context) + snapshot.id).toMutableSet()).apply()
     }
 

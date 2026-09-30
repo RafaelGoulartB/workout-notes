@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:workout_notes/models/alarm_wake_settings.dart';
 import 'package:workout_notes/models/sleep_monitor_mode.dart';
 import 'package:workout_notes/models/sleep_monitor_state.dart';
+import 'package:workout_notes/services/alarm_wake_settings_service.dart';
 import 'package:workout_notes/services/notification_service.dart';
 import 'package:workout_notes/services/sleep_mission_service.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
@@ -37,9 +39,11 @@ class SleepMonitorController extends ChangeNotifier {
     SleepMonitorService? service,
     SleepMissionService? missions,
     TraditionalAlarmService? alarmSettings,
+    AlarmWakeSettingsService? wakeSettings,
   }) : service = service ?? SleepMonitorService.instance,
        missions = missions ?? SleepMissionService(),
-       _alarmSettings = alarmSettings ?? TraditionalAlarmService.instance {
+       _alarmSettings = alarmSettings ?? TraditionalAlarmService.instance,
+       _wakeSettings = wakeSettings ?? AlarmWakeSettingsService() {
     _alarmWasDismissed = this.service.state.alarmDismissed;
     this.service.addListener(_onServiceChanged);
   }
@@ -53,6 +57,8 @@ class SleepMonitorController extends ChangeNotifier {
   final SleepMonitorService service;
   final SleepMissionService missions;
   final TraditionalAlarmService _alarmSettings;
+  final AlarmWakeSettingsService _wakeSettings;
+  AlarmWakeSettings _wake = AlarmWakeSettings.defaults;
 
   TimeOfDay _selectedTime = const TimeOfDay(hour: 7, minute: 0);
   SleepMonitoringMode _selectedMode = SleepMonitoringMode.alarmWithoutMission;
@@ -81,6 +87,19 @@ class SleepMonitorController extends ChangeNotifier {
   bool get isBusy => _isBusy;
   bool get loading => _loading;
   bool get missionReady => missions.config.isReady;
+  AlarmWakeSettings get wakeSettings => _wake;
+
+  /// Start of the smart window shown for [alarmAt]: the running night's own
+  /// window, otherwise the configured one (alarm modes only).
+  DateTime? smartWindowStartFor(SleepMonitorState state, DateTime? alarmAt) {
+    if (alarmAt == null) return null;
+    final running = state.isActive || state.isAlarmPending;
+    final minutes = running
+        ? state.smartWindowMinutes
+        : (_selectedMode.hasAlarm ? _wake.windowMinutes : 0);
+    if (minutes <= 0) return null;
+    return alarmAt.subtract(Duration(minutes: minutes));
+  }
 
   /// Whether [mode] is unusable until a mission is configured.
   bool isModeLocked(SleepMonitoringMode mode) =>
@@ -125,8 +144,10 @@ class SleepMonitorController extends ChangeNotifier {
     await missions.load();
     final globalMaxSnoozes = await _alarmSettings.getGlobalMaxSnoozes();
     final globalSnoozeEnabled = await _alarmSettings.getGlobalSnoozeEnabled();
+    final wake = await _wakeSettings.load();
     final defaultAlarm = SleepAlarmTime.defaultAlarm();
     if (_disposed) return;
+    _wake = wake;
     _selectedTime = TimeOfDay.fromDateTime(defaultAlarm);
     final remembered = missions.lastMode;
     _selectedMode =
@@ -164,7 +185,9 @@ class SleepMonitorController extends ChangeNotifier {
     await reloadMission();
     final maxSnoozes = await _alarmSettings.getGlobalMaxSnoozes();
     final snoozeEnabled = await _alarmSettings.getGlobalSnoozeEnabled();
+    final wake = await _wakeSettings.load();
     if (_disposed) return;
+    _wake = wake;
     _globalMaxSnoozes = maxSnoozes;
     _globalSnoozeEnabled = snoozeEnabled;
     _notify();
@@ -217,6 +240,14 @@ class SleepMonitorController extends ChangeNotifier {
     _selectedMode = mode;
     _notify();
     await missions.setLastMode(mode);
+  }
+
+  /// Changes the smart window or its sensitivity for this and later nights.
+  Future<void> updateWakeSettings(AlarmWakeSettings value) async {
+    if (_disposed || value == _wake) return;
+    _wake = value;
+    _notify();
+    await _wakeSettings.save(value);
   }
 
   bool get canChooseAlarmTime =>
@@ -294,11 +325,15 @@ class SleepMonitorController extends ChangeNotifier {
         return SleepStartResult.missionUnavailable;
       }
 
+      // The ringing service reads the volume rise natively.
+      await _wakeSettings.syncNative(_wake);
       final started = await service.startMonitoring(
         alarmAt: alarmAt,
         mode: _selectedMode,
         mission: missions.config,
         maxSnoozes: _globalSnoozeEnabled ? _globalMaxSnoozes : 0,
+        smartWindowMinutes: _selectedMode.hasAlarm ? _wake.windowMinutes : 0,
+        smartThreshold: _wake.sensitivity.threshold,
       );
       return started ? SleepStartResult.started : SleepStartResult.failed;
     } finally {

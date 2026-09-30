@@ -24,6 +24,7 @@ class TraditionalAlarmRepository extends BaseRepository {
     required int snoozeMinutes,
     required int maxSnoozes,
     required bool requiresMission,
+    bool gradualVolume = false,
   }) async {
     final now = DateTime.now();
     final draft = TraditionalAlarm(
@@ -36,6 +37,7 @@ class TraditionalAlarmRepository extends BaseRepository {
       snoozeMinutes: snoozeMinutes,
       maxSnoozes: maxSnoozes,
       requiresMission: requiresMission,
+      gradualVolume: gradualVolume,
       nextTriggerAt: null,
       createdAt: now,
       updatedAt: now,

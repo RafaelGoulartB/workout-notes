@@ -226,6 +226,10 @@ abstract final class DatabaseSchema {
         stage_confidence REAL,
         stage_algorithm_version TEXT,
         stage_timeline TEXT,
+        smart_window_minutes INTEGER,
+        alarm_fired_at TEXT,
+        alarm_trigger TEXT,
+        wake_feeling INTEGER,
         end_reason TEXT,
         created_at TEXT NOT NULL,
         FOREIGN KEY (sleep_entry_id) REFERENCES sleep_entries(id) ON DELETE CASCADE
@@ -244,6 +248,7 @@ abstract final class DatabaseSchema {
         snooze_minutes INTEGER NOT NULL DEFAULT 5,
         max_snoozes INTEGER NOT NULL DEFAULT 3,
         requires_mission INTEGER NOT NULL DEFAULT 0,
+        gradual_volume INTEGER NOT NULL DEFAULT 0,
         next_trigger_at TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL

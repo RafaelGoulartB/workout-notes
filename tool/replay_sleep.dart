@@ -2,17 +2,35 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:workout_notes/models/alarm_wake_settings.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/models/sleep_stage_epoch.dart';
 import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/services/sleep_stage_analysis_service.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
+import 'package:workout_notes/services/smart_wake_policy.dart';
 
 /// dart run tool/replay_sleep.dart diagnostic.json [labels.json]
+///     [--smart-window 30] [--sensitivity balanced]
 /// Reference labels cover only independently known intervals. Unlabelled time
 /// stays unlabelled; a remembered bedtime never implies epoch-level sleep.
-void main(List<String> args) {
+/// `--smart-window` also replays the smart alarm: when it would have rung in
+/// that many minutes before the night's alarm (or before its end).
+void main(List<String> arguments) {
+  final args = [...arguments];
+  int? smartWindow;
+  var sensitivity = SmartWakeSensitivity.balanced;
+  final windowFlag = args.indexOf('--smart-window');
+  if (windowFlag >= 0 && windowFlag + 1 < args.length) {
+    smartWindow = int.tryParse(args[windowFlag + 1]);
+    args.removeRange(windowFlag, windowFlag + 2);
+  }
+  final sensitivityFlag = args.indexOf('--sensitivity');
+  if (sensitivityFlag >= 0 && sensitivityFlag + 1 < args.length) {
+    sensitivity = SmartWakeSensitivity.fromWire(args[sensitivityFlag + 1]);
+    args.removeRange(sensitivityFlag, sensitivityFlag + 2);
+  }
   if (args.length == 1 && args.first == '--template') {
     stdout.writeln(
       const JsonEncoder.withIndent('  ').convert({
@@ -33,7 +51,8 @@ void main(List<String> args) {
   }
   if (args.isEmpty || args.length > 2) {
     stderr.writeln(
-      'Usage: dart run tool/replay_sleep.dart diagnostic.json [labels.json]',
+      'Usage: dart run tool/replay_sleep.dart diagnostic.json [labels.json] '
+      '[--smart-window minutes] [--sensitivity sensitive|balanced|conservative]',
     );
     exitCode = 1;
     return;
@@ -99,6 +118,13 @@ void main(List<String> args) {
                 'stage_confidence': summary.stageConfidence,
               },
         'validation': validation,
+        if (smartWindow != null && smartWindow > 0)
+          'smart_wake': simulateSmartWake(
+            session,
+            segments,
+            windowMinutes: smartWindow,
+            sensitivity: sensitivity,
+          ),
         'epochs': [
           for (final e in result.epochs)
             {...e.toMap(), 'reason': result.decisionReasons[e.id]},
@@ -109,6 +135,59 @@ void main(List<String> args) {
     stderr.writeln('Replay failed: $error');
     exitCode = 1;
   }
+}
+
+/// Replays the live filter and [SmartWakePolicy] the way the Android monitor
+/// runs them during the night.
+Map<String, dynamic> simulateSmartWake(
+  SleepMonitorSession session,
+  List<SleepMonitorSegment> segments, {
+  required int windowMinutes,
+  required SmartWakeSensitivity sensitivity,
+}) {
+  final deadline = session.alarmAt ?? session.endedAt!;
+  final windowStart = deadline.subtract(Duration(minutes: windowMinutes));
+  final cursor = SleepWakeCursor(
+    sessionId: session.id,
+    startsAwake: true,
+    featureVersion: session.algorithmVersion,
+  );
+  final policy = SmartWakePolicy(sensitivity.threshold);
+  final ordered = [...segments]
+    ..sort((a, b) => a.startedAt.compareTo(b.startedAt));
+  DateTime? firedAt;
+  String? trigger;
+  for (final segment in ordered) {
+    final decision = cursor.add(segment);
+    final end = segment.startedAt.add(
+      Duration(seconds: segment.durationSeconds),
+    );
+    trigger = policy.onWindow(
+      sleepProbability: cursor.sleepProbability!,
+      validSignal: decision.validSignal,
+      seconds: segment.durationSeconds,
+      now: end,
+      windowStart: windowStart,
+      deadline: deadline,
+    );
+    if (trigger != null) {
+      firedAt = end;
+      break;
+    }
+  }
+  return {
+    'window_minutes': windowMinutes,
+    'sensitivity': sensitivity.wireValue,
+    'threshold': sensitivity.threshold,
+    'window_start': windowStart.toIso8601String(),
+    'deadline': deadline.toIso8601String(),
+    'armed': policy.isArmed,
+    'fired_at': (firedAt ?? deadline).toIso8601String(),
+    'trigger': trigger ?? SmartWakePolicy.triggerDeadline,
+    'minutes_early': firedAt == null
+        ? 0
+        : deadline.difference(firedAt).inSeconds / 60,
+  };
 }
 
 Map<String, dynamic> evaluateLabels(

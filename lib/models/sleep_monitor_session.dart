@@ -65,6 +65,27 @@ class SleepMonitorSession {
   /// Encoded [SleepNightTimeline] for the night chart (bedside v6+).
   final String? stageTimeline;
 
+  /// Minutes before [alarmAt] in which the smart alarm could ring (v60).
+  final int? smartWindowMinutes;
+
+  /// When the night's alarm first rang (v60): before [alarmAt] when the
+  /// smart alarm caught the person stirring.
+  final DateTime? alarmFiredAt;
+
+  /// Why it rang then: [triggerAwake], [triggerStirring] or [triggerDeadline].
+  final String? alarmTrigger;
+
+  /// The user's one-tap morning answer: [feelingTired], [feelingOkay] or
+  /// [feelingRefreshed].
+  final int? wakeFeeling;
+
+  static const triggerAwake = 'awake';
+  static const triggerStirring = 'stirring';
+  static const triggerDeadline = 'deadline';
+  static const feelingTired = 1;
+  static const feelingOkay = 2;
+  static const feelingRefreshed = 3;
+
   const SleepMonitorSession({
     required this.id,
     required this.sleepEntryId,
@@ -103,7 +124,30 @@ class SleepMonitorSession {
     this.stageConfidence,
     this.stageAlgorithmVersion,
     this.stageTimeline,
+    this.smartWindowMinutes,
+    this.alarmFiredAt,
+    this.alarmTrigger,
+    this.wakeFeeling,
   });
+
+  bool get hasSmartWindow => (smartWindowMinutes ?? 0) > 0 && alarmAt != null;
+
+  /// Start of the smart window; null without one.
+  DateTime? get smartWindowStart => hasSmartWindow
+      ? alarmAt!.subtract(Duration(minutes: smartWindowMinutes!))
+      : null;
+
+  /// Whole minutes the smart alarm rang before the deadline; null when it did
+  /// not ring early.
+  int? get smartWakeLeadMinutes {
+    final fired = alarmFiredAt;
+    if (!hasSmartWindow || fired == null) return null;
+    if (alarmTrigger != triggerAwake && alarmTrigger != triggerStirring) {
+      return null;
+    }
+    final lead = alarmAt!.difference(fired).inSeconds;
+    return lead <= 0 ? null : (lead / 60).round();
+  }
 
   /// Decoded night chart data; null when absent or unreadable.
   SleepNightTimeline? get timeline => SleepNightTimeline.decode(stageTimeline);
@@ -154,6 +198,10 @@ class SleepMonitorSession {
     double? stageConfidence,
     String? stageAlgorithmVersion,
     String? stageTimeline,
+    int? smartWindowMinutes,
+    DateTime? alarmFiredAt,
+    String? alarmTrigger,
+    int? wakeFeeling,
   }) {
     return SleepMonitorSession(
       id: id,
@@ -195,6 +243,10 @@ class SleepMonitorSession {
       stageAlgorithmVersion:
           stageAlgorithmVersion ?? this.stageAlgorithmVersion,
       stageTimeline: stageTimeline ?? this.stageTimeline,
+      smartWindowMinutes: smartWindowMinutes ?? this.smartWindowMinutes,
+      alarmFiredAt: alarmFiredAt ?? this.alarmFiredAt,
+      alarmTrigger: alarmTrigger ?? this.alarmTrigger,
+      wakeFeeling: wakeFeeling ?? this.wakeFeeling,
     );
   }
 
@@ -256,6 +308,14 @@ class SleepMonitorSession {
       map['stage_algorithm_version'] = stageAlgorithmVersion;
     }
     if (stageTimeline != null) map['stage_timeline'] = stageTimeline;
+    if (smartWindowMinutes != null) {
+      map['smart_window_minutes'] = smartWindowMinutes;
+    }
+    if (alarmFiredAt != null) {
+      map['alarm_fired_at'] = alarmFiredAt!.toIso8601String();
+    }
+    if (alarmTrigger != null) map['alarm_trigger'] = alarmTrigger;
+    if (wakeFeeling != null) map['wake_feeling'] = wakeFeeling;
     return map;
   }
 
@@ -311,6 +371,12 @@ class SleepMonitorSession {
       stageConfidence: (map['stage_confidence'] as num?)?.toDouble(),
       stageAlgorithmVersion: map['stage_algorithm_version'] as String?,
       stageTimeline: map['stage_timeline'] as String?,
+      smartWindowMinutes: (map['smart_window_minutes'] as num?)?.toInt(),
+      alarmFiredAt: (map['alarm_fired_at'] as String?) == null
+          ? null
+          : DateTime.parse(map['alarm_fired_at'] as String),
+      alarmTrigger: map['alarm_trigger'] as String?,
+      wakeFeeling: (map['wake_feeling'] as num?)?.toInt(),
     );
   }
 

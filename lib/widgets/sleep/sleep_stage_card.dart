@@ -32,7 +32,9 @@ class SleepStageCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final timeline = SleepWakeEngine.supports(session) ? session.timeline : null;
+    final timeline = SleepWakeEngine.supports(session)
+        ? session.timeline
+        : null;
     return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -72,6 +74,8 @@ class SleepStageCard extends StatelessWidget {
                 timeline: timeline,
                 startedAt: session.startedAt,
                 utcOffsetMinutes: session.utcOffsetStartMinutes,
+                smartWindowStart: session.smartWindowStart,
+                alarmFiredAt: session.alarmFiredAt,
               ),
               const SizedBox(height: 16),
             ],

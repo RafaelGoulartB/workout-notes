@@ -90,6 +90,28 @@ void main() {
     expect(service.state.alarmAt, alarmAt);
   });
 
+  test('sends the smart window only for a night with an alarm', () async {
+    final service = SleepMonitorService.instance;
+
+    await service.startMonitoring(
+      alarmAt: alarmAt,
+      smartWindowMinutes: 30,
+      smartThreshold: 0.3,
+    );
+
+    final call = calls.singleWhere((item) => item.method == 'startMonitoring');
+    final arguments = call.arguments as Map<Object?, Object?>;
+    expect(arguments['smart_window_minutes'], 30);
+    expect(arguments['smart_threshold'], 0.3);
+    expect(
+      SleepMonitorState.fromMap({
+        'status': 'running',
+        'smart_window_minutes': 30,
+      }).smartWindowMinutes,
+      30,
+    );
+  });
+
   test('atomically sends a replacement time for an active alarm', () async {
     final service = SleepMonitorService.instance;
     await service.startMonitoring(alarmAt: alarmAt);

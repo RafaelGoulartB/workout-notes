@@ -327,10 +327,13 @@ class _AlarmCard extends StatelessWidget {
                         style: Theme.of(context).textTheme.labelMedium,
                       ),
                     ],
-                    if (alarm.requiresMission || alarm.snoozeEnabled) ...[
+                    if (alarm.requiresMission ||
+                        alarm.snoozeEnabled ||
+                        alarm.gradualVolume) ...[
                       const SizedBox(height: 10),
                       Wrap(
                         spacing: 8,
+                        runSpacing: 4,
                         children: [
                           if (alarm.requiresMission)
                             Chip(
@@ -339,6 +342,14 @@ class _AlarmCard extends StatelessWidget {
                                 size: 18,
                               ),
                               label: Text(loc.alarmMission),
+                            ),
+                          if (alarm.gradualVolume)
+                            Chip(
+                              avatar: const Icon(
+                                Icons.volume_up_rounded,
+                                size: 18,
+                              ),
+                              label: Text(loc.alarmGradualVolumeChip),
                             ),
                           if (alarm.snoozeEnabled)
                             Chip(
@@ -430,6 +441,7 @@ class _AlarmEditorScreenState extends State<_AlarmEditorScreen> {
   late int _snoozeMinutes;
   late int _maxSnoozes;
   late bool _requiresMission;
+  late bool _gradualVolume;
   bool _saving = false;
 
   @override
@@ -443,6 +455,7 @@ class _AlarmEditorScreenState extends State<_AlarmEditorScreen> {
     _maxSnoozes =
         alarm?.maxSnoozes ?? TraditionalAlarmService.defaultMaxSnoozes;
     _requiresMission = alarm?.requiresMission ?? false;
+    _gradualVolume = alarm?.gradualVolume ?? false;
     if (alarm == null) _loadGlobalDefault();
   }
 
@@ -494,6 +507,7 @@ class _AlarmEditorScreenState extends State<_AlarmEditorScreen> {
           snoozeMinutes: _snoozeMinutes,
           maxSnoozes: _maxSnoozes,
           requiresMission: _requiresMission,
+          gradualVolume: _gradualVolume,
         );
       } else {
         await _service.save(
@@ -505,6 +519,7 @@ class _AlarmEditorScreenState extends State<_AlarmEditorScreen> {
             snoozeMinutes: _snoozeMinutes,
             maxSnoozes: _maxSnoozes,
             requiresMission: _requiresMission,
+            gradualVolume: _gradualVolume,
           ),
         );
       }
@@ -631,6 +646,14 @@ class _AlarmEditorScreenState extends State<_AlarmEditorScreen> {
               ),
             ),
           const Divider(height: 36),
+          SwitchListTile.adaptive(
+            key: const Key('alarm-gradual-volume'),
+            contentPadding: EdgeInsets.zero,
+            value: _gradualVolume,
+            onChanged: (value) => setState(() => _gradualVolume = value),
+            title: Text(loc.alarmGradualVolume),
+            subtitle: Text(loc.alarmGradualVolumeBody),
+          ),
           SwitchListTile.adaptive(
             contentPadding: EdgeInsets.zero,
             value: _requiresMission,

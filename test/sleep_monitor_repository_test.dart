@@ -43,6 +43,30 @@ void main() {
     },
   );
 
+  test('keeps the smart alarm result and the morning answer', () async {
+    final session = bedsideSession(minutes: 240);
+    final alarmAt = session.endedAt!.add(const Duration(minutes: 9));
+    final imported = await repository.importNativeSpool({
+      'session': {
+        ...session.toMap(),
+        'alarm_at': alarmAt.toIso8601String(),
+        'end_reason': 'alarm',
+        'smart_window_minutes': 30,
+        'alarm_fired_at': session.endedAt!.toIso8601String(),
+        'alarm_trigger': SleepMonitorSession.triggerStirring,
+      },
+      'segments': [for (var i = 0; i < 480; i++) bedsideSegment(i).toMap()],
+    });
+    expect(imported.smartWindowMinutes, 30);
+    expect(imported.alarmTrigger, SleepMonitorSession.triggerStirring);
+    expect(imported.smartWakeLeadMinutes, 9);
+
+    await repository.setWakeFeeling(imported.id, 3);
+    final stored = await repository.getSession(imported.id);
+    expect(stored!.wakeFeeling, SleepMonitorSession.feelingRefreshed);
+    expect(stored.alarmFiredAt, session.endedAt);
+  });
+
   test(
     'bedside inference accepts short sessions and keeps aggregate source version',
     () async {

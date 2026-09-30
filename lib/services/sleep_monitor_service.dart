@@ -256,6 +256,8 @@ class SleepMonitorService extends ChangeNotifier {
     SleepMonitoringMode mode = SleepMonitoringMode.alarmWithoutMission,
     SleepMissionConfig? mission,
     int maxSnoozes = 3,
+    int smartWindowMinutes = 0,
+    double smartThreshold = 0.5,
   }) async {
     if (!_isAndroid) return false;
     if (_state.isActive) return true;
@@ -272,6 +274,10 @@ class SleepMonitorService extends ChangeNotifier {
       arguments['max_snoozes'] = maxSnoozes.clamp(0, 10);
       if (alarmAt != null) {
         arguments['alarm_at_epoch_ms'] = alarmAt.millisecondsSinceEpoch;
+        if (smartWindowMinutes > 0) {
+          arguments['smart_window_minutes'] = smartWindowMinutes;
+          arguments['smart_threshold'] = smartThreshold;
+        }
       }
       if (mission != null) {
         arguments.addAll({

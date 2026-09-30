@@ -23,6 +23,10 @@ object SleepAlarmScheduler {
     const val EXTRA_MISSION_SALT = "mission_salt"
     const val EXTRA_MISSION_FORMAT = "mission_format"
     const val EXTRA_MAX_SNOOZES = "max_snoozes"
+    const val EXTRA_SMART_WINDOW_MINUTES = "smart_window_minutes"
+    const val EXTRA_SMART_THRESHOLD = "smart_threshold"
+    const val EXTRA_TRIGGER = "alarm_trigger"
+    const val MAX_SMART_WINDOW_MINUTES = 90
 
     private const val PREFS_NAME = "sleep_alarm_schedule"
     private const val KEY_ALARM_AT = "alarm_at_epoch_ms"
@@ -34,6 +38,8 @@ object SleepAlarmScheduler {
     private const val KEY_MISSION_FORMAT = "mission_format"
     private const val KEY_MAX_SNOOZES = "max_snoozes"
     private const val KEY_SNOOZE_COUNT = "snooze_count"
+    private const val KEY_SMART_WINDOW_MINUTES = "smart_window_minutes"
+    private const val KEY_SMART_THRESHOLD = "smart_threshold"
     private const val KEY_STATE = "state"
     private const val KEY_EMERGENCY_TAPS = "emergency_taps"
     private const val KEY_EMERGENCY_DEADLINE = "emergency_deadline_epoch_ms"
@@ -96,7 +102,15 @@ object SleepAlarmScheduler {
         val state: String,
         val maxSnoozes: Int,
         val snoozeCount: Int,
+        /** Minutes before [alarmAtMillis] in which a smart alarm may ring; 0 = off. */
+        val smartWindowMinutes: Int = 0,
+        /** Probability of sleep under which the smart alarm rings. */
+        val smartThreshold: Double = 0.5,
     ) {
+        val hasSmartWindow: Boolean get() = smartWindowMinutes > 0
+        val smartWindowStartMillis: Long
+            get() = alarmAtMillis - smartWindowMinutes * 60_000L
+
         val requiresMission: Boolean get() = monitorMode == "alarm_with_mission"
         val isSnoozed: Boolean get() = SleepAlarmStatePolicy.isSnoozed(state, snoozeCount)
         val canRunMission: Boolean
@@ -114,6 +128,8 @@ object SleepAlarmScheduler {
         missionFormat: String? = null,
         maxSnoozes: Int = 3,
         snoozeCount: Int = 0,
+        smartWindowMinutes: Int = 0,
+        smartThreshold: Double = 0.5,
     ) {
         require(alarmAtMillis > System.currentTimeMillis()) { "Alarm must be in the future" }
         if (!canScheduleExact(context)) {
@@ -152,6 +168,11 @@ object SleepAlarmScheduler {
             .putString(KEY_MISSION_FORMAT, missionFormat)
             .putInt(KEY_MAX_SNOOZES, maxSnoozes.coerceIn(0, 10))
             .putInt(KEY_SNOOZE_COUNT, snoozeCount.coerceAtLeast(0))
+            .putInt(
+                KEY_SMART_WINDOW_MINUTES,
+                smartWindowMinutes.coerceIn(0, MAX_SMART_WINDOW_MINUTES),
+            )
+            .putFloat(KEY_SMART_THRESHOLD, smartThreshold.coerceIn(0.05, 0.95).toFloat())
             .putString(KEY_STATE, STATE_SCHEDULED)
             .putInt(KEY_EMERGENCY_TAPS, 0)
             .remove(KEY_EMERGENCY_DEADLINE)
@@ -243,6 +264,8 @@ object SleepAlarmScheduler {
             snapshot.missionFormat,
             snapshot.maxSnoozes,
             snapshot.snoozeCount + 1,
+            snapshot.smartWindowMinutes,
+            snapshot.smartThreshold,
         )
         read(context)?.let { SleepSnoozeNotification.show(context, it) }
         return true
@@ -259,6 +282,62 @@ object SleepAlarmScheduler {
         ) return null
         complete(context)
         return snapshot
+    }
+
+    /**
+     * Rings the first alarm of the night now, before its deadline (smart
+     * wake). Only a scheduled, never-snoozed alarm still aimed at
+     * [expectedAlarmAtMillis] qualifies; its pending deadline is cancelled so
+     * it cannot ring a second time. Must run on the main thread: it stops the
+     * monitoring service, whose capture thread may be the caller's.
+     */
+    fun fireEarly(context: Context, expectedAlarmAtMillis: Long, trigger: String): Boolean {
+        synchronized(this) {
+            val snapshot = read(context) ?: return false
+            if (snapshot.state != STATE_SCHEDULED ||
+                snapshot.snoozeCount > 0 ||
+                snapshot.alarmAtMillis != expectedAlarmAtMillis ||
+                snapshot.alarmAtMillis <= System.currentTimeMillis()
+            ) return false
+            context.getSystemService(AlarmManager::class.java).cancel(
+                fireIntent(context, snapshot.alarmAtMillis, snapshot.sessionId,
+                    snapshot.monitorMode, snapshot.missionType, snapshot.missionHash,
+                    snapshot.missionSalt, snapshot.missionFormat),
+            )
+        }
+        return ring(context, expectedAlarmAtMillis, trigger)
+    }
+
+    /**
+     * Marks the alarm ringing, records when and why on the night, ends the
+     * monitoring and starts the ringing service. Shared by the exact alarm
+     * (the deadline), a smart early ring and a restore after reboot.
+     */
+    fun ring(context: Context, alarmAtMillis: Long, trigger: String): Boolean {
+        val before = read(context)
+        if (!markFired(context, alarmAtMillis)) return false
+        // A snooze ringing again is not the moment the night's alarm went off.
+        if ((before?.snoozeCount ?: 0) == 0) {
+            SleepMonitoringService.recordAlarmFired(context, trigger, System.currentTimeMillis())
+        }
+        SleepMonitoringService.stopCurrent("alarm")
+        val snapshot = read(context)
+        val ringing = Intent(context, SleepAlarmRingingService::class.java).apply {
+            action = SleepAlarmRingingService.ACTION_START
+            putExtra(EXTRA_ALARM_AT, alarmAtMillis)
+            putExtra(EXTRA_SESSION_ID, snapshot?.sessionId)
+            putExtra(EXTRA_MONITOR_MODE, snapshot?.monitorMode)
+            putExtra(EXTRA_MISSION_TYPE, snapshot?.missionType)
+            putExtra(EXTRA_MISSION_HASH, snapshot?.missionHash)
+            putExtra(EXTRA_MISSION_SALT, snapshot?.missionSalt)
+            putExtra(EXTRA_MISSION_FORMAT, snapshot?.missionFormat)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(ringing)
+        } else {
+            context.startService(ringing)
+        }
+        return true
     }
 
     fun emergencyTaps(context: Context): Int =
@@ -372,9 +451,7 @@ object SleepAlarmScheduler {
             return
         }
         if (stored.alarmAtMillis <= System.currentTimeMillis()) {
-            if (markFired(context, stored.alarmAtMillis)) {
-                SleepAlarmRingingService.start(context, stored.alarmAtMillis)
-            }
+            ring(context, stored.alarmAtMillis, SmartWakePolicy.TRIGGER_DEADLINE)
             return
         }
         try {
@@ -389,6 +466,8 @@ object SleepAlarmScheduler {
                 stored.missionFormat,
                 stored.maxSnoozes,
                 stored.snoozeCount,
+                stored.smartWindowMinutes,
+                stored.smartThreshold,
             )
             read(context)?.takeIf { it.isSnoozed }?.let {
                 SleepSnoozeNotification.show(context, it)
@@ -415,6 +494,8 @@ object SleepAlarmScheduler {
                 prefs.getString(KEY_STATE, STATE_SCHEDULED) ?: STATE_SCHEDULED,
                 prefs.getInt(KEY_MAX_SNOOZES, 3),
                 prefs.getInt(KEY_SNOOZE_COUNT, 0),
+                prefs.getInt(KEY_SMART_WINDOW_MINUTES, 0),
+                prefs.getFloat(KEY_SMART_THRESHOLD, 0.5f).toDouble(),
             )
         } else {
             null

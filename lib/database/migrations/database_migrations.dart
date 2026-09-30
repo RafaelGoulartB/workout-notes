@@ -250,6 +250,19 @@ abstract final class DatabaseMigrations {
         'ALTER TABLE sleep_monitor_sessions ADD COLUMN stage_timeline TEXT',
       );
     }
+    if (step(60)) {
+      // Smart alarm: the window of the night, when and why it rang and the
+      // one-tap morning answer; gentle volume rise per standalone alarm.
+      for (final statement in const [
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN smart_window_minutes INTEGER',
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN alarm_fired_at TEXT',
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN alarm_trigger TEXT',
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN wake_feeling INTEGER',
+        'ALTER TABLE traditional_alarms ADD COLUMN gradual_volume INTEGER NOT NULL DEFAULT 0',
+      ]) {
+        await tryExecute(db, statement);
+      }
+    }
   }
 
   /// Statements that create the v56 indexes. Also used by `onCreate`.

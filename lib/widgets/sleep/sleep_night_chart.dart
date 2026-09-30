@@ -13,11 +13,19 @@ class SleepNightChart extends StatefulWidget {
   final DateTime startedAt;
   final int utcOffsetMinutes;
 
+  /// Start of the smart alarm window, shaded to the end of the night.
+  final DateTime? smartWindowStart;
+
+  /// When the alarm rang, drawn as a vertical mark.
+  final DateTime? alarmFiredAt;
+
   const SleepNightChart({
     super.key,
     required this.timeline,
     required this.startedAt,
     required this.utcOffsetMinutes,
+    this.smartWindowStart,
+    this.alarmFiredAt,
   });
 
   @override
@@ -37,6 +45,12 @@ class _SleepNightChartState extends State<SleepNightChart> {
     final index = _indexAt(dx, width);
     if (index != _selected) setState(() => _selected = index);
   }
+
+  double? _stepOf(DateTime? time) => time == null
+      ? null
+      : time.difference(widget.startedAt).inMilliseconds /
+            1000 /
+            widget.timeline.stepSeconds;
 
   String _clockAt(int step) => SleepUi.wallTime(
     widget.startedAt.add(Duration(seconds: step * widget.timeline.stepSeconds)),
@@ -105,6 +119,9 @@ class _SleepNightChartState extends State<SleepNightChart> {
                             muted: colors.onSurfaceVariant,
                             grid: colors.outlineVariant.withValues(alpha: 0.5),
                             textStyle: theme.textTheme.labelSmall!,
+                            accent: colors.primary,
+                            windowStartStep: _stepOf(widget.smartWindowStart),
+                            alarmStep: _stepOf(widget.alarmFiredAt),
                           ),
                         ),
                       ),
@@ -133,6 +150,13 @@ class _SleepNightChartState extends State<SleepNightChart> {
             ),
             if (timeline.hasSnoring)
               _LegendDot(color: SleepUi.snoring, label: loc.sleepSnoring),
+            if (widget.smartWindowStart != null)
+              _LegendDot(
+                color: colors.primary.withValues(alpha: 0.35),
+                label: loc.sleepChartSmartWindow,
+              ),
+            if (widget.alarmFiredAt != null)
+              _LegendDot(color: colors.primary, label: loc.sleepChartAlarm),
           ],
         ),
       ],
@@ -167,6 +191,9 @@ class _NightPainter extends CustomPainter {
   final Color muted;
   final Color grid;
   final TextStyle textStyle;
+  final Color accent;
+  final double? windowStartStep;
+  final double? alarmStep;
 
   _NightPainter({
     required this.timeline,
@@ -178,6 +205,9 @@ class _NightPainter extends CustomPainter {
     required this.muted,
     required this.grid,
     required this.textStyle,
+    required this.accent,
+    this.windowStartStep,
+    this.alarmStep,
   });
 
   void _text(
@@ -234,6 +264,15 @@ class _NightPainter extends CustomPainter {
         '${hour.toString().padLeft(2, '0')}:00',
         Offset(gx, soundBottom + 4),
         center: true,
+      );
+    }
+
+    // Smart alarm window, behind every row.
+    final windowStart = windowStartStep;
+    if (windowStart != null && windowStart < n) {
+      canvas.drawRect(
+        Rect.fromLTRB(x(windowStart.clamp(0, n)), bandTop, w, soundBottom),
+        Paint()..color = accent.withValues(alpha: 0.12),
       );
     }
 
@@ -358,6 +397,16 @@ class _NightPainter extends CustomPainter {
       }
     }
 
+    final alarm = alarmStep;
+    if (alarm != null && alarm >= 0 && alarm <= n + 1) {
+      final ax = x(alarm.clamp(0, n)) - 1;
+      final paint = Paint()
+        ..color = accent
+        ..strokeWidth = 2;
+      canvas.drawLine(Offset(ax, bandTop - 2), Offset(ax, soundBottom), paint);
+      canvas.drawCircle(Offset(ax, bandTop - 2), 3.5, paint);
+    }
+
     final s = selected;
     if (s != null) {
       final sx = x(s + 0.5);
@@ -387,7 +436,10 @@ class _NightPainter extends CustomPainter {
       old.selected != selected ||
       old.ink != ink ||
       old.muted != muted ||
-      old.grid != grid;
+      old.grid != grid ||
+      old.accent != accent ||
+      old.windowStartStep != windowStartStep ||
+      old.alarmStep != alarmStep;
 }
 
 /// Fixed-height strip above the chart: the hint, or the inspected minute.

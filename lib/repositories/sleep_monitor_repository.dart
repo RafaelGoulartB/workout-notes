@@ -121,6 +121,21 @@ class SleepMonitorRepository extends BaseRepository {
     );
   }
 
+  /// Saves the morning answer to "how did you wake up?" (1-3).
+  Future<void> setWakeFeeling(String sessionId, int feeling) async {
+    await (await db).update(
+      'sleep_monitor_sessions',
+      {
+        'wake_feeling': feeling.clamp(
+          SleepMonitorSession.feelingTired,
+          SleepMonitorSession.feelingRefreshed,
+        ),
+      },
+      where: 'id = ?',
+      whereArgs: [sessionId],
+    );
+  }
+
   /// Imports a native spool atomically. Re-importing the same session replaces
   /// its aggregate rows and never creates a second sleep entry.
   Future<SleepMonitorSession> importNativeSpool(

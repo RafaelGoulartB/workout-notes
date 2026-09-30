@@ -217,6 +217,12 @@ class SleepMonitorBridge(private val context: Context) :
         val missionSalt = call.argument<String>(SleepAlarmScheduler.EXTRA_MISSION_SALT)
         val missionFormat = call.argument<String>(SleepAlarmScheduler.EXTRA_MISSION_FORMAT)
         val maxSnoozes = (call.argument<Int>(SleepAlarmScheduler.EXTRA_MAX_SNOOZES) ?: 3).coerceIn(0, 10)
+        val smartWindowMinutes = if (monitorMode == "monitoring_only") 0 else {
+            (call.argument<Int>(SleepAlarmScheduler.EXTRA_SMART_WINDOW_MINUTES) ?: 0)
+                .coerceIn(0, SleepAlarmScheduler.MAX_SMART_WINDOW_MINUTES)
+        }
+        val smartThreshold =
+            call.argument<Number>(SleepAlarmScheduler.EXTRA_SMART_THRESHOLD)?.toDouble() ?: 0.5
         if (monitorMode == "alarm_with_mission" &&
             (missionType != "barcode" || missionHash.isNullOrBlank() ||
                 missionSalt.isNullOrBlank() || missionFormat.isNullOrBlank())
@@ -244,6 +250,8 @@ class SleepMonitorBridge(private val context: Context) :
                     missionSalt,
                     missionFormat,
                     maxSnoozes,
+                    smartWindowMinutes = smartWindowMinutes,
+                    smartThreshold = smartThreshold,
                 )
             }
             val intent = Intent(context, SleepMonitoringService::class.java).apply {
@@ -254,6 +262,7 @@ class SleepMonitorBridge(private val context: Context) :
                 putExtra(SleepAlarmScheduler.EXTRA_MISSION_HASH, missionHash)
                 putExtra(SleepAlarmScheduler.EXTRA_MISSION_SALT, missionSalt)
                 putExtra(SleepAlarmScheduler.EXTRA_MISSION_FORMAT, missionFormat)
+                putExtra(SleepAlarmScheduler.EXTRA_SMART_WINDOW_MINUTES, smartWindowMinutes)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
@@ -352,6 +361,8 @@ class SleepMonitorBridge(private val context: Context) :
                 snapshot.missionFormat,
                 snapshot.maxSnoozes,
                 snapshot.snoozeCount,
+                snapshot.smartWindowMinutes,
+                snapshot.smartThreshold,
             )
             result.success(SleepMonitoringService.updateAlarm(alarmAt))
         } catch (error: SecurityException) {

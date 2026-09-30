@@ -2,12 +2,15 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/alarm_wake_settings.dart';
+import 'package:workout_notes/services/alarm_wake_settings_service.dart';
 import 'package:workout_notes/services/sleep_diagnostic_store.dart';
 import 'package:workout_notes/services/sleep_goal_service.dart';
 import 'package:workout_notes/services/sleep_mission_service.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'package:workout_notes/services/traditional_alarm_service.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
+import 'package:workout_notes/widgets/sleep/monitor/smart_wake_widgets.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class SleepSettingsScreen extends StatefulWidget {
@@ -29,6 +32,8 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
   bool _globalSnoozeEnabled = true;
   bool _diagnosticsEnabled = false;
   final _diagnostics = SleepDiagnosticStore();
+  final _wakeService = AlarmWakeSettingsService();
+  AlarmWakeSettings _wake = AlarmWakeSettings.defaults;
 
   @override
   void initState() {
@@ -42,8 +47,10 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
     final globalMaxSnoozes = await _alarmService.getGlobalMaxSnoozes();
     final globalSnoozeEnabled = await _alarmService.getGlobalSnoozeEnabled();
     final diagnosticsEnabled = await _diagnostics.isEnabled();
+    final wake = await _wakeService.load();
     if (mounted) {
       setState(() {
+        _wake = wake;
         _goalMinutes = goalMinutes;
         _globalMaxSnoozes = globalMaxSnoozes;
         _globalSnoozeEnabled = globalSnoozeEnabled;
@@ -240,6 +247,44 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
     if (mounted) setState(() => _globalMaxSnoozes = selected);
   }
 
+  Future<void> _saveWake(AlarmWakeSettings value) async {
+    setState(() => _wake = value);
+    await _wakeService.save(value);
+  }
+
+  Future<void> _configureSmartWake() async {
+    final selected = await showSmartWakeSheet(context, _wake);
+    if (selected == null || !mounted) return;
+    await _saveWake(selected);
+  }
+
+  Future<void> _configureRamp() async {
+    final loc = AppLocalizations.of(context)!;
+    final selected = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: Text(loc.alarmRampTitle),
+        children: [
+          for (final seconds in AlarmWakeSettings.rampOptions)
+            ListTile(
+              key: Key('alarm-ramp-$seconds'),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+              title: Text(alarmRampLabel(loc, seconds)),
+              trailing: seconds == _wake.rampSeconds
+                  ? Icon(
+                      Icons.check_rounded,
+                      color: Theme.of(dialogContext).colorScheme.primary,
+                    )
+                  : null,
+              onTap: () => Navigator.pop(dialogContext, seconds),
+            ),
+        ],
+      ),
+    );
+    if (selected == null || !mounted) return;
+    await _saveWake(_wake.copyWith(rampSeconds: selected));
+  }
+
   Future<void> _setGlobalSnoozeEnabled(bool enabled) async {
     await _alarmService.setGlobalSnoozeEnabled(enabled);
     if (mounted) setState(() => _globalSnoozeEnabled = enabled);
@@ -318,6 +363,56 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
                         title: loc.sleepDiagnosticExport,
                         onTap: _exportDiagnostic,
                       ),
+                  ],
+                ),
+                AppSectionHeader(
+                  loc.sleepSettingsWakeSection,
+                  padding: AppSectionHeader.compactPadding,
+                ),
+                SettingsCard(
+                  children: [
+                    SettingsLinkTile(
+                      key: const Key('sleep-settings-smart-wake'),
+                      icon: Icons.auto_awesome_rounded,
+                      title: loc.sleepSmartWakeTitle,
+                      subtitle: _wake.smartWindowEnabled
+                          ? loc.sleepSettingsSmartWindowValue(
+                              _wake.windowMinutes,
+                              smartWakeSensitivityTitle(loc, _wake.sensitivity),
+                            )
+                          : loc.sleepSmartWakeWindowOff,
+                      onTap: _configureSmartWake,
+                    ),
+                    const SettingsCardDivider(),
+                    SettingsLinkTile(
+                      key: const Key('sleep-settings-ramp'),
+                      icon: Icons.volume_up_rounded,
+                      title: loc.alarmRampTitle,
+                      subtitle: _wake.rampSeconds == 0
+                          ? loc.alarmRampOff
+                          : loc.alarmRampValue(
+                              alarmRampLabel(loc, _wake.rampSeconds),
+                            ),
+                      onTap: _configureRamp,
+                    ),
+                    const SettingsCardDivider(),
+                    SettingsSwitchTile(
+                      icon: Icons.campaign_outlined,
+                      title: loc.alarmRampBoost,
+                      subtitle: loc.alarmRampBoostBody,
+                      value: _wake.boost,
+                      onChanged: (value) =>
+                          _saveWake(_wake.copyWith(boost: value)),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Text(
+                        loc.sleepSettingsWakeBody,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 AppSectionHeader(

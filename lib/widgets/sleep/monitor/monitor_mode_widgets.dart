@@ -19,11 +19,13 @@ class ModePill extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.onTap,
+    this.tapKey = const Key('sleep-monitor-mode'),
   });
 
   final String label;
   final IconData icon;
   final VoidCallback onTap;
+  final Key tapKey;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +38,7 @@ class ModePill extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        key: const Key('sleep-monitor-mode'),
+        key: tapKey,
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),

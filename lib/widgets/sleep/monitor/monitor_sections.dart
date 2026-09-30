@@ -23,6 +23,7 @@ class SleepMonitorReadyContent extends StatelessWidget {
     required this.onChooseAlarmTime,
     required this.onShiftAlarmTime,
     required this.onShowModePicker,
+    required this.onShowSmartWake,
   });
 
   final SleepMonitorController controller;
@@ -30,6 +31,7 @@ class SleepMonitorReadyContent extends StatelessWidget {
   final VoidCallback onChooseAlarmTime;
   final ValueChanged<int> onShiftAlarmTime;
   final VoidCallback onShowModePicker;
+  final VoidCallback onShowSmartWake;
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +42,8 @@ class SleepMonitorReadyContent extends StatelessWidget {
     final alarmAt = this.alarmAt;
     final valid =
         alarmAt == null || SleepAlarmTime.isWithinMonitoringWindow(alarmAt);
+    final windowStart = controller.smartWindowStartFor(state, alarmAt);
+    final wake = controller.wakeSettings;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -75,6 +79,15 @@ class SleepMonitorReadyContent extends StatelessWidget {
             loc.sleepMonitorWakeIn(formatMonitorRemaining(alarmAt)),
             emphasis: true,
           ),
+          if (windowStart != null) ...[
+            const SizedBox(height: 4),
+            MonitorCaption(
+              loc.sleepSmartWakeBetween(
+                formatMonitorTime(context, windowStart),
+                formatMonitorTime(context, alarmAt),
+              ),
+            ),
+          ],
         ] else ...[
           Icon(
             Icons.graphic_eq_rounded,
@@ -93,12 +106,28 @@ class SleepMonitorReadyContent extends StatelessWidget {
         const Spacer(flex: 2),
         const SleepSoundWaves(height: 72),
         const Spacer(flex: 2),
-        Center(
-          child: ModePill(
-            label: sleepMonitorModeTitle(loc, selectedMode),
-            icon: modeIcon(selectedMode),
-            onTap: onShowModePicker,
-          ),
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ModePill(
+              label: sleepMonitorModeTitle(loc, selectedMode),
+              icon: modeIcon(selectedMode),
+              onTap: onShowModePicker,
+            ),
+            if (selectedMode.hasAlarm)
+              ModePill(
+                tapKey: const Key('sleep-monitor-smart-wake'),
+                label: wake.smartWindowEnabled
+                    ? loc.sleepSmartWakePill(wake.windowMinutes)
+                    : loc.sleepSmartWakeOff,
+                icon: wake.smartWindowEnabled
+                    ? Icons.auto_awesome_rounded
+                    : Icons.alarm_rounded,
+                onTap: onShowSmartWake,
+              ),
+          ],
         ),
         if (!valid) ...[
           const SizedBox(height: 12),
@@ -137,6 +166,7 @@ Future<void> showSleepTipsSheet(
   required bool hasAlarm,
   required bool snoozeEnabled,
   required int maxSnoozes,
+  bool smartWake = false,
 }) {
   final loc = AppLocalizations.of(context)!;
   return showModalBottomSheet<void>(
@@ -161,6 +191,12 @@ Future<void> showSleepTipsSheet(
                 !snoozeEnabled || maxSnoozes == 0
                     ? loc.sleepMonitorSnoozesDisabled
                     : loc.sleepMonitorSnoozesConfigured(maxSnoozes),
+              ),
+            if (hasAlarm && smartWake)
+              (
+                Icons.auto_awesome_rounded,
+                loc.sleepSmartWakeTitle,
+                '${loc.sleepSmartWakeBody} ${loc.sleepSmartWakeBedPartner}',
               ),
           ],
         ),
@@ -325,6 +361,16 @@ class SleepMonitorRunningContent extends StatelessWidget {
               emphasis: true,
             ),
           ),
+          if (controller.smartWindowStartFor(state, alarmAt)
+              case final windowStart?) ...[
+            const SizedBox(height: 4),
+            MonitorCaption(
+              loc.sleepSmartWakeBetween(
+                formatMonitorTime(context, windowStart),
+                formatMonitorTime(context, alarmAt),
+              ),
+            ),
+          ],
         ] else ...[
           MonitorCaption(loc.sleepMonitorTimeMonitored),
           const SizedBox(height: 4),

@@ -5,6 +5,7 @@ import 'package:workout_notes/models/traditional_alarm.dart';
 import 'package:workout_notes/models/traditional_alarm_runtime_state.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
 import 'package:workout_notes/repositories/traditional_alarm_repository.dart';
+import 'package:workout_notes/services/alarm_wake_settings_service.dart';
 import 'package:workout_notes/services/notification_service.dart';
 import 'package:workout_notes/services/sleep_mission_service.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
@@ -67,6 +68,7 @@ class TraditionalAlarmService extends ChangeNotifier {
         await _scheduleBestEffort(alarm);
       }
       await _channel.invokeMethod<void>('restore');
+      await AlarmWakeSettingsService().syncNative();
     } on MissingPluginException {
       _runtimeStates = const {};
       // The alarm manager is intentionally an Android enhancement.
@@ -86,6 +88,7 @@ class TraditionalAlarmService extends ChangeNotifier {
     required int snoozeMinutes,
     required int maxSnoozes,
     required bool requiresMission,
+    bool gradualVolume = false,
   }) async {
     final alarm = await _repository.insert(
       hour: hour,
@@ -95,6 +98,7 @@ class TraditionalAlarmService extends ChangeNotifier {
       snoozeMinutes: snoozeMinutes,
       maxSnoozes: maxSnoozes,
       requiresMission: requiresMission,
+      gradualVolume: gradualVolume,
     );
     await _scheduleBestEffort(alarm);
     await refresh();
@@ -178,6 +182,7 @@ class TraditionalAlarmService extends ChangeNotifier {
       'snooze_minutes': alarm.snoozeMinutes,
       'max_snoozes': alarm.maxSnoozes,
       'requires_mission': alarm.requiresMission,
+      'gradual_volume': alarm.gradualVolume,
       'mission_type': mission.config.type,
       'mission_hash': mission.config.hash,
       'mission_salt': mission.config.salt,
