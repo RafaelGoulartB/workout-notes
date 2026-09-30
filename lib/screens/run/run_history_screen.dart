@@ -10,10 +10,10 @@ import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/run_achievement_engine.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/run/history/run_history_filter_bar.dart';
 import 'package:workout_notes/widgets/run/history/run_history_row.dart';
 import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class RunHistoryScreen extends StatefulWidget {
   const RunHistoryScreen({super.key});
@@ -194,7 +194,7 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : isEmptyHistory
-          ? EmptyStatePlaceholder(
+          ? AppEmptyState(
               icon: Icons.directions_run,
               title: loc.runHistoryEmptyTitle,
               subtitle: loc.runHistoryEmptySubtitle,
@@ -227,7 +227,7 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
           const SizedBox(height: 48),
-          EmptyStatePlaceholder(
+          AppEmptyState(
             icon: Icons.search_off_rounded,
             title: loc.runHistoryNoResultsTitle,
             subtitle: loc.runHistoryNoResultsSubtitle,

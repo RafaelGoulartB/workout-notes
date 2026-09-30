@@ -7,6 +7,7 @@ import 'package:workout_notes/utils/body_tracker_utils.dart';
 import 'package:workout_notes/widgets/body_tracker_badges.dart';
 import 'package:workout_notes/widgets/body_tracker_selectors.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 // ═══════════════════════════════════════════════════════════════════════
 // ADD MEASUREMENT SHEET
@@ -1063,24 +1064,11 @@ Future<void> showMeasurementDetailSheet(
                 OutlinedButton.icon(
                   onPressed: () async {
                     Navigator.pop(ctx);
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (c) => AlertDialog(
-                        title: Text(loc.bodyTrackerDeleteConfirm),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(c, false),
-                            child: Text(loc.commonCancel),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(c, true),
-                            child: Text(
-                              loc.commonDelete,
-                              style: const TextStyle(color: Colors.red),
-                            ),
-                          ),
-                        ],
-                      ),
+                    final confirm = await showConfirmDialog(
+                      context,
+                      title: loc.bodyTrackerDeleteConfirm,
+                      confirmLabel: loc.commonDelete,
+                      destructive: true,
                     );
                     if (confirm == true) {
                       await repo.deleteBodyMeasurement(

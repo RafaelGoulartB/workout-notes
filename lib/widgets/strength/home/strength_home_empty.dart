@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Shown to lifters without a single finished gym workout.
 class StrengthHomeEmpty extends StatelessWidget {
@@ -17,7 +17,7 @@ class StrengthHomeEmpty extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    return RunSectionCard(
+    return AppSectionCard(
       child: Column(
         children: [
           const Icon(Icons.fitness_center, size: 48),

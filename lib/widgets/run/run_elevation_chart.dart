@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/utils/run_elevation_analytics.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/run/run_pace_chart.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Smoothed altitude profile over distance. Touching it reports the distance
 /// through [selectedDistance], like [RunPaceChart].
@@ -68,7 +68,7 @@ class RunElevationChart extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
                     height: 1.25,
-                    fontFeatures: RunUi.tabular,
+                    fontFeatures: AppUi.tabular,
                   ),
                 );
               }).toList(),
@@ -113,7 +113,7 @@ class RunElevationChart extends StatelessWidget {
                     '${value.round()}',
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: muted,
-                      fontFeatures: RunUi.tabular,
+                      fontFeatures: AppUi.tabular,
                     ),
                   ),
                 ),

@@ -4,7 +4,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_insights_format.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/exercise/exercise_history_list.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_charts.dart';
 
@@ -96,7 +96,7 @@ class _ExerciseChartsCardState extends State<ExerciseChartsCard> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (available.length > 1) ...[
-            RunSegmentedTabs<ExerciseChartMetric>(
+            AppSegmentedTabs<ExerciseChartMetric>(
               values: available,
               selected: metric,
               labelOf: label,
@@ -119,12 +119,12 @@ class _ExerciseChartsCardState extends State<ExerciseChartsCard> {
               spacing: 8,
               runSpacing: 6,
               children: [
-                RunPill(
+                AppPill(
                   label: loc.exerciseDetailChartBest(format(metric, best)),
                   icon: Icons.emoji_events_rounded,
                   color: Theme.of(context).colorScheme.tertiary,
                 ),
-                RunPill(
+                AppPill(
                   label: loc.exerciseDetailChartLatest(
                     format(metric, values.last),
                   ),

@@ -4,7 +4,7 @@ import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// One planned-vs-actual row of an interval session. The pace delta is the
 /// number that matters: did rep 5 hold the target of rep 1?
@@ -71,7 +71,7 @@ class RunActivityStepRow extends StatelessWidget {
                 RunFormatters.paceWithUnit(step.actualPaceSecPerKm),
                 style: theme.textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.w700,
-                  fontFeatures: RunUi.tabular,
+                  fontFeatures: AppUi.tabular,
                 ),
               ),
               if (delta != null)
@@ -83,7 +83,7 @@ class RunActivityStepRow extends StatelessWidget {
                         ? theme.colorScheme.primary
                         : theme.colorScheme.error,
                     fontWeight: FontWeight.w700,
-                    fontFeatures: RunUi.tabular,
+                    fontFeatures: AppUi.tabular,
                   ),
                 ),
             ],

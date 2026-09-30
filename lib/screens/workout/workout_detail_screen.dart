@@ -7,7 +7,7 @@ import 'package:workout_notes/screens/workout/edit_workout_screen.dart';
 import 'package:workout_notes/screens/workout/exercise_detail_tabs_screen.dart';
 import 'package:workout_notes/services/export_service.dart';
 import 'package:workout_notes/utils/strength_workout_records.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/workout/strength_workout_comparison_card.dart';
 import 'package:workout_notes/widgets/strength/workout/strength_workout_exercise_card.dart';
 import 'package:workout_notes/widgets/strength/workout/strength_workout_hero.dart';
@@ -139,24 +139,24 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     final isActive = !detail.isFinished;
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: RunUi.screenPadding,
+      padding: AppUi.screenPadding,
       children: [
         StrengthWorkoutHero(detail: detail),
         if (detail.records.isNotEmpty) ...[
-          RunSectionHeader(loc.workoutDetailRecordsTitle),
+          AppSectionHeader(loc.workoutDetailRecordsTitle),
           StrengthWorkoutRecordsCard(records: detail.records),
         ],
         if (detail.comparison != null) ...[
-          RunSectionHeader(loc.workoutDetailComparisonTitle),
+          AppSectionHeader(loc.workoutDetailComparisonTitle),
           StrengthWorkoutComparisonCard(detail: detail),
         ],
         if (stats != null && stats.categories.isNotEmpty) ...[
-          RunSectionHeader(loc.workoutStatsMuscleVolume),
+          AppSectionHeader(loc.workoutStatsMuscleVolume),
           StrengthWorkoutMuscleSplit(stats: stats),
         ],
-        RunSectionHeader(loc.commonExercises),
+        AppSectionHeader(loc.commonExercises),
         if (detail.exercises.isEmpty)
-          RunSectionCard(child: Text(loc.workoutDetailNoExercises))
+          AppSectionCard(child: Text(loc.workoutDetailNoExercises))
         else
           for (final exercise in detail.exercises) ...[
             StrengthWorkoutExerciseCard(
@@ -308,27 +308,12 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
 
   Future<void> _deleteWorkout() async {
     final loc = AppLocalizations.of(context)!;
-    final colors = Theme.of(context).colorScheme;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.workoutDetailDeleteConfirm),
-        content: Text(loc.workoutDetailDeleteContent),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: colors.error,
-              foregroundColor: colors.onError,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: loc.workoutDetailDeleteConfirm,
+      message: loc.workoutDetailDeleteContent,
+      confirmLabel: loc.commonDelete,
+      destructive: true,
     );
     if (confirm != true) return;
     await _workoutRepo.deleteWorkout(widget.workoutId);

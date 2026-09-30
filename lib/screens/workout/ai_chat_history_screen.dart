@@ -6,8 +6,8 @@ import '../../l10n/app_localizations.dart';
 import '../../models/ai_chat_thread.dart';
 import '../../state/ai_chat_service.dart';
 import '../../widgets/ai/ai_history_thread_card.dart';
-import '../../widgets/settings/settings.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class AiChatHistoryScreen extends StatefulWidget {
   const AiChatHistoryScreen({super.key});
@@ -545,14 +545,15 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
     AiChatThread thread,
     AppLocalizations l10n,
   ) async {
-    final ok = await SettingsConfirmDialog.show(
-      context: context,
+    final ok = await showConfirmDialog(
+      context,
       title: l10n.aiHistoryDeleteTitle,
       message: l10n.aiHistoryDeleteBody(_displayTitle(thread, l10n)),
       confirmLabel: l10n.commonDelete,
-      cancelLabel: l10n.commonCancel,
+      destructive: true,
+      icon: Icons.warning_amber_rounded,
     );
-    return ok ?? false;
+    return ok;
   }
 
   void _showOperationError(AppLocalizations l10n) {

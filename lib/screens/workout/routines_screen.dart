@@ -4,7 +4,7 @@ import 'package:workout_notes/screens/workout/active_workout_screen.dart';
 import 'package:workout_notes/screens/workout/routine_day_editor_screen.dart';
 import 'package:workout_notes/screens/workout/routine_form_screen.dart';
 import 'package:workout_notes/utils/strength_routine_summary.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_list_cards.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_sheets.dart';
 import 'package:workout_notes/database/database_helper.dart';
@@ -184,10 +184,10 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
-                padding: RunUi.screenPadding.copyWith(top: 8),
+                padding: AppUi.screenPadding.copyWith(top: 8),
                 children: [
                   if (active != null) ...[
-                    RunSectionHeader(
+                    AppSectionHeader(
                       loc.routinesInUseSection,
                       padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
                       trailing: Text(
@@ -208,7 +208,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
                     ),
                   ],
                   if (others.isNotEmpty) ...[
-                    RunSectionHeader(
+                    AppSectionHeader(
                       loc.routinesOthersSection,
                       padding: EdgeInsets.fromLTRB(
                         4,

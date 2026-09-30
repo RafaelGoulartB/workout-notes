@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_gear.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Tappable "shoes used" row: name and total mileage, or a prompt when no
 /// shoes are set. Shared by the run detail and the post-run review.
@@ -24,10 +24,10 @@ class RunGearRow extends StatelessWidget {
         : usage.nearingReplacement
         ? loc.runGearReplaceSoon
         : null;
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: RunListRow(
-        leading: RunIconBadge(
+      child: AppListRow(
+        leading: AppIconBadge(
           Icons.directions_walk_rounded,
           color: usage == null ? colors.onSurfaceVariant : colors.primary,
         ),
@@ -39,7 +39,7 @@ class RunGearRow extends StatelessWidget {
               ),
         titleTrailing: warning == null
             ? null
-            : RunPill(
+            : AppPill(
                 label: warning,
                 color: usage!.needsReplacement ? colors.error : colors.tertiary,
               ),

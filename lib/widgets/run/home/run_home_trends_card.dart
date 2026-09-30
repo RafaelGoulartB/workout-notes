@@ -3,7 +3,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
 import 'package:workout_notes/widgets/run/run_progress_charts.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 enum _RunChartTab { volume, pace, frequency }
 
@@ -64,11 +64,11 @@ class _RunTrendsCardState extends State<RunTrendsCard> {
       ),
     };
 
-    return RunSectionCard(
+    return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          RunSegmentedTabs<_RunChartTab>(
+          AppSegmentedTabs<_RunChartTab>(
             values: _RunChartTab.values,
             selected: _tab,
             labelOf: (tab) => _tabLabel(loc, tab),

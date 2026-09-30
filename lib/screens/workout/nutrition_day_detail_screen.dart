@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
@@ -14,7 +13,7 @@ import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 import 'package:workout_notes/services/open_food_facts_gateway.dart';
 import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 import 'food_quantity_sheet.dart';
 import 'food_search_screen.dart';
@@ -294,26 +293,13 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
 
   Future<void> _deleteItem(MealLogItem item) async {
     final loc = AppLocalizations.of(context)!;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.nutritionDeleteItem),
-        content: Text(loc.nutritionDeleteItemConfirm),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.nutritionCancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-              foregroundColor: Theme.of(ctx).colorScheme.onError,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: loc.nutritionDeleteItem,
+      message: loc.nutritionDeleteItemConfirm,
+      confirmLabel: loc.commonDelete,
+      cancelLabel: loc.nutritionCancel,
+      destructive: true,
     );
     if (confirm != true) return;
     if (!mounted) return;
@@ -619,7 +605,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: AnimatedBuilder(
               animation: _tabController,
-              builder: (context, _) => RunSegmentedTabs<int>(
+              builder: (context, _) => AppSegmentedTabs<int>(
                 values: const [0, 1],
                 selected: _tabController.index,
                 labelOf: (tab) => tab == 0
@@ -645,13 +631,16 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
                       physics: const AlwaysScrollableScrollPhysics(),
                       slivers: [
                         SliverToBoxAdapter(
-                          child: NutritionSummaryCard(
-                            summary: _summary,
-                            goal: _effective.goal,
-                            planInfo: _effective,
-                            onConfigureGoal: _openSettings,
-                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                          ).animate().fadeIn(duration: 220.ms),
+                          child: FadeSlideIn(
+                            duration: const Duration(milliseconds: 220),
+                            child: NutritionSummaryCard(
+                              summary: _summary,
+                              goal: _effective.goal,
+                              planInfo: _effective,
+                              onConfigureGoal: _openSettings,
+                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                            ),
+                          ),
                         ),
                         SliverToBoxAdapter(
                           child: NutritionSectionLabel(
@@ -754,27 +743,41 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
     if (_mealTypes.isEmpty && orphanMeals.isEmpty) {
       return [
         SliverToBoxAdapter(
-          child: _EmptyDayCard(onConfigureMeals: _openSettings),
+          child: AppEmptyCard(
+            icon: Icons.restaurant_outlined,
+            title: loc.nutritionNoMealsTitle,
+            subtitle: loc.nutritionNoMealsSubtitle,
+            action: FilledButton.tonalIcon(
+              onPressed: _openSettings,
+              icon: const Icon(Icons.settings_outlined, size: 18),
+              label: Text(loc.nutritionDiaryManageMeals),
+            ),
+          ),
         ),
       ];
     }
     Widget card(MealLogWithItems meal, String title) {
       void add() => _addItem(meal.log.mealType, title);
-      return NutritionMealCard(
-        key: _mealSectionKey(meal.log.mealType),
-        keyPrefix: 'nutrition-diary',
-        title: title,
-        meal: meal,
-        detailed: true,
-        emptyLabel: loc.nutritionMealEmptyHint,
-        onOpen: meal.items.isEmpty ? add : null,
-        onAdd: add,
-        onEditItem: _editItem,
-        menu: _MealMenu(
-          onRepeat: () => _repeatMeal(meal),
-          onSaveAsMeal: () => _saveMealFromDay(meal),
+      return FadeSlideIn(
+        duration: const Duration(milliseconds: 250),
+        delay: const Duration(milliseconds: 40),
+        slideY: 0.02,
+        child: NutritionMealCard(
+          key: _mealSectionKey(meal.log.mealType),
+          keyPrefix: 'nutrition-diary',
+          title: title,
+          meal: meal,
+          detailed: true,
+          emptyLabel: loc.nutritionMealEmptyHint,
+          onOpen: meal.items.isEmpty ? add : null,
+          onAdd: add,
+          onEditItem: _editItem,
+          menu: _MealMenu(
+            onRepeat: () => _repeatMeal(meal),
+            onSaveAsMeal: () => _saveMealFromDay(meal),
+          ),
         ),
-      ).animate().fadeIn(duration: 250.ms, delay: 40.ms).slideY(begin: 0.02);
+      );
     }
 
     return [

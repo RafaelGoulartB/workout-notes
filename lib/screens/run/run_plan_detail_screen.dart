@@ -35,6 +35,7 @@ import 'package:workout_notes/widgets/run/run_balance_dialog.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Plan detail: identity header, status, week picker and the training week
 /// laid out by weekday. A running week is read by day ("longão no domingo"),
@@ -245,23 +246,12 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     final plan = _plan;
     if (plan == null) return;
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.restart_alt_rounded),
-        title: Text(loc.runPlanResetTitle),
-        content: Text(loc.runPlanResetBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.runPlanResetConfirm),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.runPlanResetTitle,
+      message: loc.runPlanResetBody,
+      confirmLabel: loc.runPlanResetConfirm,
+      icon: Icons.restart_alt_rounded,
     );
     if (confirmed != true) return;
     await _repo.resetPlanProgress(plan.id);
@@ -426,25 +416,12 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
 
   Future<void> _deleteSession(RunPlanWorkout workout) async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.runWorkoutDeleteConfirm(workout.name)),
-        content: Text(loc.commonActionCannotBeUndone),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.runWorkoutDeleteConfirm(workout.name),
+      message: loc.commonActionCannotBeUndone,
+      confirmLabel: loc.commonDelete,
+      destructive: true,
     );
     if (confirmed != true) return;
     await _repo.deleteWorkout(workout.id);

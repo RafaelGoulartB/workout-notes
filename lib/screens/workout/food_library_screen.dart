@@ -4,9 +4,8 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 import 'food_label_photo_screen.dart';
 import 'manual_food_screen.dart';
@@ -104,22 +103,11 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
   Future<void> _deleteFood(FoodSearchResultLite entry) async {
     if (!entry.food.isUserCreated) return;
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(loc.nutritionFoodDelete),
-        content: Text(loc.nutritionFoodDeleteConfirm(entry.food.name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.nutritionFoodDelete,
+      message: loc.nutritionFoodDeleteConfirm(entry.food.name),
+      confirmLabel: loc.commonDelete,
     );
     if (confirmed != true || !mounted) return;
     try {
@@ -211,7 +199,7 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _foods.isEmpty
-          ? EmptyStatePlaceholder(
+          ? AppEmptyState(
               icon: Icons.restaurant_menu_outlined,
               title: loc.nutritionFoodLibraryEmptyTitle,
               subtitle: loc.nutritionFoodLibraryEmptySubtitle,
@@ -251,7 +239,7 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
   Widget _buildList(AppLocalizations loc) {
     final foods = _visibleFoods;
     if (foods.isEmpty) {
-      return EmptyStatePlaceholder(
+      return AppEmptyState(
         icon: Icons.search_off_rounded,
         title: loc.nutritionFoodLibraryNoResults,
         subtitle: loc.nutritionFoodLibraryNoResultsSubtitle,
@@ -289,7 +277,7 @@ class _FoodLibraryFilters extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: RunSegmentedTabs<_FoodLibraryFilter>(
+      child: AppSegmentedTabs<_FoodLibraryFilter>(
         values: _FoodLibraryFilter.values,
         selected: active,
         labelOf: (filter) => switch (filter) {

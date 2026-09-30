@@ -12,8 +12,8 @@ import 'package:workout_notes/widgets/body_tracker/chart_cards.dart';
 import 'package:workout_notes/widgets/body_tracker/derived_stats_card.dart';
 import 'package:workout_notes/widgets/body_tracker/measurement_card.dart';
 import 'package:workout_notes/widgets/body_tracker_type_selector.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class BodyTrackerScreen extends StatefulWidget {
   const BodyTrackerScreen({super.key});
@@ -395,7 +395,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       child: SizedBox(
         height: MediaQuery.of(context).size.height * 0.6,
-        child: EmptyStatePlaceholder(
+        child: AppEmptyState(
           icon: Icons.accessibility_new,
           title: loc.bodyTrackerEmptyTitle,
           subtitle: loc.bodyTrackerEmptySubtitle,
@@ -696,24 +696,11 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
         );
       },
       onLongPress: () async {
-        final confirm = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(loc.bodyTrackerDeleteConfirm),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: Text(loc.commonCancel),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: Text(
-                  loc.commonDelete,
-                  style: const TextStyle(color: Colors.red),
-                ),
-              ),
-            ],
-          ),
+        final confirm = await showConfirmDialog(
+          context,
+          title: loc.bodyTrackerDeleteConfirm,
+          confirmLabel: loc.commonDelete,
+          destructive: true,
         );
         if (confirm == true) {
           await _bodyRepo.deleteBodyMeasurement(m['id'] as String);

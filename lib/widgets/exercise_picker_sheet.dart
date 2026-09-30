@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/utils/exercise_equipment.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// A bottom sheet that lets the user add/remove exercises to a workout or routine.
 /// Keeps open and calls [onExerciseAdded] / [onExerciseRemoved] in real-time.
@@ -166,7 +166,7 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
-                      child: RunSectionCard(
+                      child: AppSectionCard(
                         onTap: () => setState(() {
                           _selectedCategoryId = catId;
                           _search = '';
@@ -177,7 +177,7 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                         ),
                         child: Row(
                           children: [
-                            RunIconBadge(
+                            AppIconBadge(
                               Icons.fitness_center_rounded,
                               color: color,
                               size: 40,

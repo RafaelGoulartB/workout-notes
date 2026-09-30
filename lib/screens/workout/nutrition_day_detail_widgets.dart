@@ -49,56 +49,6 @@ class _MealMenu extends StatelessWidget {
   }
 }
 
-/// Shown when no meal types are configured and nothing was logged.
-class _EmptyDayCard extends StatelessWidget {
-  final VoidCallback onConfigureMeals;
-
-  const _EmptyDayCard({required this.onConfigureMeals});
-
-  @override
-  Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          children: [
-            RunIconBadge(Icons.restaurant_outlined),
-            const SizedBox(height: 12),
-            Text(
-              loc.nutritionNoMealsTitle,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              loc.nutritionNoMealsSubtitle,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 14),
-            FilledButton.tonalIcon(
-              onPressed: onConfigureMeals,
-              icon: const Icon(Icons.settings_outlined, size: 18),
-              label: Text(loc.nutritionDiaryManageMeals),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// One nutrient of the statistics tab.
 class _Nutrient {
   final String id;
@@ -293,31 +243,35 @@ class _DailyStatisticsView extends StatelessWidget {
       ),
     ];
 
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-      children: [
-        _MacrosCard(summary: summary, goal: goal),
-        for (final (title, nutrients) in groups) ...[
-          RunSectionHeader(title),
-          RunSectionCard(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                for (var i = 0; i < nutrients.length; i++) ...[
-                  if (i > 0)
-                    Divider(
-                      height: 1,
-                      color: RunUi.divider(Theme.of(context).colorScheme),
-                    ),
-                  _NutrientStatRow(nutrient: nutrients[i]),
+    return FadeSlideIn(
+      duration: const Duration(milliseconds: 260),
+      delay: const Duration(milliseconds: 40),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+        children: [
+          _MacrosCard(summary: summary, goal: goal),
+          for (final (title, nutrients) in groups) ...[
+            AppSectionHeader(title),
+            AppSectionCard(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: [
+                  for (var i = 0; i < nutrients.length; i++) ...[
+                    if (i > 0)
+                      Divider(
+                        height: 1,
+                        color: AppUi.divider(Theme.of(context).colorScheme),
+                      ),
+                    _NutrientStatRow(nutrient: nutrients[i]),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
+          ],
         ],
-      ],
-    ).animate().fadeIn(duration: 260.ms, delay: 40.ms);
+      ),
+    );
   }
 }
 
@@ -338,13 +292,13 @@ class _MacrosCard extends StatelessWidget {
     final fatKcal = (values.fatG ?? 0) * 9;
     final totalKcal = proteinKcal + carbsKcal + fatKcal;
 
-    return RunSectionCard(
+    return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              RunIconBadge(Icons.donut_large_rounded, size: 34, iconSize: 18),
+              AppIconBadge(Icons.donut_large_rounded, size: 34, iconSize: 18),
               const SizedBox(width: 10),
               Text(
                 loc.nutritionMacrosTitle,
@@ -385,7 +339,7 @@ class _MacrosCard extends StatelessWidget {
           ),
           if (totalKcal > 0) ...[
             const SizedBox(height: 18),
-            Divider(height: 1, color: RunUi.divider(theme.colorScheme)),
+            Divider(height: 1, color: AppUi.divider(theme.colorScheme)),
             const SizedBox(height: 14),
             Text(
               loc.nutritionMacroSplitTitle,
@@ -437,7 +391,7 @@ class _MacrosCard extends StatelessWidget {
                   ),
                   (loc.nutritionProgressFat, fatKcal, NutritionMacroColors.fat),
                 ])
-                  RunLegendItem(
+                  AppLegendItem(
                     color: color,
                     label: '$label ${(kcal / totalKcal * 100).round()}%',
                   ),
@@ -604,7 +558,7 @@ class _NutrientStatRow extends StatelessWidget {
                       ),
                   ],
                 ),
-                style: const TextStyle(fontFeatures: RunUi.tabular),
+                style: const TextStyle(fontFeatures: AppUi.tabular),
               ),
             ],
           ),

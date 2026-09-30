@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/medication.dart';
 import 'package:workout_notes/services/medication_reminder_service.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Escalation delays offered in the editor, in minutes.
 const medicationEscalationChoices = [5, 10, 15, 20, 30, 45, 60, 90, 120];
@@ -103,25 +103,12 @@ class _MedicationRemindersTabState extends State<MedicationRemindersTab> {
   }
 
   Future<void> _delete(Medication medication) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        final loc = AppLocalizations.of(context)!;
-        return AlertDialog(
-          title: Text(loc.medicationDeleteTitle),
-          content: Text(loc.medicationDeleteBody),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(loc.commonCancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text(loc.medicationDelete),
-            ),
-          ],
-        );
-      },
+    final loc = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.medicationDeleteTitle,
+      message: loc.medicationDeleteBody,
+      confirmLabel: loc.medicationDelete,
     );
     if (confirmed == true) await _service.delete(medication);
   }
@@ -143,7 +130,14 @@ class _MedicationRemindersTabState extends State<MedicationRemindersTab> {
     final loc = AppLocalizations.of(context)!;
     if (_loading) return const Center(child: CircularProgressIndicator());
     final medications = _service.medications;
-    if (medications.isEmpty) return const _EmptyMedications();
+    if (medications.isEmpty) {
+      return AppEmptyState(
+        compact: true,
+        icon: Icons.medication_outlined,
+        title: loc.medicationEmptyTitle,
+        subtitle: loc.medicationEmptyBody,
+      );
+    }
     final today = _service.todayItems();
     final taken = today
         .where((item) => item.state == MedicationDoseState.taken)
@@ -154,7 +148,7 @@ class _MedicationRemindersTabState extends State<MedicationRemindersTab> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
         children: [
-          RunSectionHeader(
+          AppSectionHeader(
             loc.medicationToday,
             trailing: today.isEmpty
                 ? null
@@ -169,7 +163,7 @@ class _MedicationRemindersTabState extends State<MedicationRemindersTab> {
                   ),
           ),
           if (today.isEmpty)
-            RunSectionCard(
+            AppSectionCard(
               child: Text(
                 loc.medicationNoDosesToday,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -178,9 +172,9 @@ class _MedicationRemindersTabState extends State<MedicationRemindersTab> {
               ),
             )
           else
-            RunSectionCard(
+            AppSectionCard(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-              child: RunDividedList(
+              child: AppDividedList(
                 children: [
                   for (final item in today)
                     _DoseRow(
@@ -194,7 +188,7 @@ class _MedicationRemindersTabState extends State<MedicationRemindersTab> {
                 ],
               ),
             ),
-          RunSectionHeader(loc.medicationList),
+          AppSectionHeader(loc.medicationList),
           for (final medication in medications) ...[
             _MedicationCard(
               medication: medication,
@@ -206,35 +200,6 @@ class _MedicationRemindersTabState extends State<MedicationRemindersTab> {
             const SizedBox(height: 10),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _EmptyMedications extends StatelessWidget {
-  const _EmptyMedications();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final loc = AppLocalizations.of(context)!;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.medication_outlined,
-              size: 56,
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(height: 16),
-            Text(loc.medicationEmptyTitle, style: theme.textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Text(loc.medicationEmptyBody, textAlign: TextAlign.center),
-          ],
-        ),
       ),
     );
   }
@@ -299,7 +264,7 @@ class _DoseRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 8),
             decoration: BoxDecoration(
               color: (done ? colors.primary : stateColor).withAlpha(28),
-              borderRadius: BorderRadius.circular(RunUi.tileRadius),
+              borderRadius: BorderRadius.circular(AppUi.tileRadius),
             ),
             child: Column(
               children: [
@@ -317,7 +282,7 @@ class _DoseRow extends StatelessWidget {
                   item.time.label,
                   style: theme.textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.w800,
-                    fontFeatures: RunUi.tabular,
+                    fontFeatures: AppUi.tabular,
                   ),
                 ),
               ],
@@ -406,7 +371,7 @@ class _MedicationCard extends StatelessWidget {
         ? loc.alarmEveryDay
         : medication.weekdays.map((d) => _weekdayNames(loc)[d - 1]).join(', ');
 
-    return RunSectionCard(
+    return AppSectionCard(
       onTap: busy ? null : onTap,
       padding: const EdgeInsets.fromLTRB(16, 14, 4, 14),
       child: Opacity(
@@ -414,7 +379,7 @@ class _MedicationCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            RunIconBadge(
+            AppIconBadge(
               Icons.medication_rounded,
               color: active ? colors.primary : colors.onSurfaceVariant,
             ),
@@ -442,7 +407,7 @@ class _MedicationCard extends StatelessWidget {
                     runSpacing: 6,
                     children: [
                       for (final time in medication.times)
-                        RunPill(
+                        AppPill(
                           icon: Icons.schedule_rounded,
                           label: time.label,
                         ),
@@ -654,7 +619,7 @@ class _MedicationEditorScreenState extends State<MedicationEditorScreen> {
                 prefixIcon: const Icon(Icons.science_outlined),
               ),
             ),
-            RunSectionHeader(loc.medicationTimes),
+            AppSectionHeader(loc.medicationTimes),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -666,7 +631,7 @@ class _MedicationEditorScreenState extends State<MedicationEditorScreen> {
                       time.label,
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
-                        fontFeatures: RunUi.tabular,
+                        fontFeatures: AppUi.tabular,
                       ),
                     ),
                     onPressed: () => _changeTime(time),
@@ -682,7 +647,7 @@ class _MedicationEditorScreenState extends State<MedicationEditorScreen> {
                 ),
               ],
             ),
-            RunSectionHeader(loc.medicationDays),
+            AppSectionHeader(loc.medicationDays),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -704,7 +669,7 @@ class _MedicationEditorScreenState extends State<MedicationEditorScreen> {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            RunSectionHeader(loc.medicationEscalation),
+            AppSectionHeader(loc.medicationEscalation),
             DropdownButtonFormField<int>(
               initialValue: _escalation,
               decoration: const InputDecoration(

@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class SleepStageCard extends StatelessWidget {
   final SleepMonitorSession session;
@@ -31,13 +31,13 @@ class SleepStageCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    return RunSectionCard(
+    return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const RunIconBadge(Icons.bedtime_rounded),
+              const AppIconBadge(Icons.bedtime_rounded),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -54,7 +54,7 @@ class SleepStageCard extends StatelessWidget {
                   session.stageConfidence != null)
                 Tooltip(
                   message: loc.sleepInferenceConfidence,
-                  child: RunPill(
+                  child: AppPill(
                     icon: Icons.verified_outlined,
                     label: '${(session.stageConfidence! * 100).round()}%',
                   ),

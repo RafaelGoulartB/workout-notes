@@ -5,7 +5,7 @@ import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
 import 'package:workout_notes/utils/workout_card_helpers.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// One exercise of a finished workout: totals line and a sets table
 /// (warm-ups muted, a star on the sets that set a record).
@@ -72,7 +72,7 @@ class StrengthWorkoutExerciseCard extends StatelessWidget {
         ),
     ].join(' · ');
 
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -120,7 +120,7 @@ class StrengthWorkoutExerciseCard extends StatelessWidget {
                     StrengthWorkoutFormat.volume(volume),
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w800,
-                      fontFeatures: RunUi.tabular,
+                      fontFeatures: AppUi.tabular,
                     ),
                   ),
                 ],
@@ -206,7 +206,7 @@ class _SetsTable extends StatelessWidget {
             const SizedBox(width: 24),
           ],
         ),
-        Divider(height: 8, color: RunUi.divider(colors)),
+        Divider(height: 8, color: AppUi.divider(colors)),
         for (final set in exercise.sets)
           Builder(
             builder: (context) {
@@ -217,7 +217,7 @@ class _SetsTable extends StatelessWidget {
               final base = theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: warmup ? FontWeight.w500 : FontWeight.w700,
                 color: muted ? colors.onSurfaceVariant : colors.onSurface,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
                 decoration: !warmup && !done
                     ? TextDecoration.lineThrough
                     : null,

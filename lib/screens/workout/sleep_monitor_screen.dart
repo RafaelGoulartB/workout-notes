@@ -10,6 +10,7 @@ import 'package:workout_notes/widgets/sleep/monitor/monitor_mode_widgets.dart';
 import 'package:workout_notes/widgets/sleep/monitor/monitor_sections.dart';
 import 'package:workout_notes/widgets/sleep/monitor/monitor_status_widgets.dart';
 import 'package:workout_notes/widgets/sleep/monitor/sleep_monitor_texts.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class SleepMonitorScreen extends StatefulWidget {
   const SleepMonitorScreen({super.key});
@@ -262,22 +263,11 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
 
   Future<void> _discard() async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(loc.sleepMonitorDiscardTitle),
-        content: Text(loc.sleepMonitorDiscardBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(loc.commonDiscard),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.sleepMonitorDiscardTitle,
+      message: loc.sleepMonitorDiscardBody,
+      confirmLabel: loc.commonDiscard,
     );
     if (confirmed != true) return;
     await _controller.discard();

@@ -21,8 +21,8 @@ import 'package:workout_notes/widgets/run/run_review_widgets.dart';
 import 'package:workout_notes/widgets/run/run_route_map.dart';
 import 'package:workout_notes/widgets/run/run_route_sketch.dart';
 import 'package:workout_notes/widgets/run/run_splits_list.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// What to do when the runner leaves the review with back / gesture.
 enum _LeaveChoice { save, discard, keepEditing }
@@ -300,30 +300,16 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
 
   Future<bool> _confirmDiscard() async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          _isStationaryBike
+    final confirmed = await showConfirmDialog(
+      context,
+      title: _isStationaryBike
               ? loc.stationaryBikeReviewDiscardTitle
               : loc.runReviewDiscardTitle,
-        ),
-        content: Text(
-          _isStationaryBike
+      message: _isStationaryBike
               ? loc.stationaryBikeReviewDiscardBody
               : loc.runReviewDiscardBody,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(loc.runReviewDiscard),
-          ),
-        ],
-      ),
+      confirmLabel: loc.runReviewDiscard,
+      cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
     );
     return confirmed == true;
   }
@@ -390,7 +376,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
   Widget _routeSection(AppLocalizations loc) {
     if (_points.length >= 2) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(RunUi.cardRadius),
+        borderRadius: BorderRadius.circular(AppUi.cardRadius),
         child: SizedBox(
           height: 220,
           child: RunRouteMap(
@@ -403,7 +389,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
         ),
       );
     }
-    return RunSectionCard(
+    return AppSectionCard(
       child: Center(
         child: RunRouteSketch(points: _route, width: 260, height: 170),
       ),
@@ -449,7 +435,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
               route: _route,
             ),
             if (_needsManualDistance) ...[
-              RunSectionHeader(
+              AppSectionHeader(
                 _isStationaryBike
                     ? loc.stationaryBikeReviewDistanceSection
                     : loc.runReviewTreadmillSection,
@@ -465,7 +451,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
               ),
             ],
             if (showRoute) ...[
-              RunSectionHeader(loc.runReviewRoute),
+              AppSectionHeader(loc.runReviewRoute),
               _routeSection(loc),
             ],
             // Pace only: the elevation profile lives on the run detail.
@@ -479,7 +465,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
                     : null,
               ),
             if (_hasPlannedWorkout && _planWorkout != null) ...[
-              RunSectionHeader(loc.runReviewPlanComparison),
+              AppSectionHeader(loc.runReviewPlanComparison),
               RunReviewPlanCard(
                 workout: _planWorkout!,
                 activity: activity,
@@ -491,8 +477,8 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
               ),
             ],
             if (_draft.splits.isNotEmpty) ...[
-              RunSectionHeader(loc.runReviewSplits),
-              RunSectionCard(
+              AppSectionHeader(loc.runReviewSplits),
+              AppSectionCard(
                 child: RunSplitsList(
                   splits: _draft.splits,
                   averagePaceSecPerKm: activity.avgPaceSecPerKm,
@@ -500,18 +486,18 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
                 ),
               ),
             ],
-            RunSectionHeader(loc.runReviewEffortTitle),
+            AppSectionHeader(loc.runReviewEffortTitle),
             RunEffortSelector(
               rpe: _rpe,
               onChanged: (value) => setState(() => _rpe = value),
             ),
-            RunSectionHeader(loc.runReviewFeelingTitle),
+            AppSectionHeader(loc.runReviewFeelingTitle),
             RunFeelingSelector(
               rating: _feelingRating,
               onChanged: (value) => setState(() => _feelingRating = value),
             ),
-            RunSectionHeader(loc.runReviewDetailsTitle),
-            RunSectionCard(
+            AppSectionHeader(loc.runReviewDetailsTitle),
+            AppSectionCard(
               child: Column(
                 children: [
                   TextField(
@@ -542,7 +528,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
               ),
             ),
             if (!_isStationaryBike) ...[
-              RunSectionHeader(loc.runReviewMeaningTitle),
+              AppSectionHeader(loc.runReviewMeaningTitle),
               RunReviewMeaningCard(
                 loading: _loading,
                 insights: _insights,
@@ -590,7 +576,7 @@ class _ReviewActionBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         border: Border(
-          top: BorderSide(color: RunUi.divider(theme.colorScheme)),
+          top: BorderSide(color: AppUi.divider(theme.colorScheme)),
         ),
       ),
       child: SafeArea(

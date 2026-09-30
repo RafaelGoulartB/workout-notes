@@ -5,7 +5,7 @@ import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
 import 'package:workout_notes/widgets/run/run_elevation_chart.dart';
 import 'package:workout_notes/widgets/run/run_pace_chart.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 enum RunChartTab { pace, elevation }
 
@@ -56,7 +56,7 @@ class _RunDetailChartCardState extends State<RunDetailChartCard> {
         if (tabs)
           Padding(
             padding: const EdgeInsets.only(top: 22, bottom: 10),
-            child: RunSegmentedTabs<RunChartTab>(
+            child: AppSegmentedTabs<RunChartTab>(
               values: RunChartTab.values,
               selected: _tab,
               labelOf: (tab) => switch (tab) {
@@ -67,12 +67,12 @@ class _RunDetailChartCardState extends State<RunDetailChartCard> {
             ),
           )
         else
-          RunSectionHeader(
+          AppSectionHeader(
             showElevation
                 ? loc.runDetailChartTabElevation
                 : loc.runDetailPaceSection,
           ),
-        RunSectionCard(
+        AppSectionCard(
           padding: const EdgeInsets.fromLTRB(8, 14, 14, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -85,7 +85,7 @@ class _RunDetailChartCardState extends State<RunDetailChartCard> {
                         unit: 'min/km',
                         legend: widget.avgPaceSecPerKm == null
                             ? null
-                            : RunLegendItem(
+                            : AppLegendItem(
                                 color: theme.colorScheme.onSurface.withValues(
                                   alpha: 0.75,
                                 ),
@@ -194,28 +194,28 @@ class _ElevationSummary extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final gain = gainMeters ?? profile.gainMeters;
     final loss = lossMeters ?? profile.lossMeters;
-    return RunStatRow(
+    return AppStatRow(
       children: [
-        RunStatTile(
+        AppStatTile(
           icon: Icons.trending_up_rounded,
           color: colors.primary,
           value: '${gain.round()}',
           unit: 'm',
           label: loc.runDetailElevationGain,
         ),
-        RunStatTile(
+        AppStatTile(
           icon: Icons.trending_down_rounded,
           color: colors.tertiary,
           value: '${loss.round()}',
           unit: 'm',
           label: loc.runDetailElevationLoss,
         ),
-        RunStatTile(
+        AppStatTile(
           value: '${(profile.maxAltitudeMeters ?? 0).round()}',
           unit: 'm',
           label: loc.runDetailElevationHigh,
         ),
-        RunStatTile(
+        AppStatTile(
           value: '${(profile.minAltitudeMeters ?? 0).round()}',
           unit: 'm',
           label: loc.runDetailElevationLow,

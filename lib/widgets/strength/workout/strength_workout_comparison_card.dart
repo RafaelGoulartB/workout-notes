@@ -5,7 +5,7 @@ import 'package:workout_notes/repositories/strength_history_repository.dart';
 import 'package:workout_notes/repositories/workout_repository.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Volume, sets and duration deltas against the previous comparable session.
 class StrengthWorkoutComparisonCard extends StatelessWidget {
@@ -43,18 +43,18 @@ class StrengthWorkoutComparisonCard extends StatelessWidget {
     final density = comparison.densityDelta;
 
     Widget trend(String title, String value, num delta) => delta == 0
-        ? RunPill(
+        ? AppPill(
             label: '$title $value',
             icon: Icons.trending_flat_rounded,
             color: colors.onSurfaceVariant,
           )
-        : RunPill.trend(
+        : AppPill.trend(
             context: context,
             label: '$title $value',
             positive: delta > 0,
           );
 
-    return RunSectionCard(
+    return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -82,7 +82,7 @@ class StrengthWorkoutComparisonCard extends StatelessWidget {
               if (duration != 0 &&
                   comparison.current.durationSeconds > 0 &&
                   comparison.previous.durationSeconds > 0)
-                RunPill(
+                AppPill(
                   label:
                       '${loc.activeWorkoutTimerDuration} ${StrengthWorkoutFormat.signedDuration(duration)}',
                   icon: Icons.schedule_rounded,

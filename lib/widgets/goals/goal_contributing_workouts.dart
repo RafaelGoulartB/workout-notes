@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/goal.dart';
 import 'package:workout_notes/widgets/goals/goal_formatters.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Card listing the workouts that contributed to the current goal's progress.
 /// Tapping a row navigates to the workout detail screen.
@@ -32,92 +33,75 @@ class GoalContributingWorkouts extends StatelessWidget {
     final isPortuguese = Localizations.localeOf(context).languageCode == 'pt';
 
     if (workouts.isEmpty) {
-      return Card(
-        elevation: 0,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side:
-              BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-          child: Column(
-            children: [
-              Icon(Icons.fitness_center,
-                  size: 36,
-                  color: theme.colorScheme.onSurfaceVariant.withAlpha(100)),
-              const SizedBox(height: 8),
-              Text(
-                loc.goalNoContributors,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                textAlign: TextAlign.center,
+      return AppSectionCard(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        child: Column(
+          children: [
+            Icon(Icons.fitness_center,
+                size: 36,
+                color: theme.colorScheme.onSurfaceVariant.withAlpha(100)),
+            const SizedBox(height: 8),
+            Text(
+              loc.goalNoContributors,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-            ],
-          ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       );
     }
 
-    return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(14, showHeader ? 12 : 4, 14, 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (showHeader) Row(
-              children: [
-                Icon(Icons.list_alt, size: 18, color: theme.colorScheme.onSurface),
-                const SizedBox(width: 8),
-                Text(
-                  loc.goalContributingWorkouts,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
+    return AppSectionCard(
+      padding: EdgeInsets.fromLTRB(14, showHeader ? 12 : 4, 14, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (showHeader) Row(
+            children: [
+              Icon(Icons.list_alt, size: 18, color: theme.colorScheme.onSurface),
+              const SizedBox(width: 8),
+              Text(
+                loc.goalContributingWorkouts,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${workouts.length}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '${workouts.length}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (showHeader) const SizedBox(height: 8),
-            for (var i = 0; i < workouts.length; i++) ...[
-              if (i > 0)
-                Divider(
-                  height: 1,
-                  color: theme.colorScheme.outlineVariant.withAlpha(60),
-                ),
-              _WorkoutTile(
-                workout: workouts[i],
-                goal: goal,
-                isKm: isKm,
-                isPortuguese: isPortuguese,
-                onTap: () => onTapWorkout(workouts[i].workoutId),
               ),
             ],
+          ),
+          if (showHeader) const SizedBox(height: 8),
+          for (var i = 0; i < workouts.length; i++) ...[
+            if (i > 0)
+              Divider(
+                height: 1,
+                color: theme.colorScheme.outlineVariant.withAlpha(60),
+              ),
+            _WorkoutTile(
+              workout: workouts[i],
+              goal: goal,
+              isKm: isKm,
+              isPortuguese: isPortuguese,
+              onTap: () => onTapWorkout(workouts[i].workoutId),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }

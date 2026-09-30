@@ -90,91 +90,6 @@ class DeltaBadge extends StatelessWidget {
   }
 }
 
-class HeroDivider extends StatelessWidget {
-  final Color color;
-
-  const HeroDivider({super.key, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 34,
-      margin: const EdgeInsets.symmetric(horizontal: 6),
-      color: color,
-    );
-  }
-}
-
-class HeroMetric extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String label;
-  final String value;
-  final String? unit;
-
-  const HeroMetric({
-    super.key,
-    required this.icon,
-    required this.color,
-    required this.label,
-    required this.value,
-    this.unit,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Icon(icon, size: 14, color: color),
-              const SizedBox(width: 3),
-              Text(
-                value,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  height: 1.1,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-              if (unit != null) ...[
-                const SizedBox(width: 2),
-                Text(
-                  unit!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          label,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            fontSize: 10,
-            height: 1.2,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 /// Start / now / target column under the goal progress bar.
 class GoalAnchor extends StatelessWidget {
   final String label;
@@ -301,31 +216,6 @@ class BodyStatsSectionHeader extends StatelessWidget {
           letterSpacing: 1.5,
           color: theme.colorScheme.onSurfaceVariant,
         ),
-      ),
-    );
-  }
-}
-
-/// Outlined rounded card that wraps each stats section.
-class BodyStatsCard extends StatelessWidget {
-  const BodyStatsCard({super.key, required this.child, this.padding});
-
-  final Widget child;
-  final EdgeInsets? padding;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Padding(
-        padding: padding ?? const EdgeInsets.all(16),
-        child: child,
       ),
     );
   }

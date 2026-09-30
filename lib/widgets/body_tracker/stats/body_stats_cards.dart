@@ -4,6 +4,7 @@ import 'package:workout_notes/screens/workout/body_stats_controller.dart';
 import 'package:workout_notes/utils/body_progress_analytics.dart';
 import 'package:workout_notes/widgets/body_tracker/body_stats_charts.dart';
 import 'package:workout_notes/widgets/body_tracker/stats/body_stats_primitives.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Hero card: this week's average against the reference week, plus the
 /// period's average / min / max / amplitude.
@@ -172,34 +173,38 @@ class BodyStatsWeekHero extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: HeroMetric(
+                child: AppStatTile(
+                  dense: true,
                   icon: Icons.show_chart_rounded,
                   color: c.currentType.color,
                   label: loc.bodyStatsPeriodAverage,
                   value: c.value(a.averageValue),
                 ),
               ),
-              HeroDivider(color: divider),
+              AppStatDivider(height: 34, color: divider),
               Expanded(
-                child: HeroMetric(
+                child: AppStatTile(
+                  dense: true,
                   icon: Icons.south_rounded,
                   color: colors.secondary,
                   label: loc.bodyStatsMin,
                   value: c.value(a.minValue),
                 ),
               ),
-              HeroDivider(color: divider),
+              AppStatDivider(height: 34, color: divider),
               Expanded(
-                child: HeroMetric(
+                child: AppStatTile(
+                  dense: true,
                   icon: Icons.north_rounded,
                   color: colors.tertiary,
                   label: loc.bodyStatsMax,
                   value: c.value(a.maxValue),
                 ),
               ),
-              HeroDivider(color: divider),
+              AppStatDivider(height: 34, color: divider),
               Expanded(
-                child: HeroMetric(
+                child: AppStatTile(
+                  dense: true,
                   icon: Icons.height_rounded,
                   color: colors.onSurfaceVariant,
                   label: loc.bodyStatsAmplitude,
@@ -266,7 +271,7 @@ class BodyStatsChartCard extends StatelessWidget {
       BodyChartTab.daily => loc.bodyStatsChartDailyLegend,
     };
 
-    return BodyStatsCard(
+    return AppSectionCard(
       padding: const EdgeInsets.fromLTRB(8, 12, 12, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -327,7 +332,7 @@ class BodyStatsRateCard extends StatelessWidget {
     };
     final paceGood = pace != BodyPace.aggressive;
 
-    return BodyStatsCard(
+    return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -395,7 +400,8 @@ class BodyStatsRateCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: HeroMetric(
+                  child: AppStatTile(
+                    dense: true,
                     icon: Icons.swap_vert_rounded,
                     color: c.currentType.color,
                     label: loc.bodyStatsTotalChange,
@@ -403,9 +409,13 @@ class BodyStatsRateCard extends StatelessWidget {
                     unit: c.unit,
                   ),
                 ),
-                HeroDivider(color: colors.outlineVariant.withAlpha(80)),
+                AppStatDivider(
+                  height: 34,
+                  color: colors.outlineVariant.withAlpha(80),
+                ),
                 Expanded(
-                  child: HeroMetric(
+                  child: AppStatTile(
+                    dense: true,
                     icon: Icons.timeline_rounded,
                     color: colors.tertiary,
                     label: loc.bodyStatsProjection,
@@ -414,9 +424,13 @@ class BodyStatsRateCard extends StatelessWidget {
                   ),
                 ),
                 if (c.bmi(a.lastValue) case final bmi?) ...[
-                  HeroDivider(color: colors.outlineVariant.withAlpha(80)),
+                  AppStatDivider(
+                    height: 34,
+                    color: colors.outlineVariant.withAlpha(80),
+                  ),
                   Expanded(
-                    child: HeroMetric(
+                    child: AppStatTile(
+                      dense: true,
                       icon: Icons.accessibility_new_rounded,
                       color: colors.secondary,
                       label: loc.bodyStatsBmi,
@@ -473,7 +487,7 @@ class BodyStatsGoalCard extends StatelessWidget {
     final colors = theme.colorScheme;
     final eta = progress.etaFrom(a.now);
 
-    return BodyStatsCard(
+    return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -594,40 +608,53 @@ class BodyStatsConsistencyCard extends StatelessWidget {
     final colors = theme.colorScheme;
     final days = a.daysSinceLast;
 
-    return BodyStatsCard(
+    return AppSectionCard(
       child: Column(
         children: [
           Row(
             children: [
               Expanded(
-                child: HeroMetric(
+                child: AppStatTile(
+                  dense: true,
                   icon: Icons.event_repeat_outlined,
                   color: c.currentType.color,
                   label: loc.bodyStatsConsistencyWeeks,
                   value: '${a.weeksWithData}/${a.weeks.length}',
                 ),
               ),
-              HeroDivider(color: colors.outlineVariant.withAlpha(80)),
+              AppStatDivider(
+                height: 34,
+                color: colors.outlineVariant.withAlpha(80),
+              ),
               Expanded(
-                child: HeroMetric(
+                child: AppStatTile(
+                  dense: true,
                   icon: Icons.local_fire_department_outlined,
                   color: Colors.deepOrange,
                   label: loc.bodyStatsStreak,
                   value: loc.bodyStatsStreakWeeks(a.weekStreak),
                 ),
               ),
-              HeroDivider(color: colors.outlineVariant.withAlpha(80)),
+              AppStatDivider(
+                height: 34,
+                color: colors.outlineVariant.withAlpha(80),
+              ),
               Expanded(
-                child: HeroMetric(
+                child: AppStatTile(
+                  dense: true,
                   icon: Icons.receipt_long_outlined,
                   color: colors.secondary,
                   label: loc.bodyStatsEntriesPerWeek,
                   value: a.entriesPerWeek.toStringAsFixed(1),
                 ),
               ),
-              HeroDivider(color: colors.outlineVariant.withAlpha(80)),
+              AppStatDivider(
+                height: 34,
+                color: colors.outlineVariant.withAlpha(80),
+              ),
               Expanded(
-                child: HeroMetric(
+                child: AppStatTile(
+                  dense: true,
                   icon: Icons.history_toggle_off_outlined,
                   color: colors.tertiary,
                   label: loc.bodyStatsDaysSinceLast,
@@ -677,7 +704,7 @@ class BodyStatsMonthlyCard extends StatelessWidget {
     // Newest first, capped so a long history does not dominate the screen.
     final months = a.months.reversed.take(12).toList();
 
-    return BodyStatsCard(
+    return AppSectionCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Column(
         children: [

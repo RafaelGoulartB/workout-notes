@@ -14,6 +14,7 @@ import 'package:workout_notes/widgets/periodization/plan_overview.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Creates or re-plans a plan: its name, the Monday it starts and the
 /// ordered list of phases, each lasting a number of weeks. Phases are laid
@@ -232,26 +233,13 @@ class _PeriodizationPlanEditorScreenState
         .where((phase) => !_phases.any((item) => item.entry.id == phase.id))
         .toList();
     if (removed.isNotEmpty) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(loc.planningRemovePhasesTitle),
-          content: Text(
-            loc.planningRemovePhasesBody(
+      final confirmed = await showConfirmDialog(
+        context,
+        title: loc.planningRemovePhasesTitle,
+        message: loc.planningRemovePhasesBody(
               removed.map((phase) => phase.name).join(', '),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(loc.commonCancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text(loc.planningDelete),
-            ),
-          ],
-        ),
+        confirmLabel: loc.planningDelete,
       );
       if (confirmed != true || !mounted) return;
     }

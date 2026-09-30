@@ -5,7 +5,7 @@ import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_split_analytics.dart';
 import 'package:workout_notes/widgets/run/run_theme_colors.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Per-km splits: a bar per kilometre (longer = faster) coloured by how it
 /// compares with the run average, the delta vs average, the climb of that km
@@ -99,7 +99,7 @@ class RunSplitsList extends StatelessWidget {
         ),
         for (var i = 0; i < rows.length; i++) ...[
           if (i > 0)
-            Divider(height: 1, color: RunUi.divider(theme.colorScheme)),
+            Divider(height: 1, color: AppUi.divider(theme.colorScheme)),
           _SplitRow(row: rows[i], showElevation: showElevation),
         ],
       ],
@@ -214,7 +214,7 @@ class _SplitRow extends StatelessWidget {
               textAlign: TextAlign.end,
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w700,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
           ),
@@ -226,7 +226,7 @@ class _SplitRow extends StatelessWidget {
               style: theme.textTheme.bodySmall?.copyWith(
                 color: toneColor,
                 fontWeight: FontWeight.w700,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
           ),
@@ -240,7 +240,7 @@ class _SplitRow extends StatelessWidget {
                 textAlign: TextAlign.end,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: colors.onSurfaceVariant,
-                  fontFeatures: RunUi.tabular,
+                  fontFeatures: AppUi.tabular,
                 ),
               ),
             ),
@@ -264,7 +264,7 @@ class RunLapsList extends StatelessWidget {
     final fastest = _fastestLap(laps);
     // Laps may be stored 0- or 1-based; always show "Lap 1" first.
     final labelOffset = laps.any((lap) => lap.index == 0) ? 1 : 0;
-    return RunDividedList(
+    return AppDividedList(
       children: [
         for (final lap in laps)
           Padding(
@@ -299,7 +299,7 @@ class RunLapsList extends StatelessWidget {
                   RunFormatters.distanceWithUnit(lap.distanceMeters),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colors.onSurfaceVariant,
-                    fontFeatures: RunUi.tabular,
+                    fontFeatures: AppUi.tabular,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -307,7 +307,7 @@ class RunLapsList extends StatelessWidget {
                   RunFormatters.duration(lap.durationSeconds),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colors.onSurfaceVariant,
-                    fontFeatures: RunUi.tabular,
+                    fontFeatures: AppUi.tabular,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -318,7 +318,7 @@ class RunLapsList extends StatelessWidget {
                     textAlign: TextAlign.end,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w700,
-                      fontFeatures: RunUi.tabular,
+                      fontFeatures: AppUi.tabular,
                     ),
                   ),
                 ),

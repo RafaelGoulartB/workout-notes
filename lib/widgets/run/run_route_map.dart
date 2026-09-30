@@ -7,7 +7,7 @@ import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_route_geometry.dart';
 import 'package:workout_notes/utils/run_route_pace_style.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Pace-coloured GPS route on an OpenStreetMap base with start / finish
 /// markers, an optional legend and a marker that follows [selectedDistance]
@@ -312,7 +312,7 @@ class RunRoutePaceLegend extends StatelessWidget {
     final value = theme.textTheme.labelSmall?.copyWith(
       color: theme.colorScheme.onSurface,
       fontWeight: FontWeight.w700,
-      fontFeatures: RunUi.tabular,
+      fontFeatures: AppUi.tabular,
     );
     return DecoratedBox(
       decoration: BoxDecoration(

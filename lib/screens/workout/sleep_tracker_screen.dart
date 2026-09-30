@@ -13,10 +13,9 @@ import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'package:workout_notes/services/sleep_goal_service.dart';
 
 import 'package:workout_notes/utils/load_generation.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/load_error_view.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_history_row.dart';
 import 'package:workout_notes/widgets/sleep/sleep_last_night_card.dart';
 import 'package:workout_notes/widgets/sleep/sleep_trend_card.dart';
@@ -268,14 +267,14 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   Widget _buildEmptyState(AppLocalizations loc) {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: RunUi.screenPadding,
+      padding: AppUi.screenPadding,
       child: Column(
         children: [
           if (_loadFailed) LoadErrorBanner(onRetry: _load),
           ..._incompleteSessionCards(loc),
           SizedBox(
             height: MediaQuery.sizeOf(context).height * .5,
-            child: EmptyStatePlaceholder(
+            child: AppEmptyState(
               icon: Icons.nightlight_round,
               title: loc.sleepEmptyTitle,
               subtitle: loc.sleepEmptySubtitle,
@@ -293,7 +292,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     final latestSession = _latestNight?.session;
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: RunUi.screenPadding,
+      padding: AppUi.screenPadding,
       children: [
         if (_loadFailed) LoadErrorBanner(onRetry: _load),
         ..._incompleteSessionCards(loc),
@@ -305,7 +304,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
             onTap: () => _showDetails(latest),
           ),
         ],
-        RunSectionHeader(
+        AppSectionHeader(
           '${loc.sleepWeekTitle} · ${SleepUi.dayMonth(weeklyDays.first)} – '
           '${SleepUi.dayMonth(weeklyDays.last)}',
           padding: const EdgeInsets.fromLTRB(4, 18, 0, 6),
@@ -337,7 +336,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
           days: weeklyDays,
           goalMinutes: _sleepGoalMinutes,
         ),
-        RunSectionHeader(loc.sleepTrendChart),
+        AppSectionHeader(loc.sleepTrendChart),
         SleepTrendCard(
           entries: _trendEntries,
           end: DateTime.now(),
@@ -349,7 +348,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
                 summary.entry.id: summary.session!.deepSleepMinutes!,
           },
         ),
-        RunSectionHeader(
+        AppSectionHeader(
           loc.sleepHistory,
           trailing: Padding(
             padding: const EdgeInsets.only(right: 4),
@@ -387,10 +386,10 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     for (final session in _unestimatedSessions)
       Padding(
         padding: const EdgeInsets.only(bottom: 12),
-        child: RunSectionCard(
+        child: AppSectionCard(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-          child: RunListRow(
-            leading: RunIconBadge(
+          child: AppListRow(
+            leading: AppIconBadge(
               Icons.bedtime_outlined,
               color: Theme.of(context).colorScheme.tertiary,
             ),
@@ -463,9 +462,9 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   Widget _buildHistory(AppLocalizations loc) {
     final visibleCount = math.min(_historyDisplayCount, _entries.length);
     final colors = Theme.of(context).colorScheme;
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-      child: RunDividedList(
+      child: AppDividedList(
         children: [
           for (final entry in _entries.take(visibleCount))
             SleepHistoryRow(
@@ -554,42 +553,42 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
                     SleepUi.duration(loc, entry.effectiveSleepMinutes),
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.w800,
-                      fontFeatures: RunUi.tabular,
+                      fontFeatures: AppUi.tabular,
                     ),
                   ),
                   const SizedBox(height: 16),
-                  RunMetricGrid(
+                  AppMetricGrid(
                     children: [
-                      RunMetricBox(
+                      AppMetricBox(
                         icon: Icons.bedtime_outlined,
                         label: loc.sleepDuration,
                         value: SleepUi.duration(loc, entry.sleepMinutes),
                       ),
-                      RunMetricBox(
+                      AppMetricBox(
                         icon: Icons.timelapse_outlined,
                         label: loc.sleepActualDuration,
                         value: entry.actualSleepMinutes == null
                             ? '--'
                             : SleepUi.duration(loc, entry.actualSleepMinutes),
                       ),
-                      RunMetricBox(
+                      AppMetricBox(
                         icon: Icons.nightlight_outlined,
                         label: loc.sleepBedtime,
                         value: SleepUi.clock(entry.bedtimeMinutes),
                       ),
-                      RunMetricBox(
+                      AppMetricBox(
                         icon: Icons.wb_sunny_outlined,
                         label: loc.sleepWakeTime,
                         value: SleepUi.clock(entry.wakeTimeMinutes),
                       ),
                       if (entry.timeInBedMinutes != null)
-                        RunMetricBox(
+                        AppMetricBox(
                           icon: Icons.hotel_rounded,
                           label: loc.sleepMonitorTimeInBed,
                           value: SleepUi.duration(loc, entry.timeInBedMinutes),
                         ),
                       if (entry.efficiency != null)
-                        RunMetricBox(
+                        AppMetricBox(
                           icon: Icons.speed_rounded,
                           label: loc.sleepEfficiency,
                           value: '${entry.efficiency!.round()}%',
@@ -626,22 +625,11 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
 
   Future<void> _deleteEntry(SleepEntry entry) async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(loc.sleepDelete),
-        content: Text(loc.sleepDeleteConfirm),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.sleepDelete,
+      message: loc.sleepDeleteConfirm,
+      confirmLabel: loc.commonDelete,
     );
     if (confirmed != true) return;
     await _repository.delete(entry.id);

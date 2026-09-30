@@ -4,7 +4,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/repositories/strength_history_repository.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Headline of a workout: routine day, date and time, the three key numbers,
 /// feeling / RPE / density chips and the notes.
@@ -58,47 +58,47 @@ class StrengthWorkoutHero extends StatelessWidget {
 
     final chips = <Widget>[
       if (isActive)
-        RunPill(
+        AppPill(
           label: loc.workoutHomeOngoing,
           icon: Icons.play_circle_outline_rounded,
           color: colors.primary,
         ),
       if (feeling > 0)
-        RunPill(
+        AppPill(
           label: '${loc.workoutDetailFeeling} $feeling/5',
           icon: Icons.star_rounded,
           color: colors.tertiary,
         ),
       if (avgRpe != null)
-        RunPill(
+        AppPill(
           label:
               '${loc.workoutStatsAverageRpe} ${RunFormatters.decimal(avgRpe, 1)}',
           icon: Icons.speed_rounded,
           color: colors.secondary,
         ),
       if (density != null)
-        RunPill(
+        AppPill(
           label:
               '${loc.workoutStatsDensity} ${RunFormatters.decimal(density, density >= 10 ? 0 : 1)} ${loc.workoutStatsKgPerMin}',
           icon: Icons.bolt_rounded,
           color: colors.secondary,
         ),
       if (calories != null && calories > 0)
-        RunPill(
+        AppPill(
           label: '${calories.round()} kcal',
           icon: Icons.local_fire_department_rounded,
           color: colors.secondary,
         ),
     ];
 
-    return RunHeroCard(
+    return AppHeroCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              RunIconBadge(
+              AppIconBadge(
                 Icons.fitness_center_rounded,
                 size: 44,
                 iconSize: 22,
@@ -135,21 +135,21 @@ class StrengthWorkoutHero extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          RunStatRow(
+          AppStatRow(
             children: [
-              RunStatTile(
+              AppStatTile(
                 icon: Icons.schedule_rounded,
                 label: loc.activeWorkoutTimerDuration,
                 value: duration > 0
                     ? RunFormatters.durationHoursMinutes(duration)
                     : '--',
               ),
-              RunStatTile(
+              AppStatTile(
                 icon: Icons.monitor_weight_outlined,
                 label: loc.commonVolume,
                 value: StrengthWorkoutFormat.volume(stats?.totalVolume ?? 0),
               ),
-              RunStatTile(
+              AppStatTile(
                 icon: Icons.repeat_rounded,
                 label: loc.workoutDetailWorkingSets,
                 value: '${stats?.completedSets ?? 0}',
@@ -170,7 +170,7 @@ class StrengthWorkoutHero extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: colors.surfaceContainerHighest.withAlpha(110),
-                borderRadius: BorderRadius.circular(RunUi.tileRadius),
+                borderRadius: BorderRadius.circular(AppUi.tileRadius),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

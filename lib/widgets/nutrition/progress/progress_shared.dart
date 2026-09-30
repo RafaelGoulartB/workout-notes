@@ -63,37 +63,58 @@ class ProgressSectionCard extends StatelessWidget {
   }
 }
 
-class ProgressEmptyNote extends StatelessWidget {
-  final String text;
-  const ProgressEmptyNote({super.key, required this.text});
+/// Label above a bold value (optionally tinted) with an optional caption.
+class BalanceMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final String? sub;
+  final Color? valueColor;
+
+  const BalanceMetric({
+    super.key,
+    required this.label,
+    required this.value,
+    this.sub,
+    this.valueColor,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.info_outline,
-            size: 16,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: valueColor ?? theme.colorScheme.onSurface,
+            height: 1.0,
+          ),
+        ),
+        if (sub != null) ...[
+          const SizedBox(height: 3),
+          Text(
+            sub!,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontSize: 10,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
-      ),
+      ],
     );
   }
 }

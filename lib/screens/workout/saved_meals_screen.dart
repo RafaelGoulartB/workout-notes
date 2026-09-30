@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/saved_meal.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
 
 import 'saved_meal_editor_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Lists the user's saved meal templates and lets them log a template
 /// into today with a single tap.
@@ -94,26 +93,13 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
 
   Future<void> _deleteMeal(SavedMealWithItems meal) async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.nutritionSavedMealDelete),
-        content: Text(loc.nutritionSavedMealDeleteConfirm(meal.meal.name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.nutritionCancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-              foregroundColor: Theme.of(ctx).colorScheme.onError,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.nutritionSavedMealDelete,
+      message: loc.nutritionSavedMealDeleteConfirm(meal.meal.name),
+      confirmLabel: loc.commonDelete,
+      cancelLabel: loc.nutritionCancel,
+      destructive: true,
     );
     if (confirmed != true) return;
     await widget.repository.deleteSavedMeal(meal.meal.id);
@@ -189,7 +175,7 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _meals.isEmpty
-          ? EmptyStatePlaceholder(
+          ? AppEmptyState(
               icon: Icons.restaurant_menu_outlined,
               title: loc.nutritionSavedMealsEmptyTitle,
               subtitle: loc.nutritionSavedMealsEmptySubtitle,
@@ -201,13 +187,16 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
               itemCount: _meals.length,
               itemBuilder: (context, index) {
                 final meal = _meals[index];
-                return _SavedMealCard(
-                  meal: meal,
-                  onTap: () => _editMeal(meal),
-                  onLog: () => _logToday(meal),
-                  onDelete: () => _deleteMeal(meal),
-                  isLogging: _isLogging,
-                ).animate().fadeIn(duration: 250.ms);
+                return FadeSlideIn(
+                  duration: const Duration(milliseconds: 250),
+                  child: _SavedMealCard(
+                    meal: meal,
+                    onTap: () => _editMeal(meal),
+                    onLog: () => _logToday(meal),
+                    onDelete: () => _deleteMeal(meal),
+                    isLogging: _isLogging,
+                  ),
+                );
               },
             ),
       floatingActionButton: _isLogging

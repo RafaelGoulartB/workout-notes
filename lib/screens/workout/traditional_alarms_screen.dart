@@ -7,6 +7,7 @@ import '../../models/traditional_alarm_runtime_state.dart';
 import '../../services/medication_reminder_service.dart';
 import '../../services/traditional_alarm_service.dart';
 import 'medication_reminders_tab.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class TraditionalAlarmsScreen extends StatefulWidget {
   const TraditionalAlarmsScreen({super.key, this.initialTab = 0});
@@ -96,25 +97,12 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
   }
 
   Future<void> _delete(TraditionalAlarm alarm) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        final loc = AppLocalizations.of(context)!;
-        return AlertDialog(
-          title: Text(loc.alarmDeleteTitle),
-          content: Text(loc.alarmDeleteBody),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(loc.commonCancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text(loc.alarmDelete),
-            ),
-          ],
-        );
-      },
+    final loc = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.alarmDeleteTitle,
+      message: loc.alarmDeleteBody,
+      confirmLabel: loc.alarmDelete,
     );
     if (confirmed != true) return;
     await _service.delete(alarm);
@@ -192,7 +180,12 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
     return _loading
         ? const Center(child: CircularProgressIndicator())
         : _service.alarms.isEmpty
-        ? const _EmptyAlarms()
+        ? AppEmptyState(
+            compact: true,
+            icon: Icons.alarm_off_rounded,
+            title: AppLocalizations.of(context)!.alarmEmptyTitle,
+            subtitle: AppLocalizations.of(context)!.alarmEmptyBody,
+          )
         : ListView.separated(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
             itemCount: _service.alarms.length,
@@ -214,37 +207,6 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
             },
           );
   }
-}
-
-class _EmptyAlarms extends StatelessWidget {
-  const _EmptyAlarms();
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.alarm_off_rounded,
-            size: 56,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            AppLocalizations.of(context)!.alarmEmptyTitle,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            AppLocalizations.of(context)!.alarmEmptyBody,
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    ),
-  );
 }
 
 class _AlarmCard extends StatelessWidget {

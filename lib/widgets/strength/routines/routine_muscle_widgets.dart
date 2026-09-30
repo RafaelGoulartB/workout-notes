@@ -4,7 +4,7 @@ import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/utils/strength_routine_summary.dart';
 import 'package:workout_notes/widgets/category_timeline_bar.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Stacked bar with the share of working sets of each muscle group.
 class RoutineMuscleBar extends StatelessWidget {
@@ -229,7 +229,7 @@ class _MuscleWeekRow extends StatelessWidget {
               loc.routinesSetsValue(muscle.sets),
               style: theme.textTheme.bodySmall?.copyWith(
                 fontWeight: FontWeight.w800,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
           ],

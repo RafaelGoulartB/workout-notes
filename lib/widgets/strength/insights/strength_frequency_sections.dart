@@ -4,7 +4,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_insights_calculator.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_charts.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_heatmap.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_insights_data.dart';
@@ -140,16 +140,16 @@ class StrengthConsistencyCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          RunMetricGrid(
+          AppMetricGrid(
             children: [
-              RunMetricBox(
+              AppMetricBox(
                 label: loc.runInsightsWeekStreak,
                 value: '${consistency.currentWeekStreak}',
                 caption: loc.runInsightsBest(
                   loc.runInsightsWeeksValue(consistency.longestWeekStreak),
                 ),
               ),
-              RunMetricBox(
+              AppMetricBox(
                 label: loc.strengthInsightsConsistencyPerWeek,
                 value: RunFormatters.decimal(consistency.sessionsPerWeek, 1),
               ),
@@ -214,7 +214,7 @@ class StrengthWeekdayCard extends StatelessWidget {
                     '${counts[i]}',
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: colors.onSurfaceVariant,
-                      fontFeatures: RunUi.tabular,
+                      fontFeatures: AppUi.tabular,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -312,7 +312,7 @@ class StrengthDayPartCard extends StatelessWidget {
                         textAlign: TextAlign.end,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colors.onSurfaceVariant,
-                          fontFeatures: RunUi.tabular,
+                          fontFeatures: AppUi.tabular,
                         ),
                       ),
                     ),

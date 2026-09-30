@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/screens/workout/settings_preferences_controller.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Workout preferences: units, rest timer, screen and notification options.
 class WorkoutSettingsScreen extends StatefulWidget {
@@ -47,7 +48,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
               // ===== TREINO =====
-              SettingsSectionHeader(text: loc.settingsSectionWorkout),
+              AppSectionHeader(loc.settingsSectionWorkout, padding: AppSectionHeader.compactPadding),
               SettingsCard(
                 children: [
                   SettingsSwitchTile(
@@ -119,7 +120,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
               ),
 
               // ===== NOTIFICAÇÕES =====
-              SettingsSectionHeader(text: loc.settingsSectionNotifications),
+              AppSectionHeader(loc.settingsSectionNotifications, padding: AppSectionHeader.compactPadding),
               SettingsCard(
                 children: [
                   SettingsSwitchTile(

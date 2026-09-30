@@ -10,6 +10,7 @@ import 'package:workout_notes/screens/workout/saved_meal_editor_controller.dart'
 import 'package:workout_notes/services/open_food_facts_gateway.dart';
 import 'package:workout_notes/widgets/nutrition/saved_meal/saved_meal_form_widgets.dart';
 import 'package:workout_notes/widgets/nutrition/saved_meal/saved_meal_totals_card.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Screen to create or edit a saved meal (template). Ingredients are
 /// picked through the regular food search + quantity sheet flows.
@@ -133,27 +134,13 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
 
   Future<void> _confirmRemoveIngredient(SavedMealIngredient ingredient) async {
     final loc = AppLocalizations.of(context)!;
-    final shouldRemove = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        icon: const Icon(Icons.delete_outline_rounded),
-        title: Text(loc.nutritionDeleteItem),
-        content: Text(loc.nutritionDeleteItemConfirm),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
-            ),
-            child: Text(loc.nutritionDeleteItem),
-          ),
-        ],
-      ),
+    final shouldRemove = await showConfirmDialog(
+      context,
+      title: loc.nutritionDeleteItem,
+      message: loc.nutritionDeleteItemConfirm,
+      confirmLabel: loc.nutritionDeleteItem,
+      destructive: true,
+      icon: Icons.delete_outline_rounded,
     );
     if (shouldRemove == true && mounted) {
       _controller.removeIngredient(ingredient);

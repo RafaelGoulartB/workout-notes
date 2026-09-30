@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
 import 'package:workout_notes/models/sleep_night_summary.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
 
 /// One night in the sleep history: date badge, duration, time window, the
@@ -56,7 +56,7 @@ class SleepHistoryRow extends StatelessWidget {
                         SleepUi.duration(loc, slept),
                         style: theme.textTheme.bodyLarge?.copyWith(
                           fontWeight: FontWeight.w700,
-                          fontFeatures: RunUi.tabular,
+                          fontFeatures: AppUi.tabular,
                         ),
                       ),
                       if (slept >= goalMinutes) ...[
@@ -76,7 +76,7 @@ class SleepHistoryRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colors.onSurfaceVariant,
-                        fontFeatures: RunUi.tabular,
+                        fontFeatures: AppUi.tabular,
                       ),
                     ),
                   if ((summary?.hasStages ?? false) && session != null) ...[
@@ -96,7 +96,7 @@ class SleepHistoryRow extends StatelessWidget {
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                       color: SleepUi.efficiencyColor(colors, efficiency),
-                      fontFeatures: RunUi.tabular,
+                      fontFeatures: AppUi.tabular,
                     ),
                   ),
                   Text(

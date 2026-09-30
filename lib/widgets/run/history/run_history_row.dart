@@ -8,7 +8,7 @@ import 'package:workout_notes/models/run_activity_filter.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/run/run_medal_badge.dart';
 import 'package:workout_notes/widgets/run/run_route_sketch.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 IconData runActivityTypeIcon(CardioActivityType type) => switch (type) {
   CardioActivityType.running => Icons.directions_run_rounded,
@@ -53,7 +53,7 @@ class RunHistoryMonthHeader extends StatelessWidget {
               ),
               style: theme.textTheme.labelMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
         ],
@@ -96,7 +96,7 @@ class RunHistoryRow extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(RunUi.tileRadius),
+      borderRadius: BorderRadius.circular(AppUi.tileRadius),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
         child: Row(
@@ -154,7 +154,7 @@ class RunHistoryRow extends StatelessWidget {
                   RunFormatters.distanceWithUnit(activity.distanceMeters),
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w800,
-                    fontFeatures: RunUi.tabular,
+                    fontFeatures: AppUi.tabular,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -162,7 +162,7 @@ class RunHistoryRow extends StatelessWidget {
                   caption,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colors.onSurfaceVariant,
-                    fontFeatures: RunUi.tabular,
+                    fontFeatures: AppUi.tabular,
                   ),
                 ),
               ],
@@ -189,7 +189,7 @@ class _Thumbnail extends StatelessWidget {
       height: 48,
       decoration: BoxDecoration(
         color: colors.primaryContainer.withAlpha(hasShape ? 90 : 255),
-        borderRadius: BorderRadius.circular(RunUi.tileRadius),
+        borderRadius: BorderRadius.circular(AppUi.tileRadius),
       ),
       child: hasShape
           ? Padding(

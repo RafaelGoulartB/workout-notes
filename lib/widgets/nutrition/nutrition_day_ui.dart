@@ -8,6 +8,7 @@ import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/screens/workout/periodization_home_screen.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Building blocks shared by the nutrition home and the day diary, so the
 /// summary card, meal cards and food rows look the same on both.
@@ -22,6 +23,24 @@ abstract final class NutritionMacroColors {
 /// `12`, `12,5` (one decimal at most, locale separator, no grouping).
 String nutritionNumber(double value) =>
     NumberFormat('0.#', Intl.defaultLocale).format(value);
+
+/// Grams of a macro with its share of the daily [goal] as a thin bar.
+Widget nutritionMacroStat(
+  String label,
+  double? value,
+  double? goal,
+  Color color,
+) {
+  final current = value ?? 0;
+  final hasGoal = goal != null && goal > 0;
+  return AppProgressStat(
+    value: nutritionNumber(current),
+    unit: 'g',
+    label: label,
+    progress: hasGoal ? current / goal : 0,
+    color: color,
+  );
+}
 
 /// The day's calories against the goal with the three macros underneath.
 /// [onTap] makes the whole card open something (the diary, from the home).
@@ -140,33 +159,26 @@ class NutritionSummaryCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Row(
+          AppStatRow(
+            divider: const AppStatDivider(),
             children: [
-              Expanded(
-                child: _MacroStat(
-                  label: loc.nutritionProgressProtein,
-                  value: summary.consumed.proteinG,
-                  goal: goal?.proteinG,
-                  color: NutritionMacroColors.protein,
-                ),
+              nutritionMacroStat(
+                loc.nutritionProgressProtein,
+                summary.consumed.proteinG,
+                goal?.proteinG,
+                NutritionMacroColors.protein,
               ),
-              const _StatDivider(),
-              Expanded(
-                child: _MacroStat(
-                  label: loc.nutritionProgressCarbs,
-                  value: summary.consumed.carbsG,
-                  goal: goal?.carbsG,
-                  color: NutritionMacroColors.carbs,
-                ),
+              nutritionMacroStat(
+                loc.nutritionProgressCarbs,
+                summary.consumed.carbsG,
+                goal?.carbsG,
+                NutritionMacroColors.carbs,
               ),
-              const _StatDivider(),
-              Expanded(
-                child: _MacroStat(
-                  label: loc.nutritionProgressFat,
-                  value: summary.consumed.fatG,
-                  goal: goal?.fatG,
-                  color: NutritionMacroColors.fat,
-                ),
+              nutritionMacroStat(
+                loc.nutritionProgressFat,
+                summary.consumed.fatG,
+                goal?.fatG,
+                NutritionMacroColors.fat,
               ),
             ],
           ),
@@ -245,85 +257,6 @@ class NutritionSummaryCard extends StatelessWidget {
     return remaining >= 0
         ? loc.nutritionGoalRemaining(nutritionNumber(remaining))
         : loc.nutritionGoalSurplus(nutritionNumber(-remaining));
-  }
-}
-
-class _StatDivider extends StatelessWidget {
-  const _StatDivider();
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 1,
-    height: 36,
-    margin: const EdgeInsets.symmetric(horizontal: 6),
-    color: Theme.of(context).colorScheme.outlineVariant.withAlpha(70),
-  );
-}
-
-class _MacroStat extends StatelessWidget {
-  final String label;
-  final double? value;
-  final double? goal;
-  final Color color;
-
-  const _MacroStat({
-    required this.label,
-    required this.value,
-    required this.color,
-    this.goal,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final current = value ?? 0;
-    final hasGoal = goal != null && goal! > 0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              nutritionNumber(current),
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                height: 1.0,
-              ),
-            ),
-            const SizedBox(width: 2),
-            Text(
-              'g',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            value: hasGoal ? (current / goal!).clamp(0.0, 1.0) : 0,
-            minHeight: 3,
-            backgroundColor: color.withAlpha(35),
-            color: color,
-          ),
-        ),
-      ],
-    );
   }
 }
 

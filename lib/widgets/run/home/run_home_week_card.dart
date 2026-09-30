@@ -3,7 +3,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/services/run_today_service.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/run/run_week_strip.dart';
 
 /// "This week": distance so far against the weekly goal (ring), the
@@ -45,7 +45,7 @@ class RunWeekCard extends StatelessWidget {
     final editable =
         onEditGoal != null && goal?.source != RunWeekGoalSource.plan;
 
-    return RunSectionCard(
+    return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -56,7 +56,7 @@ class RunWeekCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    RunValueUnit(
+                    AppValueUnit(
                       value: RunFormatters.distanceKm(done),
                       unit: 'km',
                     ),
@@ -71,7 +71,7 @@ class RunWeekCard extends StatelessWidget {
                     ),
                     if (analytics.weekStreak > 0) ...[
                       const SizedBox(height: 8),
-                      RunPill(
+                      AppPill(
                         label: loc.runStatsStreakWeeks(analytics.weekStreak),
                         icon: Icons.local_fire_department_rounded,
                         color: colors.tertiary,
@@ -158,7 +158,7 @@ class _GoalRing extends StatelessWidget {
               '$percent%',
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w800,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
         ],
@@ -205,7 +205,7 @@ class _GoalLine extends StatelessWidget {
                 ),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w700,
-                  fontFeatures: RunUi.tabular,
+                  fontFeatures: AppUi.tabular,
                 ),
               ),
               Text(

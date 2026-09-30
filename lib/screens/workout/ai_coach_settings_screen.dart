@@ -4,6 +4,7 @@ import 'package:workout_notes/main.dart';
 import 'package:workout_notes/screens/workout/ai_chat_screen.dart';
 import 'package:workout_notes/screens/workout/ai_settings_screen.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// AI section of the settings hub: opens the coach chat (or its provider
 /// setup when nothing is configured yet) and the provider settings.
@@ -41,7 +42,7 @@ class AiCoachSettingsScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           // ===== INTELIGÊNCIA ARTIFICIAL =====
-          SettingsSectionHeader(text: loc.aiCoachSection),
+          AppSectionHeader(loc.aiCoachSection, padding: AppSectionHeader.compactPadding),
           SettingsCard(
             children: [
               SettingsLinkTile(

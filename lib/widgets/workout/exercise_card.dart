@@ -5,7 +5,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/exercise_with_sets.dart';
 import 'package:workout_notes/screens/workout/exercise_detail_tabs_screen.dart';
 import 'package:workout_notes/utils/workout_card_helpers.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Card widget for an exercise during an active workout.
 /// Displays set rows, rest timer, and controls.
@@ -60,8 +60,8 @@ class ExerciseCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 4),
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(RunUi.cardRadius),
-        side: BorderSide(color: RunUi.divider(theme.colorScheme)),
+        borderRadius: BorderRadius.circular(AppUi.cardRadius),
+        side: BorderSide(color: AppUi.divider(theme.colorScheme)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),

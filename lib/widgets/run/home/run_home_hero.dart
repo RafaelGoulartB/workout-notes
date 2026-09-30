@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Period selector chips (4 weeks / 12 weeks / year / all).
 class RunPeriodChips extends StatelessWidget {
@@ -79,13 +79,13 @@ class RunPeriodHero extends StatelessWidget {
               '${DateFormat.MMMd(locale).format(analytics.now)}';
     final elevation = analytics.totalElevationGainMeters;
 
-    return RunHeroCard(
+    return AppHeroCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const RunIconBadge(Icons.directions_run),
+              const AppIconBadge(Icons.directions_run),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -112,7 +112,7 @@ class RunPeriodHero extends StatelessWidget {
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: RunValueUnit(
+                  child: AppValueUnit(
                     value: RunFormatters.distanceKm(
                       analytics.totalDistanceMeters,
                     ),
@@ -132,7 +132,7 @@ class RunPeriodHero extends StatelessWidget {
               if (ratio != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4),
-                  child: RunPill.trend(
+                  child: AppPill.trend(
                     context: context,
                     label:
                         '${ratio >= 0 ? '+' : '-'}'
@@ -153,11 +153,11 @@ class RunPeriodHero extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 14),
-          Divider(height: 1, color: RunUi.divider(colors)),
+          Divider(height: 1, color: AppUi.divider(colors)),
           const SizedBox(height: 12),
-          RunStatRow(
+          AppStatRow(
             children: [
-              RunStatTile(
+              AppStatTile(
                 icon: Icons.timer_outlined,
                 color: colors.secondary,
                 label: loc.runRecordTime,
@@ -165,20 +165,20 @@ class RunPeriodHero extends StatelessWidget {
                   analytics.totalMovingTimeSeconds,
                 ),
               ),
-              RunStatTile(
+              AppStatTile(
                 icon: Icons.speed_rounded,
                 color: colors.tertiary,
                 label: loc.runHomeAvgPace,
                 value: RunFormatters.pace(analytics.avgPaceSecPerKm),
                 unit: '/km',
               ),
-              RunStatTile(
+              AppStatTile(
                 icon: Icons.flag_outlined,
                 color: colors.primary,
                 label: loc.runStatsRunCount,
                 value: '${analytics.runCount}',
               ),
-              RunStatTile(
+              AppStatTile(
                 icon: Icons.terrain_rounded,
                 color: colors.secondary,
                 label: loc.runHomeElevationGain,

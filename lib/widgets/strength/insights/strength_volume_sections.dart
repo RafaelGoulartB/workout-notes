@@ -9,7 +9,7 @@ import 'package:workout_notes/utils/strength_insights_calculator.dart';
 import 'package:workout_notes/utils/strength_insights_format.dart';
 import 'package:workout_notes/widgets/goals/goals_section.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_charts.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_insights_data.dart';
 
@@ -103,7 +103,7 @@ class StrengthSummaryCard extends StatelessWidget {
 
   Widget _delta(BuildContext context, String? label, bool positive) {
     if (label == null) return const SizedBox(height: 26);
-    return RunPill.trend(context: context, label: label, positive: positive);
+    return AppPill.trend(context: context, label: label, positive: positive);
   }
 
   @override
@@ -122,11 +122,11 @@ class StrengthSummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          RunStatRow(
+          AppStatRow(
             children: [
               Column(
                 children: [
-                  RunStatTile(
+                  AppStatTile(
                     label: loc.strengthInsightsMetricVolume,
                     value: StrengthFormat.volume(current.volume),
                     unit: StrengthFormat.volumeUnit(current.volume),
@@ -141,7 +141,7 @@ class StrengthSummaryCard extends StatelessWidget {
               ),
               Column(
                 children: [
-                  RunStatTile(
+                  AppStatTile(
                     label: loc.strengthInsightsMetricSets,
                     value: '${current.sets}',
                   ),
@@ -155,7 +155,7 @@ class StrengthSummaryCard extends StatelessWidget {
               ),
               Column(
                 children: [
-                  RunStatTile(
+                  AppStatTile(
                     label: loc.strengthInsightsMetricSessions,
                     value: '${current.sessions}',
                   ),
@@ -259,7 +259,7 @@ class _StrengthVolumeTrendCardState extends State<StrengthVolumeTrendCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          RunSegmentedTabs<_TrendMetric>(
+          AppSegmentedTabs<_TrendMetric>(
             values: _TrendMetric.values,
             selected: _metric,
             labelOf: (m) => m == _TrendMetric.volume
@@ -437,7 +437,7 @@ class _MuscleRow extends StatelessWidget {
               maxLines: 1,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colors.onSurfaceVariant,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
           ],
@@ -500,7 +500,7 @@ class _MuscleRow extends StatelessWidget {
               width: 82,
               child: Align(
                 alignment: Alignment.centerRight,
-                child: RunPill(label: statusLabel, color: statusColor),
+                child: AppPill(label: statusLabel, color: statusColor),
               ),
             ),
           ],
@@ -537,11 +537,11 @@ class StrengthTopExercisesCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: RunInsightsNote(loc.strengthInsightsTopEmpty),
             )
-          : RunDividedList(
+          : AppDividedList(
               children: [
                 for (final e in top)
-                  RunListRow(
-                    leading: RunIconBadge(
+                  AppListRow(
+                    leading: AppIconBadge(
                       Icons.fitness_center_rounded,
                       color: data.categoryColor(e.categoryId),
                     ),

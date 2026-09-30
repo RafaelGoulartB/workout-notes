@@ -7,8 +7,8 @@ import 'package:workout_notes/screens/run/plans/run_plan_creation_flow.dart';
 import 'package:workout_notes/screens/run/run_plan_detail_screen.dart';
 import 'package:workout_notes/services/run_plan_week_view.dart';
 import 'package:workout_notes/widgets/run/plans/run_plan_library_cards.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// The running counterpart of [RoutinesScreen]: a library of structured plans.
 /// The plan being followed is pinned on top with its next session; the rest
@@ -110,25 +110,12 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
 
   Future<void> _delete(RunPlan plan) async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.runPlansDeleteConfirm(plan.name)),
-        content: Text(loc.runPlansDeleteContent),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.runPlansDeleteConfirm(plan.name),
+      message: loc.runPlansDeleteContent,
+      confirmLabel: loc.commonDelete,
+      destructive: true,
     );
     if (confirmed != true) return;
     await _repo.deletePlan(plan.id);
@@ -191,7 +178,7 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
-                padding: RunUi.screenPadding.copyWith(top: 8),
+                padding: AppUi.screenPadding.copyWith(top: 8),
                 children: [
                   Text(
                     loc.runPlansSubtitle,
@@ -200,7 +187,7 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
                     ),
                   ),
                   if (pinned.isNotEmpty) ...[
-                    RunSectionHeader(
+                    AppSectionHeader(
                       loc.runPlansFollowingSection,
                       padding: const EdgeInsets.fromLTRB(4, 16, 0, 8),
                     ),
@@ -223,7 +210,7 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
                   ],
                   if (others.isNotEmpty) ...[
                     if (pinned.isNotEmpty)
-                      RunSectionHeader(
+                      AppSectionHeader(
                         loc.runPlansOthersSection,
                         padding: const EdgeInsets.fromLTRB(4, 12, 0, 8),
                       )
@@ -232,7 +219,7 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
                     for (final plan in others) _libraryCard(plan, today),
                   ],
                   if (archived.isNotEmpty) ...[
-                    RunSectionHeader(
+                    AppSectionHeader(
                       loc.runPlansArchivedSection,
                       padding: const EdgeInsets.fromLTRB(4, 12, 0, 8),
                     ),

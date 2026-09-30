@@ -4,7 +4,7 @@ import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_data_field.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/utils/run_data_field_values.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 String runDataFieldLabel(AppLocalizations loc, RunDataField field) =>
     switch (field) {
@@ -57,7 +57,7 @@ class RunDataFieldsGrid extends StatelessWidget {
       for (var c = 0; c < columns; c++) {
         final i = index++;
         if (c > 0) {
-          cells.add(_VerticalDivider(color: RunUi.divider(theme.colorScheme)));
+          cells.add(_VerticalDivider(color: AppUi.divider(theme.colorScheme)));
         }
         cells.add(
           Expanded(
@@ -84,7 +84,7 @@ class RunDataFieldsGrid extends StatelessWidget {
       }
       if (r > 0) {
         children.add(
-          Divider(height: 1, color: RunUi.divider(theme.colorScheme)),
+          Divider(height: 1, color: AppUi.divider(theme.colorScheme)),
         );
       }
       children.add(IntrinsicHeight(child: Row(children: cells)));
@@ -148,7 +148,7 @@ class _FieldCell extends StatelessWidget {
             ?.copyWith(
               fontWeight: FontWeight.w800,
               height: 1.05,
-              fontFeatures: RunUi.tabular,
+              fontFeatures: AppUi.tabular,
               color: dimmed ? colors.onSurfaceVariant : colors.onSurface,
             );
     return Semantics(
@@ -294,7 +294,7 @@ class _FieldsEditorState extends State<_FieldsEditor> {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            RunSectionHeader(
+            AppSectionHeader(
               loc.runFieldVisible,
               padding: const EdgeInsets.fromLTRB(4, 16, 0, 6),
             ),
@@ -326,7 +326,7 @@ class _FieldsEditorState extends State<_FieldsEditor> {
               ],
             ),
             if (available.isNotEmpty) ...[
-              RunSectionHeader(
+              AppSectionHeader(
                 loc.runFieldAvailable,
                 padding: const EdgeInsets.fromLTRB(4, 12, 0, 6),
               ),

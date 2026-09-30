@@ -7,6 +7,7 @@ import 'package:workout_notes/widgets/workout/set_editor_fields.dart';
 import '../../models/exercise_with_sets.dart';
 import 'active_workout_screen.dart';
 import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Screen for planning/editing a future workout.
 /// Similar to WorkoutDetailScreen but tailored for future dates:
@@ -342,198 +343,192 @@ class _FutureWorkoutPlannerScreenState
     ThemeData theme,
     AppLocalizations loc,
   ) {
-    return Card(
+    return AppSectionCard(
       key: ValueKey(ex.entryId),
       margin: const EdgeInsets.symmetric(vertical: 4),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Exercise header with drag handle
-            Row(
-              children: [
-                Container(
-                  width: 4,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: ex.categoryColor,
-                    borderRadius: BorderRadius.circular(2),
+      radius: 12,
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Exercise header with drag handle
+          Row(
+            children: [
+              Container(
+                width: 4,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: ex.categoryColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  ex.localizedName(loc),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(width: 10),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  ex.localizedCategory(loc),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              // Delete button
+              InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => _removeExercise(ex),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(
+                    Icons.close,
+                    size: 18,
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+              ),
+              // Drag handle
+              ReorderableDragStartListener(
+                index: index,
+                child: const Padding(
+                  padding: EdgeInsets.only(left: 4),
+                  child: Icon(Icons.drag_handle, size: 20),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Sets table header
+          if (ex.sets.isNotEmpty) ...[
+            Row(
+              children: [
+                const SizedBox(width: 28),
                 Expanded(
+                  flex: 2,
                   child: Text(
-                    ex.localizedName(loc),
-                    style: theme.textTheme.titleSmall?.copyWith(
+                    loc.workoutDetailSetNumber,
+                    style: theme.textTheme.bodySmall?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
+                Expanded(
+                  flex: 3,
                   child: Text(
-                    ex.localizedCategory(loc),
+                    loc.workoutDetailWeight,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-                const SizedBox(width: 4),
-                // Delete button
-                InkWell(
-                  borderRadius: BorderRadius.circular(20),
-                  onTap: () => _removeExercise(ex),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Icon(
-                      Icons.close,
-                      size: 18,
-                      color: theme.colorScheme.error,
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    loc.commonReps,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-                // Drag handle
-                ReorderableDragStartListener(
-                  index: index,
-                  child: const Padding(
-                    padding: EdgeInsets.only(left: 4),
-                    child: Icon(Icons.drag_handle, size: 20),
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    loc.workoutDetailRpe,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const Divider(height: 4),
+          ],
 
-            // Sets table header
-            if (ex.sets.isNotEmpty) ...[
-              Row(
-                children: [
-                  const SizedBox(width: 28),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      loc.workoutDetailSetNumber,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
+          // Sets rows
+          ...ex.sets.asMap().entries.map((entry) {
+            final i = entry.key;
+            final s = entry.value;
+            final isWarmup = (s['is_warmup'] as int?) == 1;
+            return GestureDetector(
+              onTap: () => _editSetDialog(ex, i),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isWarmup
+                            ? Colors.orange.withAlpha(30)
+                            : theme.colorScheme.surfaceContainerHighest,
                       ),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 3,
-                    child: Text(
-                      loc.workoutDetailWeight,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 3,
-                    child: Text(
-                      loc.commonReps,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 3,
-                    child: Text(
-                      loc.workoutDetailRpe,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const Divider(height: 4),
-            ],
-
-            // Sets rows
-            ...ex.sets.asMap().entries.map((entry) {
-              final i = entry.key;
-              final s = entry.value;
-              final isWarmup = (s['is_warmup'] as int?) == 1;
-              return GestureDetector(
-                onTap: () => _editSetDialog(ex, i),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isWarmup
-                              ? Colors.orange.withAlpha(30)
-                              : theme.colorScheme.surfaceContainerHighest,
-                        ),
-                        child: Center(
-                          child: Text(
-                            isWarmup ? 'W' : '${i + 1}',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: isWarmup ? Colors.orange : null,
-                            ),
+                      child: Center(
+                        child: Text(
+                          isWarmup ? 'W' : '${i + 1}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: isWarmup ? Colors.orange : null,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          (s['weight'] as num?)?.toStringAsFixed(1) ?? '-',
-                          style: theme.textTheme.bodyMedium,
-                        ),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        (s['weight'] as num?)?.toStringAsFixed(1) ?? '-',
+                        style: theme.textTheme.bodyMedium,
                       ),
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          (s['reps'] as int?)?.toString() ?? '-',
-                          style: theme.textTheme.bodyMedium,
-                        ),
+                    ),
+                    Expanded(
+                      flex: 3,
+                      child: Text(
+                        (s['reps'] as int?)?.toString() ?? '-',
+                        style: theme.textTheme.bodyMedium,
                       ),
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          (s['rpe'] as num?)?.toStringAsFixed(1) ?? '-',
-                          style: theme.textTheme.bodyMedium,
-                        ),
+                    ),
+                    Expanded(
+                      flex: 3,
+                      child: Text(
+                        (s['rpe'] as num?)?.toStringAsFixed(1) ?? '-',
+                        style: theme.textTheme.bodyMedium,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              );
-            }),
-
-            // Add set button
-            const SizedBox(height: 4),
-            TextButton.icon(
-              onPressed: () => _addSet(ex),
-              icon: const Icon(Icons.add, size: 16),
-              label: Text(
-                loc.activeWorkoutAddSet,
-                style: theme.textTheme.bodySmall,
               ),
+            );
+          }),
+
+          // Add set button
+          const SizedBox(height: 4),
+          TextButton.icon(
+            onPressed: () => _addSet(ex),
+            icon: const Icon(Icons.add, size: 16),
+            label: Text(
+              loc.activeWorkoutAddSet,
+              style: theme.textTheme.bodySmall,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -608,27 +603,12 @@ class _FutureWorkoutPlannerScreenState
 
   Future<void> _removeExercise(ExerciseWithSets ex) async {
     final loc = AppLocalizations.of(context)!;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.activeWorkoutRemoveExercise),
-        content: Text(
-          loc.activeWorkoutRemoveExerciseContent(ex.localizedName(loc)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.commonCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              loc.commonDelete,
-              style: const TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: loc.activeWorkoutRemoveExercise,
+      message: loc.activeWorkoutRemoveExerciseContent(ex.localizedName(loc)),
+      confirmLabel: loc.commonDelete,
+      destructive: true,
     );
     if (confirm == true) {
       await _workoutRepo.deleteExerciseEntry(ex.entryId);
@@ -1140,25 +1120,12 @@ class _FutureWorkoutPlannerScreenState
 
   Future<void> _deleteWorkout() async {
     final loc = AppLocalizations.of(context)!;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.workoutDetailDeleteConfirm),
-        content: Text(loc.commonActionCannotBeUndone),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.commonCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              loc.commonDelete,
-              style: const TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: loc.workoutDetailDeleteConfirm,
+      message: loc.commonActionCannotBeUndone,
+      confirmLabel: loc.commonDelete,
+      destructive: true,
     );
     if (confirm == true) {
       await _workoutRepo.deleteWorkout(widget.workoutId);

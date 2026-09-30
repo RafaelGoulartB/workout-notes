@@ -5,6 +5,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
 import 'package:workout_notes/utils/nutrition_goal_suggest.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Callback invoked when the user applies the suggestion. The
 /// suggestion always carries the maintenance expenditure (TDEE) and
@@ -224,14 +225,8 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
     await settings.setSetting(_kHeight, _heightController.text.trim());
     await settings.setSetting(_kWeight, _weightController.text.trim());
     await settings.setSetting(_kActivity, _activity.name);
-    await settings.setSetting(
-      _kMacroProtein,
-      ratios.proteinPerKg.toString(),
-    );
-    await settings.setSetting(
-      _kMacroFat,
-      ratios.fatPerKg.toString(),
-    );
+    await settings.setSetting(_kMacroProtein, ratios.proteinPerKg.toString());
+    await settings.setSetting(_kMacroFat, ratios.fatPerKg.toString());
     if (!mounted) return;
     widget.onApply(suggestion);
     Navigator.of(context).pop();
@@ -468,15 +463,15 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
                 ),
                 if (!_allRatiosValid || _hasMacroEnergyConflict) ...[
                   const SizedBox(height: 8),
-                  _InlineWarning(
-                    message: !_allRatiosValid
+                  AppBanner.warning(
+                    !_allRatiosValid
                         ? loc.nutritionSuggestInvalidMacros
                         : loc.nutritionSuggestMacroEnergyError,
                   ),
                 ],
                 const SizedBox(height: 20),
                 if (_suggestion == null && !_hasCompleteProfile)
-                  _InlineInfo(message: loc.nutritionSuggestNoProfile)
+                  AppBanner(loc.nutritionSuggestNoProfile)
                 else if (_suggestion != null)
                   _SuggestionPreviewCard(suggestion: _suggestion!),
               ],
@@ -731,70 +726,6 @@ class _MacroRatioField extends StatelessWidget {
           vertical: 14,
         ),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
-  }
-}
-
-class _InlineWarning extends StatelessWidget {
-  final String message;
-
-  const _InlineWarning({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.warning_amber_rounded,
-            color: theme.colorScheme.onErrorContainer,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onErrorContainer,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InlineInfo extends StatelessWidget {
-  final String message;
-
-  const _InlineInfo({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.secondaryContainer.withAlpha(100),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.info_outline_rounded,
-            size: 19,
-            color: theme.colorScheme.onSecondaryContainer,
-          ),
-          const SizedBox(width: 9),
-          Expanded(child: Text(message, style: theme.textTheme.bodySmall)),
-        ],
       ),
     );
   }

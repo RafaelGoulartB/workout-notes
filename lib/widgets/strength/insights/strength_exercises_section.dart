@@ -6,7 +6,7 @@ import 'package:workout_notes/utils/strength_insights_calculator.dart';
 import 'package:workout_notes/utils/strength_insights_format.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_charts.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_insights_data.dart';
 
@@ -98,7 +98,7 @@ class _StrengthExercisesSectionState extends State<StrengthExercisesSection> {
                       }),
                     ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(RunUi.tileRadius),
+                borderRadius: BorderRadius.circular(AppUi.tileRadius),
               ),
             ),
             onChanged: (v) => setState(() {
@@ -147,7 +147,7 @@ class _StrengthExercisesSectionState extends State<StrengthExercisesSection> {
               ),
             )
           else
-            RunDividedList(
+            AppDividedList(
               children: [
                 for (final e in visible)
                   _ExerciseRow(
@@ -261,7 +261,7 @@ class _ExerciseRow extends StatelessWidget {
                     maxLines: 1,
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w800,
-                      fontFeatures: RunUi.tabular,
+                      fontFeatures: AppUi.tabular,
                     ),
                   ),
                   Text(
@@ -277,7 +277,7 @@ class _ExerciseRow extends StatelessWidget {
                           : trend >= 0
                           ? colors.primary
                           : colors.error,
-                      fontFeatures: RunUi.tabular,
+                      fontFeatures: AppUi.tabular,
                     ),
                   ),
                 ],

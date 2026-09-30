@@ -9,6 +9,7 @@ import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'package:workout_notes/services/sleep_goal_service.dart';
 import 'package:workout_notes/services/traditional_alarm_service.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class SleepSettingsScreen extends StatefulWidget {
   const SleepSettingsScreen({super.key});
@@ -249,22 +250,11 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
 
   Future<void> _remove() async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(loc.sleepMissionRemove),
-        content: Text(loc.sleepMissionRemoveConfirm),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(loc.sleepMissionRemove),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.sleepMissionRemove,
+      message: loc.sleepMissionRemoveConfirm,
+      confirmLabel: loc.sleepMissionRemove,
     );
     if (confirmed == true) {
       await _missions.clear();
@@ -287,7 +277,7 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
-                SettingsSectionHeader(text: loc.sleepSettingsGoalSection),
+                AppSectionHeader(loc.sleepSettingsGoalSection, padding: AppSectionHeader.compactPadding),
                 SettingsCard(
                   children: [
                     SettingsLinkTile(
@@ -309,7 +299,7 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
                     ),
                   ],
                 ),
-                SettingsSectionHeader(text: loc.sleepDiagnosticTitle),
+                AppSectionHeader(loc.sleepDiagnosticTitle, padding: AppSectionHeader.compactPadding),
                 SettingsCard(
                   children: [
                     SettingsSwitchTile(
@@ -327,7 +317,7 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
                       ),
                   ],
                 ),
-                SettingsSectionHeader(text: loc.sleepSettingsAlarmsSection),
+                AppSectionHeader(loc.sleepSettingsAlarmsSection, padding: AppSectionHeader.compactPadding),
                 SettingsCard(
                   children: [
                     SettingsSwitchTile(
@@ -359,7 +349,7 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
                     ),
                   ],
                 ),
-                SettingsSectionHeader(text: loc.sleepSettingsMissionSection),
+                AppSectionHeader(loc.sleepSettingsMissionSection, padding: AppSectionHeader.compactPadding),
                 SettingsCard(
                   children: [
                     SettingsSwitchTile(

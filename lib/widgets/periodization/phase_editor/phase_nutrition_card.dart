@@ -3,6 +3,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/periodization/phase_editor_controller.dart';
 import 'package:workout_notes/widgets/periodization/phase_editor/phase_editor_fields.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class PhaseNutritionCard extends StatelessWidget {
   final PhaseEditorController controller;
@@ -98,7 +99,7 @@ class PhaseNutritionCard extends StatelessWidget {
           PhaseCarbsLine(carbs: controller.carbsG),
           if (controller.macroConflict) ...[
             const SizedBox(height: 8),
-            PhaseNutritionWarning(text: loc.planningMacroConflict),
+            AppBanner.warning(loc.planningMacroConflict),
           ],
           const Divider(height: 28),
           SwitchListTile(
@@ -134,7 +135,7 @@ class PhaseNutritionCard extends StatelessWidget {
                 controller.runPlan == null &&
                 controller.runDays.isEmpty) ...[
               const SizedBox(height: 8),
-              PhaseNutritionWarning(text: loc.planningRestNeedsDays),
+              AppBanner.warning(loc.planningRestNeedsDays),
             ],
           ],
           if (tdee == null) ...[
@@ -198,31 +199,3 @@ class PhaseCarbsLine extends StatelessWidget {
   }
 }
 
-class PhaseNutritionWarning extends StatelessWidget {
-  final String text;
-
-  const PhaseNutritionWarning({super.key, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer.withAlpha(90),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.info_outline_rounded,
-            size: 16,
-            color: theme.colorScheme.error,
-          ),
-          const SizedBox(width: 8),
-          Expanded(child: Text(text, style: theme.textTheme.bodySmall)),
-        ],
-      ),
-    );
-  }
-}

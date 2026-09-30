@@ -1,10 +1,9 @@
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// What happened (or is planned) on one day of the current week.
 class WorkoutDayMark {
@@ -59,7 +58,7 @@ class WorkoutWeekHero extends StatelessWidget {
     final strengthColor = colors.primary;
     final runColor = colors.tertiary;
 
-    return RunHeroCard(
+    return AppHeroCard(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -82,7 +81,7 @@ class WorkoutWeekHero extends StatelessWidget {
                   onTap: onOpenStrength,
                 ),
               ),
-              Container(width: 1, height: 52, color: RunUi.divider(colors)),
+              Container(width: 1, height: 52, color: AppUi.divider(colors)),
               Expanded(
                 child: _SportRing(
                   key: const Key('workout-home-ring-run'),
@@ -123,36 +122,50 @@ class WorkoutWeekHero extends StatelessWidget {
                 color: colors.onSurfaceVariant.withAlpha(90),
                 label: loc.workoutHomeLegendPlanned,
               ),
-              const Spacer(),
-              Icon(
-                Icons.timer_outlined,
-                size: 14,
-                color: colors.onSurfaceVariant,
-              ),
-              const SizedBox(width: 3),
-              Text(
-                RunFormatters.durationHoursMinutes(activeSeconds),
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: colors.onSurfaceVariant,
-                  fontFeatures: RunUi.tabular,
-                ),
-              ),
-              if (streakWeeks > 0) ...[
-                const SizedBox(width: 10),
-                const Icon(
-                  Icons.local_fire_department_rounded,
-                  size: 14,
-                  color: Colors.orange,
-                ),
-                const SizedBox(width: 2),
-                Text(
-                  '$streakWeeks ${loc.workoutHomeWeeksShort}',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: Colors.orange,
-                    fontWeight: FontWeight.w700,
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  // Shrinks instead of overflowing on narrow screens or with
+                  // large system fonts.
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.timer_outlined,
+                          size: 14,
+                          color: colors.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          RunFormatters.durationHoursMinutes(activeSeconds),
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: colors.onSurfaceVariant,
+                            fontFeatures: AppUi.tabular,
+                          ),
+                        ),
+                        if (streakWeeks > 0) ...[
+                          const SizedBox(width: 10),
+                          const Icon(
+                            Icons.local_fire_department_rounded,
+                            size: 14,
+                            color: Colors.orange,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            '$streakWeeks ${loc.workoutHomeWeeksShort}',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: Colors.orange,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
-              ],
+              ),
             ],
           ),
         ],
@@ -187,7 +200,7 @@ class _SportRing extends StatelessWidget {
     final colors = theme.colorScheme;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(RunUi.tileRadius),
+      borderRadius: BorderRadius.circular(AppUi.tileRadius),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         child: Row(
@@ -196,7 +209,7 @@ class _SportRing extends StatelessWidget {
               width: 50,
               height: 50,
               child: CustomPaint(
-                painter: _RingPainter(
+                painter: RingPainter(
                   progress: progress.clamp(0.0, 1.0),
                   color: color,
                   track: color.withAlpha(40),
@@ -217,7 +230,7 @@ class _SportRing extends StatelessWidget {
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w800,
                         height: 1.05,
-                        fontFeatures: RunUi.tabular,
+                        fontFeatures: AppUi.tabular,
                       ),
                     ),
                   ),
@@ -249,50 +262,6 @@ class _SportRing extends StatelessWidget {
       ),
     );
   }
-}
-
-class _RingPainter extends CustomPainter {
-  final double progress;
-  final Color color;
-  final Color track;
-
-  const _RingPainter({
-    required this.progress,
-    required this.color,
-    required this.track,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const stroke = 5.0;
-    final rect = Rect.fromLTWH(
-      stroke / 2,
-      stroke / 2,
-      size.width - stroke,
-      size.height - stroke,
-    );
-    final base = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..color = track;
-    canvas.drawArc(rect, 0, math.pi * 2, false, base);
-    if (progress <= 0) return;
-    canvas.drawArc(
-      rect,
-      -math.pi / 2,
-      math.pi * 2 * progress,
-      false,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = stroke
-        ..strokeCap = StrokeCap.round
-        ..color = color,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_RingPainter old) =>
-      old.progress != progress || old.color != color || old.track != track;
 }
 
 /// Monday–Sunday, one column per day with a sport icon per activity: full
@@ -441,13 +410,13 @@ class WorkoutTodayCard extends StatelessWidget {
     final colors = theme.colorScheme;
 
     if (items.isEmpty) {
-      return RunSectionCard(
+      return AppSectionCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                RunIconBadge(
+                AppIconBadge(
                   emptyIcon,
                   color: colors.secondary,
                   size: 44,
@@ -502,9 +471,9 @@ class WorkoutTodayCard extends StatelessWidget {
       );
     }
 
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: RunDividedList(
+      child: AppDividedList(
         children: [for (final item in items) _TodayRow(item: item)],
       ),
     );
@@ -529,7 +498,7 @@ class _TodayRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
         child: Row(
           children: [
-            RunIconBadge(item.icon, color: item.color, size: 44, iconSize: 22),
+            AppIconBadge(item.icon, color: item.color, size: 44, iconSize: 22),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -556,7 +525,7 @@ class _TodayRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             if (item.done)
-              RunPill(
+              AppPill(
                 icon: Icons.check_rounded,
                 color: item.color,
                 label: loc.workoutHomeTodayDone,
@@ -604,7 +573,7 @@ class WorkoutAreaTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    return RunSectionCard(
+    return AppSectionCard(
       key: tileKey,
       onTap: onTap,
       padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
@@ -613,7 +582,7 @@ class WorkoutAreaTile extends StatelessWidget {
         children: [
           Row(
             children: [
-              RunIconBadge(icon, color: color),
+              AppIconBadge(icon, color: color),
               const Spacer(),
               Icon(Icons.chevron_right_rounded, color: colors.onSurfaceVariant),
             ],
@@ -682,13 +651,13 @@ class WorkoutRecentList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final locale = Localizations.localeOf(context).toString();
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: RunDividedList(
+      child: AppDividedList(
         children: [
           for (final item in items)
-            RunListRow(
-              leading: RunIconBadge(item.icon, color: item.color, size: 40),
+            AppListRow(
+              leading: AppIconBadge(item.icon, color: item.color, size: 40),
               title: item.title,
               subtitle: [
                 toBeginningOfSentenceCase(

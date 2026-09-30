@@ -8,6 +8,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/services/export_service.dart';
 import 'package:workout_notes/widgets/settings/backup_flows.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Data & privacy: CSV/JSON exports, backup restore, about and delete-all.
 /// The developer test-data entry only exists in debug builds, behind a
@@ -46,22 +47,12 @@ class _DataPrivacyScreenState extends State<DataPrivacyScreen> {
 
   Future<void> _generateTestData() async {
     if (_isGeneratingTestData) return;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(AppLocalizations.of(context)!.settingsGenerateTitle),
-        content: Text(AppLocalizations.of(context)!.settingsGenerateContent),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(AppLocalizations.of(context)!.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(AppLocalizations.of(context)!.settingsGenerate),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: AppLocalizations.of(context)!.settingsGenerateTitle,
+      message: AppLocalizations.of(context)!.settingsGenerateContent,
+      confirmLabel: AppLocalizations.of(context)!.settingsGenerate,
+      cancelLabel: AppLocalizations.of(context)!.commonCancel,
     );
     if (confirm != true || !mounted) return;
 
@@ -152,27 +143,13 @@ class _DataPrivacyScreenState extends State<DataPrivacyScreen> {
   }
 
   Future<void> _deleteAllHistory() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(AppLocalizations.of(context)!.settingsDeleteHistoryTitle),
-        content: Text(
-          AppLocalizations.of(context)!.settingsDeleteHistoryContent,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(AppLocalizations.of(context)!.commonCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              AppLocalizations.of(context)!.settingsDeleteEverything,
-              style: const TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: AppLocalizations.of(context)!.settingsDeleteHistoryTitle,
+      message: AppLocalizations.of(context)!.settingsDeleteHistoryContent,
+      confirmLabel: AppLocalizations.of(context)!.settingsDeleteEverything,
+      cancelLabel: AppLocalizations.of(context)!.commonCancel,
+      destructive: true,
     );
 
     if (confirm == true) {
@@ -277,7 +254,7 @@ class _DataPrivacyScreenState extends State<DataPrivacyScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           // ===== EXPORTAÇÕES =====
-          SettingsSectionHeader(text: loc.settingsSectionExports),
+          AppSectionHeader(loc.settingsSectionExports, padding: AppSectionHeader.compactPadding),
           SettingsCard(
             children: [
               SettingsLinkTile(
@@ -291,7 +268,7 @@ class _DataPrivacyScreenState extends State<DataPrivacyScreen> {
           ),
 
           // ===== DADOS =====
-          SettingsSectionHeader(text: loc.settingsSectionData),
+          AppSectionHeader(loc.settingsSectionData, padding: AppSectionHeader.compactPadding),
           SettingsCard(
             children: [
               SettingsLinkTile(

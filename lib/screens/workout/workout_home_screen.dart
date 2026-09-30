@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
@@ -16,7 +15,7 @@ import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/widgets/load_error_view.dart';
 import 'package:workout_notes/widgets/workout/active_session_banner.dart';
 import 'package:workout_notes/widgets/run/run_pending_review_banner.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
 import 'package:workout_notes/screens/workout/workout_home_controller.dart';
@@ -242,12 +241,12 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                           const SizedBox(height: 20),
                           _buildAreas(loc),
                         ] else ...[
-                          RunSectionHeader(loc.workoutHomeTodayTitle),
+                          AppSectionHeader(loc.workoutHomeTodayTitle),
                           _buildToday(loc),
-                          RunSectionHeader(loc.workoutHomeAreasTitle),
+                          AppSectionHeader(loc.workoutHomeAreasTitle),
                           _buildAreas(loc),
                           if (_recentItems(loc).isNotEmpty) ...[
-                            RunSectionHeader(loc.workoutHomeRecentTitle),
+                            AppSectionHeader(loc.workoutHomeRecentTitle),
                             WorkoutRecentList(items: _recentItems(loc)),
                           ],
                         ],
@@ -272,18 +271,20 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     final runGoal = run?.plan?.weekPlannedMeters ?? run?.userWeeklyGoalMeters;
     final now = DateTime.now();
 
-    return WorkoutWeekHero(
-      strengthDone: _controller.overview.strengthSessions,
-      strengthGoal: strengthGoal,
-      runMeters: _controller.overview.runMeters,
-      runGoalMeters: runGoal != null && runGoal > 0 ? runGoal : null,
-      activeSeconds: _controller.overview.activeSeconds,
-      streakWeeks: _controller.overview.streakWeeks,
-      days: _controller.weekDays,
-      today: dayOf(now),
-      onOpenStrength: _openStrengthHub,
-      onOpenRun: _openRunHub,
-    ).animate().fadeIn(duration: 300.ms);
+    return FadeSlideIn(
+      child: WorkoutWeekHero(
+        strengthDone: _controller.overview.strengthSessions,
+        strengthGoal: strengthGoal,
+        runMeters: _controller.overview.runMeters,
+        runGoalMeters: runGoal != null && runGoal > 0 ? runGoal : null,
+        activeSeconds: _controller.overview.activeSeconds,
+        streakWeeks: _controller.overview.streakWeeks,
+        days: _controller.weekDays,
+        today: dayOf(now),
+        onOpenStrength: _openStrengthHub,
+        onOpenRun: _openRunHub,
+      ),
+    );
   }
 
   String _dayName(StrengthRoutineDayInfo day) =>
@@ -386,20 +387,23 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         strength?.status == StrengthTodayStatus.rest ||
         run?.status == RunTodayStatus.rest;
     final next = strength?.next;
-    return WorkoutTodayCard(
-      items: items,
-      emptyIcon: rest
-          ? Icons.self_improvement_rounded
-          : Icons.wb_sunny_outlined,
-      emptyTitle: rest
-          ? loc.workoutHomeTodayRestTitle
-          : loc.workoutHomeTodayFreeTitle,
-      emptySubtitle: next != null
-          ? loc.workoutHomeTodayNextStrength(_dayName(next))
-          : loc.workoutHomeTodayFreeSubtitle,
-      onQuickStrength: _trainStrength,
-      onQuickRun: _startRun,
-    ).animate().fadeIn(duration: 300.ms, delay: 60.ms);
+    return FadeSlideIn(
+      delay: const Duration(milliseconds: 60),
+      child: WorkoutTodayCard(
+        items: items,
+        emptyIcon: rest
+            ? Icons.self_improvement_rounded
+            : Icons.wb_sunny_outlined,
+        emptyTitle: rest
+            ? loc.workoutHomeTodayRestTitle
+            : loc.workoutHomeTodayFreeTitle,
+        emptySubtitle: next != null
+            ? loc.workoutHomeTodayNextStrength(_dayName(next))
+            : loc.workoutHomeTodayFreeSubtitle,
+        onQuickStrength: _trainStrength,
+        onQuickRun: _startRun,
+      ),
+    );
   }
 
   Widget _buildAreas(AppLocalizations loc) {
@@ -414,40 +418,45 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     final runs = _controller.recentCardio.where((a) => a.isRunning);
     final lastRun = runs.isEmpty ? null : runs.first.startedAt.toLocal();
 
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: WorkoutAreaTile(
-              tileKey: const Key('workout-home-strength-hub'),
-              icon: Icons.fitness_center,
-              color: colors.primary,
-              title: loc.workoutHomeHubStrengthTitle,
-              line1: loc.workoutHomeHubStrengthWeek(
-                _controller.overview.strengthSessions,
+    return FadeSlideIn(
+      delay: const Duration(milliseconds: 120),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: WorkoutAreaTile(
+                tileKey: const Key('workout-home-strength-hub'),
+                icon: Icons.fitness_center,
+                color: colors.primary,
+                title: loc.workoutHomeHubStrengthTitle,
+                line1: loc.workoutHomeHubStrengthWeek(
+                  _controller.overview.strengthSessions,
+                ),
+                line2: last(lastGym),
+                onTap: _openStrengthHub,
               ),
-              line2: last(lastGym),
-              onTap: _openStrengthHub,
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: WorkoutAreaTile(
-              tileKey: const Key('workout-home-run-hub'),
-              icon: Icons.directions_run,
-              color: colors.tertiary,
-              title: loc.workoutHomeHubRunTitle,
-              line1: loc.workoutHomeHubRunWeek(
-                RunFormatters.distanceWithUnit(_controller.overview.runMeters),
+            const SizedBox(width: 12),
+            Expanded(
+              child: WorkoutAreaTile(
+                tileKey: const Key('workout-home-run-hub'),
+                icon: Icons.directions_run,
+                color: colors.tertiary,
+                title: loc.workoutHomeHubRunTitle,
+                line1: loc.workoutHomeHubRunWeek(
+                  RunFormatters.distanceWithUnit(
+                    _controller.overview.runMeters,
+                  ),
+                ),
+                line2: last(lastRun),
+                onTap: _openRunHub,
               ),
-              line2: last(lastRun),
-              onTap: _openRunHub,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ).animate().fadeIn(duration: 300.ms, delay: 120.ms);
+    );
   }
 
   /// The latest gym workouts and cardio sessions, newest first.
@@ -694,54 +703,58 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
 
   // ===================== FIRST-TIME EMPTY =====================
   Widget _buildFirstTimeEmpty(ThemeData theme, AppLocalizations loc) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: theme.colorScheme.primaryContainer.withAlpha(120),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withAlpha(30),
-                shape: BoxShape.circle,
+    return FadeSlideIn(
+      delay: const Duration(milliseconds: 120),
+      slideY: 0.05,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primaryContainer.withAlpha(120),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withAlpha(30),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.fitness_center,
+                  size: 32,
+                  color: theme.colorScheme.primary,
+                ),
               ),
-              child: Icon(
-                Icons.fitness_center,
-                size: 32,
-                color: theme.colorScheme.primary,
+              const SizedBox(height: 14),
+              Text(
+                loc.workoutHomeEmptyTitle,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              loc.workoutHomeEmptyTitle,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+              const SizedBox(height: 6),
+              Text(
+                loc.workoutHomeEmptySubtitle,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              loc.workoutHomeEmptySubtitle,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: _startWorkout,
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: Text(loc.workoutHomeEmptyCta),
               ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: _startWorkout,
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: Text(loc.workoutHomeEmptyCta),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ).animate().fadeIn(duration: 300.ms, delay: 120.ms).slideY(begin: 0.05);
+    );
   }
 }
 

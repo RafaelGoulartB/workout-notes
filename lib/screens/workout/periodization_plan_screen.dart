@@ -10,6 +10,7 @@ import 'periodization_phase_screen.dart';
 import 'periodization_plan_editor_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// A plan that is not necessarily the active one: its roadmap and phases,
 /// plus activating, editing, finishing, archiving and deleting it.
@@ -75,22 +76,11 @@ class _PeriodizationPlanScreenState extends State<PeriodizationPlanScreen> {
 
   Future<void> _delete() async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(loc.planningDeletePlanTitle),
-        content: Text(loc.planningDeletePlanBody(widget.plan.name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(loc.planningDelete),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.planningDeletePlanTitle,
+      message: loc.planningDeletePlanBody(widget.plan.name),
+      confirmLabel: loc.planningDelete,
     );
     if (confirmed != true) return;
     await _repository.deletePlan(widget.plan.id);

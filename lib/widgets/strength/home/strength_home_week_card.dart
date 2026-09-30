@@ -3,7 +3,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:workout_notes/services/strength_today_service.dart';
 import 'package:workout_notes/utils/strength_week_analytics.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_format.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_week_strip.dart';
 
@@ -66,7 +66,7 @@ class StrengthWeekCard extends StatelessWidget {
       snapshot?.planMaxSetsPerWeek,
     );
 
-    return RunSectionCard(
+    return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -76,7 +76,7 @@ class StrengthWeekCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    RunValueUnit(
+                    AppValueUnit(
                       value: '$done',
                       unit: loc.strengthHomeWorkoutsUnit(done),
                     ),
@@ -96,7 +96,7 @@ class StrengthWeekCard extends StatelessWidget {
                     ),
                     if (analytics.weekStreak > 0) ...[
                       const SizedBox(height: 8),
-                      RunPill(
+                      AppPill(
                         label: loc.runStatsStreakWeeks(analytics.weekStreak),
                         icon: Icons.local_fire_department_rounded,
                         color: colors.tertiary,
@@ -193,7 +193,7 @@ class _GoalRing extends StatelessWidget {
               '$percent%',
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w800,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
         ],
@@ -237,7 +237,7 @@ class _GoalLine extends StatelessWidget {
                 loc.strengthHomeWeekGoalOf(done, goal.sessions),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w700,
-                  fontFeatures: RunUi.tabular,
+                  fontFeatures: AppUi.tabular,
                 ),
               ),
               Text(
@@ -303,7 +303,7 @@ class _SetsTarget extends StatelessWidget {
               loc.strengthHomeWeekSetsOf(done, range),
               style: theme.textTheme.bodySmall?.copyWith(
                 fontWeight: FontWeight.w700,
-                fontFeatures: RunUi.tabular,
+                fontFeatures: AppUi.tabular,
               ),
             ),
           ],

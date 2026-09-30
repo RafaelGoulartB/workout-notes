@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Header card of the session editor: kind, weekday, profile bar and totals.
 class RunPlanEditorSummary extends StatelessWidget {
@@ -26,7 +26,7 @@ class RunPlanEditorSummary extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: color.withAlpha(24),
-        borderRadius: BorderRadius.circular(RunUi.cardRadius),
+        borderRadius: BorderRadius.circular(AppUi.cardRadius),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -106,7 +106,7 @@ class _SummaryStat extends StatelessWidget {
           value,
           style: theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w800,
-            fontFeatures: RunUi.tabular,
+            fontFeatures: AppUi.tabular,
           ),
         ),
         Text(

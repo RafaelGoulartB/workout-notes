@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
-import 'package:workout_notes/widgets/nutrition/progress/progress_shared.dart';
 import 'package:workout_notes/models/nutrition/nutrition_progress.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class AverageNutrientsCard extends StatelessWidget {
   final bool expanded;
@@ -60,9 +60,9 @@ class AverageNutrientsCard extends StatelessWidget {
               child: Center(child: CircularProgressIndicator()),
             )
           else if (loadFailed)
-            ProgressEmptyNote(text: loc.nutritionBalanceAverageNutrientsError)
+            AppBanner.note(loc.nutritionBalanceAverageNutrientsError)
           else if (averages == null || averages!.daysLogged == 0)
-            ProgressEmptyNote(text: loc.nutritionBalanceAverageNutrientsEmpty)
+            AppBanner.note(loc.nutritionBalanceAverageNutrientsEmpty)
           else
             AverageNutrientTable(values: averages!.values, goal: goal),
         ],

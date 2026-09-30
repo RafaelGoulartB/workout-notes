@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Header of the selected week: name, dates, totals and the one place where
 /// the week is scheduled (a button while it is not, a badge once it is).
@@ -80,12 +80,12 @@ class RunPlanWeekHeader extends StatelessWidget {
             if (isCurrent)
               Padding(
                 padding: const EdgeInsets.only(right: 4),
-                child: RunPill(label: loc.runPlanDetailCurrentWeekMark),
+                child: AppPill(label: loc.runPlanDetailCurrentWeekMark),
               ),
             if (scheduled)
               Padding(
                 padding: const EdgeInsets.only(right: 4),
-                child: RunPill(
+                child: AppPill(
                   icon: Icons.event_available,
                   label: loc.runPlanWeekScheduled,
                   color: scheme.tertiary,
@@ -109,7 +109,7 @@ class RunPlanWeekHeader extends StatelessWidget {
           spacing: 6,
           runSpacing: 6,
           children: [
-            RunPill(
+            AppPill(
               icon: Icons.straighten,
               color: scheme.onSurfaceVariant,
               label: loc.runPlanWeekSummary(
@@ -118,7 +118,7 @@ class RunPlanWeekHeader extends StatelessWidget {
               ),
             ),
             if (doneMeters > 0)
-              RunPill(
+              AppPill(
                 icon: Icons.check_circle_outline_rounded,
                 label: loc.runPlanDetailWeekProgress(
                   RunPlanUi.kmValue(doneMeters),
@@ -126,7 +126,7 @@ class RunPlanWeekHeader extends StatelessWidget {
                 ),
               ),
             if (longRun != null)
-              RunPill(
+              AppPill(
                 icon: Icons.timeline,
                 color: scheme.onSurfaceVariant,
                 label:
@@ -134,7 +134,7 @@ class RunPlanWeekHeader extends StatelessWidget {
                     '${RunPlanUi.distanceLabel(longRun.plannedDistanceMeters)}',
               ),
             if (quality > 0)
-              RunPill(
+              AppPill(
                 icon: Icons.bolt,
                 label: loc.runPlanQualityCount(quality),
               ),

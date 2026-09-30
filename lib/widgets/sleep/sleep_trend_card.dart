@@ -7,7 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
 import 'package:workout_notes/utils/date_utils.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
 
 /// Last 30 days of sleep per night against the goal, with the period average
@@ -53,7 +53,7 @@ class SleepTrendCard extends StatelessWidget {
     }
 
     if (sleepSpots.length < 2) {
-      return RunSectionCard(
+      return AppSectionCard(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 14),
           child: Text(
@@ -76,7 +76,7 @@ class SleepTrendCard extends StatelessWidget {
         (math.max(goalHours, sleepSpots.map((s) => s.y).reduce(math.max)) + 1)
             .ceilToDouble();
 
-    return RunSectionCard(
+    return AppSectionCard(
       padding: const EdgeInsets.fromLTRB(16, 14, 12, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -97,13 +97,13 @@ class SleepTrendCard extends StatelessWidget {
                       SleepUi.duration(loc, (average * 60).round()),
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w800,
-                        fontFeatures: RunUi.tabular,
+                        fontFeatures: AppUi.tabular,
                       ),
                     ),
                   ],
                 ),
               ),
-              RunPill(
+              AppPill(
                 icon: Icons.flag_outlined,
                 color: onGoal * 2 >= sleepSpots.length
                     ? colors.primary
@@ -261,13 +261,13 @@ class SleepTrendCard extends StatelessWidget {
             runSpacing: 6,
             alignment: WrapAlignment.center,
             children: [
-              RunLegendItem(color: colors.primary, label: loc.sleepMetricSleep),
+              AppLegendItem(color: colors.primary, label: loc.sleepMetricSleep),
               if (deepSpots.isNotEmpty)
-                RunLegendItem(
+                AppLegendItem(
                   color: SleepUi.deep,
                   label: loc.sleepStageDeepEstimated,
                 ),
-              RunLegendItem(
+              AppLegendItem(
                 color: colors.onSurfaceVariant,
                 dashed: true,
                 label:

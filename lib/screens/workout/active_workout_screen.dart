@@ -12,7 +12,7 @@ import '../../widgets/workout/finish_workout_sheet.dart';
 import '../../models/exercise_with_sets.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_today_card.dart';
 import 'package:workout_notes/services/workout_summary_service.dart';
 import 'package:workout_notes/utils/workout_volume_comparison.dart';
@@ -264,7 +264,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
     ).format(DateTime.now());
 
     return ListView(
-      padding: RunUi.screenPadding.copyWith(top: 4),
+      padding: AppUi.screenPadding.copyWith(top: 4),
       children: [
         Text(
           loc.strengthHomeNewWorkout,
@@ -281,12 +281,12 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
         ),
         const SizedBox(height: 18),
         if (suggestion != null)
-          RunSoftCard(
+          AppSoftCard(
             key: const Key('active-workout-suggestion'),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                RunTodayHeader(
+                AppTodayHeader(
                   title: loc.activeWorkoutSuggestionTitle,
                   icon: Icons.lightbulb_outline_rounded,
                   showDate: false,
@@ -302,10 +302,10 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
             ),
           )
         else
-          RunSectionCard(
+          AppSectionCard(
             child: Row(
               children: [
-                const RunIconBadge(
+                const AppIconBadge(
                   Icons.fitness_center,
                   size: 44,
                   iconSize: 22,
@@ -333,20 +333,20 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
               ],
             ),
           ),
-        RunSectionHeader(loc.activeWorkoutBuildSection),
-        RunSectionCard(
+        AppSectionHeader(loc.activeWorkoutBuildSection),
+        AppSectionCard(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-          child: RunDividedList(
+          child: AppDividedList(
             children: [
-              RunListRow(
+              AppListRow(
                 key: const Key('active-workout-add-exercise'),
-                leading: const RunIconBadge(Icons.add_rounded),
+                leading: const AppIconBadge(Icons.add_rounded),
                 title: loc.activeWorkoutAddExercise,
                 subtitle: loc.activeWorkoutAddExerciseHint,
                 onTap: _pickExercise,
               ),
-              RunListRow(
-                leading: RunIconBadge(
+              AppListRow(
+                leading: AppIconBadge(
                   Icons.repeat_rounded,
                   color: colors.secondary,
                 ),

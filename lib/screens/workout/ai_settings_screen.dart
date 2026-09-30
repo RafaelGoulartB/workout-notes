@@ -8,8 +8,8 @@ import '../../services/ai_service.dart';
 import '../../state/ai_settings_notifier.dart';
 import '../../utils/ai_error_localizer.dart';
 import '../../widgets/ai/ai_provider_picker_sheet.dart';
-import '../../widgets/empty_state_placeholder.dart';
 import '../../widgets/settings/settings.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class AiSettingsScreen extends StatefulWidget {
   const AiSettingsScreen({super.key});
@@ -48,14 +48,14 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           _buildConnectionStatus(settings),
-          SettingsSectionHeader(text: l10n.aiSettingsSectionConnection),
+          AppSectionHeader(l10n.aiSettingsSectionConnection, padding: AppSectionHeader.compactPadding),
           _buildProvidersCard(settings),
-          SettingsSectionHeader(text: l10n.aiSettingsSectionBehavior),
+          AppSectionHeader(l10n.aiSettingsSectionBehavior, padding: AppSectionHeader.compactPadding),
           _buildResponseStyleCard(settings),
           _buildContextModeCard(settings),
-          SettingsSectionHeader(text: l10n.aiSettingsSectionAppearance),
+          AppSectionHeader(l10n.aiSettingsSectionAppearance, padding: AppSectionHeader.compactPadding),
           _buildAppearanceCard(settings),
-          SettingsSectionHeader(text: l10n.aiSettingsSectionAdvanced),
+          AppSectionHeader(l10n.aiSettingsSectionAdvanced, padding: AppSectionHeader.compactPadding),
           _buildAdvancedCard(),
           _buildAboutCard(),
         ],
@@ -148,7 +148,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
         if (settings.providers.isEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: EmptyStatePlaceholder(
+            child: AppEmptyState(
               icon: Icons.cloud_off_rounded,
               title: l10n.aiSettingsNoProviders,
               subtitle: l10n.aiSettingsNoProvidersSubtitle,
@@ -392,12 +392,13 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
 
   Future<void> _confirmRemove(AiProvider p) async {
     final l10n = AppLocalizations.of(context)!;
-    final ok = await SettingsConfirmDialog.show(
-      context: context,
+    final ok = await showConfirmDialog(
+      context,
       title: l10n.aiSettingsRemoveConfirmTitle(p.name),
       message: l10n.aiSettingsRemoveConfirmBody,
       confirmLabel: l10n.aiSettingsRemove,
-      cancelLabel: l10n.commonCancel,
+      destructive: true,
+      icon: Icons.warning_amber_rounded,
     );
     if (ok == true) {
       await _notifier.deleteProvider(p.id);

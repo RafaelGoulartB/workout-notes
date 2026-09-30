@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
@@ -32,6 +31,7 @@ import 'settings_screen.dart';
 import 'saved_meals_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Nutrition dashboard. Shows the day's totals at a glance, a tools
 /// grid (progress, saved meals, food library, settings) and a
@@ -387,26 +387,13 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   Future<void> _deleteItem(MealLogItem item) async {
     if (!mounted) return;
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(loc.nutritionDeleteItem),
-        content: Text(loc.nutritionDeleteItemConfirm),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(loc.nutritionCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(dialogContext).colorScheme.error,
-              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
-            ),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.nutritionDeleteItem,
+      message: loc.nutritionDeleteItemConfirm,
+      confirmLabel: loc.commonDelete,
+      cancelLabel: loc.nutritionCancel,
+      destructive: true,
     );
     if (confirmed != true || !mounted) return;
     try {
@@ -442,38 +429,56 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
         .toList();
     final empty = _mealTypes.isEmpty && orphanMeals.isEmpty && _meals.isEmpty;
     if (empty) {
-      return [SliverToBoxAdapter(child: _NutritionHomeEmptyMeals())];
+      return [
+        SliverToBoxAdapter(
+          child: AppEmptyCard(
+            icon: Icons.restaurant_outlined,
+            title: AppLocalizations.of(context)!.nutritionHomeEmptyMeals,
+            subtitle: AppLocalizations.of(
+              context,
+            )!.nutritionHomeEmptyMealsSubtitle,
+          ),
+        ),
+      ];
     }
     return [
       for (final type in _mealTypes)
         SliverToBoxAdapter(
-          child: NutritionMealCard(
-            title: type.displayName(loc),
-            emptyLabel: loc.nutritionHomeEmptyMeals,
-            meal: _mealFor(type.key),
-            onOpen: () => _openMealInDay(type.key),
-            onAdd: () => _addToMeal(type),
-            onEditItem: _editItem,
-          ).animate().fadeIn(duration: 220.ms, delay: 30.ms),
+          child: FadeSlideIn(
+            duration: const Duration(milliseconds: 220),
+            delay: const Duration(milliseconds: 30),
+            child: NutritionMealCard(
+              title: type.displayName(loc),
+              emptyLabel: loc.nutritionHomeEmptyMeals,
+              meal: _mealFor(type.key),
+              onOpen: () => _openMealInDay(type.key),
+              onAdd: () => _addToMeal(type),
+              onEditItem: _editItem,
+            ),
+          ),
         ),
       for (final meal in orphanMeals)
         SliverToBoxAdapter(
-          child: NutritionMealCard(
-            title: meal.log.displayName(loc),
-            emptyLabel: loc.nutritionHomeEmptyMeals,
-            meal: meal,
-            onOpen: () => _openMealInDay(meal.log.mealType),
-            onEditItem: _editItem,
-            onAdd: () => _addToMeal(
-              MealTypeDefinition(
-                id: meal.log.mealType,
-                key: meal.log.mealType,
-                name: meal.log.name,
-                orderIndex: 0,
-                createdAt: DateTime.now(),
+          child: FadeSlideIn(
+            duration: const Duration(milliseconds: 220),
+            delay: const Duration(milliseconds: 30),
+            child: NutritionMealCard(
+              title: meal.log.displayName(loc),
+              emptyLabel: loc.nutritionHomeEmptyMeals,
+              meal: meal,
+              onOpen: () => _openMealInDay(meal.log.mealType),
+              onEditItem: _editItem,
+              onAdd: () => _addToMeal(
+                MealTypeDefinition(
+                  id: meal.log.mealType,
+                  key: meal.log.mealType,
+                  name: meal.log.name,
+                  orderIndex: 0,
+                  createdAt: DateTime.now(),
+                ),
               ),
             ),
-          ).animate().fadeIn(duration: 220.ms, delay: 30.ms),
+          ),
         ),
     ];
   }
@@ -596,26 +601,30 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                           child: LoadErrorBanner(onRetry: _load),
                         ),
                       SliverToBoxAdapter(
-                        child:
-                            NutritionSummaryCard(
-                                  summary: _summary,
-                                  goal: _effective.goal,
-                                  planInfo: _effective,
-                                  onTap: () => _openDay(),
-                                  onConfigureGoal: _openSettings,
-                                )
-                                .animate()
-                                .fadeIn(duration: 300.ms, delay: 60.ms)
-                                .slideY(begin: 0.05),
+                        child: FadeSlideIn(
+                          delay: const Duration(milliseconds: 60),
+                          slideY: 0.05,
+                          child: NutritionSummaryCard(
+                            summary: _summary,
+                            goal: _effective.goal,
+                            planInfo: _effective,
+                            onTap: () => _openDay(),
+                            onConfigureGoal: _openSettings,
+                          ),
+                        ),
                       ),
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                         sliver: SliverToBoxAdapter(
-                          child: _NutritionToolsGrid(
-                            onProgress: _openProgress,
-                            onSavedMeals: _openSavedMeals,
-                            onFoods: _openFoodLibrary,
-                          ).animate().fadeIn(duration: 350.ms, delay: 120.ms),
+                          child: FadeSlideIn(
+                            duration: const Duration(milliseconds: 350),
+                            delay: const Duration(milliseconds: 120),
+                            child: _NutritionToolsGrid(
+                              onProgress: _openProgress,
+                              onSavedMeals: _openSavedMeals,
+                              onFoods: _openFoodLibrary,
+                            ),
+                          ),
                         ),
                       ),
                       SliverToBoxAdapter(
@@ -1036,60 +1045,6 @@ class _NutritionToolTile extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// First-time / empty state for the "today" meals list. Shown when
-/// the meal catalog is empty AND no meals have been logged yet.
-class _NutritionHomeEmptyMeals extends StatelessWidget {
-  const _NutritionHomeEmptyMeals();
-
-  @override
-  Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withAlpha(28),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.restaurant_outlined,
-                color: theme.colorScheme.primary,
-                size: 26,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              loc.nutritionHomeEmptyMeals,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              loc.nutritionHomeEmptyMealsSubtitle,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
         ),
       ),
     );

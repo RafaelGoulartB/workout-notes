@@ -8,8 +8,8 @@ import 'package:workout_notes/screens/run/plan_editor/run_plan_editor_sheets.dar
 import 'package:workout_notes/screens/run/plan_editor/run_plan_editor_summary.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Session editor — the running counterpart of [RoutineDayEditorScreen].
 /// A session is either a continuous run (just a target) or a structured one
@@ -73,25 +73,12 @@ class _RunPlanWorkoutEditorScreenState
     final workout = _workout;
     if (workout == null) return;
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.runWorkoutDeleteConfirm(workout.name)),
-        content: Text(loc.commonActionCannotBeUndone),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.runWorkoutDeleteConfirm(workout.name),
+      message: loc.commonActionCannotBeUndone,
+      confirmLabel: loc.commonDelete,
+      destructive: true,
     );
     if (confirmed != true) return;
     await _repo.deleteWorkout(workout.id);
@@ -349,7 +336,7 @@ class _RunPlanWorkoutEditorScreenState
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           RunPlanEditorSummary(workout: workout),
-          RunSectionHeader(
+          AppSectionHeader(
             loc.runWorkoutStepsTitle,
             padding: const EdgeInsets.fromLTRB(4, 20, 0, 8),
           ),

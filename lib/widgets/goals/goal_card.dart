@@ -3,7 +3,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/goal.dart';
 import 'package:workout_notes/widgets/goals/goal_formatters.dart';
 import 'package:workout_notes/widgets/goals/goal_progress_ring.dart';
-import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Where a goal stands against the time already spent in its period.
 enum GoalPace { done, onTrack, behind, paused }
@@ -112,7 +112,7 @@ class GoalCard extends StatelessWidget {
                       '${(progress.percent.clamp(0.0, 1.0) * 100).round()}%',
                       style: theme.textTheme.labelSmall?.copyWith(
                         fontWeight: FontWeight.w800,
-                        fontFeatures: RunUi.tabular,
+                        fontFeatures: AppUi.tabular,
                       ),
                     ),
             ),
@@ -168,7 +168,7 @@ class GoalCard extends StatelessWidget {
                   ),
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w800,
-                    fontFeatures: RunUi.tabular,
+                    fontFeatures: AppUi.tabular,
                   ),
                 ),
                 Text(
@@ -181,7 +181,7 @@ class GoalCard extends StatelessWidget {
                       : loc.goalRowLeft(_value(left)),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colors.onSurfaceVariant,
-                    fontFeatures: RunUi.tabular,
+                    fontFeatures: AppUi.tabular,
                   ),
                 ),
               ],
