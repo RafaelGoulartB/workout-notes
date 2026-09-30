@@ -453,6 +453,7 @@ class ExportImportRepository extends BaseRepository {
       'sleep_efficiency',
       'stage_confidence',
       'stage_algorithm_version',
+      'stage_timeline',
     };
     return rows
         .map((raw) {

@@ -1,3 +1,4 @@
+import 'package:workout_notes/models/sleep_night_timeline.dart';
 import 'package:workout_notes/models/sleep_stage_epoch.dart';
 import 'package:workout_notes/models/sleep_stage_summary.dart';
 import 'package:workout_notes/models/sleep_stage_type.dart';
@@ -106,6 +107,11 @@ class SleepStageAnalysisService {
           : (sleepSeconds / classifiedSeconds * 100).clamp(0.0, 100.0),
       stageConfidence: knownSeconds == 0 ? 0 : confidenceSeconds / knownSeconds,
       algorithmVersion: version,
+      timeline: SleepNightTimeline.fromEpochs(
+        start: sessionStart,
+        end: sessionEnd,
+        epochs: ordered,
+      ),
     );
   }
 

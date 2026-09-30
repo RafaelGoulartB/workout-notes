@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
+import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
@@ -12,8 +13,11 @@ abstract final class SleepUi {
   static const Color sleeping = Colors.lightBlue;
   static const Color deep = Colors.indigo;
   static const Color unknown = Colors.grey;
-  static const Color restless = Colors.deepPurple;
-  static const Color snoring = Colors.teal;
+  static const Color restless = Color(0xFFE87BA4);
+  static const Color snoring = Color(0xFF8E7CE8);
+
+  /// Room sound in the night chart (birds, HVAC, traffic).
+  static const Color ambient = Color(0xFF1BAF7A);
 
   /// Inner padding of the sleep cards (an [AppSoftCard]).
   static const EdgeInsets cardPadding = EdgeInsets.fromLTRB(20, 18, 16, 16);
@@ -60,21 +64,32 @@ abstract final class SleepUi {
   }
 }
 
-/// Thin horizontal bar with the awake / sleeping / deep split of a night.
+/// Thin horizontal bar of a night: chronological (when the night timeline is
+/// stored) or the awake / sleeping / deep split.
 class SleepStageBar extends StatelessWidget {
   final SleepMonitorSession session;
   final double height;
 
   const SleepStageBar({super.key, required this.session, this.height = 6});
 
+  static Color stageColor(SleepStageType stage) => switch (stage) {
+    SleepStageType.awake => SleepUi.awake,
+    SleepStageType.sleeping => SleepUi.sleeping,
+    SleepStageType.deep => SleepUi.deep,
+    SleepStageType.unknown => SleepUi.unknown,
+  };
+
   @override
   Widget build(BuildContext context) {
-    final parts = [
-      (session.awakeMinutes ?? 0, SleepUi.awake),
-      (session.sleepingMinutes ?? 0, SleepUi.sleeping),
-      (session.deepSleepMinutes ?? 0, SleepUi.deep),
-      (session.unknownMinutes ?? 0, SleepUi.unknown),
-    ].where((part) => part.$1 > 0).toList();
+    final timeline = session.timeline;
+    final parts = timeline != null
+        ? _runs(timeline.stages)
+        : [
+            (session.awakeMinutes ?? 0, SleepUi.awake),
+            (session.sleepingMinutes ?? 0, SleepUi.sleeping),
+            (session.deepSleepMinutes ?? 0, SleepUi.deep),
+            (session.unknownMinutes ?? 0, SleepUi.unknown),
+          ].where((part) => part.$1 > 0).toList();
     if (parts.isEmpty) return const SizedBox.shrink();
     return ClipRRect(
       borderRadius: BorderRadius.circular(99),
@@ -91,6 +106,20 @@ class SleepStageBar extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static List<(int, Color)> _runs(List<SleepStageType> stages) {
+    final runs = <(int, Color)>[];
+    var i = 0;
+    while (i < stages.length) {
+      var j = i;
+      while (j + 1 < stages.length && stages[j + 1] == stages[i]) {
+        j++;
+      }
+      runs.add((j - i + 1, stageColor(stages[i])));
+      i = j + 1;
+    }
+    return runs;
   }
 }
 

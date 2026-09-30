@@ -1,5 +1,6 @@
 import 'package:workout_notes/models/sleep_monitor_mode.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
+import 'package:workout_notes/models/sleep_night_timeline.dart';
 
 /// Durable aggregate for one microphone monitoring session.
 class SleepMonitorSession {
@@ -61,6 +62,9 @@ class SleepMonitorSession {
   final double? stageConfidence;
   final String? stageAlgorithmVersion;
 
+  /// Encoded [SleepNightTimeline] for the night chart (bedside v6+).
+  final String? stageTimeline;
+
   const SleepMonitorSession({
     required this.id,
     required this.sleepEntryId,
@@ -98,7 +102,11 @@ class SleepMonitorSession {
     this.sleepEfficiency,
     this.stageConfidence,
     this.stageAlgorithmVersion,
+    this.stageTimeline,
   });
+
+  /// Decoded night chart data; null when absent or unreadable.
+  SleepNightTimeline? get timeline => SleepNightTimeline.decode(stageTimeline);
 
   bool get hasSleepStages =>
       analysisStatus == analysisAvailable &&
@@ -145,6 +153,7 @@ class SleepMonitorSession {
     double? sleepEfficiency,
     double? stageConfidence,
     String? stageAlgorithmVersion,
+    String? stageTimeline,
   }) {
     return SleepMonitorSession(
       id: id,
@@ -185,6 +194,7 @@ class SleepMonitorSession {
       stageConfidence: stageConfidence ?? this.stageConfidence,
       stageAlgorithmVersion:
           stageAlgorithmVersion ?? this.stageAlgorithmVersion,
+      stageTimeline: stageTimeline ?? this.stageTimeline,
     );
   }
 
@@ -245,6 +255,7 @@ class SleepMonitorSession {
     if (stageAlgorithmVersion != null) {
       map['stage_algorithm_version'] = stageAlgorithmVersion;
     }
+    if (stageTimeline != null) map['stage_timeline'] = stageTimeline;
     return map;
   }
 
@@ -299,6 +310,7 @@ class SleepMonitorSession {
       sleepEfficiency: (map['sleep_efficiency'] as num?)?.toDouble(),
       stageConfidence: (map['stage_confidence'] as num?)?.toDouble(),
       stageAlgorithmVersion: map['stage_algorithm_version'] as String?,
+      stageTimeline: map['stage_timeline'] as String?,
     );
   }
 

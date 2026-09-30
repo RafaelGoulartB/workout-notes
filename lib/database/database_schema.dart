@@ -225,6 +225,7 @@ abstract final class DatabaseSchema {
         sleep_efficiency REAL,
         stage_confidence REAL,
         stage_algorithm_version TEXT,
+        stage_timeline TEXT,
         end_reason TEXT,
         created_at TEXT NOT NULL,
         FOREIGN KEY (sleep_entry_id) REFERENCES sleep_entries(id) ON DELETE CASCADE

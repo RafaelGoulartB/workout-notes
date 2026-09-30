@@ -9,7 +9,7 @@ import 'package:workout_notes/services/run_route_codec.dart';
 import 'support/schema_snapshot.dart';
 import 'support/test_db.dart';
 
-const _latest = 58;
+const _latest = 59;
 const _now = '2026-08-01T08:00:00.000';
 
 /// Upgrade coverage for every step from the v37 migration floor to the current
@@ -688,6 +688,18 @@ void main() {
       final row = (await database.query('sleep_monitor_sessions')).single;
       expect(row['restless_sleep_minutes'], isNull);
       expect(row['snore_minutes'], isNull);
+    });
+  });
+
+  group('v59', () {
+    test('adds the night timeline to monitor sessions', () async {
+      final database = await openAt(58);
+      await DatabaseSchema.onUpgrade(database, 58, 59);
+      await DatabaseSchema.onUpgrade(database, 58, 59);
+      expect(
+        await columnNames(database, 'sleep_monitor_sessions'),
+        contains('stage_timeline'),
+      );
     });
   });
 }

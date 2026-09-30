@@ -16,6 +16,9 @@ class SleepAudioEvidence {
   /// Seconds of sound attributed to the person (movement, voice). Ambient
   /// sound and snoring are excluded.
   final double movementSeconds;
+
+  /// Seconds of sound attributed to the room (birds, HVAC, traffic).
+  final double ambientSeconds;
   final bool snoring;
 
   const SleepAudioEvidence({
@@ -23,6 +26,7 @@ class SleepAudioEvidence {
     required this.validSignal,
     required this.likelihoods,
     this.movementSeconds = 0,
+    this.ambientSeconds = 0,
     this.snoring = false,
   });
 
@@ -193,6 +197,7 @@ class SleepAudioEvidenceExtractor {
         reason: 'environmental_sound',
         validSignal: true,
         likelihoods: [for (final v in _groups(0)) math.sqrt(v)],
+        ambientSeconds: active,
       );
     }
     final levelStddev = segment.audioLevelStddevDb;
@@ -210,7 +215,9 @@ class SleepAudioEvidenceExtractor {
     final lowShare = excess != null && excess.total > 0
         ? (excess.bands[0] + excess.bands[1]) / excess.total
         : (energy[0] + energy[1]) / total;
-    if (periodic && noise >= loudActivityNoiseDb && lowShare >= snoringLowShare) {
+    if (periodic &&
+        noise >= loudActivityNoiseDb &&
+        lowShare >= snoringLowShare) {
       return const SleepAudioEvidence(
         reason: 'snoring',
         validSignal: true,
@@ -263,8 +270,7 @@ class SleepAudioEvidenceExtractor {
         floor.isFinite &&
         peak - floor < maximumEnvironmentalProminenceDb &&
         (energy[0] / total >= environmentalLowBandFraction ||
-            (energy[3] + energy[4]) / total >=
-                environmentalHighBandFraction)) {
+            (energy[3] + energy[4]) / total >= environmentalHighBandFraction)) {
       return true;
     }
     if (excess == null || segment.noiseScore! >= maximumEnvironmentalNoiseDb) {

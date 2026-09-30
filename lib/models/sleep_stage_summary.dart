@@ -1,3 +1,5 @@
+import 'package:workout_notes/models/sleep_night_timeline.dart';
+
 class SleepStageSummary {
   final DateTime? sleepOnsetAt;
   final DateTime? finalWakeAt;
@@ -16,6 +18,9 @@ class SleepStageSummary {
   final double stageConfidence;
   final String algorithmVersion;
 
+  /// Minute-by-minute night for the chart; null without epochs.
+  final SleepNightTimeline? timeline;
+
   const SleepStageSummary({
     required this.sleepOnsetAt,
     required this.finalWakeAt,
@@ -30,6 +35,7 @@ class SleepStageSummary {
     required this.sleepEfficiency,
     required this.stageConfidence,
     required this.algorithmVersion,
+    this.timeline,
   });
 
   int get estimatedSleepMinutes => sleepingMinutes + deepSleepMinutes;

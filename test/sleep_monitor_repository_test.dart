@@ -3,8 +3,10 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
+import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/repositories/sleep_repository.dart';
+import 'package:workout_notes/services/sleep_wake_engine.dart';
 import 'support/sleep_bedside_fixture.dart';
 import 'support/test_db.dart';
 
@@ -191,6 +193,79 @@ void main() {
       expect(await database.query('sleep_entries'), hasLength(1));
     },
   );
+
+  group('night timeline', () {
+    Map<String, dynamic> quietNight() => {
+      'session': bedsideSession(minutes: 240).toMap(),
+      'segments': [for (var i = 0; i < 480; i++) bedsideSegment(i).toMap()],
+    };
+
+    test('import stores the minute-by-minute night for the chart', () async {
+      final imported = await repository.importNativeSpool(quietNight());
+      final stored = (await repository.getSession(imported.id))!;
+      final timeline = stored.timeline!;
+      expect(timeline.length, 240);
+      expect(timeline.stages.first, SleepStageType.awake);
+      expect(timeline.stages.last, SleepStageType.sleeping);
+      expect(stored.stageTimeline!.length, lessThan(2000));
+    });
+
+    Future<SleepMonitorSession> olderNight({required int entryEstimate}) async {
+      final imported = await repository.importNativeSpool(quietNight());
+      await database.update(
+        'sleep_monitor_sessions',
+        {
+          'stage_algorithm_version': 'sleep-wake-bedside-v5',
+          'stage_timeline': null,
+          'estimated_sleep_minutes': 180,
+          'restless_sleep_minutes': null,
+        },
+        where: 'id = ?',
+        whereArgs: [imported.id],
+      );
+      await database.update(
+        'sleep_entries',
+        {
+          'estimated_sleep_minutes': entryEstimate,
+          'sleep_minutes': entryEstimate,
+        },
+        where: 'id = ?',
+        whereArgs: [imported.sleepEntryId],
+      );
+      return (await repository.getSession(imported.id))!;
+    }
+
+    test('an older night is re-staged once from its archive', () async {
+      final old = await olderNight(entryEstimate: 180);
+      expect(
+        (await repository.getSessionsNeedingAnalysisRefresh()).map((s) => s.id),
+        [old.id],
+      );
+      final refreshed = await repository.refreshAnalysis(quietNight());
+      expect(
+        refreshed!.stageAlgorithmVersion,
+        SleepWakeEngine.algorithmVersion,
+      );
+      final stored = (await repository.getSession(old.id))!;
+      expect(stored.timeline, isNotNull);
+      expect(stored.restlessSleepMinutes, 0);
+      expect(stored.estimatedSleepMinutes, greaterThan(220));
+      // The entry still carried this session's estimate, so it follows.
+      final entry = (await repository.getSleepEntry(old.sleepEntryId!))!;
+      expect(entry.estimatedSleepMinutes, stored.estimatedSleepMinutes);
+      expect(entry.sleepMinutes, stored.estimatedSleepMinutes);
+      expect(await repository.getSessionsNeedingAnalysisRefresh(), isEmpty);
+      expect(await repository.refreshAnalysis(quietNight()), isNull);
+    });
+
+    test('re-staging never overwrites an entry that changed since', () async {
+      final old = await olderNight(entryEstimate: 150);
+      expect(await repository.refreshAnalysis(quietNight()), isNotNull);
+      final entry = (await repository.getSleepEntry(old.sleepEntryId!))!;
+      expect(entry.estimatedSleepMinutes, 150);
+      expect(entry.sleepMinutes, 150);
+    });
+  });
 
   setUpAll(initSqfliteFfiForTests);
 

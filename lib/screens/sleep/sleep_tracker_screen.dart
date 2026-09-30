@@ -58,6 +58,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   bool _hasMoreHistory = false;
   bool _isLoadingMoreHistory = false;
   int _lastRecoveryCount = 0;
+  int _lastAnalysisRevision = 0;
   late DateTime _weekEnd;
   bool _isChangingWeek = false;
   int _sleepGoalMinutes = SleepGoalService.defaultGoalMinutes;
@@ -68,6 +69,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     _weekEnd = dayOf(DateTime.now());
     _monitorService.addListener(_onMonitorChanged);
     _lastRecoveryCount = _monitorService.recoveredCount;
+    _lastAnalysisRevision = _monitorService.analysisRevision;
     _bootstrap();
     if (_lastRecoveryCount > 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -96,6 +98,10 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _showRecoveryMessage(_lastRecoveryCount);
         });
+      }
+      if (_monitorService.analysisRevision > _lastAnalysisRevision) {
+        _lastAnalysisRevision = _monitorService.analysisRevision;
+        _load();
       }
       if (!_monitorService.isMonitoring &&
           (_monitorService.state.status == 'completed' ||

@@ -255,6 +255,7 @@ class SleepWakeEngine {
       algorithmVersion: e.algorithmVersion,
       source: e.source,
       movementSeconds: e.movementSeconds,
+      ambientSeconds: e.ambientSeconds,
       snoring: e.snoring,
     );
   }
@@ -410,6 +411,7 @@ class SleepWakeCursor {
       algorithmVersion: SleepWakeEngine.algorithmVersion,
       source: SleepWakeEngine.source,
       movementSeconds: evidence?.movementSeconds ?? 0,
+      ambientSeconds: evidence?.ambientSeconds ?? 0,
       snoring: evidence?.snoring ?? false,
     );
   }

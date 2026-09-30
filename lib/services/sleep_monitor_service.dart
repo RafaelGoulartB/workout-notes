@@ -25,7 +25,8 @@ class SleepMonitorService extends ChangeNotifier {
   static const methods = MethodChannel('workout_notes/sleep_monitor/methods');
   static const events = EventChannel('workout_notes/sleep_monitor/events');
 
-  final SleepMonitorRepository _repository = DatabaseHelper.instance.sleepMonitorRepo;
+  final SleepMonitorRepository _repository =
+      DatabaseHelper.instance.sleepMonitorRepo;
   SleepMonitorState _state = SleepMonitorState.initial(
     supported: defaultTargetPlatform == TargetPlatform.android,
   );
@@ -46,6 +47,11 @@ class SleepMonitorService extends ChangeNotifier {
   bool get isSupported => _state.supported;
   bool get isMonitoring => _state.isActive;
   int get recoveredCount => _recoveredCount;
+
+  /// Bumped when stored nights are re-staged in the background, so screens
+  /// showing them reload without announcing a recovery.
+  int get analysisRevision => _analysisRevision;
+  int _analysisRevision = 0;
 
   /// Subscribes to the native events, reads capabilities/state and imports
   /// pending spools. Concurrent and later callers share the same run; a failed
@@ -484,6 +490,26 @@ class SleepMonitorService extends ChangeNotifier {
             }
           } catch (error) {
             _setError('import_failed', error.toString());
+          }
+        }
+        // Upgrade recent nights staged by an older engine (or without the
+        // night chart) while their archive still exists.
+        if (await store.isEnabled()) {
+          for (final session
+              in await _repository.getSessionsNeedingAnalysisRefresh()) {
+            if (_state.isActive) break;
+            try {
+              final archive = await store.readSession(session.id);
+              if (archive == null) continue;
+              final refreshed = await _repository.refreshAnalysis(archive);
+              if (refreshed != null) {
+                _analysisRevision++;
+                await store.save(archive, resultSummary: refreshed.toMap());
+                notifyListeners();
+              }
+            } catch (error) {
+              _setError('import_failed', error.toString());
+            }
           }
         }
       }

@@ -20,6 +20,9 @@ class SleepStageEpoch {
   /// Seconds of sound attributed to the person in this window (movement,
   /// voice), excluding ambient sound and snoring. Drives restlessness.
   final double movementSeconds;
+
+  /// Seconds of sound attributed to the room (birds, HVAC, traffic).
+  final double ambientSeconds;
   final bool snoring;
 
   const SleepStageEpoch({
@@ -35,6 +38,7 @@ class SleepStageEpoch {
     required this.algorithmVersion,
     this.source = 'acoustic_model',
     this.movementSeconds = 0,
+    this.ambientSeconds = 0,
     this.snoring = false,
   });
 
@@ -57,6 +61,7 @@ class SleepStageEpoch {
     'algorithm_version': algorithmVersion,
     'source': source,
     'movement_seconds': movementSeconds,
+    'ambient_seconds': ambientSeconds,
     'snoring': snoring,
   };
 
@@ -75,6 +80,7 @@ class SleepStageEpoch {
           (map['algorithm_version'] as String?) ?? 'unknown-model',
       source: (map['source'] as String?) ?? 'acoustic_model',
       movementSeconds: (map['movement_seconds'] as num?)?.toDouble() ?? 0,
+      ambientSeconds: (map['ambient_seconds'] as num?)?.toDouble() ?? 0,
       snoring: map['snoring'] == true,
     );
   }

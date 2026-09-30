@@ -243,6 +243,13 @@ abstract final class DatabaseMigrations {
         );
       }
     }
+    if (step(59)) {
+      // Minute-by-minute night summary for the sleep chart (~2 KB a night).
+      await tryExecute(
+        db,
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN stage_timeline TEXT',
+      );
+    }
   }
 
   /// Statements that create the v56 indexes. Also used by `onCreate`.

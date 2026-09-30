@@ -183,6 +183,7 @@ class SleepMonitorRepository extends BaseRepository {
           ? stageSummary.sleepEfficiency
           : null,
       stageAlgorithmVersion: stageSummary?.algorithmVersion,
+      stageTimeline: stageSummary?.timeline?.encode(),
     );
     final database = await db;
 
@@ -330,6 +331,137 @@ class SleepMonitorRepository extends BaseRepository {
     }, expectedStageVersion: current.stageAlgorithmVersion);
   }
 
+  /// Recent bedside nights whose analysis predates the current engine or has
+  /// no night timeline; [refreshAnalysis] can upgrade them from an archive.
+  Future<List<SleepMonitorSession>> getSessionsNeedingAnalysisRefresh({
+    int limit = 14,
+  }) async {
+    final rows = await (await db).query(
+      'sleep_monitor_sessions',
+      where:
+          'algorithm_version IN '
+          '(${List.filled(SleepWakeEngine.featureVersions.length, '?').join(', ')}) '
+          'AND status IN (?, ?) '
+          'AND (stage_algorithm_version IS NULL OR stage_algorithm_version != ? '
+          'OR stage_timeline IS NULL)',
+      whereArgs: [
+        ...SleepWakeEngine.featureVersions,
+        SleepMonitorSession.completed,
+        SleepMonitorSession.interrupted,
+        SleepWakeEngine.algorithmVersion,
+      ],
+      orderBy: 'started_at DESC',
+      limit: limit,
+    );
+    return rows.map(SleepMonitorSession.fromMap).toList();
+  }
+
+  /// Re-stages an already imported night from its diagnostic archive with the
+  /// current engine. Only the session's analysis changes; the linked sleep
+  /// entry follows only while it still carries this session's untouched
+  /// estimate (a manual correction or a longer night on the same date wins).
+  /// Returns null when nothing was updated.
+  Future<SleepMonitorSession?> refreshAnalysis(
+    Map<String, dynamic> archive,
+  ) async {
+    final raw = archive['session'];
+    if (raw is! Map || raw['id'] is! String || archive['segments'] is! List) {
+      return null;
+    }
+    final current = await getSession(raw['id'] as String);
+    if (current == null ||
+        !SleepWakeEngine.supports(current) ||
+        (current.stageAlgorithmVersion == SleepWakeEngine.algorithmVersion &&
+            current.stageTimeline != null) ||
+        !{
+          SleepMonitorSession.completed,
+          SleepMonitorSession.interrupted,
+        }.contains(current.status) ||
+        DateTime.tryParse(raw['started_at']?.toString() ?? '') !=
+            current.startedAt ||
+        DateTime.tryParse(raw['ended_at']?.toString() ?? '') !=
+            current.endedAt) {
+      return null;
+    }
+    final segments = (archive['segments'] as List)
+        .whereType<Map>()
+        .map(
+          (row) => SleepMonitorSegment.fromMap(Map<String, dynamic>.from(row)),
+        )
+        .where((segment) => segment.sessionId == current.id)
+        .toList();
+    final end = current.endedAt;
+    if (end == null || !segments.any((s) => s.hasSpectralFeatures)) {
+      return null;
+    }
+    final result = const SleepWakeEngine().run(
+      session: current,
+      segments: segments,
+    );
+    if (!result.ran) return null;
+    final summary = const SleepStageAnalysisService().summarize(
+      sessionStart: current.startedAt,
+      sessionEnd: end,
+      epochs: result.epochs,
+    );
+    // Never trade an existing estimate for an incomplete one.
+    if (summary == null ||
+        summary.unknownMinutes > (current.timeInBedMinutes ?? 0) * 0.2) {
+      return null;
+    }
+    final refreshed = current.copyWith(
+      analysisStatus: SleepMonitorSession.analysisAvailable,
+      estimatedSleepMinutes: summary.estimatedSleepMinutes,
+      sleepOnsetAt: summary.sleepOnsetAt,
+      finalWakeAt: summary.finalWakeAt,
+      sleepLatencyMinutes: summary.sleepOnsetAt == null
+          ? null
+          : summary.sleepLatencyMinutes,
+      awakeMinutes: summary.awakeMinutes,
+      sleepingMinutes: summary.sleepingMinutes,
+      unknownMinutes: summary.unknownMinutes,
+      restlessSleepMinutes: summary.restlessSleepMinutes,
+      snoreMinutes: summary.snoreMinutes,
+      awakeningCount: summary.awakeningCount,
+      sleepEfficiency: summary.sleepEfficiency,
+      stageAlgorithmVersion: summary.algorithmVersion,
+      stageTimeline: summary.timeline?.encode(),
+    );
+    await (await db).transaction((txn) async {
+      await txn.update(
+        'sleep_monitor_sessions',
+        {
+          ...refreshed.toMap(),
+          // copyWith cannot clear a value; a night without a final wake
+          // must not keep the previous engine's.
+          'final_wake_at': summary.finalWakeAt?.toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [current.id],
+      );
+      final entryId = current.sleepEntryId;
+      final previous = current.estimatedSleepMinutes;
+      if (entryId == null || previous == null) return;
+      final entry = await _sleepEntries.getById(txn, entryId);
+      if (entry == null ||
+          entry.source != 'monitored' ||
+          entry.estimatedSleepMinutes != previous) {
+        return;
+      }
+      await txn.update(
+        'sleep_entries',
+        {
+          'estimated_sleep_minutes': summary.estimatedSleepMinutes,
+          if (entry.sleepMinutes == previous)
+            'sleep_minutes': summary.estimatedSleepMinutes,
+        },
+        where: 'id = ?',
+        whereArgs: [entryId],
+      );
+    });
+    return refreshed;
+  }
+
   Future<SleepEntry?> getSleepEntry(String id) async =>
       _sleepEntries.getById(await db, id);
 }
@@ -351,7 +483,7 @@ class SleepEntryRepositoryAdapter {
     return rows.isEmpty ? null : SleepEntry.fromMap(rows.first);
   }
 
-  Future<SleepEntry?> getById(Database database, String id) async {
+  Future<SleepEntry?> getById(DatabaseExecutor database, String id) async {
     final rows = await database.query(
       'sleep_entries',
       where: 'id = ?',
