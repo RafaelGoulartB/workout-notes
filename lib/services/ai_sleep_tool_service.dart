@@ -2,8 +2,8 @@
 // exception to the repository-only rule); writes never happen in this file.
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
-import 'package:workout_notes/services/sleep_goal_service.dart';
 import 'package:workout_notes/services/ai_tool_math.dart';
+import 'package:workout_notes/services/sleep_goal_service.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 
 /// Read-only sleep queries exposed to the AI Coach.

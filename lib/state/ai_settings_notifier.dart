@@ -4,9 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../models/ai_provider.dart';
-import '../models/ai_settings.dart';
-import '../services/ai_service.dart';
+import 'package:workout_notes/models/ai_provider.dart';
+import 'package:workout_notes/models/ai_settings.dart';
+import 'package:workout_notes/services/ai_service.dart';
 
 const _kPrefsProviders = 'ai_providers_v1';
 const _kPrefsActiveId = 'ai_active_provider_id_v1';

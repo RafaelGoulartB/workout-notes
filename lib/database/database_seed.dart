@@ -1,6 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 
-import 'seed_data.dart';
+import 'package:workout_notes/database/seed_data.dart';
 
 /// Seeds stable catalogs and default application settings.
 abstract final class DatabaseSeed {

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:intl/intl.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/exercise_with_sets.dart';
+import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:workout_notes/repositories/workout_repository.dart';
 import 'package:workout_notes/screens/workout/active_workout_screen.dart';
 import 'package:workout_notes/widgets/strength/workout/active_workout_header.dart';

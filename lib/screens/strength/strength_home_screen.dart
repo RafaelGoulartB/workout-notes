@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:workout_notes/services/strength_routine_day_inference.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/goal.dart';
@@ -14,12 +13,13 @@ import 'package:workout_notes/screens/workout/exercise_library_screen.dart';
 import 'package:workout_notes/screens/workout/future_workout_planner_screen.dart';
 import 'package:workout_notes/screens/workout/routines_screen.dart';
 import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
+import 'package:workout_notes/services/strength_routine_day_inference.dart';
 import 'package:workout_notes/services/strength_today_service.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
 import 'package:workout_notes/utils/strength_week_analytics.dart';
 import 'package:workout_notes/widgets/goals/goals_section.dart';
 import 'package:workout_notes/widgets/run/home/run_home_hero.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_active_banner.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_empty.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_hero.dart';
@@ -29,7 +29,7 @@ import 'package:workout_notes/widgets/strength/home/strength_home_records_sectio
 import 'package:workout_notes/widgets/strength/home/strength_home_today_card.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_trends_card.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_week_card.dart';
-import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 enum _HomeMenu { routines, exercises, history, records, calendar }
 

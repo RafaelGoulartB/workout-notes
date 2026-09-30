@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/dev_tools/run_debug_backend.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_activity.dart';
@@ -17,7 +18,6 @@ import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/services/run_native_tracking_backend.dart';
 import 'package:workout_notes/services/run_tracking_backend.dart';
 import 'package:workout_notes/utils/run_spool_recovery.dart';
-import 'package:workout_notes/database/database_helper.dart';
 
 class RunGpsFix {
   final double lat;

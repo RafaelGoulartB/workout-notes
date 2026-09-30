@@ -1,4 +1,4 @@
-import 'nutrition_values.dart';
+import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 
 /// A user-defined meal template (e.g. "Vitamina pós-treino").
 ///

@@ -1,5 +1,5 @@
 import 'package:uuid/uuid.dart';
-import 'base_repository.dart';
+import 'package:workout_notes/repositories/base_repository.dart';
 
 /// How often and how recently an exercise was actually trained.
 class ExerciseUsage {

@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/app_localizations_en.dart';
 import 'package:workout_notes/l10n/app_localizations_pt.dart';
 import 'package:workout_notes/utils/duration_format.dart';
-import 'package:workout_notes/database/database_helper.dart';
 
 /// Centralized notification service for timer notifications.
 ///

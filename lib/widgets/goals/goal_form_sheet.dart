@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/goal.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
-import 'package:workout_notes/database/database_helper.dart';
 
 /// Bottom sheet for creating or editing a user goal.
 /// Multi-step flow: scope → metric → period+target.

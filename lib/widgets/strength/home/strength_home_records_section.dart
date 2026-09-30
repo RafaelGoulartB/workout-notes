@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_format.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// The latest personal records: exercise, new estimated 1RM or load, the
 /// improvement over the previous best and the date.

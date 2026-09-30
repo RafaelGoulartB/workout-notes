@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_achievement.dart';
 import 'package:workout_notes/models/run_activity.dart';
@@ -26,7 +27,6 @@ import 'package:workout_notes/widgets/run/home/run_home_today_card.dart';
 import 'package:workout_notes/widgets/run/home/run_home_trends_card.dart';
 import 'package:workout_notes/widgets/run/home/run_home_week_card.dart';
 import 'package:workout_notes/widgets/run/run_pending_review_banner.dart';
-import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 enum _HomeMenu { plans, history, shoes, records, voice }

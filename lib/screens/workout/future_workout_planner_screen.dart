@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
+import 'package:workout_notes/models/exercise_with_sets.dart';
+import 'package:workout_notes/screens/workout/active_workout_screen.dart';
 import 'package:workout_notes/widgets/strength/exercises/exercise_picker_sheet.dart';
-import 'package:workout_notes/widgets/workout/set_editor_fields.dart';
-import '../../models/exercise_with_sets.dart';
-import 'active_workout_screen.dart';
-import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
+import 'package:workout_notes/widgets/workout/set_editor_fields.dart';
 
 /// Screen for planning/editing a future workout.
 /// Similar to WorkoutDetailScreen but tailored for future dates:

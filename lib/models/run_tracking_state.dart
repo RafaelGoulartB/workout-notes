@@ -1,8 +1,8 @@
 import 'package:workout_notes/models/run_interval_snapshot.dart';
 import 'package:workout_notes/models/run_lap.dart';
+import 'package:workout_notes/models/run_session_context.dart';
 import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/models/run_step_snapshot.dart';
-import 'package:workout_notes/models/run_session_context.dart';
 
 class RunLatLng {
   final double lat;

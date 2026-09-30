@@ -3,8 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_week_analytics.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_format.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Headline numbers of the selected period: volume with its trend against the
 /// previous period, and workouts, sets, total time and average duration.

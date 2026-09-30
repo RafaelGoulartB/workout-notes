@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_week_analytics.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_charts.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_format.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 enum _TrendTab { volume, frequency, duration }
 

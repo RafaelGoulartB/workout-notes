@@ -7,8 +7,8 @@ import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
-import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
 import 'package:workout_notes/services/ai_tool_math.dart';
+import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 
 /// Read-only nutrition queries exposed to the AI Coach.

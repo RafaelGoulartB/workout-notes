@@ -1,11 +1,10 @@
-import 'package:flutter/material.dart';
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
-
-import '../../l10n/app_localizations.dart';
-import '../../models/ai_chat_message.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/ai_chat_message.dart';
 import 'package:workout_notes/widgets/ai/ai_thumbnail.dart';
 
 class AiMessageBubble extends StatelessWidget {

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_template.dart';
@@ -12,7 +13,6 @@ import 'package:workout_notes/services/run_plan_adaptation.dart';
 import 'package:workout_notes/services/run_plan_composer.dart';
 import 'package:workout_notes/services/run_plan_templates.dart';
 import 'package:workout_notes/utils/date_utils.dart';
-import 'package:workout_notes/database/database_helper.dart';
 
 /// Weekly review of the plan being followed: turns what was actually run
 /// into a [RunPlanAdaptationProposal], and applies it by re-planning the rest

@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
-
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
+import 'package:workout_notes/screens/planning/periodization_phase_screen.dart';
+import 'package:workout_notes/screens/planning/periodization_plan_editor_screen.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/periodization/plan_overview.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
-
-import 'periodization_phase_screen.dart';
-import 'periodization_plan_editor_screen.dart';
-import 'package:workout_notes/utils/date_utils.dart';
-import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// A plan that is not necessarily the active one: its roadmap and phases,

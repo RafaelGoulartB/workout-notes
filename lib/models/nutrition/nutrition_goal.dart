@@ -1,4 +1,4 @@
-import 'nutrition_values.dart';
+import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 
 /// User-defined nutrition goal. At most one [NutritionGoal] is active
 /// at a time. When no goal exists, the daily screen shows the

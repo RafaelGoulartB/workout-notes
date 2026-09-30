@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
 import 'package:workout_notes/utils/date_utils.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_duration_chart.dart';
 import 'package:workout_notes/widgets/sleep/sleep_schedule_chart.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 enum SleepWeekView { schedule, duration }
 

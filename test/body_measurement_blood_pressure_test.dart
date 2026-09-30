@@ -1,8 +1,9 @@
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/database/database_schema.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
 import 'package:workout_notes/utils/body_tracker_utils.dart';
+
 import 'support/test_db.dart';
 
 void main() {

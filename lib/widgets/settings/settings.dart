@@ -8,8 +8,8 @@
 /// re-implementing private copies.
 library;
 
-export 'settings_primitives.dart';
-export 'settings_tiles.dart';
-export 'settings_value_picker.dart';
-export 'settings_app_bar.dart';
-export 'settings_sheet_helpers.dart';
+export 'package:workout_notes/widgets/settings/settings_app_bar.dart';
+export 'package:workout_notes/widgets/settings/settings_primitives.dart';
+export 'package:workout_notes/widgets/settings/settings_sheet_helpers.dart';
+export 'package:workout_notes/widgets/settings/settings_tiles.dart';
+export 'package:workout_notes/widgets/settings/settings_value_picker.dart';

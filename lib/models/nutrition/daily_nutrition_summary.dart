@@ -1,4 +1,4 @@
-import 'nutrition_values.dart';
+import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 
 /// Aggregated totals for a single day, used by the daily nutrition
 /// screen and for goal progress.

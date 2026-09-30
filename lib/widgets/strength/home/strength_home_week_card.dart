@@ -3,9 +3,9 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:workout_notes/services/strength_today_service.dart';
 import 'package:workout_notes/utils/strength_week_analytics.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_format.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_week_strip.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// "This week": sessions against the weekly goal (ring), the Monday-to-Sunday
 /// strip with planned strength days, working sets against the plan's range

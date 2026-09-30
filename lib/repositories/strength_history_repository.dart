@@ -8,9 +8,9 @@ import 'package:workout_notes/repositories/base_repository.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/repositories/workout_repository.dart';
 import 'package:workout_notes/repositories/workout_sql.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/sql_helpers.dart';
 import 'package:workout_notes/utils/strength_workout_records.dart';
-import 'package:workout_notes/utils/date_utils.dart';
 
 /// How the exercise-name part of a search matches an `exercises` row
 /// (`id`, `name`, `locale_key`). Lets the UI search localized names.

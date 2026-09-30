@@ -1,14 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
-
-import 'database_nutrition_schema.dart';
-import 'database_periodization_schema.dart';
-import 'database_medication_schema.dart';
-import 'database_run_extras_schema.dart';
-import 'database_run_plan_schema.dart';
-import 'database_run_route_schema.dart';
-import 'database_seed.dart';
-import 'migrations/database_migrations.dart';
+import 'package:workout_notes/database/database_medication_schema.dart';
+import 'package:workout_notes/database/database_nutrition_schema.dart';
+import 'package:workout_notes/database/database_periodization_schema.dart';
+import 'package:workout_notes/database/database_run_extras_schema.dart';
+import 'package:workout_notes/database/database_run_plan_schema.dart';
+import 'package:workout_notes/database/database_run_route_schema.dart';
+import 'package:workout_notes/database/database_seed.dart';
+import 'package:workout_notes/database/migrations/database_migrations.dart';
 
 /// Owns database creation and coordinates incremental schema upgrades.
 abstract final class DatabaseSchema {

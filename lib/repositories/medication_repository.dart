@@ -1,8 +1,8 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
-import '../models/medication.dart';
-import 'base_repository.dart';
+import 'package:workout_notes/models/medication.dart';
+import 'package:workout_notes/repositories/base_repository.dart';
 
 class MedicationRepository extends BaseRepository {
   static const _uuid = Uuid();

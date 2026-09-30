@@ -1,10 +1,10 @@
 import 'dart:math' as math;
 
 import 'package:uuid/uuid.dart';
+import 'package:workout_notes/dev_tools/run_lap_log.dart';
 import 'package:workout_notes/models/run_lap.dart';
 import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
-import 'package:workout_notes/dev_tools/run_lap_log.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 
 /// Pure debug GPS path generator. Not used in release builds.

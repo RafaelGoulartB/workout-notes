@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:workout_notes/services/strength_today_service.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_format.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// "Today" card at the top of the gym hub: the routine day to train (with a
 /// one-tap start), the workout already done, a rest day of the plan, or a

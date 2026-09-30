@@ -1,7 +1,7 @@
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/services/run_pace_calculator.dart';
-import 'package:workout_notes/utils/run_analytics_dates.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/run_analytics_dates.dart';
 
 /// Fitness from running efforts: the VDOT estimate, race predictions and the
 /// monthly fitness curve.

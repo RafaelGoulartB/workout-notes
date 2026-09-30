@@ -3,7 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/daily_nutrition_summary.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
@@ -12,26 +12,24 @@ import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/screens/nutrition/food_library_screen.dart';
+import 'package:workout_notes/screens/nutrition/food_quantity_sheet.dart';
+import 'package:workout_notes/screens/nutrition/food_search_screen.dart';
+import 'package:workout_notes/screens/nutrition/nutrition_day_detail_screen.dart';
+import 'package:workout_notes/screens/nutrition/nutrition_progress_screen.dart';
+import 'package:workout_notes/screens/nutrition/nutrition_settings_screen.dart';
+import 'package:workout_notes/screens/nutrition/saved_meals_screen.dart';
+import 'package:workout_notes/screens/settings/settings_screen.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
-import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
-import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 import 'package:workout_notes/services/open_food_facts_gateway.dart';
-
-import 'package:workout_notes/widgets/ui/load_error_view.dart';
-import 'food_quantity_sheet.dart';
-import 'food_library_screen.dart';
-import 'food_search_screen.dart';
-import 'nutrition_day_detail_screen.dart';
-export 'nutrition_day_detail_screen.dart';
-
-import 'nutrition_progress_screen.dart';
-import 'nutrition_settings_screen.dart';
-import '../settings/settings_screen.dart';
-import 'saved_meals_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';
-import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
+import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
+
+export 'package:workout_notes/screens/nutrition/nutrition_day_detail_screen.dart';
 
 /// Nutrition dashboard. Shows the day's totals at a glance, a tools
 /// grid (progress, saved meals, food library, settings) and a

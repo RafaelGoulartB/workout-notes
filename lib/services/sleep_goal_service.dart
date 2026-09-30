@@ -1,5 +1,5 @@
-import '../repositories/settings_repository.dart';
 import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/repositories/settings_repository.dart';
 
 /// Persists the user's target amount of sleep per night.
 ///

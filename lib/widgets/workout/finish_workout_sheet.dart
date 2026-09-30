@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
-import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Summary data class for finished workout.

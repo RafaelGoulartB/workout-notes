@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/models/run_session_context.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
-import 'package:workout_notes/database/database_helper.dart';
 
 /// In-app timer for indoor sessions: stationary bike and treadmill.
 ///

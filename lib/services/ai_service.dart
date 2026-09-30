@@ -3,8 +3,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import '../models/ai_tool_call.dart';
-import '../utils/text_sanitizer.dart';
+import 'package:workout_notes/models/ai_tool_call.dart';
+import 'package:workout_notes/utils/text_sanitizer.dart';
 
 class AiChatCompletion {
   final String? text;

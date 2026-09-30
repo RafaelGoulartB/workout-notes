@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
@@ -8,7 +8,6 @@ import 'package:workout_notes/screens/run/plan_editor/run_plan_editor_sheets.dar
 import 'package:workout_notes/screens/run/plan_editor/run_plan_editor_summary.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Session editor — the running counterpart of [RoutineDayEditorScreen].

@@ -1,7 +1,7 @@
 // Read-only queries built for the AI Coach may run SQL directly (a documented
 // exception to the repository-only rule); writes never happen in this file.
-import '../database/database_helper.dart';
-import '../models/ai_provider.dart';
+import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/models/ai_provider.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 
 /// Builds a JSON snapshot of the user's data to inject into the system prompt.

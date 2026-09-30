@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_template.dart';
@@ -10,7 +10,6 @@ import 'package:workout_notes/services/run_plan_history.dart';
 import 'package:workout_notes/services/run_plan_text.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import 'package:workout_notes/database/database_helper.dart';
 
 /// Where the athlete can do hill-type strength work.
 enum RunPlanWizardTerrain { hill, stairs, treadmill, flat }

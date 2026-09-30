@@ -9,7 +9,7 @@ import 'package:workout_notes/models/nutrition/food_serving.dart';
 import 'package:workout_notes/models/nutrition/food_variant.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 
-import 'nutrition_gateway.dart';
+import 'package:workout_notes/services/nutrition_gateway.dart';
 
 /// Gateway for the Open Food Facts collaborative database.
 ///

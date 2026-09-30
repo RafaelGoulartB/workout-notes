@@ -1,6 +1,6 @@
 import 'package:intl/intl.dart';
-import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/duration_format.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 
 /// Locale-aware display helpers shared by the routine screens.
 abstract final class StrengthRoutineFormat {

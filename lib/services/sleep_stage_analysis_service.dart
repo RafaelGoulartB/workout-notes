@@ -1,6 +1,6 @@
-import '../models/sleep_stage_epoch.dart';
-import '../models/sleep_stage_summary.dart';
-import '../models/sleep_stage_type.dart';
+import 'package:workout_notes/models/sleep_stage_epoch.dart';
+import 'package:workout_notes/models/sleep_stage_summary.dart';
+import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
 
 /// Consolidates model-labelled epochs into user-facing nightly metrics.

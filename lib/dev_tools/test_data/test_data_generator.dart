@@ -1,12 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:workout_notes/database/database_helper.dart';
 
-import 'test_data_context.dart';
-import 'test_data_fitness_generator.dart';
-import 'test_data_periodization_generator.dart';
-import 'test_data_run_generator.dart';
-import 'test_data_run_plan_generator.dart';
-import 'test_data_wellness_generator.dart';
+import 'package:workout_notes/dev_tools/test_data/test_data_context.dart';
+import 'package:workout_notes/dev_tools/test_data/test_data_fitness_generator.dart';
+import 'package:workout_notes/dev_tools/test_data/test_data_periodization_generator.dart';
+import 'package:workout_notes/dev_tools/test_data/test_data_run_generator.dart';
+import 'package:workout_notes/dev_tools/test_data/test_data_run_plan_generator.dart';
+import 'package:workout_notes/dev_tools/test_data/test_data_wellness_generator.dart';
 
 /// Debug-only entry point for a complete, disposable usage scenario.
 ///

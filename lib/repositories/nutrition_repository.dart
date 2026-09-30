@@ -4,7 +4,6 @@ import 'dart:math' as math;
 
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
-
 import 'package:workout_notes/models/nutrition/daily_nutrition_summary.dart';
 import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/food_serving.dart';
@@ -15,11 +14,10 @@ import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/models/nutrition/saved_meal.dart';
-import 'package:workout_notes/utils/nutrition_conversion.dart';
-
+import 'package:workout_notes/repositories/base_repository.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/nutrition_conversion.dart';
 import 'package:workout_notes/utils/sql_helpers.dart';
-import 'base_repository.dart';
 
 part 'nutrition_repository_calorie_analytics.dart';
 

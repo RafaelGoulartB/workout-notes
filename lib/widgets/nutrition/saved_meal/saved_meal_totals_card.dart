@@ -1,7 +1,7 @@
-import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
+import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
 import 'package:workout_notes/widgets/nutrition/saved_meal/saved_meal_form_widgets.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 

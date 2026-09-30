@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'settings_sheet_helpers.dart';
+import 'package:workout_notes/widgets/settings/settings_sheet_helpers.dart';
 
 /// Tappable row showing the current [displayValue] and a chevron. Tapping
 /// opens a bottom sheet that lets the user pick from [choices]. The

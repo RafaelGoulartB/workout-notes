@@ -1,6 +1,6 @@
 // Read-only queries built for the AI Coach may run SQL directly (a documented
 // exception to the repository-only rule); writes never happen in this file.
-import '../database/database_helper.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/services/ai_tool_math.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 

@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
-
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_checkin.dart';
 import 'package:workout_notes/models/periodization_metrics.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_target.dart';
-import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 import 'package:workout_notes/utils/date_utils.dart';
-import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 
 class PeriodizationCheckinScreen extends StatefulWidget {
   final PeriodizationPhase phase;

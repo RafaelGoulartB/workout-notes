@@ -5,8 +5,8 @@ import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/utils/strength_insights_format.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_insights_data.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Best marks of every exercise grouped by muscle group, with a search box.
 class StrengthRecordsList extends StatefulWidget {

@@ -1,8 +1,7 @@
 import 'package:flutter/foundation.dart';
-
-import '../models/sleep_monitor_mode.dart';
-import '../repositories/settings_repository.dart';
 import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/models/sleep_monitor_mode.dart';
+import 'package:workout_notes/repositories/settings_repository.dart';
 
 /// Stores the barcode mission configuration in the same SQLite-backed settings
 /// store used by the Workout settings screen.

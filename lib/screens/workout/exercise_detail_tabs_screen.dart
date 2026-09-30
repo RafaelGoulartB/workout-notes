@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/screens/workout/exercise_form_screen.dart';
 import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/exercise/exercise_charts_card.dart';
 import 'package:workout_notes/widgets/strength/exercise/exercise_detail_header.dart';
 import 'package:workout_notes/widgets/strength/exercise/exercise_history_list.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 enum _DetailTab { history, charts }
 

@@ -4,9 +4,9 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_insights_format.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/exercise/exercise_history_list.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_charts.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// What the chart plots for each workout.
 enum ExerciseChartMetric { e1rm, weight, volume, reps }

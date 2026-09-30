@@ -1,5 +1,5 @@
-import 'sleep_monitor_segment.dart';
-import 'sleep_monitor_mode.dart';
+import 'package:workout_notes/models/sleep_monitor_mode.dart';
+import 'package:workout_notes/models/sleep_monitor_segment.dart';
 
 class SleepMonitorState {
   static const idle = 'idle';

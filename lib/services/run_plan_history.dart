@@ -1,7 +1,7 @@
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/services/run_plan_composer.dart';
-import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 
 /// A completed GPS run the wizard can use as "recent race" calibration.
 class RunPlanSuggestedRace {

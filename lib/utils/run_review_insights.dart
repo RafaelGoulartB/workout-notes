@@ -1,7 +1,7 @@
 import 'package:workout_notes/models/run_achievement.dart';
 import 'package:workout_notes/models/run_activity.dart';
-import 'package:workout_notes/utils/run_achievement_engine.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/run_achievement_engine.dart';
 
 /// What a just-finished run means against the history: record placements,
 /// month bests and the running volume of its week. Pure, so the post-run

@@ -3,8 +3,8 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/strength_routine_format.dart';
 import 'package:workout_notes/utils/strength_routine_summary.dart';
 import 'package:workout_notes/utils/workout_estimator.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_muscle_widgets.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Hero of the routine screen: description and the numbers that size the
 /// routine (days, weekly sets, session time, volume) plus its muscle split.

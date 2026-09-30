@@ -1,3 +1,4 @@
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/exercise_with_sets.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
@@ -7,7 +8,6 @@ import 'package:workout_notes/utils/strength_workout_format.dart';
 import 'package:workout_notes/utils/strength_workout_records.dart';
 import 'package:workout_notes/utils/workout_estimator.dart';
 import 'package:workout_notes/widgets/workout/finish_workout_sheet.dart';
-import 'package:workout_notes/database/database_helper.dart';
 
 /// Builds the summary shown when finishing a workout: duration, volume, sets,
 /// cardio totals, estimated calories and the personal records the session

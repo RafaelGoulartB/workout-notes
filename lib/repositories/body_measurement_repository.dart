@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
-import 'base_repository.dart';
+import 'package:workout_notes/repositories/base_repository.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 
 /// Repository for body measurements CRUD and analytics operations.

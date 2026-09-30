@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:sqflite/sqflite.dart';
-import 'base_repository.dart';
 import 'package:workout_notes/database/migrations/database_migrations.dart';
+import 'package:workout_notes/repositories/base_repository.dart';
 import 'package:workout_notes/services/run_route_codec.dart';
 
 /// Repository for data export and import operations.

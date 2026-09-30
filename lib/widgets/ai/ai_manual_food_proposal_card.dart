@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../l10n/app_localizations.dart';
-import '../../models/nutrition/ai_manual_food_proposal.dart';
-import '../../models/nutrition/nutrition_values.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/nutrition/ai_manual_food_proposal.dart';
+import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class AiManualFoodProposalCard extends StatefulWidget {

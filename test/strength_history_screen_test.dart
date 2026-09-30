@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:workout_notes/services/strength_routine_day_inference.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/screens/strength/strength_history_screen.dart';
+import 'package:workout_notes/services/strength_routine_day_inference.dart';
 
 import 'support/ai_test_db.dart';
 import 'support/strength_workout_seed.dart';

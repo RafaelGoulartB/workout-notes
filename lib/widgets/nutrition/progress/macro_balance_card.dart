@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
-import 'package:workout_notes/widgets/nutrition/progress/progress_shared.dart';
 import 'package:workout_notes/models/nutrition/nutrition_progress.dart';
-import 'package:workout_notes/widgets/nutrition/progress/average_nutrients_card.dart';
 import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
+import 'package:workout_notes/widgets/nutrition/progress/average_nutrients_card.dart';
+import 'package:workout_notes/widgets/nutrition/progress/progress_shared.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class MacroBalanceCard extends StatelessWidget {

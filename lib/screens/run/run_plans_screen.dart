@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/screens/run/plans/run_plan_activation.dart';
@@ -7,7 +7,6 @@ import 'package:workout_notes/screens/run/plans/run_plan_creation_flow.dart';
 import 'package:workout_notes/screens/run/run_plan_detail_screen.dart';
 import 'package:workout_notes/services/run_plan_week_view.dart';
 import 'package:workout_notes/widgets/run/plans/run_plan_library_cards.dart';
-import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// The running counterpart of [RoutinesScreen]: a library of structured plans.

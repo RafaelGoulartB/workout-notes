@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/screens/nutrition/nutrition_settings_screen.dart';
 import 'package:workout_notes/screens/settings/ai_coach_settings_screen.dart';
 import 'package:workout_notes/screens/settings/data_privacy_screen.dart';
 import 'package:workout_notes/screens/settings/general_settings_screen.dart';
-import 'package:workout_notes/screens/nutrition/nutrition_settings_screen.dart';
 import 'package:workout_notes/screens/settings/plan_settings_screen.dart';
-import 'package:workout_notes/screens/sleep/sleep_settings_screen.dart';
 import 'package:workout_notes/screens/settings/workout_settings_screen.dart';
+import 'package:workout_notes/screens/sleep/sleep_settings_screen.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 

@@ -2,18 +2,18 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
-import 'l10n/app_localizations.dart';
-import 'services/sleep_monitor_service.dart';
-import 'services/traditional_alarm_service.dart';
-import 'services/medication_reminder_service.dart';
-import 'services/run_tracking_service.dart';
-import 'screens/main_shell.dart';
-import 'state/ai_chat_service.dart';
-import 'state/ai_settings_notifier.dart';
-import 'state/sections_notifier.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/screens/main_shell.dart';
+import 'package:workout_notes/services/medication_reminder_service.dart';
+import 'package:workout_notes/services/run_tracking_service.dart';
+import 'package:workout_notes/services/sleep_monitor_service.dart';
+import 'package:workout_notes/services/traditional_alarm_service.dart';
+import 'package:workout_notes/state/ai_chat_service.dart';
+import 'package:workout_notes/state/ai_settings_notifier.dart';
+import 'package:workout_notes/state/sections_notifier.dart';
 
 /// List of accent seed colors available in settings.
 class AccentColors {

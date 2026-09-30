@@ -5,9 +5,9 @@ import 'package:workout_notes/utils/strength_routine_format.dart';
 import 'package:workout_notes/utils/strength_routine_summary.dart';
 import 'package:workout_notes/utils/workout_card_helpers.dart';
 import 'package:workout_notes/utils/workout_estimator.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_muscle_widgets.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_set_sheets.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Summary on top of the day editor: exercises, sets, time and volume plus
 /// the muscle split of the day.

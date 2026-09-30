@@ -1,5 +1,5 @@
 import 'package:sqflite/sqflite.dart';
-import 'base_repository.dart';
+import 'package:workout_notes/repositories/base_repository.dart';
 
 /// Repository for app settings CRUD operations.
 class SettingsRepository extends BaseRepository {

@@ -3,9 +3,6 @@ import 'dart:math' as math;
 
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
-import 'package:workout_notes/repositories/phase_target_training.dart';
-import 'package:workout_notes/utils/date_utils.dart';
-import 'package:workout_notes/utils/sql_helpers.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_ledger.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
@@ -13,6 +10,9 @@ import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/base_repository.dart';
+import 'package:workout_notes/repositories/phase_target_training.dart';
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/sql_helpers.dart';
 
 /// Repository for structured running plans, their sessions, steps, the dated
 /// schedule and per-step results.

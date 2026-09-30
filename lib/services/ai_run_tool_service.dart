@@ -9,10 +9,10 @@ import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
-import 'package:workout_notes/utils/run_achievement_engine.dart';
-import 'package:workout_notes/utils/run_progress_analytics.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/run_achievement_engine.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
+import 'package:workout_notes/utils/run_progress_analytics.dart';
 
 /// Read-only, AI-facing access to recorded cardio activities and running plans.
 ///

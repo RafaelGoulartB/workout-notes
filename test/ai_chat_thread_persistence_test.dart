@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/database/database_helper.dart';
-import 'package:workout_notes/models/ai_chat_thread.dart';
 import 'package:workout_notes/models/ai_chat_message.dart';
+import 'package:workout_notes/models/ai_chat_thread.dart';
 import 'package:workout_notes/models/ai_image_attachment.dart';
 import 'package:workout_notes/models/ai_message_role.dart';
 

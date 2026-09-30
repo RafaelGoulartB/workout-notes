@@ -3,9 +3,9 @@ import 'dart:developer' as developer;
 import 'package:collection/collection.dart';
 import 'package:uuid/uuid.dart';
 
-import '../database/database_helper.dart';
-import '../models/ai_message_role.dart';
-import '../models/ai_routine_proposal.dart';
+import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/models/ai_message_role.dart';
+import 'package:workout_notes/models/ai_routine_proposal.dart';
 
 const _uuid = Uuid();
 

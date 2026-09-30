@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
-
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/saved_meal.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
-import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
-
-import 'saved_meal_editor_screen.dart';
+import 'package:workout_notes/screens/nutrition/saved_meal_editor_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Lists the user's saved meal templates and lets them log a template

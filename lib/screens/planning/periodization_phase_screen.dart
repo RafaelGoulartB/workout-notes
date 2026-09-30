@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_checkin.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
@@ -8,12 +8,10 @@ import 'package:workout_notes/models/periodization_schedule.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/periodization/week_progress.dart';
-import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
-
-import 'periodization_checkin_flow.dart';
-import 'periodization_phase_editor_screen.dart';
+import 'package:workout_notes/screens/planning/periodization_checkin_flow.dart';
+import 'package:workout_notes/screens/planning/periodization_phase_editor_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';
-import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// A phase at a glance: what it plans (targets and template week) and how

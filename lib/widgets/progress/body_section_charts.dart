@@ -1,9 +1,9 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/utils/progress_helpers.dart';
 import 'package:workout_notes/screens/body/body_tracker_screen.dart';
+import 'package:workout_notes/utils/progress_helpers.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Displays body measurement section: summary grid, composition chart,

@@ -1,4 +1,4 @@
-import 'nutrition_values.dart';
+import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 
 /// One serving extracted from a nutrition label photo.
 class AiFoodLabelServingDraft {

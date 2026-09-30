@@ -6,12 +6,12 @@ import 'package:workout_notes/models/run_gear.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_gear_screen.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/run_calendar_stats.dart';
 import 'package:workout_notes/utils/run_fitness_analytics.dart';
 import 'package:workout_notes/utils/run_training_load_analytics.dart';
 import 'package:workout_notes/widgets/run/insights/run_insights_fitness_sections.dart';
 import 'package:workout_notes/widgets/run/insights/run_insights_year_sections.dart';
-import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Which group of analysis cards is showing.

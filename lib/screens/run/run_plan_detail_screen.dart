@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_ledger.dart';
@@ -23,6 +23,7 @@ import 'package:workout_notes/services/run_plan_week_view.dart';
 import 'package:workout_notes/services/run_strength_planner.dart';
 import 'package:workout_notes/services/run_week_balance.dart';
 import 'package:workout_notes/services/runner_strength_routine.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/run/plan_detail/run_plan_adaptation_card.dart';
 import 'package:workout_notes/widgets/run/plan_detail/run_plan_day_row.dart';
 import 'package:workout_notes/widgets/run/plan_detail/run_plan_identity.dart';
@@ -33,8 +34,6 @@ import 'package:workout_notes/widgets/run/plan_detail/run_plan_week_header.dart'
 import 'package:workout_notes/widgets/run/plan_detail/run_plan_week_strip.dart';
 import 'package:workout_notes/widgets/run/run_balance_dialog.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-import 'package:workout_notes/utils/date_utils.dart';
-import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Plan detail: identity header, status, week picker and the training week

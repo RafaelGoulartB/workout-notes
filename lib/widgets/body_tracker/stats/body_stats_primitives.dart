@@ -1,7 +1,7 @@
-import 'package:workout_notes/screens/body/body_stats_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/screens/body/body_stats_controller.dart';
 import 'package:workout_notes/utils/body_progress_analytics.dart';
 import 'package:workout_notes/utils/body_tracker_utils.dart';
 

@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
-import '../models/sleep_entry.dart';
+import 'package:workout_notes/models/sleep_entry.dart';
+import 'package:workout_notes/repositories/base_repository.dart';
 import 'package:workout_notes/utils/date_utils.dart';
-import 'base_repository.dart';
 
 /// Persistence and dashboard queries for nightly sleep records.
 class SleepRepository extends BaseRepository {

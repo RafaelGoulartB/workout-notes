@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
 import 'package:workout_notes/models/sleep_night_summary.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// One night in the sleep history: date badge, duration, time window, the
 /// stage split when measured, and efficiency on the right.

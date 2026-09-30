@@ -1,34 +1,35 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
+import 'package:workout_notes/screens/run/run_detail_screen.dart';
+import 'package:workout_notes/screens/run/run_record_screen.dart';
+import 'package:workout_notes/screens/run/run_stats_screen.dart';
+import 'package:workout_notes/screens/settings/settings_screen.dart';
 import 'package:workout_notes/screens/strength/strength_home_screen.dart';
+import 'package:workout_notes/screens/workout/active_workout_screen.dart';
+import 'package:workout_notes/screens/workout/calendar_screen.dart';
+import 'package:workout_notes/screens/workout/rest_timer_screen.dart';
+import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
+import 'package:workout_notes/screens/workout/workout_home_controller.dart';
+import 'package:workout_notes/services/rest_timer_service.dart';
 import 'package:workout_notes/services/run_today_service.dart';
 import 'package:workout_notes/services/strength_today_service.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_week_analytics.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
-import 'package:workout_notes/widgets/ui/load_error_view.dart';
-import 'package:workout_notes/widgets/workout/active_session_banner.dart';
 import 'package:workout_notes/widgets/run/run_pending_review_banner.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
-import 'package:workout_notes/screens/run/run_detail_screen.dart';
-import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
-import 'package:workout_notes/screens/workout/workout_home_controller.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_format.dart';
-import 'package:workout_notes/widgets/workout/workout_home_widgets.dart';
-import '../../services/rest_timer_service.dart';
-import 'active_workout_screen.dart';
-import '../run/run_record_screen.dart';
-import '../run/run_stats_screen.dart';
-import 'calendar_screen.dart';
-import '../settings/settings_screen.dart';
-import 'rest_timer_screen.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
+import 'package:workout_notes/widgets/workout/active_session_banner.dart';
 import 'package:workout_notes/widgets/workout/workout_home_chrome.dart';
+import 'package:workout_notes/widgets/workout/workout_home_widgets.dart';
 
 /// The Treino tab: live banners, this week across gym and running, and the
 /// two hub entries (Musculação and Corrida) with a start button each.

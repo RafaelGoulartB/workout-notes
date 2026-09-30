@@ -2,9 +2,7 @@ import 'dart:math' as math;
 
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
-
-import 'package:workout_notes/utils/date_utils.dart';
-import 'package:workout_notes/utils/sql_helpers.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/periodization_checkin.dart';
 import 'package:workout_notes/models/periodization_metrics.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
@@ -19,9 +17,9 @@ import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/periodization/phase_week_plan.dart';
 import 'package:workout_notes/periodization/run_plan_week_resolver.dart';
-import 'package:workout_notes/database/database_helper.dart';
-
-import 'base_repository.dart';
+import 'package:workout_notes/repositories/base_repository.dart';
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/sql_helpers.dart';
 
 /// Sentinel for "no matching session" — `firstWhere` needs a non-null default.
 final RunPlanWorkout _missingRunWorkout = RunPlanWorkout(

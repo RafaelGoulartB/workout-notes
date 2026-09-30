@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/repositories/exercise_repository.dart';
@@ -8,9 +9,8 @@ import 'package:workout_notes/screens/workout/exercise_detail_tabs_screen.dart';
 import 'package:workout_notes/screens/workout/exercise_form_screen.dart';
 import 'package:workout_notes/utils/exercise_equipment.dart';
 import 'package:workout_notes/utils/strength_exercise_library.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/exercises/exercise_library_widgets.dart';
-import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Every exercise, dense and searchable. Grouped by muscle when "All" is
 /// selected and sorted A-Z; other sorts give one flat ranking.

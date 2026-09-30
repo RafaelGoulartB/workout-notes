@@ -1,4 +1,4 @@
-import 'test_data_context.dart';
+import 'package:workout_notes/dev_tools/test_data/test_data_context.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 
 class FitnessGenerationResult {

@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/models/sleep_monitor_state.dart';
 import 'package:workout_notes/models/sleep_monitor_mode.dart';
+import 'package:workout_notes/models/sleep_monitor_state.dart';
 import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/screens/sleep/sleep_monitor_controller.dart';
 import 'package:workout_notes/utils/sleep_alarm_time.dart';
-import 'package:workout_notes/widgets/ui/second_ticker.dart';
 import 'package:workout_notes/widgets/sleep/monitor/monitor_alarm_cards.dart';
 import 'package:workout_notes/widgets/sleep/monitor/monitor_mode_widgets.dart';
 import 'package:workout_notes/widgets/sleep/monitor/monitor_status_widgets.dart';
 import 'package:workout_notes/widgets/sleep/monitor/sleep_monitor_texts.dart';
+import 'package:workout_notes/widgets/ui/second_ticker.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Body of the sleep monitor while idle: wake time, mode picker, tips and any

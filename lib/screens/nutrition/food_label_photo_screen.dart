@@ -2,19 +2,17 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/main.dart';
 import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/screens/nutrition/manual_food_screen.dart';
+import 'package:workout_notes/screens/settings/ai_settings_screen.dart';
 import 'package:workout_notes/services/ai_food_label_service.dart';
 import 'package:workout_notes/state/ai_settings_notifier.dart';
 import 'package:workout_notes/utils/ai_error_localizer.dart';
 import 'package:workout_notes/widgets/ai/ai_thumbnail.dart';
-
-import '../settings/ai_settings_screen.dart';
-import 'manual_food_screen.dart';
 
 /// Photo flow for the nutrition module: the user takes/picks a photo
 /// of a nutrition label, the AI Coach identifies the food and its

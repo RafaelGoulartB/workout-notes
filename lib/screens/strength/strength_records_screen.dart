@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_insights_data.dart';
 import 'package:workout_notes/widgets/strength/records/strength_recent_records.dart';
 import 'package:workout_notes/widgets/strength/records/strength_records_hero.dart';
 import 'package:workout_notes/widgets/strength/records/strength_records_list.dart';
-import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Personal records: headline counts, the latest bests as a timeline and the
 /// best e1RM / heaviest weight / best session volume of each exercise grouped

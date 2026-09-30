@@ -1,12 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:workout_notes/services/strength_routine_day_inference.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/repositories/strength_history_repository.dart';
 import 'package:workout_notes/screens/workout/active_workout_screen.dart';
 import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
+import 'package:workout_notes/services/strength_routine_day_inference.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';

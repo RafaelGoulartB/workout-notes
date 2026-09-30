@@ -1,8 +1,8 @@
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
-import 'package:workout_notes/database/database_helper.dart';
 
 /// The nutrition goal in effect for a given day.
 ///

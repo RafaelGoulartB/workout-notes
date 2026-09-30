@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/utils/exercise_equipment.dart';
 import 'package:workout_notes/widgets/ui/form_section_card.dart';
-import 'package:workout_notes/database/database_helper.dart';
 
 class ExerciseFormScreen extends StatefulWidget {
   final String? exerciseId;

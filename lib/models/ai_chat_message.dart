@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'ai_image_attachment.dart';
-import 'ai_message_role.dart';
-import 'ai_tool_call.dart';
+import 'package:workout_notes/models/ai_image_attachment.dart';
+import 'package:workout_notes/models/ai_message_role.dart';
+import 'package:workout_notes/models/ai_tool_call.dart';
 
 /// A single chat message, persisted in `ai_chat_messages`.
 class AiChatMessage {

@@ -9,8 +9,8 @@ import 'package:workout_notes/services/run_pace_calculator.dart';
 import 'package:workout_notes/services/run_plan_build_config.dart';
 import 'package:workout_notes/services/run_plan_outline.dart';
 import 'package:workout_notes/services/run_plan_text.dart';
-import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 
 export 'package:workout_notes/services/run_plan_build_config.dart';
 export 'package:workout_notes/services/run_plan_outline.dart';

@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
@@ -15,7 +15,6 @@ import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/utils/date_utils.dart';
-import 'package:workout_notes/database/database_helper.dart';
 
 /// Per-week deviation from the phase targets: a label ("Deload", "Refeed")
 /// and/or different calories for training and rest days.

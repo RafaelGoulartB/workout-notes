@@ -1,8 +1,8 @@
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
 import 'package:workout_notes/repositories/workout_repository.dart';
 import 'package:workout_notes/utils/date_utils.dart';
-import 'package:workout_notes/database/database_helper.dart';
 
 /// The "Strength for runners" routine a running plan points at.
 ///

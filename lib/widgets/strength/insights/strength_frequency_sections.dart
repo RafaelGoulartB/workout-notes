@@ -4,10 +4,10 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_insights_calculator.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_charts.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_heatmap.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_insights_data.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Year chips for the calendar (shown only with more than one year of data).
 class StrengthYearSelector extends StatelessWidget {

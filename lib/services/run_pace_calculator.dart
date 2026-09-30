@@ -1,6 +1,6 @@
-import 'package:workout_notes/utils/run_formatters.dart';
-
 import 'dart:math' as math;
+
+import 'package:workout_notes/utils/run_formatters.dart';
 
 /// Coaching pace targets derived from a known race or a goal race time.
 ///

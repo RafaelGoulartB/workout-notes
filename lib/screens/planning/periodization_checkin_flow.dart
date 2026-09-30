@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_checkin.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
-
-import 'periodization_checkin_screen.dart';
-import 'periodization_phase_editor_screen.dart';
+import 'package:workout_notes/screens/planning/periodization_checkin_screen.dart';
+import 'package:workout_notes/screens/planning/periodization_phase_editor_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';
-import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Weekly review followed by what the decision implies: nothing (keep

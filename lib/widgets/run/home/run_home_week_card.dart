@@ -3,8 +3,8 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/services/run_today_service.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/run/run_week_strip.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// "This week": distance so far against the weekly goal (ring), the
 /// Monday-to-Sunday strip with planned sessions, and one comparison line.

@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/material.dart';
 
 /// A small sparkline chart shown in the summary card header.
 class BodySparkline extends StatelessWidget {

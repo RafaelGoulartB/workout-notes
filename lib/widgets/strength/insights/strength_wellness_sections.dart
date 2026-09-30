@@ -7,9 +7,9 @@ import 'package:workout_notes/utils/strength_insights_calculator.dart';
 import 'package:workout_notes/utils/strength_insights_format.dart';
 import 'package:workout_notes/widgets/progress/body_section_charts.dart';
 import 'package:workout_notes/widgets/run/insights/run_insight_card.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_charts.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_insights_data.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Weekly average feeling (1 to 5) after workouts.
 class StrengthFeelingCard extends StatelessWidget {

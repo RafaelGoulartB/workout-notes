@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../l10n/app_localizations.dart';
-import '../../models/ai_image_attachment.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/ai_image_attachment.dart';
 import 'package:workout_notes/widgets/ai/ai_thumbnail.dart';
 
 /// Mobile-first composer inspired by current conversational AI apps.

@@ -3,8 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/utils/strength_insights_format.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/exercise/exercise_equipment_label.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Muscle group, equipment and notes of the exercise.
 class ExerciseDetailHeader extends StatelessWidget {

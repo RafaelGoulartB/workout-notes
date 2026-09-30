@@ -1,6 +1,6 @@
 import 'package:workout_notes/models/run_activity.dart';
-import 'package:workout_notes/utils/run_analytics_dates.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/run_analytics_dates.dart';
 
 /// Calendar statistics: daily distance for the heatmap, monthly totals,
 /// consistency streaks, elevation and the year in review.

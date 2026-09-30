@@ -1,8 +1,8 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:workout_notes/repositories/base_repository.dart';
-import 'package:workout_notes/utils/workout_estimator.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/workout_estimator.dart';
 
 /// The routine (and day) a workout was last trained from.
 class StrengthLastRoutineUse {

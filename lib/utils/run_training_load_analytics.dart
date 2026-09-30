@@ -1,7 +1,7 @@
 import 'package:workout_notes/models/run_activity.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/run_analytics_dates.dart';
 import 'package:workout_notes/utils/run_fitness_analytics.dart';
-import 'package:workout_notes/utils/date_utils.dart';
 
 /// Training load: session load with its acute:chronic ratio, time per pace
 /// zone, and the weekly effort/feeling trend.

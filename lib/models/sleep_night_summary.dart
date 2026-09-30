@@ -1,5 +1,5 @@
-import 'sleep_entry.dart';
-import 'sleep_monitor_session.dart';
+import 'package:workout_notes/models/sleep_entry.dart';
+import 'package:workout_notes/models/sleep_monitor_session.dart';
 
 class SleepNightSummary {
   final SleepEntry entry;

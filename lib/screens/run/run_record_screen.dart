@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_data_field.dart';
@@ -17,11 +18,11 @@ import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/screens/run/run_post_run_review_screen.dart';
 import 'package:workout_notes/screens/run/run_voice_settings_screen.dart';
+import 'package:workout_notes/services/indoor_tracking_service.dart';
 import 'package:workout_notes/services/run_audio_gate_service.dart';
 import 'package:workout_notes/services/run_data_fields_store.dart';
 import 'package:workout_notes/services/run_session_coach.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
-import 'package:workout_notes/services/indoor_tracking_service.dart';
 import 'package:workout_notes/widgets/run/record/run_data_fields_grid.dart';
 import 'package:workout_notes/widgets/run/record/run_goal_sheet.dart';
 import 'package:workout_notes/widgets/run/record/run_record_countdown.dart';
@@ -30,7 +31,6 @@ import 'package:workout_notes/widgets/run/record/run_record_map.dart';
 import 'package:workout_notes/widgets/run/record/run_record_sheet.dart';
 import 'package:workout_notes/widgets/run/record/run_record_top_bar.dart';
 import 'package:workout_notes/widgets/run/run_permission_onboarding_sheet.dart';
-import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class RunRecordScreen extends StatefulWidget {

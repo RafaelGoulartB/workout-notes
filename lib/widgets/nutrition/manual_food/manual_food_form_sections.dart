@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/screens/nutrition/manual_food_controller.dart';
-import 'package:workout_notes/widgets/ui/form_section_card.dart';
 import 'package:workout_notes/widgets/nutrition/manual_food/manual_food_form_widgets.dart';
+import 'package:workout_notes/widgets/ui/form_section_card.dart';
 
 /// All sections of the manual food form: basic info, reference macros, the
 /// collapsible fat / other nutrients / micronutrient groups and the servings.

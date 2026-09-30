@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/daily_nutrition_summary.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
@@ -12,27 +12,25 @@ import 'package:workout_notes/models/periodization_schedule.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/periodization/phase_seed.dart';
 import 'package:workout_notes/periodization/week_progress.dart';
+import 'package:workout_notes/screens/body/body_tracker_screen.dart';
+import 'package:workout_notes/screens/planning/periodization_checkin_flow.dart';
+import 'package:workout_notes/screens/planning/periodization_phase_editor_screen.dart';
+import 'package:workout_notes/screens/planning/periodization_phase_screen.dart';
+import 'package:workout_notes/screens/planning/periodization_plan_editor_screen.dart';
+import 'package:workout_notes/screens/planning/periodization_plan_screen.dart';
+import 'package:workout_notes/screens/planning/periodization_plans_screen.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
+import 'package:workout_notes/screens/settings/settings_screen.dart';
+import 'package:workout_notes/screens/workout/active_workout_screen.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/load_generation.dart';
-import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/widgets/periodization/body_measurements_teaser_card.dart';
 import 'package:workout_notes/widgets/periodization/plan_overview.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
-
-import '../workout/active_workout_screen.dart';
-import '../body/body_tracker_screen.dart';
-import 'periodization_checkin_flow.dart';
-import 'periodization_phase_editor_screen.dart';
-import 'periodization_phase_screen.dart';
-import 'periodization_plan_editor_screen.dart';
-import 'periodization_plan_screen.dart';
-import 'periodization_plans_screen.dart';
-import '../settings/settings_screen.dart';
-import 'package:workout_notes/utils/date_utils.dart';
-import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Progress tab: body weight, then the active plan — what today asks for,

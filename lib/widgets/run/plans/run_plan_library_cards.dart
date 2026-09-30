@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/services/run_plan_week_view.dart';
-import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Callbacks shared by every plan card of the library.

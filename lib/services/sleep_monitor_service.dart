@@ -2,15 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-
-import '../models/sleep_monitor_state.dart';
-import '../models/sleep_monitor_mode.dart';
-import '../repositories/sleep_monitor_repository.dart';
+import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/models/sleep_monitor_mode.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
-import 'package:workout_notes/services/sleep_wake_engine.dart';
+import 'package:workout_notes/models/sleep_monitor_state.dart';
+import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/services/sleep_diagnostic_store.dart';
-import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/services/sleep_wake_engine.dart';
 
 /// Flutter facade for the Android foreground sleep monitor.
 ///

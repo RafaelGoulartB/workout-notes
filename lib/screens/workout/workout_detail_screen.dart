@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/repositories/strength_history_repository.dart';
 import 'package:workout_notes/screens/workout/active_workout_screen.dart';
@@ -7,13 +8,12 @@ import 'package:workout_notes/screens/workout/edit_workout_screen.dart';
 import 'package:workout_notes/screens/workout/exercise_detail_tabs_screen.dart';
 import 'package:workout_notes/services/export_service.dart';
 import 'package:workout_notes/utils/strength_workout_records.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/workout/strength_workout_comparison_card.dart';
 import 'package:workout_notes/widgets/strength/workout/strength_workout_exercise_card.dart';
 import 'package:workout_notes/widgets/strength/workout/strength_workout_hero.dart';
 import 'package:workout_notes/widgets/strength/workout/strength_workout_muscle_split.dart';
 import 'package:workout_notes/widgets/strength/workout/strength_workout_records_card.dart';
-import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class WorkoutDetailScreen extends StatefulWidget {
   final String workoutId;

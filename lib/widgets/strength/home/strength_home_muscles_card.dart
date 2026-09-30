@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_format.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Working sets per muscle group this week as horizontal bars in the group's
 /// colour, with a shaded reference band (10 to 20 sets a week is the usual

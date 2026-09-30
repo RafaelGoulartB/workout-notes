@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/strength_insights_calculator.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_exercises_section.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_frequency_sections.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_insights_data.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_volume_sections.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_wellness_sections.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Which group of analysis cards is showing.
 enum _InsightsTab { volume, frequency, exercises, wellness }

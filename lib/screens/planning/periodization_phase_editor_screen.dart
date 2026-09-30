@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
-
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/periodization/phase_editor_controller.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
-import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 import 'package:workout_notes/widgets/periodization/phase_editor/phase_identity_cards.dart';
 import 'package:workout_notes/widgets/periodization/phase_editor/phase_nutrition_card.dart';
 import 'package:workout_notes/widgets/periodization/phase_editor/phase_target_cards.dart';
 import 'package:workout_notes/widgets/periodization/phase_editor/phase_weeks_card.dart';
+import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Everything a phase plans, on one screen: what it is and how long it

@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-
-import '../../models/traditional_alarm.dart';
-import '../../models/traditional_alarm_runtime_state.dart';
-import '../../services/medication_reminder_service.dart';
-import '../../services/traditional_alarm_service.dart';
-import 'medication_reminders_tab.dart';
+import 'package:workout_notes/models/traditional_alarm.dart';
+import 'package:workout_notes/models/traditional_alarm_runtime_state.dart';
+import 'package:workout_notes/screens/alarms/medication_reminders_tab.dart';
+import 'package:workout_notes/services/medication_reminder_service.dart';
+import 'package:workout_notes/services/traditional_alarm_service.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class TraditionalAlarmsScreen extends StatefulWidget {

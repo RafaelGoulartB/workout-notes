@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../l10n/app_localizations.dart';
-import '../../models/ai_chat_thread.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/ai_chat_thread.dart';
 
 enum _ThreadMenuAction { rename, togglePin, delete }
 

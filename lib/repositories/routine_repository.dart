@@ -1,8 +1,8 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
-import 'package:workout_notes/utils/strength_routine_summary.dart';
+import 'package:workout_notes/repositories/base_repository.dart';
 import 'package:workout_notes/repositories/phase_target_training.dart';
-import 'base_repository.dart';
+import 'package:workout_notes/utils/strength_routine_summary.dart';
 
 double _normalizeRoutineDecimal(double value, int decimals) =>
     double.tryParse(value.toStringAsFixed(decimals)) ?? 0;

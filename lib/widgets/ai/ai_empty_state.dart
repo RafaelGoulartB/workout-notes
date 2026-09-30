@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-
-import '../../screens/settings/ai_settings_screen.dart';
-import '../../l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/screens/settings/ai_settings_screen.dart';
 
 class AiEmptyState extends StatelessWidget {
   final String title;

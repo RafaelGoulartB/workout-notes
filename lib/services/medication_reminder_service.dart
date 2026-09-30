@@ -1,11 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-
-import '../models/medication.dart';
-import '../repositories/medication_repository.dart';
-import 'traditional_alarm_service.dart';
-import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/models/medication.dart';
+import 'package:workout_notes/repositories/medication_repository.dart';
+import 'package:workout_notes/services/traditional_alarm_service.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Where one of today's doses stands.
 enum MedicationDoseState {

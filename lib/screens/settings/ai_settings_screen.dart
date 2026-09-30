@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
-
-import '../../main.dart';
-import '../../l10n/app_localizations.dart';
-import '../../models/ai_provider.dart';
-import '../../models/ai_settings.dart';
-import '../../services/ai_service.dart';
-import '../../state/ai_settings_notifier.dart';
-import '../../utils/ai_error_localizer.dart';
-import '../../widgets/ai/ai_provider_picker_sheet.dart';
-import '../../widgets/settings/settings.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/main.dart';
+import 'package:workout_notes/models/ai_provider.dart';
+import 'package:workout_notes/models/ai_settings.dart';
+import 'package:workout_notes/services/ai_service.dart';
+import 'package:workout_notes/state/ai_settings_notifier.dart';
+import 'package:workout_notes/utils/ai_error_localizer.dart';
+import 'package:workout_notes/widgets/ai/ai_provider_picker_sheet.dart';
+import 'package:workout_notes/widgets/settings/settings.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class AiSettingsScreen extends StatefulWidget {

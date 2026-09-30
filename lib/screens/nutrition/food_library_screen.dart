@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
-
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/screens/nutrition/food_label_photo_screen.dart';
+import 'package:workout_notes/screens/nutrition/manual_food_screen.dart';
 import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
-
-import 'food_label_photo_screen.dart';
-import 'manual_food_screen.dart';
 
 enum _FoodLibraryAction { edit, delete }
 

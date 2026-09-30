@@ -1,8 +1,8 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:workout_notes/models/goal.dart';
+import 'package:workout_notes/repositories/base_repository.dart';
 import 'package:workout_notes/repositories/workout_sql.dart';
 import 'package:workout_notes/utils/date_utils.dart';
-import 'base_repository.dart';
 
 /// Repository for user-defined goals: CRUD + progress computation.
 class GoalRepository extends BaseRepository {

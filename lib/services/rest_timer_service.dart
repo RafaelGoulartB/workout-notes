@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'notification_service.dart';
+import 'package:workout_notes/services/notification_service.dart';
 import 'package:workout_notes/utils/duration_format.dart';
 
 class RestTimerService extends ChangeNotifier {

@@ -2,9 +2,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/utils/workout_card_helpers.dart';
 import 'package:workout_notes/widgets/workout/stepper_button.dart';
-import 'package:workout_notes/utils/duration_format.dart';
 
 /// Shared, purpose-built controls for editing the values of a workout set.
 ///

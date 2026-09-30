@@ -3,13 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
-import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/ai_food_label_draft.dart';
-import 'package:workout_notes/models/nutrition/food_serving.dart';
+import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/food_search_result.dart';
+import 'package:workout_notes/models/nutrition/food_serving.dart';
 import 'package:workout_notes/models/nutrition/food_variant.dart';
 import 'package:workout_notes/models/nutrition/meal_log_item.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
@@ -23,6 +21,8 @@ import 'package:workout_notes/screens/nutrition/nutrition_progress_screen.dart';
 import 'package:workout_notes/screens/nutrition/nutrition_replicate_day_dialog.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 import 'package:workout_notes/utils/nutrition_conversion.dart';
+import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
+
 import 'support/test_db.dart';
 
 Widget _app(Widget child) => MaterialApp(

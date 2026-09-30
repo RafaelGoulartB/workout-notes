@@ -1,13 +1,13 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
-import '../models/sleep_entry.dart';
-import '../models/sleep_monitor_segment.dart';
-import '../models/sleep_monitor_session.dart';
-import '../models/sleep_night_summary.dart';
-import '../models/sleep_stage_summary.dart';
-import 'base_repository.dart';
-import '../services/sleep_stage_analysis_service.dart';
+import 'package:workout_notes/models/sleep_entry.dart';
+import 'package:workout_notes/models/sleep_monitor_segment.dart';
+import 'package:workout_notes/models/sleep_monitor_session.dart';
+import 'package:workout_notes/models/sleep_night_summary.dart';
+import 'package:workout_notes/models/sleep_stage_summary.dart';
+import 'package:workout_notes/repositories/base_repository.dart';
+import 'package:workout_notes/services/sleep_stage_analysis_service.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 

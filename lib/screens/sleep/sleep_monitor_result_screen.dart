@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_stage_card.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
-import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Detail of one monitored night: headline sleep and efficiency, the night's
 /// numbers, the stage timeline and the estimate disclaimer.

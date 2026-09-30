@@ -1,7 +1,7 @@
-import 'ai_chat_message.dart';
-import 'ai_chat_error_details.dart';
-import 'ai_chat_thread.dart';
-import 'ai_routine_proposal.dart';
+import 'package:workout_notes/models/ai_chat_error_details.dart';
+import 'package:workout_notes/models/ai_chat_message.dart';
+import 'package:workout_notes/models/ai_chat_thread.dart';
+import 'package:workout_notes/models/ai_routine_proposal.dart';
 
 enum AiTurnPhase {
   idle,

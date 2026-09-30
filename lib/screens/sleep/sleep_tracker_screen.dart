@@ -4,31 +4,28 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
-import 'package:workout_notes/models/sleep_night_summary.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
-import 'package:workout_notes/services/sleep_monitor_service.dart';
+import 'package:workout_notes/models/sleep_night_summary.dart';
+import 'package:workout_notes/screens/alarms/traditional_alarms_screen.dart';
+import 'package:workout_notes/screens/settings/settings_screen.dart';
+import 'package:workout_notes/screens/sleep/sleep_monitor_result_screen.dart';
+import 'package:workout_notes/screens/sleep/sleep_monitor_screen.dart';
 import 'package:workout_notes/services/sleep_goal_service.dart';
-
+import 'package:workout_notes/services/sleep_monitor_service.dart';
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/utils/load_generation.dart';
-import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
-import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_history_row.dart';
 import 'package:workout_notes/widgets/sleep/sleep_last_night_card.dart';
 import 'package:workout_notes/widgets/sleep/sleep_trend_card.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_week_card.dart';
-
-import 'sleep_monitor_result_screen.dart';
-import 'sleep_monitor_screen.dart';
-import '../alarms/traditional_alarms_screen.dart';
-import '../settings/settings_screen.dart';
-import 'package:workout_notes/utils/date_utils.dart';
-import 'package:workout_notes/utils/duration_format.dart';
-import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class SleepTrackerScreen extends StatefulWidget {
   const SleepTrackerScreen({super.key});

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
-import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/models/nutrition/nutrition_progress.dart';
+import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class AverageNutrientsCard extends StatelessWidget {

@@ -1,12 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-
-import '../../l10n/app_localizations.dart';
-import '../../models/ai_chat_thread.dart';
-import '../../state/ai_chat_service.dart';
-import '../../widgets/ai/ai_history_thread_card.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/ai_chat_thread.dart';
+import 'package:workout_notes/state/ai_chat_service.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/widgets/ai/ai_history_thread_card.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class AiChatHistoryScreen extends StatefulWidget {
