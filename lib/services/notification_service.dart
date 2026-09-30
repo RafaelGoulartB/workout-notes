@@ -325,7 +325,9 @@ class NotificationService {
   Future<void> _cancel(int id) async {
     try {
       await _plugin.cancel(id: id);
-    } catch (_) {}
+    } catch (_) {
+      // Cancelling a notification that is gone or unsupported is harmless.
+    }
   }
 
   // Helpers

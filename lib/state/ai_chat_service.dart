@@ -200,7 +200,9 @@ class AiChatService extends ChangeNotifier {
         }
       }
       await _imageStore.deleteOrphans(retained);
-    } catch (_) {}
+    } catch (_) {
+      // Orphan image cleanup is best-effort; retried on the next run.
+    }
   }
 
   // ===========================================================================
@@ -813,7 +815,9 @@ class AiChatService extends ChangeNotifier {
     Map<String, dynamic>? existing;
     try {
       existing = await _db.aiChatRepo.getAiChatThreadSummary(threadId);
-    } catch (_) {}
+    } catch (_) {
+      // Without a stored summary the thread is summarized from scratch.
+    }
     final existingSummary = existing?['summary'] as String?;
     final existingThrough = existing?['through_message_id'] as String?;
 
@@ -1029,7 +1033,9 @@ class AiChatService extends ChangeNotifier {
       final decoded = jsonDecode(cleaned);
       if (decoded is Map<String, dynamic>) return decoded;
       if (decoded is Map) return decoded.cast<String, dynamic>();
-    } catch (_) {}
+    } catch (_) {
+      // Falls through to the invalid-draft error below.
+    }
     throw const AiServiceException(
       'The provider returned an invalid manual-food draft.',
       code: 'invalid_response',

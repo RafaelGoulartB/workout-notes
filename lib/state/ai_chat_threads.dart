@@ -34,7 +34,9 @@ extension AiChatThreadManagement on AiChatService {
         totalThreadCount: total,
       );
       if (notify) _emit();
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Loading AI chat threads failed: $error');
+    }
   }
 
   /// One page of threads matching [query] straight from SQLite (title,
@@ -188,7 +190,9 @@ extension AiChatThreadManagement on AiChatService {
           .map(AiChatMessage.fromRow)
           .expand((message) => message.attachments)
           .toList();
-    } catch (_) {}
+    } catch (_) {
+      // Attachment cleanup is best-effort; the thread is still deleted.
+    }
     try {
       await _db.aiChatRepo.deleteAiChatThread(threadId);
       await _imageStore.deleteAll(attachments);

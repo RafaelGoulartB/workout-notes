@@ -164,7 +164,9 @@ class AiSettingsNotifier extends ChangeNotifier {
             providers.add(AiProvider.fromMap(raw.cast<String, dynamic>()));
           }
         }
-      } catch (_) {}
+      } catch (error) {
+        debugPrint('Reading the saved AI providers failed: $error');
+      }
     }
 
     final activeId = prefs.getString(_kPrefsActiveId);
@@ -225,7 +227,9 @@ class AiSettingsNotifier extends ChangeNotifier {
           await secure.delete(key: _kLegacyTokenKey);
         }
         await prefs.setBool(_kPrefsLegacyTokenMigrated, true);
-      } catch (_) {}
+      } catch (error) {
+        debugPrint('Migrating the legacy AI token failed: ${error.runtimeType}');
+      }
     }
 
     _loaded = true;
@@ -286,7 +290,9 @@ class AiSettingsNotifier extends ChangeNotifier {
     await _persistProviders();
     try {
       await secure.delete(key: '$_kTokenPrefix$id');
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Deleting the AI provider token failed: ${error.runtimeType}');
+    }
     notifyListeners();
   }
 
@@ -353,7 +359,9 @@ class AiSettingsNotifier extends ChangeNotifier {
       } else {
         await secure.write(key: '$_kTokenPrefix$providerId', value: token);
       }
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Saving the AI provider token failed: ${error.runtimeType}');
+    }
   }
 
   Future<List<String>> fetchModels(String providerId) async {

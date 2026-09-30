@@ -127,7 +127,9 @@ class NutritionGatewayFoodPayload {
         if (item is Map) {
           try {
             variants.add(_parseVariant(item.cast<String, dynamic>()));
-          } catch (_) {}
+          } catch (_) {
+            // Skip a malformed variant from the remote payload.
+          }
         }
       }
     }
@@ -151,7 +153,9 @@ class NutritionGatewayFoodPayload {
           try {
             final serving = _parseServing(item.cast<String, dynamic>());
             servings.putIfAbsent(variants.first.id, () => []).add(serving);
-          } catch (_) {}
+          } catch (_) {
+            // Skip a malformed serving from the remote payload.
+          }
         }
       }
     }

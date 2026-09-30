@@ -86,7 +86,9 @@ extension _AiChatPersistence on AiChatService {
       await _db.aiChatRepo.upsertAiChatMessages(id, changedRows);
       _persistedMessages.addAll(seen);
       _upsertThreadInMemory(thread);
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Saving the AI chat thread failed: $error');
+    }
   }
 
   Future<AiChatThread?> _loadStoredThread(String id) async {

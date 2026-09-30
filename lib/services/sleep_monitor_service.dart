@@ -365,7 +365,9 @@ class SleepMonitorService extends ChangeNotifier {
     if (_isAndroid && sessionId != null) {
       try {
         await methods.invokeMethod<void>('discardSession', sessionId);
-      } catch (_) {}
+      } catch (_) {
+        // The native session may already be gone; the SQLite row is removed below.
+      }
     }
     if (sessionId != null) {
       await _repository.deleteSession(sessionId);

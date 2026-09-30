@@ -151,7 +151,9 @@ class _BodySummaryGrid extends StatelessWidget {
         Map<String, dynamic>? previous;
         try {
           latest = bodySummary.firstWhere((s) => s['type'] == typeId);
-        } catch (_) {}
+        } catch (_) {
+          // No summary for this type yet.
+        }
 
         if (latest != null && bodyComposition.isNotEmpty) {
           final latestDate = latest['date'] as String? ?? '';

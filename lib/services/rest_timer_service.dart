@@ -133,7 +133,9 @@ class RestTimerService extends ChangeNotifier {
       Future.delayed(Duration(milliseconds: 500 * i), () {
         try {
           HapticFeedback.heavyImpact();
-        } catch (_) {}
+        } catch (_) {
+          // Haptics are optional (unsupported on some devices).
+        }
       });
     }
   }

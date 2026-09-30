@@ -246,7 +246,9 @@ class BackupMediaService {
     if (directory == null) return;
     try {
       if (await directory.exists()) await directory.delete(recursive: true);
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort cleanup of a temporary restore directory.
+    }
   }
 
   /// Removes media directories left by previous successful restores. Files
@@ -259,7 +261,9 @@ class BackupMediaService {
         if (entity is Directory && entity.path != retainedDirectory.path) {
           try {
             await entity.delete(recursive: true);
-          } catch (_) {}
+          } catch (_) {
+            // Best-effort cleanup of stale restore directories.
+          }
         }
       }
     } catch (_) {}

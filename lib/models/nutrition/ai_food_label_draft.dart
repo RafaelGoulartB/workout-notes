@@ -99,7 +99,9 @@ class AiFoodLabelDraft {
             servings.add(
               AiFoodLabelServingDraft.fromJson(item.cast<String, dynamic>()),
             );
-          } catch (_) {}
+          } catch (_) {
+            // Skip a malformed serving and keep the rest of the draft.
+          }
         }
       }
     }

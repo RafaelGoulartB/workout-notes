@@ -83,7 +83,9 @@ class AiChatMessage {
             }
           }
         }
-      } catch (_) {}
+      } catch (_) {
+        // Unreadable tool calls: show the message without them.
+      }
     }
 
     final attachments = <AiImageAttachment>[];
@@ -100,7 +102,9 @@ class AiChatMessage {
             }
           }
         }
-      } catch (_) {}
+      } catch (_) {
+        // Unreadable attachments: show the message without them.
+      }
     }
 
     return AiChatMessage(

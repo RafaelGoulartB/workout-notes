@@ -2329,7 +2329,9 @@ class NutritionExportRow {
           isEstimated = (snapshot['is_estimated'] as bool?) ?? false;
           hasMissing = (snapshot['has_missing_values'] as bool?) ?? false;
         }
-      } catch (_) {}
+      } catch (_) {
+        // Corrupt snapshot: keep the default flags.
+      }
     }
     return NutritionExportRow(
       date: (map['date'] as String?) ?? '',

@@ -449,7 +449,9 @@ class AiNutritionToolService {
     try {
       final raw = jsonDecode(row['nutrition_snapshot_json'] as String);
       if (raw is Map) snapshot = raw.cast<String, dynamic>();
-    } catch (_) {}
+    } catch (_) {
+      // Unreadable snapshot: the tool reports no snapshot.
+    }
     return {
       'itemId': row['id'],
       'foodId': row['food_id'],

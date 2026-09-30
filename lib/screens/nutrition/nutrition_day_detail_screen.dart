@@ -327,7 +327,9 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
   Future<void> _undoDelete(MealLogItem item) async {
     try {
       await _repository.restoreMealLogItem(item);
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Restoring the deleted meal item failed: $error');
+    }
     if (!mounted) return;
     await _load();
   }

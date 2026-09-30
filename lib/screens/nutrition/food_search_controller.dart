@@ -501,7 +501,9 @@ class FoodSearchController extends ChangeNotifier {
         variants: [variant],
         servings: {variant.id: remote.servings},
       );
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Caching the scanned food failed: $error');
+    }
     return BarcodeLookup(
       BarcodeLookupKind.found,
       selection: NutritionSelection(

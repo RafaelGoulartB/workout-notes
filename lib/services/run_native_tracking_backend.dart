@@ -213,7 +213,9 @@ class NativeRunTrackingBackend implements RunTrackingBackend {
     if (activityId != null) {
       try {
         await methods.invokeMethod<dynamic>('deleteSpool', activityId);
-      } catch (_) {}
+      } catch (_) {
+        // The spool may already be gone; cleanup is best-effort.
+      }
     }
   }
 

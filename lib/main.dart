@@ -146,7 +146,9 @@ Future<void> _initializeDeferredServices() async {
 Future<void> _guarded(Future<void> Function() step) async {
   try {
     await step();
-  } catch (_) {}
+  } catch (error) {
+    debugPrint('Startup step failed: $error');
+  }
 }
 
 Locale _parseLocale(String value) {

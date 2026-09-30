@@ -113,7 +113,9 @@ class ExportService {
         if (!await dir.exists()) await dir.create(recursive: true);
         return dir;
       }
-    } catch (_) {}
+    } catch (_) {
+      // Public Downloads is unavailable: fall back to app documents.
+    }
 
     // Fallback: app's documents
     final appDir = await getApplicationDocumentsDirectory();
@@ -336,7 +338,9 @@ class ExportService {
       if (preferencesChanged) {
         try {
           await _replacePortablePreferences(previousPreferences);
-        } catch (_) {}
+        } catch (_) {
+          // Best-effort rollback; the original restore error is rethrown.
+        }
       }
       await _backupMedia.discardRestore(restoreDirectory);
       rethrow;
