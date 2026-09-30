@@ -152,7 +152,7 @@ class RunElevationProfile {
     for (final value in altitudes) {
       prefix.add(prefix.last + value);
     }
-    final half = smoothingWindowMeters / 2;
+    const half = smoothingWindowMeters / 2;
     final result = <double>[];
     var lo = 0;
     var hi = 0;

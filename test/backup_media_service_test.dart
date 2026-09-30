@@ -54,7 +54,7 @@ void main() {
     expect(data['media_count'], 1);
     expect(data['media_files'], everyElement(isNot(contains('path'))));
     expect(
-      data['body_measurements'].first['photos_paths'],
+      ((data['body_measurements'] as List).first as Map)['photos_paths'],
       contains('backup-media://'),
     );
 
@@ -64,7 +64,8 @@ void main() {
 
     final restoredDirectory = await service.materializeForRestore(data);
     final bodyPaths =
-        (jsonDecode(data['body_measurements'].first['photos_paths'] as String)
+        (jsonDecode(((data['body_measurements'] as List).first as Map)['photos_paths']
+                as String)
                 as List)
             .cast<String>();
     expect(await File(bodyPaths.single).readAsBytes(), [1, 2, 3]);
@@ -107,7 +108,7 @@ void main() {
       containsPair('data_base64', isNotEmpty),
     );
     expect(
-      data['body_measurements'].first['photos_paths'],
+      ((data['body_measurements'] as List).first as Map)['photos_paths'],
       contains('backup-media://'),
     );
   });
@@ -120,7 +121,7 @@ void main() {
       final data = await exportedData([first.path, second.path]);
       // Valid by size and shape but not decodable: fails on the second file,
       // after the first one was already written.
-      (data['media_files'] as List)[1]['data_base64'] = '!!!!';
+      ((data['media_files'] as List)[1] as Map)['data_base64'] = '!!!!';
 
       await expectLater(
         service.materializeForRestore(data),
@@ -164,7 +165,7 @@ void main() {
   test('rejects a declared size that disagrees with the payload', () async {
     final photo = File('${source.path}/body.jpg')..writeAsBytesSync([1, 2, 3]);
     final data = await exportedData([photo.path]);
-    (data['media_files'] as List).single['size_bytes'] = 4000;
+    ((data['media_files'] as List).single as Map)['size_bytes'] = 4000;
 
     await expectLater(
       service.materializeForRestore(data),

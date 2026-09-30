@@ -120,13 +120,13 @@ void main() {
     expect(text, isNot(contains('\n')));
     expect(data['media_count'], 3);
     expect(data['media_files'], hasLength(3));
-    expect((data['media_files'] as List).map((e) => e['size_bytes']), [
+    expect((data['media_files'] as List).map((e) => (e as Map)['size_bytes']), [
       5,
       300,
       400 * 1024,
     ]);
     expect(RegExp('"media_files"').allMatches(text), hasLength(1));
-    expect(data['record_counts']['workouts'], 2);
+    expect((data['record_counts'] as Map)['workouts'], 2);
   });
 
   test('round-trips through a backup file keeping counts and photos', () async {
@@ -176,7 +176,7 @@ void main() {
               as Map<String, dynamic>;
       // Valid manifest (count matches), but one row points to a photo that is
       // not embedded.
-      (data['body_measurements'] as List)[0]['photos_paths'] = jsonEncode([
+      ((data['body_measurements'] as List)[0] as Map)['photos_paths'] = jsonEncode([
         'backup-media://media_0',
         'backup-media://media_99',
       ]);

@@ -606,7 +606,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                             summary: _summary,
                             goal: _effective.goal,
                             planInfo: _effective,
-                            onTap: () => _openDay(),
+                            onTap: _openDay,
                             onConfigureGoal: _openSettings,
                           ),
                         ),

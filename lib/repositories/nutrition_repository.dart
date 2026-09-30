@@ -1706,7 +1706,8 @@ class NutritionRepository extends BaseRepository {
           food: food,
           variants: variantsByFood[food.id] ?? const [],
           servings: {
-            for (final variant in variantsByFood[food.id] ?? const [])
+            for (final variant
+                in variantsByFood[food.id] ?? const <FoodVariant>[])
               variant.id:
                   servingsByVariant[variant.id] ?? const <FoodServing>[],
           },

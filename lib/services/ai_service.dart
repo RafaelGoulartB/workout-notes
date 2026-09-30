@@ -67,7 +67,7 @@ class AiService {
     Future<void> Function(Duration)? delay,
   }) : _client = client ?? http.Client(),
        _ownsClient = client == null,
-       _delay = delay ?? ((duration) => Future<void>.delayed(duration));
+       _delay = delay ?? (Future<void>.delayed);
 
   /// Releases the HTTP client if this instance created it (see the class
   /// docs). Instances built with an injected client leave it open.

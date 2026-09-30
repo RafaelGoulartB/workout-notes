@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/database/database_helper.dart';
@@ -216,7 +217,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
         builder: (_) => ActiveWorkoutScreen(workoutId: widget.workoutId),
       ),
     );
-    if (result == true && mounted) _load();
+    if (result == true && mounted) await _load();
   }
 
   Future<void> _editDate() async {
@@ -232,7 +233,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     if (newDate == null || !mounted) return;
     await _workoutRepo.updateWorkoutDate(widget.workoutId, newDate);
     if (!mounted) return;
-    _load();
+    unawaited(_load());
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(loc.workoutDetailDateChanged),
@@ -250,7 +251,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
       ),
     );
     if (result != true || !mounted) return;
-    _load();
+    unawaited(_load());
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(loc.editWorkoutSaved),

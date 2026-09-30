@@ -409,7 +409,7 @@ void main() {
       final totals = await repository.previewSavedMealTotals(
         portions: 2,
         items: [
-          SavedMealItemDraft(
+          const SavedMealItemDraft(
             foodNameSnapshot: 'Invisível',
             quantity: 100,
             unit: 'g',
@@ -629,10 +629,7 @@ void main() {
 
       final suggestions = await repository.getMealSuggestions('breakfast');
       expect(suggestions.map((f) => f.food.name), ['Banana', 'Iogurte']);
-      expect(
-        suggestions,
-        isNot(contains(anyElement((f) => f.food.name == 'Salada'))),
-      );
+      expect(suggestions.map((f) => f.food.name), isNot(contains('Salada')));
     });
   });
 
@@ -686,7 +683,7 @@ void main() {
           name: 'Café da manhã',
           food: banana,
           variant: await variantOf(banana),
-          conversion: NutritionConversion(
+          conversion: const NutritionConversion(
             quantity: 100,
             unit: 'g',
             referenceAmount: 100,
@@ -714,7 +711,7 @@ void main() {
           name: 'Pré-treino',
           food: banana,
           variant: await variantOf(banana),
-          conversion: NutritionConversion(
+          conversion: const NutritionConversion(
             quantity: 100,
             unit: 'g',
             referenceAmount: 100,
@@ -734,7 +731,7 @@ void main() {
         name: 'Jantar',
         food: banana,
         variant: await variantOf(banana),
-        conversion: NutritionConversion(
+        conversion: const NutritionConversion(
           quantity: 100,
           unit: 'g',
           referenceAmount: 100,

@@ -4,8 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/food_search_result.dart';
-import 'package:workout_notes/models/nutrition/food_serving.dart';
-import 'package:workout_notes/models/nutrition/food_variant.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
@@ -151,14 +149,14 @@ class FoodSearchController extends ChangeNotifier {
           repository.getMealSuggestions(_selectedMealType!),
       ]);
       if (_disposed) return;
-      _favorites = attachVariants(results[0]);
-      _recents = attachVariants(results[1]);
-      _allFoods = attachVariants(results[2]);
+      _favorites = attachVariants(results[0] as List<FoodSearchResultLite>);
+      _recents = attachVariants(results[1] as List<FoodSearchResultLite>);
+      _allFoods = attachVariants(results[2] as List<FoodSearchResultLite>);
       _mealTypes = results[3] as List<MealTypeDefinition>;
       _savedMeals = results[4] as List<SavedMealWithItems>;
       _mealSuggestions = _selectedMealType == null
           ? const []
-          : attachVariants(results[5]);
+          : attachVariants(results[5] as List<FoodSearchResultLite>);
       _suggestionsLoading = false;
       _notify();
     } catch (_) {
@@ -365,16 +363,17 @@ class FoodSearchController extends ChangeNotifier {
     return hydrated;
   }
 
-  static List<FoodSearchResult> attachVariants(List<dynamic> results) {
+  static List<FoodSearchResult> attachVariants(
+    List<FoodSearchResultLite> results,
+  ) {
     return results.map<FoodSearchResult>((entry) {
-      final primaryVariant = entry.primaryVariant as FoodVariant?;
-      final servings = (entry.servings as Map<String, List<FoodServing>>);
+      final primaryVariant = entry.primaryVariant;
       return FoodSearchResult(
-        food: entry.food as Food,
+        food: entry.food,
         primaryVariant: primaryVariant,
         servings: primaryVariant == null
             ? const []
-            : servings[primaryVariant.id] ?? const [],
+            : entry.servings[primaryVariant.id] ?? const [],
         isRemote: false,
       );
     }).toList();

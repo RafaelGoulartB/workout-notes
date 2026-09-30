@@ -12,6 +12,21 @@ analyzer:
     - windows/**
 
 linter:
+  # discarded_futures is intentionally left off: it flags every fire-and-forget
+  # call from sync callbacks and is too noisy next to unawaited_futures.
   rules:
     always_use_package_imports: true
     directives_ordering: true
+    unawaited_futures: true
+    prefer_const_constructors: true
+    prefer_const_declarations: true
+    prefer_const_literals_to_create_immutables: true
+    unnecessary_lambdas: true
+    unnecessary_breaks: true
+    cancel_subscriptions: true
+    close_sinks: true
+    avoid_dynamic_calls: true
+    prefer_final_locals: true
+    use_build_context_synchronously: true
+    unnecessary_await_in_return: true
+    avoid_void_async: true

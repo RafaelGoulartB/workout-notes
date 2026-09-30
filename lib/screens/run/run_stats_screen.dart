@@ -99,7 +99,7 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
 
   Future<void> _push(Widget screen) async {
     await Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
-    if (mounted) _reload();
+    if (mounted) await _reload();
   }
 
   Future<void> _startFreeRun() => _push(const RunRecordScreen());
@@ -119,7 +119,7 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
     );
     if (edit == null) return;
     await _todayService.setWeeklyGoalKm(edit.km);
-    if (mounted) _reload();
+    if (mounted) await _reload();
   }
 
   void _onMenu(_HomeMenu item) {

@@ -13,7 +13,7 @@ import 'support/strength_workout_seed.dart';
 final _setCircle = find.byWidgetPredicate(
   (w) =>
       w is AnimatedContainer &&
-      w.constraints == BoxConstraints.tightFor(width: 26, height: 26),
+      w.constraints == const BoxConstraints.tightFor(width: 26, height: 26),
 );
 
 Future<void> _settle(WidgetTester tester) async {

@@ -56,11 +56,11 @@ const _pushDay = StrengthRoutineDayInfo(
 Future<void> _pumpHub(WidgetTester tester) async {
   await tester.runAsync(() async {
     await tester.pumpWidget(
-      MaterialApp(
+      const MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        locale: const Locale('pt'),
-        home: const StrengthHomeScreen(),
+        locale: Locale('pt'),
+        home: StrengthHomeScreen(),
       ),
     );
     await Future<void>.delayed(const Duration(milliseconds: 500));

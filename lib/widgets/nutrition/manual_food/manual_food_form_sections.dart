@@ -132,7 +132,7 @@ class ManualFoodFormSections extends StatelessWidget {
                 type: MaterialType.transparency,
                 child: SwitchListTile(
                   value: form.isEstimated,
-                  onChanged: (v) => form.setEstimated(v),
+                  onChanged: form.setEstimated,
                   title: Text(loc.nutritionManualIsEstimated),
                   contentPadding: EdgeInsets.zero,
                   dense: true,

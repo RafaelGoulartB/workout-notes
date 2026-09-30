@@ -208,11 +208,11 @@ class AiRoutineMutationService {
       return 'O nome da rotina é obrigatório.';
     }
     final seen = <String>{};
-    for (final day in target['days'] as List) {
+    for (final day in (target['days'] as List).cast<Map<String, dynamic>>()) {
       if ((day['name'] as String?)?.trim().isEmpty ?? true) {
         return 'Todo dia precisa de nome.';
       }
-      for (final exercise in day['exercises'] as List) {
+      for (final exercise in (day['exercises'] as List).cast<Map<String, dynamic>>()) {
         final exerciseId = exercise['exercise_id'] as String?;
         if (exerciseId == null || exerciseId.isEmpty) {
           return 'Todo exercício precisa de exercise_id.';
@@ -227,7 +227,7 @@ class AiRoutineMutationService {
         }
         final rest = exercise['rest_time_seconds'];
         if (rest is int && rest < 0) return 'O descanso não pode ser negativo.';
-        for (final set in exercise['sets'] as List) {
+        for (final set in (exercise['sets'] as List).cast<Map<String, dynamic>>()) {
           for (final key in const [
             'weight',
             'reps',
@@ -329,11 +329,11 @@ class AiRoutineMutationService {
       if (tree == null) return 0;
       if (key == 'days') return (tree['days'] as List? ?? const []).length;
       var total = 0;
-      for (final d in tree['days'] as List? ?? const []) {
+      for (final d in (tree['days'] as List? ?? const []).cast<Map<String, dynamic>>()) {
         if (key == 'exercises') {
           total += (d['exercises'] as List? ?? const []).length;
         }
-        for (final e in d['exercises'] as List? ?? const []) {
+        for (final e in (d['exercises'] as List? ?? const []).cast<Map<String, dynamic>>()) {
           if (key == 'sets') total += (e['sets'] as List? ?? const []).length;
         }
       }
@@ -347,10 +347,12 @@ class AiRoutineMutationService {
     final afterExercises = count(target, 'exercises');
     final afterSets = count(target, 'sets');
     final existingDayIds = (before?['days'] as List? ?? const [])
+        .cast<Map<String, dynamic>>()
         .map((d) => d['source_day_id'])
         .whereType<String>()
         .toSet();
     final keptDayIds = (target['days'] as List)
+        .cast<Map<String, dynamic>>()
         .map((d) => d['source_day_id'])
         .whereType<String>()
         .toSet();

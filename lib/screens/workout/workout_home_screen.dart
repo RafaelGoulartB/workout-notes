@@ -68,7 +68,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         ),
       ),
     );
-    _loadData();
+    await _loadData();
   }
 
   /// Starts today's suggested routine day (or a blank workout); resumes the
@@ -87,7 +87,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         ),
       ),
     );
-    _loadData();
+    await _loadData();
   }
 
   Future<void> _openStrengthHub() async {
@@ -95,7 +95,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       context,
       MaterialPageRoute(builder: (_) => const StrengthHomeScreen()),
     );
-    _loadData();
+    await _loadData();
   }
 
   Future<void> _openRunHub() async {
@@ -103,7 +103,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       context,
       MaterialPageRoute(builder: (_) => const RunStatsScreen()),
     );
-    _loadData();
+    await _loadData();
   }
 
   Future<void> _openActiveWorkout(Map<String, dynamic> workout) async {
@@ -114,7 +114,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
             ActiveWorkoutScreen(workoutId: workout['id'] as String?),
       ),
     );
-    _loadData();
+    await _loadData();
   }
 
   Future<void> _startRun() async {
@@ -142,7 +142,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         ),
       ),
     );
-    _loadData();
+    await _loadData();
   }
 
   Future<void> _openActiveBike() async {
@@ -154,7 +154,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         ),
       ),
     );
-    _loadData();
+    await _loadData();
   }
 
   // ===================== HELPERS =====================
@@ -540,7 +540,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       context,
       MaterialPageRoute(builder: (_) => WorkoutDetailScreen(workoutId: id)),
     );
-    _loadData();
+    await _loadData();
   }
 
   Future<void> _openRunDetail(String id) async {
@@ -548,7 +548,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       context,
       MaterialPageRoute(builder: (_) => RunDetailScreen(activityId: id)),
     );
-    _loadData();
+    await _loadData();
   }
 
   // ===================== APP BAR =====================

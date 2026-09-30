@@ -182,7 +182,7 @@ class TestDataWellnessGenerator {
   }
 
   Future<(int, int, int)> _nutrition() async {
-    final foods = _foods;
+    const foods = _foods;
     for (var index = 0; index < foods.length; index++) {
       final food = foods[index];
       final foodId = context.id('food', index);

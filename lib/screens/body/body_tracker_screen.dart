@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
@@ -704,7 +705,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
         );
         if (confirm == true) {
           await _bodyRepo.deleteBodyMeasurement(m['id'] as String);
-          _load();
+          unawaited(_load());
         }
       },
     );

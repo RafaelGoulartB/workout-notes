@@ -258,7 +258,8 @@ class WorkoutRepository extends BaseRepository {
           'notes': entry['notes'],
           'rest_time_seconds': entry['rest_time_seconds'],
         });
-        for (final s in setsByEntry[entry['id']] ?? const []) {
+        for (final s in setsByEntry[entry['id']] ??
+            const <Map<String, Object?>>[]) {
           batch.insert('sets', {
             'id': const Uuid().v4(),
             'exercise_entry_id': newEntryId,

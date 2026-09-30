@@ -447,10 +447,10 @@ void main() {
       expect(c.arguments, isEmpty);
     });
     test('round-trips through toJson', () {
-      final c = AiToolCall(
+      const c = AiToolCall(
         id: 'call_3',
         name: 'list_recent_workouts',
-        arguments: const {'limit': 5},
+        arguments: {'limit': 5},
       );
       final back = AiToolCall.fromJson(c.toJson());
       expect(back.id, c.id);

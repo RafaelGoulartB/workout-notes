@@ -115,13 +115,10 @@ class AiHistoryThreadCard extends StatelessWidget {
                   switch (action) {
                     case _ThreadMenuAction.rename:
                       onRename();
-                      break;
                     case _ThreadMenuAction.togglePin:
                       onTogglePinned();
-                      break;
                     case _ThreadMenuAction.delete:
                       onDelete();
-                      break;
                   }
                 },
                 itemBuilder: (_) => [

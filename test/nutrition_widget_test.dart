@@ -903,7 +903,7 @@ void main() {
       unit: 'serving',
       gramsEquivalent: 170,
     );
-    final snapshot = NutritionSnapshot(
+    const snapshot = NutritionSnapshot(
       version: NutritionSnapshot.currentVersion,
       source: FoodSource.manual,
       externalId: 'food',
@@ -916,7 +916,7 @@ void main() {
       unit: 'serving',
       gramsEquivalent: 170,
       mlEquivalent: null,
-      consumed: const NutritionValues(calories: 102),
+      consumed: NutritionValues(calories: 102),
       isEstimated: false,
       hasMissingValues: true,
     );

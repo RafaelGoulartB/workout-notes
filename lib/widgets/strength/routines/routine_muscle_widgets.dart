@@ -172,7 +172,7 @@ class RoutineWeeklyMusclesCard extends StatelessWidget {
   /// fits with some headroom.
   static double _scaleFor(List<RoutineMuscleSets> muscles) {
     final maxSets = muscles.fold<int>(0, (m, e) => e.sets > m ? e.sets : m);
-    final base = kRecommendedWeeklySetsMax * 1.25;
+    const base = kRecommendedWeeklySetsMax * 1.25;
     return (maxSets > base ? maxSets * 1.05 : base).toDouble();
   }
 }

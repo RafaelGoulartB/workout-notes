@@ -169,7 +169,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
         ),
       ),
     );
-    if (result == true || mounted) _load();
+    if (result == true || mounted) await _load();
   }
 
   Future<void> _createExercise() async {
@@ -177,7 +177,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
       context,
       MaterialPageRoute(builder: (_) => const ExerciseFormScreen()),
     );
-    if (result == true && mounted) _load();
+    if (result == true && mounted) await _load();
   }
 
   void _clearFilters() {

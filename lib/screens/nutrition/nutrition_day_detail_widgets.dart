@@ -298,7 +298,7 @@ class _MacrosCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              AppIconBadge(Icons.donut_large_rounded, size: 34, iconSize: 18),
+              const AppIconBadge(Icons.donut_large_rounded, size: 34, iconSize: 18),
               const SizedBox(width: 10),
               Text(
                 loc.nutritionMacrosTitle,

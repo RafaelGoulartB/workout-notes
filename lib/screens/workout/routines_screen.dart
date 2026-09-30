@@ -74,7 +74,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
         builder: (_) => RoutineFormScreen(routineId: routine.id),
       ),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _openDay(RoutineSummary routine, RoutineDaySummary day) async {
@@ -92,7 +92,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
         ),
       ),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _startDay(RoutineSummary routine, RoutineDaySummary day) async {
@@ -103,7 +103,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
             ActiveWorkoutScreen(routineId: routine.id, routineDayId: day.id),
       ),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _createRoutine() async {
@@ -128,7 +128,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
       context,
       MaterialPageRoute(builder: (_) => RoutineFormScreen(routineId: id)),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _duplicate(RoutineSummary routine) async {
@@ -137,7 +137,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
       routine.id,
       loc.routinesDuplicateSuffix(routine.name),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _delete(RoutineSummary routine) async {
@@ -149,7 +149,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
     );
     if (!confirmed) return;
     await _repo.deleteRoutine(routine.id);
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   RoutineCardActions _actionsFor(RoutineSummary routine) => RoutineCardActions(

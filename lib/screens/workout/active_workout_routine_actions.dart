@@ -406,7 +406,7 @@ mixin _ActiveWorkoutRoutineActions
     );
   }
 
-  void _updateRestTimeAndClose(ExerciseWithSets exercise, int seconds) async {
+  Future<void> _updateRestTimeAndClose(ExerciseWithSets exercise, int seconds) async {
     await _workoutRepo.updateExerciseEntryRestTime(exercise.entryId, seconds);
     await _loadExercises();
     if (mounted) setState(() {});
@@ -468,7 +468,7 @@ mixin _ActiveWorkoutRoutineActions
       // Stop any running timers
       _elapsedTimer?.cancel();
       _timerService.stop();
-      NotificationService.instance.cancelWorkoutTimer();
+      unawaited(NotificationService.instance.cancelWorkoutTimer());
 
       await _workoutRepo.deleteWorkout(_workoutId!);
 

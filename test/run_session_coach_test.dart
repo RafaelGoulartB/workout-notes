@@ -72,8 +72,8 @@ void main() {
 
     final begin = calls.singleWhere((call) => call.method == 'beginSession');
     final args = Map<String, dynamic>.from(begin.arguments as Map);
-    expect(args['settings']['resolvedLanguage'], 'pt');
-    expect(args['goal']['value'], 5000);
+    expect((args['settings'] as Map)['resolvedLanguage'], 'pt');
+    expect((args['goal'] as Map)['value'], 5000);
     // A structured plan replaces the quick interval preset.
     expect(args['intervalsOn'], isFalse);
     expect(args['plan'], hasLength(1));
@@ -178,6 +178,6 @@ void main() {
 
     expect(ok, isTrue);
     final call = calls.singleWhere((c) => c.method == 'speakTest');
-    expect((call.arguments as Map)['settings']['resolvedLanguage'], 'pt');
+    expect(((call.arguments as Map)['settings'] as Map)['resolvedLanguage'], 'pt');
   });
 }

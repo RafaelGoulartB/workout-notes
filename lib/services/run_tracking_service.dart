@@ -530,7 +530,7 @@ class RunTrackingService extends ChangeNotifier {
       _backend = _native;
     }
     _sessionContext = null;
-    _state = RunTrackingState.initial(
+    _state = const RunTrackingState.initial(
       supported: true,
     ).copyWith(locationGranted: _state.locationGranted);
     notifyListeners();
@@ -613,7 +613,7 @@ class RunTrackingService extends ChangeNotifier {
       final activityMap = Map<String, dynamic>.from(
         raw['activity'] as Map? ?? const {},
       );
-      var status = activityMap['status'] as String? ?? 'completed';
+      final status = activityMap['status'] as String? ?? 'completed';
       if (status == 'discarded') {
         await methods.invokeMethod<dynamic>('deleteSpool', id);
         return null;
@@ -631,7 +631,7 @@ class RunTrackingService extends ChangeNotifier {
               status == 'stopping')) {
         final points = (raw['points'] as List? ?? const [])
             .whereType<Map>()
-            .map((row) => Map<String, dynamic>.from(row))
+            .map(Map<String, dynamic>.from)
             .toList();
         RunSpoolRecovery.finalizeInterruptedActivity(
           activityMap,

@@ -98,9 +98,7 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
             content: Text(loc.sleepMissionScanError),
             action: SnackBarAction(
               label: loc.sleepMissionOpenSettings,
-              onPressed: () {
-                _monitor.openCameraSettings();
-              },
+              onPressed: _monitor.openCameraSettings,
             ),
           ),
         );

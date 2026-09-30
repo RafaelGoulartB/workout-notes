@@ -283,7 +283,7 @@ class _HeatmapPainter extends CustomPainter {
     const cell = _ActivityHeatmapState._cell;
     const step = _ActivityHeatmapState._step;
     const top = _ActivityHeatmapState._monthLabelHeight;
-    final radius = const Radius.circular(3);
+    const radius = Radius.circular(3);
     final todayOnly = dayOf(today);
     var lastLabelEnd = -100.0;
 

@@ -188,7 +188,7 @@ class _StrengthHistoryScreenState extends State<StrengthHistoryScreen> {
       context,
       MaterialPageRoute(builder: (_) => const ActiveWorkoutScreen()),
     );
-    if (mounted) _load(showSpinner: false);
+    if (mounted) await _load(showSpinner: false);
   }
 
   Future<void> _openDetail(StrengthHistoryWorkout workout) async {
@@ -198,7 +198,7 @@ class _StrengthHistoryScreenState extends State<StrengthHistoryScreen> {
         builder: (_) => WorkoutDetailScreen(workoutId: workout.id),
       ),
     );
-    if (mounted) _load(showSpinner: false);
+    if (mounted) await _load(showSpinner: false);
   }
 
   @override

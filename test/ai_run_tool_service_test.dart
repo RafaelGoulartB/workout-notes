@@ -130,7 +130,7 @@ void main() {
       expect(data['found'], isTrue);
       expect((data['plan'] as Map)['name'], 'Plano 5K');
       expect((data['routeSummary'] as Map)['elevationGainMeters'], 12.0);
-      expect((data['stepResults'] as List).single['paceDeltaSecPerKm'], -20.0);
+      expect(((data['stepResults'] as List).single as Map)['paceDeltaSecPerKm'], -20.0);
     },
   );
 

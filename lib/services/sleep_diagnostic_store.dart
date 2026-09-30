@@ -138,7 +138,7 @@ class SleepDiagnosticStore {
         decoded['schema'] != 'sleep-aggregate-replay' ||
         decoded['schema_version'] != 1 ||
         decoded['session'] is! Map ||
-        decoded['session']['id'] != id ||
+        (decoded['session'] as Map)['id'] != id ||
         decoded['segments'] is! List) {
       return null;
     }

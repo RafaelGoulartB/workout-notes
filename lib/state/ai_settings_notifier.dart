@@ -146,7 +146,7 @@ class AiSettingsNotifier extends ChangeNotifier {
       '$systemPrompt\n\n${_settings.responseStyle.systemInstruction}';
 
   static AiSettings _loadInitial() {
-    return AiSettings(
+    return const AiSettings(
       systemPrompt: kDefaultAiCoachSystemPrompt,
       contextMode: AiContextMode.standard,
     );

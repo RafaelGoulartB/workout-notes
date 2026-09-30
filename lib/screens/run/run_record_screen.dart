@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -372,7 +373,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
       onChanged: (next) {
         if (!mounted) return;
         setState(() => _fields = RunDataFieldLayout.sanitize(next));
-        RunDataFieldsStore.instance.save(next);
+        unawaited(RunDataFieldsStore.instance.save(next));
       },
     );
   }
@@ -387,7 +388,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     if (picked == null || !mounted) return;
     final next = [..._fields]..[index] = picked;
     setState(() => _fields = next);
-    RunDataFieldsStore.instance.save(next);
+    await RunDataFieldsStore.instance.save(next);
   }
 
   Future<RunGpsFix?> _prepareGps() async {
@@ -603,7 +604,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     final loc = AppLocalizations.of(context)!;
     final lap = await _service.lap();
     if (lap == null || !mounted) return;
-    HapticFeedback.mediumImpact();
+    unawaited(HapticFeedback.mediumImpact());
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(

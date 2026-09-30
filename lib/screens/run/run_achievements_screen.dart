@@ -144,7 +144,7 @@ class _AchievementHero extends StatelessWidget {
         children: [
           Row(
             children: [
-              AppIconBadge(Icons.emoji_events_rounded, size: 48, iconSize: 28),
+              const AppIconBadge(Icons.emoji_events_rounded, size: 48, iconSize: 28),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(

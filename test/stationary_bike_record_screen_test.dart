@@ -21,11 +21,11 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      MaterialApp(
-        locale: const Locale('pt'),
+      const MaterialApp(
+        locale: Locale('pt'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: const RunRecordScreen(
+        home: RunRecordScreen(
           initialActivityType: CardioActivityType.stationaryBike,
         ),
       ),

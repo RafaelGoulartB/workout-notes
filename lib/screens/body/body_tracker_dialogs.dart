@@ -548,7 +548,7 @@ Future<void> showQuickMeasureSheet(
                           ),
                           label: Text(
                             loc.bodyTrackerFasted,
-                            style: TextStyle(fontSize: 12),
+                            style: const TextStyle(fontSize: 12),
                           ),
                           selected: isFasted,
                           onSelected: (v) => setSheetState(() => isFasted = v),

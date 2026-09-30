@@ -676,7 +676,7 @@ class RunRepository extends BaseRepository {
     );
     final rawPoints = (spool['points'] as List? ?? const [])
         .whereType<Map>()
-        .map((row) => Map<String, dynamic>.from(row))
+        .map(Map<String, dynamic>.from)
         .toList();
 
     final now = DateTime.now();

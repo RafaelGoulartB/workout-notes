@@ -406,7 +406,7 @@ void main() {
 
   group('run targets persistence', () {
     test('a saved target keeps the routine and running links', () async {
-      final routine = 'routine-1';
+      const routine = 'routine-1';
       await database.insert('routines', {
         'id': routine,
         'name': 'Full body',

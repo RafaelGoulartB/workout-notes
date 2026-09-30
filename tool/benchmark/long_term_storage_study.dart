@@ -490,7 +490,7 @@ class _Generator {
         .difference(DateTime(startDate.year, startDate.month, startDate.day))
         .inDays;
     var foodCounter = 0;
-    final catalogCount = 120;
+    const catalogCount = 120;
     final foodNames = <String>[
       'Arroz branco', 'Feijão preto', 'Frango grelhado', 'Ovo cozido',
       'Banana', 'Maçã', 'Aveia', 'Whey protein', 'Batata doce', 'Brócolis',

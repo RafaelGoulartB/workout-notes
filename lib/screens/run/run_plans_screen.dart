@@ -77,7 +77,7 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
       context,
       MaterialPageRoute(builder: (_) => RunPlanDetailScreen(planId: plan.id)),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _createPlan() async {
@@ -90,13 +90,13 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
     final view = _next;
     if (view == null) return;
     await startRunPlanSession(context, _repo, view);
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _duplicate(RunPlan plan) async {
     final loc = AppLocalizations.of(context)!;
     await _repo.duplicatePlan(plan.id, loc.runPlansDuplicateSuffix(plan.name));
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _toggleArchive(RunPlan plan) async {
@@ -104,7 +104,7 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
       plan.id,
       status: plan.isArchived ? RunPlanStatus.active : RunPlanStatus.archived,
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _delete(RunPlan plan) async {
@@ -118,7 +118,7 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
     );
     if (confirmed != true) return;
     await _repo.deletePlan(plan.id);
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   RunPlanCardActions _actionsFor(RunPlan plan) => RunPlanCardActions(

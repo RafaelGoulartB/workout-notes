@@ -225,7 +225,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
         builder: (_) => ActiveWorkoutScreen(workoutId: workoutId),
       ),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   /// Follows this plan from today, or stops following it. Only one plan is
@@ -274,7 +274,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
       raceDate: result.raceDate,
       weeks: result.weeks,
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   // --- week ------------------------------------------------------------------
@@ -319,7 +319,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(loc.runPlanCopyWeekApplied(applied))),
     );
-    _load();
+    await _load();
   }
 
   Future<void> _scheduleWeek() async {
@@ -345,7 +345,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(loc.runPlanScheduleWeekDone(createdIds.length))),
     );
-    _load();
+    await _load();
   }
 
   // --- sessions --------------------------------------------------------------
@@ -375,7 +375,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
         RunPlanDraft.isUntouched(current, defaultName: defaultName)) {
       await _repo.deleteWorkout(created.id);
     }
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _openSession(RunPlanWorkout workout) async {
@@ -385,12 +385,12 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
         builder: (_) => RunPlanWorkoutEditorScreen(workoutId: workout.id),
       ),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _startSession(RunPlanSessionView view) async {
     await startRunPlanSession(context, _repo, view);
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _openRun(RunPlanSessionView view) async {
@@ -400,7 +400,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
       context,
       MaterialPageRoute(builder: (_) => RunDetailScreen(activityId: id)),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _duplicateSession(RunPlanWorkout workout) async {
@@ -410,7 +410,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(loc.runPlanSessionDuplicated)));
-    _load();
+    await _load();
   }
 
   Future<void> _deleteSession(RunPlanWorkout workout) async {
@@ -424,7 +424,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     );
     if (confirmed != true) return;
     await _repo.deleteWorkout(workout.id);
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _moveSession(RunPlanWorkout workout) async {
@@ -442,7 +442,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(loc.runPlanMoveWeekDone(target + 1))),
     );
-    _load();
+    await _load();
   }
 
   Future<void> _moveSessionToDay(RunPlanWorkout workout, int dayOfWeek) async {

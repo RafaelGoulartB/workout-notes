@@ -206,7 +206,7 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
   }
 
   void _restoreCurrentMacroDefaults() {
-    final defaults = NutritionMacroRatios.defaults;
+    const defaults = NutritionMacroRatios.defaults;
     _macroControllers.protein.text = _formatRatio(defaults.proteinPerKg);
     _macroControllers.fat.text = _formatRatio(defaults.fatPerKg);
     _recompute();
@@ -566,7 +566,7 @@ class _MacroRatioControllers {
   _MacroRatioControllers({required this.protein, required this.fat});
 
   factory _MacroRatioControllers.defaults() {
-    final defaults = NutritionMacroRatios.defaults;
+    const defaults = NutritionMacroRatios.defaults;
     return _MacroRatioControllers(
       protein: TextEditingController(
         text: defaults.proteinPerKg.toStringAsFixed(1),

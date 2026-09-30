@@ -115,13 +115,10 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
                 switch (value) {
                   case 'import_routine':
                     _importFromRoutine();
-                    break;
                   case 'reset_timer':
                     _resetTimer();
-                    break;
                   case 'delete_workout':
                     _deleteWorkout();
-                    break;
                 }
               },
               itemBuilder: (ctx) => [
@@ -157,7 +154,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
                       ],
                     ),
                   ),
-                PopupMenuDivider(),
+                const PopupMenuDivider(),
                 PopupMenuItem<String>(
                   value: 'delete_workout',
                   child: Row(

@@ -782,7 +782,7 @@ void main() {
       expect(RunPlanUi.estimatedSeconds(_step(0, RunStepRole.work, 1000)), 330);
       expect(
         RunPlanUi.estimatedSeconds(
-          RunWorkoutStep(
+          const RunWorkoutStep(
             id: 't',
             runPlanWorkoutId: 'w',
             orderIndex: 0,

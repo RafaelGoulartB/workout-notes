@@ -10,7 +10,7 @@ void main() {
     // 18 kg × 8 every session: the e1RM is 22.799999999999997 and the trend
     // line lands on 22.8, a spread of 4e-15 that used to make fl_chart step
     // through the axis forever.
-    final e1rm = 18 * (1 + 8 / 30);
+    const e1rm = 18 * (1 + 8 / 30);
     final points = [
       for (var i = 0; i < 11; i++)
         StrengthTrendPoint(

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
@@ -95,7 +96,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen> {
     );
     if (saved == true && mounted) {
       _changed = true;
-      _load();
+      unawaited(_load());
     }
   }
 
@@ -128,7 +129,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen> {
         builder: (_) => WorkoutDetailScreen(workoutId: session.workoutId),
       ),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   @override

@@ -337,7 +337,7 @@ class _GearEditorSheetState extends State<_GearEditorSheet> {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final numberKeyboard = const TextInputType.numberWithOptions(decimal: true);
+    const numberKeyboard = TextInputType.numberWithOptions(decimal: true);
     return Padding(
       padding: EdgeInsets.fromLTRB(
         20,

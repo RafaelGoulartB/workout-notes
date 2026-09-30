@@ -281,7 +281,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
             icon: const Icon(Icons.add_comment_rounded),
             onPressed: state.isSending
                 ? null
-                : () => AiChatService.instance.newChat(),
+                : AiChatService.instance.newChat,
           ),
           IconButton(
             tooltip: l10n.aiChatHistory,
@@ -300,7 +300,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const AiSettingsScreen()),
                   );
-                  break;
               }
             },
             itemBuilder: (_) => [

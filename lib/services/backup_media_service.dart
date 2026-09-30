@@ -177,8 +177,9 @@ class BackupMediaService {
       throw const FormatException('Invalid backup media collection.');
     }
     final mediaRows = rawMedia is List ? rawMedia : const [];
-    if (data['version'] is int &&
-        data['version'] >= 15 &&
+    final version = data['version'];
+    if (version is int &&
+        version >= 15 &&
         (data['media_count'] is! int ||
             data['media_count'] != mediaRows.length)) {
       throw const FormatException('Backup media collection is incomplete.');
@@ -316,7 +317,7 @@ class BackupMediaService {
     if (raw is! List) return [];
     return raw
         .whereType<Map>()
-        .map((row) => Map<String, dynamic>.from(row))
+        .map(Map<String, dynamic>.from)
         .toList(growable: false);
   }
 

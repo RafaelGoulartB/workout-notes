@@ -309,9 +309,9 @@ void main() {
       );
       final built = RunPlanComposer.compose(
         RunPlanTemplates.fiveK,
-        RunPlanBuildConfig(
+        const RunPlanBuildConfig(
           sessionsPerWeek: 4,
-          availableDays: const [2, 4, 5, 7],
+          availableDays: [2, 4, 5, 7],
           intent: RunPlanIntent.pb,
           calibration: goal,
           paceSource: RunPlanPaceSource.goal,
@@ -347,9 +347,9 @@ void main() {
       expect(racePace, greaterThan(goalRace + 20));
       final readiness = RunPlanComposer.assess(
         RunPlanTemplates.fiveK,
-        RunPlanBuildConfig(
+        const RunPlanBuildConfig(
           sessionsPerWeek: 4,
-          availableDays: const [2, 4, 5, 7],
+          availableDays: [2, 4, 5, 7],
           intent: RunPlanIntent.pb,
           calibration: goal,
           paceSource: RunPlanPaceSource.goal,

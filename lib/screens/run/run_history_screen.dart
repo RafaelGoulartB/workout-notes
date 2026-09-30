@@ -166,7 +166,7 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> {
       context,
       MaterialPageRoute(builder: (_) => const RunRecordScreen()),
     );
-    if (mounted) _load(showSpinner: false);
+    if (mounted) await _load(showSpinner: false);
   }
 
   Future<void> _openDetail(RunActivity activity) async {
@@ -176,7 +176,7 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> {
         builder: (_) => RunDetailScreen(activityId: activity.id),
       ),
     );
-    if (mounted) _load(showSpinner: false);
+    if (mounted) await _load(showSpinner: false);
   }
 
   @override

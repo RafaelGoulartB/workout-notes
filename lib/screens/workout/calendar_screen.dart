@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/database/database_helper.dart';
@@ -330,7 +331,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                       context,
                                       MaterialPageRoute(builder: (_) => target),
                                     );
-                                    if (result == true) _loadMonth();
+                                    if (result == true) await _loadMonth();
                                   },
                                 ),
                               );
@@ -488,7 +489,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             } else if (value == 'remove') {
               await _runPlanRepo.deleteScheduledRun(scheduled.id);
             }
-            if (mounted) _loadMonth();
+            if (mounted) await _loadMonth();
           },
           itemBuilder: (ctx) => [
             if (scheduled.isPlanned)
@@ -519,7 +520,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     ),
                   ),
                 );
-                if (mounted) _loadMonth();
+                if (mounted) await _loadMonth();
               },
       ),
     );
@@ -564,7 +565,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               builder: (_) => RunDetailScreen(activityId: activity.id),
             ),
           );
-          if (mounted) _loadMonth();
+          if (mounted) await _loadMonth();
         },
       ),
     );
@@ -703,7 +704,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   /// Builds up to 4 small colored dots representing exercise categories.
   /// If more than 4 categories, shows 3 dots + a "+N" indicator.
   Widget _buildCategoryDots(List<Map<String, dynamic>> categories) {
-    final maxDots = 4;
+    const maxDots = 4;
     final displayCats = categories.take(maxDots).toList();
     final overflow = categories.length - maxDots;
 
@@ -739,7 +740,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Future<void> _createWorkoutForSelectedDate() async {
     await _workoutRepo.createWorkout(date: _selectedDate);
-    _loadMonth();
+    unawaited(_loadMonth());
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -925,7 +926,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     // Create workout and import
     final newWorkoutId = await _workoutRepo.createWorkout(date: _selectedDate);
     await _workoutRepo.importRoutineDayToWorkout(newWorkoutId, dayId);
-    _loadMonth();
+    unawaited(_loadMonth());
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

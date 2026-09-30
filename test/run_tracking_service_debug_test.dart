@@ -61,7 +61,7 @@ void main() {
     final draft = await service.stopForReview();
 
     expect(draft, isNotNull);
-    expect(draft!.spool['activity']['status'], 'pending_review');
+    expect((draft!.spool['activity'] as Map)['status'], 'pending_review');
     expect(service.isDebugSimulating, isFalse);
     expect(service.state.status, RunTrackingState.idle);
     final pending = await service.listPendingReviews();

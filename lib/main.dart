@@ -230,7 +230,7 @@ class _WorkoutNotesAppState extends State<WorkoutNotesApp> {
         brightness: brightness,
       ),
       useMaterial3: true,
-      appBarTheme: AppBarTheme(
+      appBarTheme: const AppBarTheme(
         centerTitle: true,
         elevation: 0,
         scrolledUnderElevation: 1,

@@ -71,7 +71,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
     );
     if (details == null) return;
     await _repo.addRoutineDay(widget.routineId, details.name);
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _editDetails() async {
@@ -95,7 +95,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
       name: details.name,
       notes: details.notes,
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _deleteRoutine() async {
@@ -129,7 +129,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
       ),
     );
     // Exercises and sets may have changed inside the editor.
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _startDay(RoutineDaySummary day) async {
@@ -142,7 +142,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
         ),
       ),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   @override

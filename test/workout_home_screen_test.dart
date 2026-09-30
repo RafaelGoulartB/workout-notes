@@ -13,11 +13,11 @@ import 'support/test_db.dart';
 Future<void> _pumpHome(WidgetTester tester) async {
   await tester.runAsync(() async {
     await tester.pumpWidget(
-      MaterialApp(
-        locale: const Locale('pt'),
+      const MaterialApp(
+        locale: Locale('pt'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: const WorkoutHomeScreen(),
+        home: WorkoutHomeScreen(),
       ),
     );
     await Future<void>.delayed(const Duration(milliseconds: 500));

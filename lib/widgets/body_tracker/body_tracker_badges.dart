@@ -133,7 +133,7 @@ class FastedChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     return Chip(
-      avatar: Icon(Icons.nightlight_round, size: 16, color: Colors.deepPurple),
+      avatar: const Icon(Icons.nightlight_round, size: 16, color: Colors.deepPurple),
       label: Text(loc.bodyTrackerFasting),
       visualDensity: VisualDensity.compact,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
@@ -65,7 +66,7 @@ class _RunPlanWorkoutEditorScreenState
       targetDurationSeconds: draft.targetDurationSeconds,
       targetPaceSecPerKm: draft.targetPaceSecPerKm,
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _deleteSession() async {
@@ -100,7 +101,7 @@ class _RunPlanWorkoutEditorScreenState
       targetPaceMinSecPerKm: result.paceMin,
       targetPaceMaxSecPerKm: result.paceMax,
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   Future<void> _editStep(RunWorkoutStep step) async {
@@ -116,7 +117,7 @@ class _RunPlanWorkoutEditorScreenState
         targetPaceMaxSecPerKm: result.paceMax,
       ),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   /// Deletes with an undo, because a step is one tap to lose and several taps
@@ -151,7 +152,7 @@ class _RunPlanWorkoutEditorScreenState
       await _repo.deleteStep(step.id);
     }
     if (!mounted) return;
-    _load();
+    unawaited(_load());
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -215,7 +216,7 @@ class _RunPlanWorkoutEditorScreenState
       ...restoredIds,
       ...base.skip(at),
     ]);
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   /// Reorders whole blocks instead of individual steps: dragging one leg of a
@@ -232,7 +233,7 @@ class _RunPlanWorkoutEditorScreenState
       workout.id,
       ordered.map((step) => step.id).toList(),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   /// Adds `effort + recovery` as one repeated block — the shape of a tiro
@@ -266,7 +267,7 @@ class _RunPlanWorkoutEditorScreenState
         repeatCount: draft.repeats,
       );
     }
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   static int _nextRepeatGroup(RunPlanWorkout workout) {
@@ -285,7 +286,7 @@ class _RunPlanWorkoutEditorScreenState
       context,
       MaterialPageRoute(builder: (_) => RunRecordScreen(planWorkout: workout)),
     );
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   @override

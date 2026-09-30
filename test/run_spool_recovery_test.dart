@@ -19,7 +19,7 @@ void main() {
 
       RunSpoolRecovery.finalizeInterruptedActivity(
         activity,
-        points: points.map((e) => Map<String, dynamic>.from(e)).toList(),
+        points: points.map(Map<String, dynamic>.from).toList(),
         now: DateTime.parse('2026-08-18T12:00:00.000Z'),
       );
 
@@ -48,7 +48,7 @@ void main() {
 
       RunSpoolRecovery.finalizeInterruptedActivity(
         activity,
-        points: points.map((e) => Map<String, dynamic>.from(e)).toList(),
+        points: points.map(Map<String, dynamic>.from).toList(),
       );
 
       expect(activity['duration_seconds'], 480);

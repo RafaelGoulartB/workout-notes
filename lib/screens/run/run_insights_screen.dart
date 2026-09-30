@@ -140,7 +140,7 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
       context,
       MaterialPageRoute(builder: (_) => RunDetailScreen(activityId: id)),
     );
-    if (mounted) _loadAll();
+    if (mounted) await _loadAll();
   }
 
   Future<void> _openShoes() async {
@@ -148,7 +148,7 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
       context,
       MaterialPageRoute(builder: (_) => const RunGearScreen()),
     );
-    if (mounted) _loadAll();
+    if (mounted) await _loadAll();
   }
 
   @override

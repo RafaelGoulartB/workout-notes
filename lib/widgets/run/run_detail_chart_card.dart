@@ -80,7 +80,7 @@ class _RunDetailChartCardState extends State<RunDetailChartCard> {
               Padding(
                 padding: const EdgeInsets.only(left: 8, bottom: 10),
                 child: showElevation
-                    ? _ChartCaption(unit: 'm')
+                    ? const _ChartCaption(unit: 'm')
                     : _ChartCaption(
                         unit: 'min/km',
                         legend: widget.avgPaceSecPerKm == null

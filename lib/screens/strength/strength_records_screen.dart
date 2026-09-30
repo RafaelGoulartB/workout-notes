@@ -77,7 +77,7 @@ class _StrengthRecordsScreenState extends State<StrengthRecordsScreen> {
       exerciseRow: exerciseRow,
     );
     // The exercise may have been renamed or deleted meanwhile.
-    if (mounted) _load();
+    if (mounted) await _load();
   }
 
   @override

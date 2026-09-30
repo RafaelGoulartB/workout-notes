@@ -247,7 +247,7 @@ void main() {
 
   group('goal progress', () {
     test('tracks a weight-loss target from the start value', () {
-      final progress = BodyGoalProgress(
+      const progress = BodyGoalProgress(
         startValue: 82,
         currentValue: 78,
         targetValue: 76,
@@ -266,7 +266,7 @@ void main() {
     });
 
     test('no ETA when the trend moves away from the target', () {
-      final progress = BodyGoalProgress(
+      const progress = BodyGoalProgress(
         startValue: 82,
         currentValue: 78,
         targetValue: 76,
@@ -279,7 +279,7 @@ void main() {
     });
 
     test('overshooting the target reads as achieved', () {
-      final progress = BodyGoalProgress(
+      const progress = BodyGoalProgress(
         startValue: 82,
         currentValue: 75,
         targetValue: 76,
@@ -296,7 +296,7 @@ void main() {
     });
 
     test('a target not yet crossed is not passed', () {
-      final progress = BodyGoalProgress(
+      const progress = BodyGoalProgress(
         startValue: 82,
         currentValue: 78,
         targetValue: 76,
@@ -308,7 +308,7 @@ void main() {
     });
 
     test('moving away from the start counts as zero progress', () {
-      final progress = BodyGoalProgress(
+      const progress = BodyGoalProgress(
         startValue: 82,
         currentValue: 84,
         targetValue: 76,

@@ -206,7 +206,7 @@ void main() {
         mealType: 'breakfast',
         food: food,
         variant: variant,
-        conversion: NutritionConversion(
+        conversion: const NutritionConversion(
           quantity: 30,
           unit: 'g',
           referenceAmount: 100,
@@ -252,7 +252,7 @@ void main() {
         mealType: 'lunch',
         food: food,
         variant: variant,
-        conversion: NutritionConversion(
+        conversion: const NutritionConversion(
           quantity: 50,
           unit: 'g',
           referenceAmount: 100,
@@ -287,7 +287,7 @@ void main() {
         mealType: 'lunch',
         food: food,
         variant: variant,
-        conversion: NutritionConversion(
+        conversion: const NutritionConversion(
           quantity: 100,
           unit: 'g',
           referenceAmount: 100,
@@ -296,7 +296,7 @@ void main() {
       );
       final updated = await repository.updateMealLogItem(
         itemId: item.id,
-        conversion: NutritionConversion(
+        conversion: const NutritionConversion(
           quantity: 200,
           unit: 'g',
           referenceAmount: 100,
@@ -322,7 +322,7 @@ void main() {
         mealType: 'snacks',
         food: food,
         variant: variant,
-        conversion: NutritionConversion(
+        conversion: const NutritionConversion(
           quantity: 100,
           unit: 'g',
           referenceAmount: 100,
@@ -376,7 +376,7 @@ void main() {
           mealType: 'breakfast',
           food: details.food,
           variant: variant,
-          conversion: NutritionConversion(
+          conversion: const NutritionConversion(
             quantity: 100,
             unit: 'g',
             referenceAmount: 100,
@@ -413,7 +413,7 @@ void main() {
         mealType: 'snacks',
         food: food,
         variant: variant,
-        conversion: NutritionConversion(
+        conversion: const NutritionConversion(
           quantity: 30,
           unit: 'g',
           referenceAmount: 100,
@@ -453,7 +453,7 @@ void main() {
         mealType: 'dinner',
         food: food,
         variant: variant,
-        conversion: NutritionConversion(
+        conversion: const NutritionConversion(
           quantity: 50,
           unit: 'g',
           referenceAmount: 100,
@@ -827,7 +827,7 @@ void main() {
         mealType: 'snacks',
         food: food,
         variant: variant,
-        conversion: NutritionConversion(
+        conversion: const NutritionConversion(
           quantity: 120,
           unit: 'g',
           referenceAmount: 100,

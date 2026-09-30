@@ -79,7 +79,7 @@ class TestDataGenerator {
 
   Future<void> _clearPreviousScenario(TestDataContext context) async {
     final db = context.database;
-    final like = '$devDataPrefix%';
+    const like = '$devDataPrefix%';
     // Delete children before parents so the clear works even when
     // foreign_keys is temporarily off or the DB is in a partially-migrated
     // state. Parents are still deleted for cascade coverage, but every

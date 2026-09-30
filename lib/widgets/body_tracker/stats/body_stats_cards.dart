@@ -281,7 +281,7 @@ class BodyStatsChartCard extends StatelessWidget {
             child: ChartTabBar(
               selected: c.chartTab,
               labels: labels,
-              onChanged: (tab) => c.setChartTab(tab),
+              onChanged: c.setChartTab,
             ),
           ),
           const SizedBox(height: 14),

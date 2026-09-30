@@ -302,7 +302,7 @@ class BodyBilateralChartCard extends StatelessWidget {
                       isCurved: true,
                       color: Colors.blue,
                       barWidth: 3,
-                      dotData: FlDotData(show: false),
+                      dotData: const FlDotData(show: false),
                       belowBarData: BarAreaData(show: false),
                     ),
                     // Right line
@@ -314,7 +314,7 @@ class BodyBilateralChartCard extends StatelessWidget {
                       isCurved: true,
                       color: Colors.red,
                       barWidth: 3,
-                      dotData: FlDotData(show: false),
+                      dotData: const FlDotData(show: false),
                       belowBarData: BarAreaData(show: false),
                     ),
                   ],
@@ -370,7 +370,7 @@ class BodyBilateralChartCard extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11)),
+        Text(label, style: const TextStyle(fontSize: 11)),
       ],
     );
   }

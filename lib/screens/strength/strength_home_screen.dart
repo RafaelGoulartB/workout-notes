@@ -113,7 +113,7 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
 
   Future<void> _push(Widget screen) async {
     await Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
-    if (mounted) _reload();
+    if (mounted) await _reload();
   }
 
   Future<void> _openWorkoutScreen({
@@ -133,7 +133,7 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
         ),
       ),
     );
-    if (mounted) _reload();
+    if (mounted) await _reload();
   }
 
   /// Resumes the unfinished workout of today when there is one; starting a
@@ -169,7 +169,7 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
     );
     if (edit == null) return;
     await _todayService.setWeeklyGoalSessions(edit.sessions);
-    if (mounted) _reload();
+    if (mounted) await _reload();
   }
 
   void _onMenu(_HomeMenu item) {

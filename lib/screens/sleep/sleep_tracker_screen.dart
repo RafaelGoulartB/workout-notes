@@ -495,7 +495,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
       context,
       MaterialPageRoute(builder: (_) => const SleepMonitorScreen()),
     );
-    _load();
+    await _load();
   }
 
   Future<void> _showDetails(SleepEntry entry) async {

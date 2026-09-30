@@ -120,7 +120,6 @@ extension AiChatWireTesting on AiChatService {
                         : ''),
             });
           }
-          break;
         case AiMessageRole.assistant:
           final entry = <String, dynamic>{'role': 'assistant'};
           if (m.content != null && m.content!.isNotEmpty) {
@@ -130,14 +129,12 @@ extension AiChatWireTesting on AiChatService {
             entry['tool_calls'] = m.toolCalls.map((c) => c.toJson()).toList();
           }
           out.add(entry);
-          break;
         case AiMessageRole.tool:
           out.add({
             'role': 'tool',
             'tool_call_id': m.toolCallId ?? '',
             'content': _wireToolContent(m.content ?? ''),
           });
-          break;
       }
     }
     return out;

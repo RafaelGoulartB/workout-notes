@@ -366,7 +366,7 @@ class _BodyCompositionChart extends StatelessWidget {
                       color: Colors.orange,
                       barWidth: 2,
                       dashArray: [6, 3],
-                      dotData: FlDotData(show: false),
+                      dotData: const FlDotData(show: false),
                       belowBarData: BarAreaData(show: false),
                     ),
                   // Waist
@@ -385,7 +385,7 @@ class _BodyCompositionChart extends StatelessWidget {
                       color: Colors.teal,
                       barWidth: 2,
                       dashArray: [3, 3],
-                      dotData: FlDotData(show: false),
+                      dotData: const FlDotData(show: false),
                       belowBarData: BarAreaData(show: false),
                     ),
                 ],
@@ -436,7 +436,7 @@ class _BodyCompositionChart extends StatelessWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 10)),
+        Text(label, style: const TextStyle(fontSize: 10)),
       ],
     );
   }
@@ -614,7 +614,7 @@ class _BodyWeightChart extends StatelessWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 10)),
+        Text(label, style: const TextStyle(fontSize: 10)),
       ],
     );
   }

@@ -35,7 +35,7 @@ class RunPlanRepository extends BaseRepository {
       orderBy: 'updated_at DESC',
     );
     if (!hydrate || rows.isEmpty) {
-      return rows.map((row) => RunPlan.fromMap(row)).toList();
+      return rows.map(RunPlan.fromMap).toList();
     }
     final byPlan = await _loadWorkoutsByPlan(
       database,

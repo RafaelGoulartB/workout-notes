@@ -112,7 +112,7 @@ class AiChatService extends ChangeNotifier {
   AiToolRegistry _tools = AiToolRegistry();
   AiContextService _context = AiContextService();
   AiRoutineMutationService _routineMutations = AiRoutineMutationService();
-  AiImageAttachmentStore _imageStore = AiImageAttachmentStore();
+  AiImageAttachmentStore _imageStore = const AiImageAttachmentStore();
   AiSettingsNotifier? _settings;
   bool _isReady = false;
   Future<void>? _readyFuture;
@@ -278,7 +278,7 @@ class AiChatService extends ChangeNotifier {
       attachments: attachments,
       createdAt: now,
     );
-    var messages = [..._state.messages, userMsg];
+    final messages = [..._state.messages, userMsg];
 
     _state = _state.copyWith(activeThreadId: threadId);
 

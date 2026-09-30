@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:workout_notes/models/sleep_monitor_mode.dart';
 import 'package:workout_notes/models/sleep_monitor_state.dart';
@@ -136,8 +137,8 @@ class SleepMonitorController extends ChangeNotifier {
   /// App returned to the foreground: refresh mission config and native state.
   Future<void> onResumed() async {
     if (!service.isSupported) return;
-    reloadMission();
-    service.resync().then((_) => service.getAlarmCapabilities());
+    unawaited(reloadMission());
+    unawaited(service.resync().then((_) => service.getAlarmCapabilities()));
   }
 
   Future<void> reloadMission() async {

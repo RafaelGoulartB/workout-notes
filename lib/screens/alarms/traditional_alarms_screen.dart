@@ -164,7 +164,7 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
               label: Text(loc.medicationNew),
             )
           : FloatingActionButton.extended(
-              onPressed: _busy ? null : () => _edit(),
+              onPressed: _busy ? null : _edit,
               icon: const Icon(Icons.add_alarm_rounded),
               label: Text(loc.alarmNew),
             ),
@@ -334,7 +334,7 @@ class _AlarmCard extends StatelessWidget {
                         children: [
                           if (alarm.requiresMission)
                             Chip(
-                              avatar: Icon(
+                              avatar: const Icon(
                                 Icons.qr_code_scanner_rounded,
                                 size: 18,
                               ),

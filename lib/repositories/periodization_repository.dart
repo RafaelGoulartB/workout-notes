@@ -811,7 +811,8 @@ class PeriodizationRepository extends BaseRepository {
       for (final routineId in routineIds) {
         final routineName = routineNames[routineId];
         if (routineName == null) continue;
-        for (final routineDay in daysByRoutine[routineId] ?? const []) {
+        for (final routineDay in daysByRoutine[routineId] ??
+            const <Map<String, Object?>>[]) {
           sequence.add((
             routineId: routineId,
             routineName: routineName as String,

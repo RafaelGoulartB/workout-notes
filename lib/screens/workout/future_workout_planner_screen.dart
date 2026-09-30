@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/database/database_helper.dart';
@@ -81,7 +82,7 @@ class _FutureWorkoutPlannerScreenState
         builder: (_) => ActiveWorkoutScreen(workoutId: widget.workoutId),
       ),
     );
-    if (result == true) _load();
+    if (result == true) await _load();
   }
 
   @override
@@ -144,7 +145,7 @@ class _FutureWorkoutPlannerScreenState
                 value: 'delete',
                 child: Row(
                   children: [
-                    Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                    const Icon(Icons.delete_outline, size: 18, color: Colors.red),
                     const SizedBox(width: 8),
                     Text(
                       loc.workoutDetailDelete,
@@ -1069,7 +1070,7 @@ class _FutureWorkoutPlannerScreenState
     if (newDate == null || !mounted) return;
 
     await _workoutRepo.updateWorkoutDate(widget.workoutId, newDate);
-    _load();
+    unawaited(_load());
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
