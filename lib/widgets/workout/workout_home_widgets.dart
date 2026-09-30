@@ -704,24 +704,20 @@ class WorkoutAreaTile extends StatelessWidget {
     return AppSectionCard(
       key: tileKey,
       onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      color: Color.alphaBlend(color.withAlpha(14), colors.surfaceContainerLow),
+      padding: const EdgeInsets.all(12),
+      child: Row(
         children: [
-          Row(
-            children: [
-              AppIconBadge(icon, color: color),
-              const Spacer(),
-              Icon(Icons.chevron_right_rounded, color: colors.onSurfaceVariant),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w800,
+          AppIconBadge(icon, color: color, size: 40, iconSize: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
