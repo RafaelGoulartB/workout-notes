@@ -53,6 +53,7 @@ class SleepMonitorBridge(private val context: Context) :
             )
             "getAlarmCapabilities" -> result.success(alarmCapabilities())
             "getState" -> result.success(SleepMonitoringService.currentState(context))
+            "getLiveLevel" -> result.success(SleepMonitoringService.liveLevel())
             "requestMicrophonePermission" -> requestMicrophonePermission(result)
             "openCameraSettings" -> {
                 val visibleActivity = activity
@@ -89,7 +90,7 @@ class SleepMonitorBridge(private val context: Context) :
             }
             "startMonitoring" -> startMonitoring(call, result)
             "updateAlarm" -> updateAlarm(call, result)
-            "openSnoozedAlarmMission" -> openSnoozedAlarmMission(result)
+            "openAlarmScreen" -> openAlarmScreen(result)
             "dismissSnoozedAlarm" -> dismissSnoozedAlarm(result)
             "stopMonitoring" -> result.success(SleepMonitoringService.stopCurrent("user"))
             "discardSession" -> {
@@ -276,31 +277,25 @@ class SleepMonitorBridge(private val context: Context) :
         }
     }
 
-    private fun openSnoozedAlarmMission(result: MethodChannel.Result) {
-        val current = SleepAlarmScheduler.read(context)
-        val snapshot = if (current != null &&
-            current.state == SleepAlarmScheduler.STATE_RINGING &&
-            current.requiresMission
+    /**
+     * Opens the native alarm screen for a ringing alarm or a snoozed one. A
+     * snoozed alarm stays silent: its mission can be completed early, and
+     * backing out keeps the snooze exactly as it was.
+     */
+    private fun openAlarmScreen(result: MethodChannel.Result) {
+        val snapshot = SleepAlarmScheduler.read(context)
+        if (snapshot == null ||
+            (snapshot.state != SleepAlarmScheduler.STATE_RINGING && !snapshot.isSnoozed)
         ) {
-            current
-        } else {
-            SleepAlarmScheduler.resumeSnoozedMission(context)
-        }
-        if (snapshot == null) {
-            result.error("invalid_alarm_state", "No monitored mission is currently snoozing", null)
+            result.error("invalid_alarm_state", "No monitored alarm is ringing or snoozed", null)
             return
         }
-        SleepMonitoringService.publishAlarmRinging(context)
-        SleepAlarmRingingService.start(context, snapshot.alarmAtMillis)
-        val alarmIntent = Intent(context, SleepAlarmActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra(SleepAlarmScheduler.EXTRA_ALARM_AT, snapshot.alarmAtMillis)
-        }
+        val alarmIntent = SleepSnoozeNotification.alarmScreenIntent(context, snapshot.alarmAtMillis)
         val visibleActivity = activity
         if (visibleActivity != null) {
+            alarmIntent.flags = alarmIntent.flags and Intent.FLAG_ACTIVITY_NEW_TASK.inv()
             visibleActivity.startActivity(alarmIntent)
         } else {
-            alarmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(alarmIntent)
         }
         result.success(SleepMonitoringService.currentState(context))

@@ -163,6 +163,9 @@ class SleepMonitoringService : Service() {
             eventSink?.invoke(updated)
         }
 
+        /** Live microphone level while recording; a UI signal, never spooled. */
+        fun liveLevel(): Map<String, Any?>? = activeInstance?.processor?.liveLevel()
+
         fun currentState(context: android.content.Context): Map<String, Any?> {
             val service = activeInstance
             if (service != null) return service.stateMap()

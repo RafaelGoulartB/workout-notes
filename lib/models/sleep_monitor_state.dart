@@ -98,6 +98,13 @@ class SleepMonitorState {
       snoozeCount > 0 &&
       (alarmSnoozing || alarmState == 'scheduled');
 
+  /// The wake-up alarm of the night is ringing right now.
+  bool get isAlarmRinging =>
+      !alarmDismissed && (alarmRinging || alarmState == 'ringing');
+
+  /// Ringing or snoozed: the night ended and its alarm still needs an answer.
+  bool get isAlarmPending => isAlarmRinging || isAlarmSnoozing;
+
   Duration get elapsed {
     if (startedAt == null) return Duration.zero;
     final end = isActive ? DateTime.now() : (updatedAt ?? DateTime.now());

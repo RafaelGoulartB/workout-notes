@@ -1,59 +1,18 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
-class MissionStatusBanner extends StatelessWidget {
-  const MissionStatusBanner({
-    super.key,
-    required this.label,
-    required this.body,
-  });
-  final String label;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: scheme.tertiaryContainer,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.qr_code_2_rounded, color: scheme.onTertiaryContainer),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: scheme.onTertiaryContainer,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(body, style: TextStyle(color: scheme.onTertiaryContainer)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
+/// Night gradient behind the monitor. [dim] keeps it darker while a night is
+/// being recorded.
 class MonitorNightBackground extends StatelessWidget {
   final Widget child;
+  final bool dim;
 
-  const MonitorNightBackground({super.key, required this.child});
+  const MonitorNightBackground({
+    super.key,
+    required this.child,
+    this.dim = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +23,7 @@ class MonitorNightBackground extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            scheme.primaryContainer.withAlpha(145),
+            scheme.primaryContainer.withAlpha(dim ? 60 : 130),
             scheme.surface,
             scheme.surface,
           ],
@@ -72,66 +31,6 @@ class MonitorNightBackground extends StatelessWidget {
         ),
       ),
       child: child,
-    );
-  }
-}
-
-class MonitorNightHero extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  const MonitorNightHero({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final compact = constraints.maxWidth < 360;
-        return Column(
-          children: [
-            Container(
-              width: compact ? 48 : 72,
-              height: compact ? 48 : 72,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: theme.colorScheme.primary.withAlpha(26),
-              ),
-              child: Icon(
-                icon,
-                size: compact ? 26 : 38,
-                color: theme.colorScheme.primary,
-              ),
-            ),
-            SizedBox(height: compact ? 6 : 12),
-            Text(
-              title,
-              style:
-                  (compact
-                          ? theme.textTheme.titleMedium
-                          : theme.textTheme.headlineSmall)
-                      ?.copyWith(fontWeight: FontWeight.w700),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style:
-                  (compact
-                          ? theme.textTheme.bodySmall
-                          : theme.textTheme.bodyLarge)
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        );
-      },
     );
   }
 }
@@ -239,87 +138,151 @@ class TipsCard extends StatelessWidget {
   }
 }
 
-class PermissionRow extends StatelessWidget {
-  final bool granted;
-  final String label;
+/// Muted centred line of text used around the big time and the waves.
+class MonitorCaption extends StatelessWidget {
+  final String text;
 
-  const PermissionRow({super.key, required this.granted, required this.label});
+  /// Slightly brighter, for the value under the big time.
+  final bool emphasis;
+
+  const MonitorCaption(this.text, {super.key, this.emphasis = false});
 
   @override
   Widget build(BuildContext context) {
-    final color = granted ? Colors.green : Theme.of(context).colorScheme.error;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(granted ? Icons.check_circle : Icons.warning_amber, color: color),
-        const SizedBox(width: 8),
-        Text(
-          '$label: ${granted ? AppLocalizations.of(context)!.commonOk : '—'}',
-        ),
-      ],
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Text(
+      text,
+      textAlign: TextAlign.center,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style:
+          (emphasis ? theme.textTheme.titleMedium : theme.textTheme.bodyMedium)
+              ?.copyWith(
+                color: emphasis ? colors.primary : colors.onSurfaceVariant,
+                fontFeatures: AppUi.tabular,
+              ),
     );
   }
 }
 
-class LiveSignal extends StatelessWidget {
-  final SleepMonitorSegment? segment;
-  final double? noiseScore;
-  final AppLocalizations loc;
+/// Large, light clock ("06:30"); tappable when [onTap] is set.
+class MonitorBigTime extends StatelessWidget {
+  final String time;
+  final String? tooltip;
+  final VoidCallback? onTap;
 
-  const LiveSignal({
+  const MonitorBigTime({
     super.key,
-    required this.segment,
-    required this.noiseScore,
-    required this.loc,
+    required this.time,
+    this.tooltip,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final classification = segment?.classification;
-    final isNoise = classification == 'noise';
-    final isInvalid = classification == 'invalid';
-    final color = classification == null
-        ? Theme.of(context).colorScheme.outline
-        : isInvalid
-        ? Theme.of(context).colorScheme.error
-        : isNoise
-        ? Colors.orange
-        : Colors.teal;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withAlpha(22),
-        borderRadius: BorderRadius.circular(12),
+    final theme = Theme.of(context);
+    final text = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(
+        time,
+        maxLines: 1,
+        style: theme.textTheme.displayLarge?.copyWith(
+          fontSize: 76,
+          fontWeight: FontWeight.w300,
+          height: 1.1,
+          letterSpacing: -1,
+          color: theme.colorScheme.onSurface,
+          fontFeatures: AppUi.tabular,
+        ),
       ),
-      child: Row(
-        children: [
-          Icon(
-            isInvalid
-                ? Icons.signal_wifi_bad
-                : isNoise
-                ? Icons.volume_up
-                : Icons.volume_off,
-            color: color,
+    );
+    final onTap = this.onTap;
+    if (onTap == null && tooltip == null) return Center(child: text);
+    return Center(
+      child: Tooltip(
+        message: tooltip ?? '',
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppUi.heroRadius),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: text,
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              classification == null
-                  ? loc.sleepMonitorWaitingSignal
-                  : isInvalid
-                  ? loc.sleepMonitorInvalidSignal
-                  : isNoise
-                  ? loc.sleepMonitorNoiseNow
-                  : loc.sleepMonitorQuietNow,
-            ),
-          ),
-          if (noiseScore != null)
-            Text(
-              noiseScore!.toStringAsFixed(2),
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Fades the monitor down after a while without touches, so a glance at the
+/// phone in the night is not a flash of light. Any touch brings it back; the
+/// touch still reaches the screen.
+class MonitorAutoDim extends StatefulWidget {
+  final bool enabled;
+  final Widget child;
+  final Duration delay;
+
+  const MonitorAutoDim({
+    super.key,
+    required this.enabled,
+    required this.child,
+    this.delay = const Duration(seconds: 20),
+  });
+
+  @override
+  State<MonitorAutoDim> createState() => _MonitorAutoDimState();
+}
+
+class _MonitorAutoDimState extends State<MonitorAutoDim> {
+  Timer? _timer;
+  bool _dimmed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _restart();
+  }
+
+  @override
+  void didUpdateWidget(MonitorAutoDim oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.enabled != widget.enabled) _wake();
+  }
+
+  void _restart() {
+    _timer?.cancel();
+    _timer = widget.enabled
+        ? Timer(widget.delay, () {
+            if (mounted) setState(() => _dimmed = true);
+          })
+        : null;
+  }
+
+  void _wake() {
+    if (_dimmed) setState(() => _dimmed = false);
+    _restart();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) => _wake(),
+      child: ColoredBox(
+        color: Colors.black,
+        child: AnimatedOpacity(
+          opacity: _dimmed ? 0.3 : 1,
+          duration: const Duration(milliseconds: 900),
+          curve: Curves.easeInOut,
+          child: widget.child,
+        ),
       ),
     );
   }

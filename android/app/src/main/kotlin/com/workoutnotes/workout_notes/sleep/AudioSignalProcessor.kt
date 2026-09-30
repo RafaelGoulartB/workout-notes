@@ -53,7 +53,7 @@ class AudioSignalProcessor(
     private var recordingStartedElapsed = 0L
     private var recordingStartedAt = 0L
     private var windowSamples = 0
-    private var features = SleepAudioFeatures(SAMPLE_RATE)
+    @Volatile private var features = SleepAudioFeatures(SAMPLE_RATE)
     private var activeSampleRate = SAMPLE_RATE
 
     @Synchronized
@@ -120,6 +120,9 @@ class AudioSignalProcessor(
         }
         throw IllegalStateException("audio_record_unavailable", lastError)
     }
+
+    /** Latest block level for the live waveform (see [SleepAudioFeatures.liveLevel]). */
+    fun liveLevel(): Map<String, Any?>? = features.liveLevel()
 
     @Synchronized
     fun stop() {

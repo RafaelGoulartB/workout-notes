@@ -40,6 +40,7 @@ class SleepMonitorController extends ChangeNotifier {
   }) : service = service ?? SleepMonitorService.instance,
        missions = missions ?? SleepMissionService(),
        _alarmSettings = alarmSettings ?? TraditionalAlarmService.instance {
+    _alarmWasDismissed = this.service.state.alarmDismissed;
     this.service.addListener(_onServiceChanged);
   }
 
@@ -62,7 +63,11 @@ class SleepMonitorController extends ChangeNotifier {
   bool _openingResult = false;
   bool _disposed = false;
   String? _pendingAlarmResultId;
-  String? _handledAlarmResultId;
+
+  /// Last seen dismissal flag. The native state keeps reporting a dismissed
+  /// alarm until the next night starts, so only the change to "dismissed"
+  /// (seen while this screen is open) leads to the result.
+  bool _alarmWasDismissed = false;
 
   /// Called when a night ended by its alarm has a result waiting and the app
   /// is in the foreground; the screen opens the result page from it.
@@ -85,7 +90,7 @@ class SleepMonitorController extends ChangeNotifier {
   /// is one, otherwise the next occurrence of the selected time (only for
   /// alarm modes).
   DateTime? alarmAtFor(SleepMonitorState state) {
-    final running = state.isActive || state.isAlarmSnoozing;
+    final running = state.isActive || state.isAlarmPending;
     if (running && state.alarmAt != null) return state.alarmAt!.toLocal();
     return _selectedMode.hasAlarm
         ? SleepAlarmTime.nextOccurrence(_selectedTime)
@@ -167,13 +172,15 @@ class SleepMonitorController extends ChangeNotifier {
 
   void _onServiceChanged() {
     final state = service.state;
-    if (!state.isActive &&
+    final justDismissed = state.alarmDismissed && !_alarmWasDismissed;
+    _alarmWasDismissed = state.alarmDismissed;
+    final sessionId = state.sessionId;
+    if (justDismissed &&
+        !state.isActive &&
         state.endReason == 'alarm' &&
-        state.alarmDismissed &&
-        state.sessionId != null &&
-        state.sessionId != _handledAlarmResultId) {
-      _pendingAlarmResultId = state.sessionId;
-      _handledAlarmResultId = state.sessionId;
+        sessionId != null &&
+        service.claimAlarmResult(sessionId)) {
+      _pendingAlarmResultId = sessionId;
       if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
         onAlarmResultReady?.call();
       }
@@ -193,6 +200,8 @@ class SleepMonitorController extends ChangeNotifier {
       await service.recoverPendingSessions();
       if (_disposed) return;
       _pendingAlarmResultId = null;
+      // A night discarded or deleted meanwhile has no result to show.
+      if (!await service.hasSession(sessionId) || _disposed) return;
       await show(sessionId);
     } finally {
       _openingResult = false;
@@ -317,15 +326,17 @@ class SleepMonitorController extends ChangeNotifier {
     _setBusy(false);
   }
 
-  /// Dismisses (or opens the mission for) a snoozing alarm. Returns whether
-  /// the native call succeeded.
-  Future<bool> handleSnoozedAlarm() async {
+  /// Answers a pending alarm: a snooze without mission is dismissed here;
+  /// otherwise the alarm screen opens (silently during a snooze, so its
+  /// mission can be completed early). Returns whether the native call
+  /// succeeded.
+  Future<bool> handlePendingAlarm() async {
     if (_isBusy) return true;
     _setBusy(true);
     final state = service.state;
-    final succeeded = state.mode.requiresMission
-        ? await service.openSnoozedAlarmMission()
-        : await service.dismissSnoozedAlarm();
+    final succeeded = state.isAlarmSnoozing && !state.mode.requiresMission
+        ? await service.dismissSnoozedAlarm()
+        : await service.openAlarmScreen();
     if (!succeeded && !_disposed) {
       // The caller shows the error; refresh the native state meanwhile.
       await service.getState();

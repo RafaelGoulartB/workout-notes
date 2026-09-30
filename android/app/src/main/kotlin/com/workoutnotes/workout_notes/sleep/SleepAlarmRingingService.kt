@@ -65,21 +65,35 @@ class SleepAlarmRingingService : Service() {
             sendAction(context, ACTION_SNOOZE)
         }
 
+        // Pausing and resuming only apply to a ringing alarm. During a snooze
+        // nothing rings, and starting the foreground service there would
+        // break its startForeground() contract.
         fun pauseForEmergency(context: Context) {
-            sendAction(context, ACTION_PAUSE_FOR_EMERGENCY)
+            if (isRinging(context)) sendAction(context, ACTION_PAUSE_FOR_EMERGENCY)
         }
 
         fun resumeAfterEmergency(context: Context) {
-            sendAction(context, ACTION_RESUME_AFTER_EMERGENCY)
+            if (isRinging(context)) {
+                sendAction(context, ACTION_RESUME_AFTER_EMERGENCY)
+            } else {
+                SleepAlarmScheduler.resetEmergencyChallenge(context)
+            }
         }
 
         fun pauseForBarcode(context: Context) {
-            sendAction(context, ACTION_PAUSE_FOR_BARCODE)
+            if (isRinging(context)) sendAction(context, ACTION_PAUSE_FOR_BARCODE)
         }
 
         fun resumeAfterBarcode(context: Context) {
-            sendAction(context, ACTION_RESUME_AFTER_BARCODE)
+            if (isRinging(context)) {
+                sendAction(context, ACTION_RESUME_AFTER_BARCODE)
+            } else {
+                SleepAlarmScheduler.resetBarcodeChallenge(context)
+            }
         }
+
+        private fun isRinging(context: Context): Boolean =
+            SleepAlarmScheduler.read(context)?.state == SleepAlarmScheduler.STATE_RINGING
 
         private fun sendAction(context: Context, action: String) {
             val intent = Intent(context, SleepAlarmRingingService::class.java).apply {
@@ -94,8 +108,7 @@ class SleepAlarmRingingService : Service() {
 
         fun completeBarcode(context: Context, rawValue: String, format: String): Boolean {
             val snapshot = SleepAlarmScheduler.read(context) ?: return false
-            if (snapshot.state != SleepAlarmScheduler.STATE_RINGING ||
-                !snapshot.requiresMission || snapshot.missionHash == null ||
+            if (!snapshot.canRunMission || snapshot.missionHash == null ||
                 snapshot.missionSalt == null ||
                 !SleepAlarmScheduler.isBarcodeChallengeActive(context)
             ) return false
@@ -109,15 +122,16 @@ class SleepAlarmRingingService : Service() {
 
         fun tapEmergency(context: Context): Int {
             val snapshot = SleepAlarmScheduler.read(context) ?: return 0
-            if (snapshot.state != SleepAlarmScheduler.STATE_RINGING ||
-                !snapshot.requiresMission ||
+            if (!snapshot.canRunMission ||
                 !SleepAlarmScheduler.isEmergencyChallengeActive(context)
             ) return 0
             if (SleepAlarmScheduler.emergencyTaps(context) >= SleepAlarmScheduler.MAX_EMERGENCY_TAPS) {
                 return SleepAlarmScheduler.MAX_EMERGENCY_TAPS
             }
             val taps = SleepAlarmScheduler.incrementEmergencyTaps(context)
-            SleepMonitoringService.publishAlarmRinging(context)
+            if (snapshot.state == SleepAlarmScheduler.STATE_RINGING) {
+                SleepMonitoringService.publishAlarmRinging(context)
+            }
             if (taps >= SleepAlarmScheduler.MAX_EMERGENCY_TAPS) {
                 complete(context, SleepMonitorSessionDismiss.EMERGENCY)
             }
@@ -230,6 +244,17 @@ class SleepAlarmRingingService : Service() {
             return START_NOT_STICKY
         }
         if (action == ACTION_SNOOZE) {
+            // Started with startForegroundService(): honour its contract
+            // even though the notification is removed right after.
+            try {
+                ensureChannel()
+                startForeground(
+                    NOTIFICATION_ID,
+                    buildNotification(alarmAt, snapshot?.requiresMission == true),
+                )
+            } catch (_: Throwable) {
+                // Started with startService() from a notification action: no contract.
+            }
             val snoozed = try {
                 SleepAlarmScheduler.snooze(this)
             } catch (_: Throwable) {
@@ -239,13 +264,17 @@ class SleepAlarmRingingService : Service() {
                 SleepMonitoringService.publishAlarmSnoozing(this)
                 stopRinging()
                 stopSelf()
+            } else if (snapshot?.state != SleepAlarmScheduler.STATE_RINGING) {
+                // A stale snooze action with nothing ringing.
+                stopRinging()
+                stopSelf()
             }
             return START_NOT_STICKY
         }
         if (intent?.action == ACTION_COMPLETE) {
             val method = intent.getStringExtra(EXTRA_METHOD)
-            if (snapshot?.state == SleepAlarmScheduler.STATE_RINGING &&
-                snapshot.requiresMission &&
+            // Also completes early, during a snooze.
+            if (snapshot?.canRunMission == true &&
                 method in setOf(SleepMonitorSessionDismiss.BARCODE, SleepMonitorSessionDismiss.EMERGENCY)
             ) {
                 finishAlarm(method!!)

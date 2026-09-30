@@ -10,6 +10,7 @@ import 'package:workout_notes/models/sleep_monitor_state.dart';
 import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/services/sleep_diagnostic_store.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
+import 'package:workout_notes/utils/sleep_live_level.dart';
 
 /// Flutter facade for the Android foreground sleep monitor.
 ///
@@ -37,6 +38,9 @@ class SleepMonitorService extends ChangeNotifier {
   SleepWakeDecision? _liveDecision;
   SleepWakeDecision? get liveDecision => _liveDecision;
   String? _restoredLiveSession;
+  // Alarm nights whose result already opened in this process; the native
+  // state reports the dismissal until the next night starts.
+  final Set<String> _shownAlarmResults = {};
 
   SleepMonitorState get state => _state;
   bool get isSupported => _state.supported;
@@ -121,6 +125,36 @@ class SleepMonitorService extends ChangeNotifier {
     } catch (error) {
       _setError('capabilities_error', error.toString());
       return {'supported': true, 'error': error.toString()};
+    }
+  }
+
+  /// Claims the result of a night ended by its alarm for display. False when
+  /// it was already shown, so reopening the monitor never jumps to it again.
+  bool claimAlarmResult(String sessionId) => _shownAlarmResults.add(sessionId);
+
+  /// Whether the monitored night [sessionId] is stored (imported and not
+  /// deleted).
+  Future<bool> hasSession(String sessionId) async =>
+      await _repository.getSession(sessionId) != null;
+
+  /// Latest microphone level while recording, from 0 (room baseline) to 1
+  /// (loud), or null when nothing is being captured. It only drives the live
+  /// waveform of the visible monitor screen and is never persisted.
+  Future<double?> getLiveLevel() async {
+    if (!_isAndroid || !_state.isActive) return null;
+    try {
+      final result = await methods.invokeMapMethod<String, dynamic>(
+        'getLiveLevel',
+      );
+      final level = (result?['level_dbfs'] as num?)?.toDouble();
+      final baseline = (result?['baseline_dbfs'] as num?)?.toDouble();
+      if (level == null || baseline == null) return null;
+      return SleepLiveLevel.normalize(levelDbfs: level, baselineDbfs: baseline);
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      // Best effort: a missed sample only holds the waveform for a frame.
+      return null;
     }
   }
 
@@ -280,23 +314,22 @@ class SleepMonitorService extends ChangeNotifier {
     }
   }
 
-  Future<bool> openSnoozedAlarmMission() async {
-    if (!_isAndroid ||
-        !_state.isAlarmSnoozing ||
-        !_state.mode.requiresMission) {
-      return false;
-    }
+  /// Opens the native alarm screen of a ringing or snoozed alarm. A snoozed
+  /// alarm stays silent there: its mission can be completed early, and
+  /// leaving keeps the snooze as it was.
+  Future<bool> openAlarmScreen() async {
+    if (!_isAndroid || !_state.isAlarmPending) return false;
     try {
       final result = await methods.invokeMapMethod<String, dynamic>(
-        'openSnoozedAlarmMission',
+        'openAlarmScreen',
       );
       if (result != null) _onEvent(result);
-      return _state.alarmRinging;
+      return true;
     } on PlatformException catch (error) {
       _setError(error.code, error.message ?? error.toString());
       return false;
     } catch (error) {
-      _setError('alarm_resume_failed', error.toString());
+      _setError('alarm_open_failed', error.toString());
       return false;
     }
   }

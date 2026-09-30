@@ -7,6 +7,13 @@ import android.os.Build
 
 class SleepAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
+        if (intent?.action == SleepAlarmScheduler.ACTION_DISMISS_SNOOZE) {
+            // "Turn off" on the snooze notification of an alarm without mission.
+            if (SleepAlarmScheduler.dismissSnooze(context) != null) {
+                SleepMonitoringService.alarmDismissed(context, SleepMonitorSessionDismiss.BUTTON)
+            }
+            return
+        }
         if (intent?.action != SleepAlarmScheduler.ACTION_FIRE) return
         val snapshot = SleepAlarmScheduler.read(context)
         val alarmAt = intent.getLongExtra(

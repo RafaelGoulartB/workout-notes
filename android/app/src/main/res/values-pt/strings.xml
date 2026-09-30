@@ -17,6 +17,22 @@
     <string name="sleep_alarm_mission_camera_denied">O acesso à câmera é necessário para ler a missão.</string>
     <string name="sleep_alarm_mission_timeout">O tempo acabou. Tente cumprir a missão novamente.</string>
     <string name="sleep_alarm_open_camera_settings">Abrir configurações da câmera</string>
+    <string name="sleep_alarm_snoozed_label">Soneca até</string>
+    <string name="sleep_alarm_rings_again_in" formatted="false">Toca de novo em %s</string>
+    <string name="sleep_alarm_snoozed_mission_body">Já acordou? Cumpra a missão agora para desligar o alarme.</string>
+    <string name="sleep_alarm_snoozed_dismiss_body">Já acordou? Desligue o alarme agora.</string>
+    <string name="sleep_alarm_scan_code">Ler código</string>
+    <string name="sleep_alarm_emergency_short">Emergência · 500 toques</string>
+    <string name="sleep_alarm_snooze_left">Soneca de 5 min · restam %1$d</string>
+    <string name="sleep_alarm_back_to_snooze">Voltar à soneca</string>
+    <string name="sleep_alarm_dismiss_now">Desligar alarme</string>
+    <string name="sleep_alarm_complete_mission_now">Cumprir missão agora</string>
+    <string name="sleep_alarm_snooze_channel_name">Alarme em soneca</string>
+    <string name="sleep_alarm_snooze_channel_description">Mostra o despertador em soneca para você desligá-lo antes</string>
+    <string name="sleep_alarm_snooze_notification_title">Alarme em soneca até %1$s</string>
+    <string name="sleep_alarm_snooze_notification_mission">Cumpra a missão agora para desligá-lo.</string>
+    <string name="sleep_alarm_snooze_notification_plain">Toque para desligá-lo antes.</string>
+    <string name="sleep_alarm_emergency_cancel_hint_snoozed">Se o tempo acabar, a soneca continua normalmente.</string>
     <string name="barcode_scanner_instruction">Aponte a câmera para um código de barras</string>
     <string name="barcode_scanner_flashlight">Lanterna</string>
     <string name="barcode_scanner_flashlight_off">Desligar lanterna</string>

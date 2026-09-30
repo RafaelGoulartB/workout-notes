@@ -364,9 +364,34 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
 
   Widget? _buildMonitorFab() {
     if (defaultTargetPlatform != TargetPlatform.android) return null;
+    final state = _monitorService.state;
     final isActive = _monitorService.isMonitoring;
     final loc = AppLocalizations.of(context)!;
-    final elapsed = DurationFormat.clock(_monitorService.state.elapsed);
+    if (!isActive && state.isAlarmPending) {
+      // The alarm of the night still waits for an answer (ringing or
+      // snoozed): lead straight to it instead of "start monitoring".
+      final alarmAt = state.alarmAt?.toLocal();
+      final colors = Theme.of(context).colorScheme;
+      return FloatingActionButton.extended(
+        heroTag: 'sleep-monitor-fab',
+        onPressed: _openMonitor,
+        backgroundColor: colors.tertiaryContainer,
+        foregroundColor: colors.onTertiaryContainer,
+        icon: Icon(
+          state.isAlarmRinging ? Icons.alarm_rounded : Icons.snooze_rounded,
+        ),
+        label: Text(
+          state.isAlarmRinging || alarmAt == null
+              ? loc.sleepMonitorAlarmRinging
+              : loc.alarmSnoozingUntil(
+                  MaterialLocalizations.of(
+                    context,
+                  ).formatTimeOfDay(TimeOfDay.fromDateTime(alarmAt)),
+                ),
+        ),
+      );
+    }
+    final elapsed = DurationFormat.clock(state.elapsed);
     return FloatingActionButton.extended(
       heroTag: 'sleep-monitor-fab',
       onPressed: _openMonitor,
@@ -645,5 +670,4 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
       (index) => _weekEnd.subtract(Duration(days: 6 - index)),
     );
   }
-
 }

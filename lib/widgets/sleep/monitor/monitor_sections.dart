@@ -5,15 +5,16 @@ import 'package:workout_notes/models/sleep_monitor_state.dart';
 import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/screens/sleep/sleep_monitor_controller.dart';
 import 'package:workout_notes/utils/sleep_alarm_time.dart';
-import 'package:workout_notes/widgets/sleep/monitor/monitor_alarm_cards.dart';
 import 'package:workout_notes/widgets/sleep/monitor/monitor_mode_widgets.dart';
 import 'package:workout_notes/widgets/sleep/monitor/monitor_status_widgets.dart';
 import 'package:workout_notes/widgets/sleep/monitor/sleep_monitor_texts.dart';
+import 'package:workout_notes/widgets/sleep/monitor/sleep_sound_waves.dart';
 import 'package:workout_notes/widgets/ui/second_ticker.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
-/// Body of the sleep monitor while idle: wake time, mode picker, tips and any
-/// permission/validity warnings.
+/// Body of the sleep monitor while idle: the wake time front and centre,
+/// calm waves and the mode pill. Tips live in a sheet ([showSleepTipsSheet]);
+/// only actionable warnings are shown inline.
 class SleepMonitorReadyContent extends StatelessWidget {
   const SleepMonitorReadyContent({
     super.key,
@@ -33,6 +34,7 @@ class SleepMonitorReadyContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
     final state = controller.state;
     final selectedMode = controller.selectedMode;
     final alarmAt = this.alarmAt;
@@ -41,71 +43,72 @@ class SleepMonitorReadyContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        MonitorNightHero(
-          icon: Icons.nightlight_round,
-          title: loc.sleepMonitorReady,
-          subtitle: selectedMode.hasAlarm
-              ? loc.sleepAlarmSectionTitle
-              : loc.sleepMonitorModeOnly,
-        ),
-        const SizedBox(height: 16),
-        if (alarmAt != null)
-          AlarmClockCard(
-            time: formatMonitorTime(context, alarmAt),
-            date: formatModeDate(context, alarmAt),
-            remaining: formatMonitorRemaining(alarmAt),
-            sectionTitle: loc.sleepMonitorReadyWakeTime,
-            changeLabel: loc.sleepMonitorChangeWakeTime,
-            onTap: onChooseAlarmTime,
-            onEarlier: () => onShiftAlarmTime(-15),
-            onLater: () => onShiftAlarmTime(15),
-          )
-        else
-          MonitoringOnlyCard(
-            title: loc.sleepMonitorModeOnly,
-            body: loc.sleepMonitorModeOnlyBody,
-          ),
-        const SizedBox(height: 18),
-        ModeSelectorCard(
-          sectionLabel: loc.sleepMonitorModeSection,
-          title: sleepMonitorModeTitle(loc, selectedMode),
-          body: controller.isModeLocked(selectedMode)
-              ? loc.sleepMonitorModeMissionUnavailable
-              : sleepMonitorModeBody(loc, selectedMode),
-          icon: modeIcon(selectedMode),
-          onTap: onShowModePicker,
-        ),
-        const SizedBox(height: 10),
-        TipsCard(
-          title: loc.sleepMonitorTipsTitle,
-          tips: [
-            (
-              Icons.phone_android_rounded,
-              loc.sleepMonitorPlacementTitle,
-              loc.sleepMonitorPlacementBody,
-            ),
-            if (selectedMode.hasAlarm)
-              (
-                Icons.snooze_rounded,
-                loc.sleepMonitorSnoozesTitle,
-                !controller.globalSnoozeEnabled ||
-                        controller.globalMaxSnoozes == 0
-                    ? loc.sleepMonitorSnoozesDisabled
-                    : loc.sleepMonitorSnoozesConfigured(
-                        controller.globalMaxSnoozes,
-                      ),
+        const Spacer(flex: 3),
+        if (alarmAt != null) ...[
+          MonitorCaption(loc.sleepMonitorReadyWakeTime),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              IconButton.outlined(
+                key: const Key('sleep-monitor-earlier'),
+                tooltip: loc.sleepAlarmShiftEarlier,
+                onPressed: () => onShiftAlarmTime(-15),
+                icon: const Icon(Icons.remove_rounded),
               ),
-          ],
+              Expanded(
+                child: MonitorBigTime(
+                  key: const Key('sleep-monitor-wake-time'),
+                  time: formatMonitorTime(context, alarmAt),
+                  tooltip: loc.sleepMonitorChangeWakeTime,
+                  onTap: onChooseAlarmTime,
+                ),
+              ),
+              IconButton.outlined(
+                key: const Key('sleep-monitor-later'),
+                tooltip: loc.sleepAlarmShiftLater,
+                onPressed: () => onShiftAlarmTime(15),
+                icon: const Icon(Icons.add_rounded),
+              ),
+            ],
+          ),
+          MonitorCaption(
+            loc.sleepMonitorWakeIn(formatMonitorRemaining(alarmAt)),
+            emphasis: true,
+          ),
+        ] else ...[
+          Icon(
+            Icons.graphic_eq_rounded,
+            size: 56,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            sleepMonitorModeTitle(loc, selectedMode),
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+        const Spacer(flex: 2),
+        const SleepSoundWaves(height: 72),
+        const Spacer(flex: 2),
+        Center(
+          child: ModePill(
+            label: sleepMonitorModeTitle(loc, selectedMode),
+            icon: modeIcon(selectedMode),
+            onTap: onShowModePicker,
+          ),
         ),
         if (!valid) ...[
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           AppBanner.warning(
             loc.sleepAlarmInvalidWindow,
             icon: Icons.schedule_rounded,
           ),
         ],
         if (selectedMode.hasAlarm && !state.exactAlarmGranted) ...[
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           PermissionNotice(
             text: loc.sleepAlarmExactPermission,
             action: loc.sleepAlarmEnableExactPermission,
@@ -115,21 +118,62 @@ class SleepMonitorReadyContent extends StatelessWidget {
         if (selectedMode.hasAlarm &&
             state.exactAlarmGranted &&
             !state.fullScreenIntentGranted) ...[
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           PermissionNotice(
             text: loc.sleepAlarmFullScreenLimited,
             action: loc.sleepAlarmEnableFullScreen,
             onPressed: controller.service.requestFullScreenPermission,
           ),
         ],
+        const SizedBox(height: 8),
       ],
     );
   }
 }
 
-/// Body of the sleep monitor while a snoozed alarm waits to be dismissed.
-class SleepMonitorSnoozingContent extends StatelessWidget {
-  const SleepMonitorSnoozingContent({
+/// Bottom sheet with the bedside tips (placement and snoozes).
+Future<void> showSleepTipsSheet(
+  BuildContext context, {
+  required bool hasAlarm,
+  required bool snoozeEnabled,
+  required int maxSnoozes,
+}) {
+  final loc = AppLocalizations.of(context)!;
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (sheetContext) => SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: TipsCard(
+          title: loc.sleepMonitorTipsTitle,
+          tips: [
+            (
+              Icons.phone_android_rounded,
+              loc.sleepMonitorPlacementTitle,
+              loc.sleepMonitorPlacementBody,
+            ),
+            if (hasAlarm)
+              (
+                Icons.snooze_rounded,
+                loc.sleepMonitorSnoozesTitle,
+                !snoozeEnabled || maxSnoozes == 0
+                    ? loc.sleepMonitorSnoozesDisabled
+                    : loc.sleepMonitorSnoozesConfigured(maxSnoozes),
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// Body of the sleep monitor once the night ended and its alarm still needs
+/// an answer: ringing now, or snoozed until the next ring. The mission (or the
+/// dismissal) is always one tap away, even before the snooze rings again.
+class SleepMonitorAlarmContent extends StatelessWidget {
+  const SleepMonitorAlarmContent({
     super.key,
     required this.state,
     required this.alarmAt,
@@ -141,247 +185,224 @@ class SleepMonitorSnoozingContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final ringing = state.isAlarmRinging;
+    final mission = state.mode.requiresMission;
     final alarmAt = this.alarmAt;
-    final maximum = state.maxSnoozes <= 0 ? 1 : state.maxSnoozes;
-    final progress = (state.snoozeCount / maximum).clamp(0.0, 1.0).toDouble();
     return Column(
+      key: const Key('sleep-monitor-alarm'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        MonitorNightHero(
-          icon: Icons.snooze_rounded,
-          title: loc.sleepMonitorAlarmSnoozingTitle,
-          subtitle: alarmAt == null
-              ? loc.sleepAlarmSectionTitle
-              : loc.alarmSnoozingUntil(formatMonitorTime(context, alarmAt)),
-        ),
-        const SizedBox(height: 16),
-        Card(
-          key: const Key('sleep-monitor-snoozing-card'),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      state.mode.requiresMission
-                          ? Icons.qr_code_scanner_rounded
-                          : Icons.alarm_off_rounded,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        state.mode.requiresMission
-                            ? loc.sleepMonitorMissionPending
-                            : loc.sleepMonitorAlarmSnoozingTitle,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                LinearProgressIndicator(value: progress),
-                const SizedBox(height: 8),
-                Text(
-                  loc.alarmSnoozeProgress(state.snoozeCount, state.maxSnoozes),
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  state.mode.requiresMission
-                      ? loc.sleepMonitorSnoozingMissionBody
-                      : loc.sleepMonitorSnoozingDismissBody,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ],
+        const Spacer(flex: 3),
+        Center(
+          child: Container(
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: colors.primary.withAlpha(ringing ? 46 : 26),
+            ),
+            child: Icon(
+              ringing ? Icons.alarm_rounded : Icons.snooze_rounded,
+              size: 40,
+              color: colors.primary,
             ),
           ),
         ),
-        if (state.errorCode != null) ...[
-          const SizedBox(height: 14),
-          Text(
-            sleepMonitorErrorMessage(loc, state.errorCode),
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
+        const SizedBox(height: 20),
+        MonitorCaption(
+          ringing ? loc.sleepMonitorAlarmRinging : loc.sleepMonitorSnoozedUntil,
+        ),
+        const SizedBox(height: 4),
+        if (ringing)
+          SecondTicker(
+            builder: (context) => MonitorBigTime(
+              time: formatMonitorTime(context, DateTime.now()),
+            ),
+          )
+        else if (alarmAt != null) ...[
+          MonitorBigTime(time: formatMonitorTime(context, alarmAt)),
+          SecondTicker(
+            builder: (context) => MonitorCaption(
+              loc.sleepMonitorWakeIn(formatMonitorRemaining(alarmAt)),
+              emphasis: true,
+            ),
           ),
         ],
+        const Spacer(flex: 2),
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (state.snoozeCount > 0)
+              AppPill(
+                icon: Icons.snooze_rounded,
+                label: loc.alarmSnoozeProgress(
+                  state.snoozeCount,
+                  state.maxSnoozes,
+                ),
+              ),
+            if (mission)
+              AppPill(
+                icon: Icons.qr_code_2_rounded,
+                label: loc.sleepMonitorMissionPending,
+                color: colors.tertiary,
+              ),
+          ],
+        ),
+        if (!ringing) ...[
+          const SizedBox(height: 16),
+          MonitorCaption(
+            mission
+                ? loc.sleepMonitorSnoozingMissionBody
+                : loc.sleepMonitorSnoozingDismissBody,
+          ),
+        ],
+        if (state.errorCode != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            sleepMonitorErrorMessage(loc, state.errorCode),
+            textAlign: TextAlign.center,
+            style: TextStyle(color: colors.error),
+          ),
+        ],
+        const SizedBox(height: 8),
       ],
     );
   }
 }
 
-/// Body of the sleep monitor while a night is being recorded.
+/// Body of the sleep monitor while a night is being recorded: the wake time,
+/// live waves following the microphone and one line of status. Meant to be
+/// glanced at in the dark, so everything else stays out of the way.
 class SleepMonitorRunningContent extends StatelessWidget {
   const SleepMonitorRunningContent({
     super.key,
     required this.controller,
     required this.alarmAt,
     required this.onChooseAlarmTime,
-    required this.onDiscard,
   });
 
   final SleepMonitorController controller;
   final DateTime? alarmAt;
   final VoidCallback onChooseAlarmTime;
-  final VoidCallback onDiscard;
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final state = controller.state;
     final alarmAt = this.alarmAt;
-    final isBusy = controller.isBusy;
-    final liveDecision = controller.service.liveDecision;
+    final elapsed = SecondTicker(
+      builder: (context) => Text(
+        formatMonitorDuration(state.elapsed),
+        key: const Key('sleep-monitor-elapsed'),
+        style: theme.textTheme.labelLarge?.copyWith(
+          color: colors.onSurfaceVariant,
+          fontFeatures: AppUi.tabular,
+        ),
+      ),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        MonitorNightHero(
-          icon: Icons.graphic_eq_rounded,
-          title: loc.sleepMonitorRunning,
-          subtitle: alarmAt == null
-              ? loc.sleepMonitorModeOnly
-              : loc.sleepAlarmScheduledFor(formatMonitorTime(context, alarmAt)),
-        ),
-        const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              children: [
-                Text(
-                  loc.sleepMonitorTimeMonitored,
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-                const SizedBox(height: 4),
-                // Only the clock rebuilds every second, not the whole screen.
-                SecondTicker(
-                  builder: (context) => Text(
-                    formatMonitorDuration(state.elapsed),
-                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                if (alarmAt != null)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final compact = constraints.maxWidth < 320;
-                        final remaining = Row(
-                          children: [
-                            const Icon(Icons.alarm_rounded),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    loc.sleepAlarmRemaining,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.labelMedium,
-                                  ),
-                                  SecondTicker(
-                                    builder: (context) => Text(
-                                      formatMonitorRemaining(
-                                        alarmAt,
-                                        withSeconds: true,
-                                      ),
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleLarge
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        );
-                        final changeButton = TextButton(
-                          onPressed: isBusy ? null : onChooseAlarmTime,
-                          child: Text(loc.sleepAlarmChange),
-                        );
-                        return compact
-                            ? Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  remaining,
-                                  Align(
-                                    alignment: AlignmentDirectional.centerEnd,
-                                    child: changeButton,
-                                  ),
-                                ],
-                              )
-                            : Row(children: [remaining, changeButton]);
-                      },
-                    ),
-                  ),
-                const SizedBox(height: 14),
-                if (state.mode == SleepMonitoringMode.alarmWithMission)
-                  MissionStatusBanner(
-                    label: loc.sleepMonitorMissionPending,
-                    body: loc.sleepMonitorModeAlarmWithMissionBody,
-                  ),
-                if (state.mode == SleepMonitoringMode.alarmWithMission)
-                  const SizedBox(height: 12),
-                PermissionRow(
-                  granted: state.microphoneGranted,
-                  label: loc.sleepMonitorMicrophone,
-                ),
-                const SizedBox(height: 12),
-                LiveSignal(
-                  segment: state.latestSegment,
-                  noiseScore: state.currentNoiseScore,
-                  loc: loc,
-                ),
-                if (liveDecision != null) ...[
-                  const SizedBox(height: 8),
-                  Text(switch (liveDecision.epoch.stage) {
-                    SleepStageType.awake => loc.sleepLiveProbablyAwake,
-                    SleepStageType.sleeping ||
-                    SleepStageType.deep => loc.sleepLiveProbablyAsleep,
-                    SleepStageType.unknown => loc.sleepLiveUncertain,
-                  }),
-                ],
-              ],
+        const Spacer(flex: 3),
+        if (alarmAt != null) ...[
+          MonitorCaption(loc.sleepMonitorReadyWakeTime),
+          const SizedBox(height: 4),
+          MonitorBigTime(
+            key: const Key('sleep-monitor-wake-time'),
+            time: formatMonitorTime(context, alarmAt),
+            tooltip: loc.sleepAlarmChange,
+            onTap: controller.isBusy ? null : onChooseAlarmTime,
+          ),
+          SecondTicker(
+            builder: (context) => MonitorCaption(
+              loc.sleepMonitorWakeIn(formatMonitorRemaining(alarmAt)),
+              emphasis: true,
             ),
           ),
-        ),
-        const SizedBox(height: 12),
-        if (state.mode == SleepMonitoringMode.alarmWithMission)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Text(
-              loc.sleepMonitorProtectedStopBody,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        OutlinedButton.icon(
-          onPressed: isBusy ? null : onDiscard,
-          icon: const Icon(Icons.delete_outline),
-          label: Text(loc.sleepMonitorDiscard),
-        ),
-        if (state.errorCode != null) ...[
-          const SizedBox(height: 14),
-          Text(
-            sleepMonitorErrorMessage(loc, state.errorCode),
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
+        ] else ...[
+          MonitorCaption(loc.sleepMonitorTimeMonitored),
+          const SizedBox(height: 4),
+          SecondTicker(
+            builder: (context) =>
+                MonitorBigTime(time: formatMonitorDuration(state.elapsed)),
           ),
         ],
+        const Spacer(flex: 2),
+        SleepSoundWaves(height: 140, sampler: controller.service.getLiveLevel),
+        const SizedBox(height: 12),
+        MonitorCaption(_statusLine(loc, controller)),
+        const Spacer(flex: 3),
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            if (alarmAt != null)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.fiber_manual_record_rounded,
+                    size: 10,
+                    color: colors.error.withAlpha(200),
+                  ),
+                  const SizedBox(width: 6),
+                  elapsed,
+                ],
+              ),
+            if (state.mode == SleepMonitoringMode.alarmWithMission)
+              AppPill(
+                icon: Icons.qr_code_2_rounded,
+                label: loc.sleepMonitorMissionPending,
+                color: colors.tertiary,
+              ),
+          ],
+        ),
+        if (!state.microphoneGranted) ...[
+          const SizedBox(height: 12),
+          AppBanner.warning(
+            loc.sleepMonitorMicrophoneDenied,
+            icon: Icons.mic_off_rounded,
+          ),
+        ],
+        if (state.errorCode != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            sleepMonitorErrorMessage(loc, state.errorCode),
+            textAlign: TextAlign.center,
+            style: TextStyle(color: colors.error),
+          ),
+        ],
+        const SizedBox(height: 8),
       ],
     );
+  }
+
+  /// One short line under the waves: the provisional live estimate once the
+  /// engine has one, otherwise the state of the audio signal.
+  static String _statusLine(
+    AppLocalizations loc,
+    SleepMonitorController controller,
+  ) {
+    final decision = controller.service.liveDecision;
+    if (decision != null) {
+      return switch (decision.epoch.stage) {
+        SleepStageType.awake => loc.sleepLiveProbablyAwake,
+        SleepStageType.sleeping ||
+        SleepStageType.deep => loc.sleepLiveProbablyAsleep,
+        SleepStageType.unknown => loc.sleepLiveUncertain,
+      };
+    }
+    final segment = controller.state.latestSegment;
+    if (segment == null) return loc.sleepMonitorListening;
+    if (segment.isInvalid) return loc.sleepMonitorInvalidSignal;
+    return loc.sleepMonitorListening;
   }
 }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_monitor_mode.dart';
+import 'package:workout_notes/models/sleep_monitor_state.dart';
 import 'package:workout_notes/screens/sleep/sleep_monitor_controller.dart';
 import 'package:workout_notes/screens/sleep/sleep_monitor_result_screen.dart';
 import 'package:workout_notes/screens/sleep/sleep_settings_screen.dart';
@@ -88,71 +89,98 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     }
 
     final active = state.isActive;
-    final snoozing = state.isAlarmSnoozing;
+    // A new night takes over; otherwise the last alarm waits for an answer.
+    final pending = !active && state.isAlarmPending;
     final alarmAt = controller.alarmAtFor(state);
     final isBusy = controller.isBusy;
-    return Scaffold(
-      appBar: AppBar(toolbarHeight: compact ? 48 : null),
+    final horizontal = compact ? 16.0 : 24.0;
+    final content = CustomScrollView(
+      slivers: [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: horizontal),
+            child: pending
+                ? SleepMonitorAlarmContent(state: state, alarmAt: alarmAt)
+                : active
+                ? SleepMonitorRunningContent(
+                    controller: controller,
+                    alarmAt: alarmAt,
+                    onChooseAlarmTime: _chooseAlarmTime,
+                  )
+                : SleepMonitorReadyContent(
+                    controller: controller,
+                    alarmAt: alarmAt,
+                    onChooseAlarmTime: _chooseAlarmTime,
+                    onShiftAlarmTime: _shiftAlarmTime,
+                    onShowModePicker: _showModePicker,
+                  ),
+          ),
+        ),
+      ],
+    );
+    final scaffold = Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        toolbarHeight: compact ? 48 : null,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        actions: [
+          if (!controller.loading && !active && !pending)
+            IconButton(
+              tooltip: loc.sleepMonitorTipsTitle,
+              icon: const Icon(Icons.lightbulb_outline_rounded),
+              onPressed: _showTips,
+            ),
+          if (active)
+            PopupMenuButton<void>(
+              key: const Key('sleep-monitor-menu'),
+              enabled: !isBusy,
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  onTap: () => unawaited(_discard()),
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.delete_outline),
+                    title: Text(loc.sleepMonitorDiscard),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
       body: controller.loading
           ? const Center(child: CircularProgressIndicator())
           : MonitorNightBackground(
-              child: ListView(
-                padding: EdgeInsets.fromLTRB(
-                  compact ? 12 : 16,
-                  compact ? 8 : 12,
-                  compact ? 12 : 16,
-                  compact ? 16 : 28,
-                ),
-                children: [
-                  snoozing
-                      ? SleepMonitorSnoozingContent(
-                          state: state,
-                          alarmAt: alarmAt,
-                        )
-                      : active
-                      ? SleepMonitorRunningContent(
-                          controller: controller,
-                          alarmAt: alarmAt,
-                          onChooseAlarmTime: _chooseAlarmTime,
-                          onDiscard: _discard,
-                        )
-                      : SleepMonitorReadyContent(
-                          controller: controller,
-                          alarmAt: alarmAt,
-                          onChooseAlarmTime: _chooseAlarmTime,
-                          onShiftAlarmTime: _shiftAlarmTime,
-                          onShowModePicker: _showModePicker,
-                        ),
-                ],
-              ),
+              dim: active,
+              child: SafeArea(bottom: false, child: content),
             ),
       bottomNavigationBar: controller.loading
           ? null
           : SafeArea(
               minimum: EdgeInsets.fromLTRB(
-                compact ? 12 : 16,
+                horizontal,
                 compact ? 6 : 10,
-                compact ? 12 : 16,
-                compact ? 8 : 12,
+                horizontal,
+                compact ? 8 : 16,
               ),
               child: SizedBox(
-                height: compact ? 52 : 56,
-                child: snoozing
+                height: compact ? 52 : 58,
+                child: pending
                     ? FilledButton.icon(
-                        onPressed: isBusy ? null : _handleSnoozedAlarm,
+                        key: const Key('sleep-monitor-alarm-action'),
+                        onPressed: isBusy ? null : _handlePendingAlarm,
                         icon: _busyIcon(
                           state.mode.requiresMission
                               ? Icons.qr_code_scanner_rounded
                               : Icons.alarm_off_rounded,
                         ),
-                        label: Text(
-                          state.mode.requiresMission
-                              ? loc.alarmOpenMissionNow
-                              : loc.alarmDismissSnooze,
-                        ),
+                        label: Text(_pendingAlarmLabel(loc, state)),
                       )
                     : active
-                    ? FilledButton.icon(
+                    // Tonal, not a bright fill: this one is seen in the dark.
+                    ? FilledButton.tonalIcon(
                         onPressed: isBusy ? null : _stop,
                         icon: _busyIcon(Icons.stop_rounded),
                         label: Text(
@@ -171,6 +199,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
               ),
             ),
     );
+    return MonitorAutoDim(enabled: active, child: scaffold);
   }
 
   Widget _busyIcon(IconData fallback) => _controller.isBusy
@@ -186,10 +215,23 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _handleSnoozedAlarm() async {
-    final succeeded = await _controller.handleSnoozedAlarm();
+  static String _pendingAlarmLabel(
+    AppLocalizations loc,
+    SleepMonitorState state,
+  ) {
+    final mission = state.mode.requiresMission;
+    if (state.isAlarmRinging) {
+      return mission ? loc.sleepMonitorOpenMission : loc.sleepMonitorOpenAlarm;
+    }
+    return mission
+        ? loc.sleepMonitorCompleteMissionNow
+        : loc.sleepMonitorTurnOffAlarm;
+  }
+
+  Future<void> _handlePendingAlarm() async {
+    final succeeded = await _controller.handlePendingAlarm();
     if (!succeeded && mounted) {
-      _showMessage(AppLocalizations.of(context)!.alarmSnoozeActionError);
+      _showMessage(AppLocalizations.of(context)!.sleepMonitorAlarmActionError);
     }
   }
 
@@ -271,6 +313,15 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     );
     if (confirmed != true) return;
     await _controller.discard();
+  }
+
+  Future<void> _showTips() {
+    return showSleepTipsSheet(
+      context,
+      hasAlarm: _controller.selectedMode.hasAlarm,
+      snoozeEnabled: _controller.globalSnoozeEnabled,
+      maxSnoozes: _controller.globalMaxSnoozes,
+    );
   }
 
   Future<void> _showModePicker() async {

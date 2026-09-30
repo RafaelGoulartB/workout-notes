@@ -36,9 +36,7 @@ class SleepTrendCard extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
     final last = dayOf(end);
     final start = addDays(last, -(_days - 1));
-    final byDate = {
-      for (final entry in entries) dateKey(entry.date): entry,
-    };
+    final byDate = {for (final entry in entries) dateKey(entry.date): entry};
     final sleepSpots = <FlSpot>[];
     final deepSpots = <FlSpot>[];
     for (var index = 0; index < _days; index++) {
@@ -197,9 +195,7 @@ class SleepTrendCard extends StatelessWidget {
                         final date = start.add(Duration(days: value.toInt()));
                         return SideTitleWidget(
                           meta: meta,
-                          fitInside: SideTitleFitInsideData.fromTitleMeta(
-                            meta,
-                          ),
+                          fitInside: SideTitleFitInsideData.fromTitleMeta(meta),
                           child: Text(
                             DateFormat('d/M').format(date),
                             style: theme.textTheme.labelSmall?.copyWith(

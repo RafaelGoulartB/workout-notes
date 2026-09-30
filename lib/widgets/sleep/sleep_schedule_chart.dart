@@ -28,9 +28,7 @@ class SleepScheduleChart extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
-    final byDate = {
-      for (final entry in entries) dateKey(entry.date): entry,
-    };
+    final byDate = {for (final entry in entries) dateKey(entry.date): entry};
     final windows = <({int index, double start, double end})>[];
     for (var index = 0; index < days.length; index++) {
       final entry = byDate[dateKey(days[index])];

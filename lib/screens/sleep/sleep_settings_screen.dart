@@ -274,7 +274,10 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
-                AppSectionHeader(loc.sleepSettingsGoalSection, padding: AppSectionHeader.compactPadding),
+                AppSectionHeader(
+                  loc.sleepSettingsGoalSection,
+                  padding: AppSectionHeader.compactPadding,
+                ),
                 SettingsCard(
                   children: [
                     SettingsLinkTile(
@@ -296,7 +299,10 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
                     ),
                   ],
                 ),
-                AppSectionHeader(loc.sleepDiagnosticTitle, padding: AppSectionHeader.compactPadding),
+                AppSectionHeader(
+                  loc.sleepDiagnosticTitle,
+                  padding: AppSectionHeader.compactPadding,
+                ),
                 SettingsCard(
                   children: [
                     SettingsSwitchTile(
@@ -314,7 +320,10 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
                       ),
                   ],
                 ),
-                AppSectionHeader(loc.sleepSettingsAlarmsSection, padding: AppSectionHeader.compactPadding),
+                AppSectionHeader(
+                  loc.sleepSettingsAlarmsSection,
+                  padding: AppSectionHeader.compactPadding,
+                ),
                 SettingsCard(
                   children: [
                     SettingsSwitchTile(
@@ -346,7 +355,10 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
                     ),
                   ],
                 ),
-                AppSectionHeader(loc.sleepSettingsMissionSection, padding: AppSectionHeader.compactPadding),
+                AppSectionHeader(
+                  loc.sleepSettingsMissionSection,
+                  padding: AppSectionHeader.compactPadding,
+                ),
                 SettingsCard(
                   children: [
                     SettingsSwitchTile(

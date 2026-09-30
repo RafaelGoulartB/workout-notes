@@ -72,12 +72,11 @@ String formatMonitorDuration(Duration duration) {
   return DurationFormat.clock(duration);
 }
 
-/// Time left until [alarmAt], clamped at zero.
-String formatMonitorRemaining(DateTime alarmAt, {bool withSeconds = false}) {
+/// Time left until [alarmAt] ("7h 49min", "12min"), clamped at zero.
+String formatMonitorRemaining(DateTime alarmAt) {
   final duration = alarmAt.difference(DateTime.now());
   final safe = duration.isNegative ? Duration.zero : duration;
   final hours = safe.inHours;
   final minutes = safe.inMinutes.remainder(60);
-  if (!withSeconds) return '${hours}h ${minutes}min';
-  return DurationFormat.clock(safe);
+  return hours == 0 ? '${minutes}min' : '${hours}h ${minutes}min';
 }

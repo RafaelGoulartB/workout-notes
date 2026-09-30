@@ -29,9 +29,7 @@ class SleepDurationChart extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
-    final byDate = {
-      for (final entry in entries) dateKey(entry.date): entry,
-    };
+    final byDate = {for (final entry in entries) dateKey(entry.date): entry};
     final goalHours = goalMinutes / 60;
     final groups = <BarChartGroupData>[];
     var maxHours = goalHours;

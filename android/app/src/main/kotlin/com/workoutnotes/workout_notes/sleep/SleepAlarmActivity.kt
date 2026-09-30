@@ -1,55 +1,73 @@
 package com.workoutnotes.workout_notes.sleep
 
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.app.Activity
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
-import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
-import android.view.WindowManager
-import android.widget.Button
+import android.widget.Chronometer
+import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.TextClock
 import android.widget.TextView
 import com.workoutnotes.workout_notes.R
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * Wake-up screen of a monitored night. While ringing it offers snooze and the
+ * way to turn the alarm off (the mission, when there is one). During a snooze
+ * it opens silently from the snooze notification or the app, so the mission
+ * can be completed early; leaving keeps the snooze as it was.
+ */
 class SleepAlarmActivity : Activity() {
-    private var protectedAlarm = false
     private var missionError: String? = null
     private var showCameraSettings = false
+    private var pulse: AnimatorSet? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        configureLockScreen()
-        render(intent)
+        SleepAlarmUi.configureWindow(this)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        render(intent)
+        // onResume follows and renders the new state (e.g. the snooze rang).
+    }
+
+    override fun onResume() {
+        super.onResume()
+        render()
+    }
+
+    override fun onPause() {
+        pulse?.cancel()
+        pulse = null
+        super.onPause()
     }
 
     @Deprecated("Deprecated in Android SDK")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != BarcodeScannerActivity.RESULT_SUCCESS + 9000) return
+        if (requestCode != SCAN_REQUEST) return
         if (resultCode != BarcodeScannerActivity.RESULT_SUCCESS || data == null) {
             SleepAlarmRingingService.resumeAfterBarcode(this)
             if (data?.getBooleanExtra(BarcodeScannerActivity.EXTRA_CAMERA_DENIED, false) == true) {
                 missionError = getString(R.string.sleep_alarm_mission_camera_denied)
                 showCameraSettings = true
-                render(intent)
             } else if (data?.getBooleanExtra(BarcodeScannerActivity.EXTRA_TIMEOUT, false) == true) {
                 missionError = getString(R.string.sleep_alarm_mission_timeout)
-                render(intent)
             }
             return
         }
@@ -62,156 +80,232 @@ class SleepAlarmActivity : Activity() {
         } else {
             SleepAlarmRingingService.resumeAfterBarcode(this)
             missionError = getString(R.string.sleep_alarm_mission_wrong_code)
-            render(intent)
         }
     }
 
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
-        // An alarm must be explicitly dismissed.
+        // A ringing alarm must be explicitly handled; a snooze just continues.
+        if (SleepAlarmScheduler.read(this)?.isSnoozed == true) super.onBackPressed()
     }
 
-    private fun configureLockScreen() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
-        } else {
-            @Suppress("DEPRECATION")
-            window.addFlags(
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
-            )
-        }
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        window.statusBarColor = Color.rgb(16, 18, 38)
-        window.navigationBarColor = Color.rgb(16, 18, 38)
-    }
-
-    private fun render(intent: Intent?) {
-        val alarmAt = intent?.getLongExtra(
-            SleepAlarmScheduler.EXTRA_ALARM_AT,
-            System.currentTimeMillis(),
-        ) ?: System.currentTimeMillis()
-        val locale = resources.configuration.locales[0] ?: Locale.getDefault()
-        val pattern = android.text.format.DateFormat.getBestDateTimePattern(locale, "Hm")
-        val timeText = SimpleDateFormat(pattern, locale).format(Date(alarmAt))
+    private fun render() {
+        pulse?.cancel()
+        pulse = null
         val snapshot = SleepAlarmScheduler.read(this)
-        protectedAlarm = snapshot?.requiresMission == true
+        val ringing = snapshot?.state == SleepAlarmScheduler.STATE_RINGING
+        if (snapshot == null || (!ringing && !snapshot.isSnoozed)) {
+            // Already turned off (here, in the app or from the notification).
+            finishAndRemoveTask()
+            return
+        }
+        val mission = snapshot.requiresMission
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(dp(28), dp(48), dp(28), dp(36))
-            background = GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.rgb(19, 24, 54), Color.rgb(55, 42, 92)),
-            )
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(28), dp(40), dp(28), dp(28))
+            background = SleepAlarmUi.background(ringing)
         }
+        root.addView(View(this), LinearLayout.LayoutParams(1, 0, 1f))
+        root.addView(halo(ringing), LinearLayout.LayoutParams(dp(150), dp(150)))
+
         root.addView(TextView(this).apply {
-            text = "☾"
-            textSize = 58f
+            text = getString(
+                if (ringing) R.string.sleep_alarm_good_morning else R.string.sleep_alarm_snoozed_label,
+            )
+            textSize = 18f
             gravity = Gravity.CENTER
-            setTextColor(Color.rgb(196, 190, 255))
-        })
-        root.addView(TextView(this).apply {
-            text = getString(R.string.sleep_alarm_good_morning)
-            textSize = 24f
-            gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
-            setTypeface(typeface, Typeface.BOLD)
-        }, margins(top = 16))
-        root.addView(TextView(this).apply {
-            text = timeText
-            textSize = 68f
-            gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
-            setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL))
-        }, margins(top = 8))
-        root.addView(TextView(this).apply {
-            text = if (protectedAlarm) {
-                getString(R.string.sleep_alarm_mission_body)
+            setTextColor(SleepAlarmUi.muted)
+        }, wrap(top = 8))
+
+        root.addView(bigTime(ringing, snapshot.alarmAtMillis), wrap())
+
+        root.addView(
+            if (ringing) {
+                TextView(this).apply {
+                    text = longDate()
+                    textSize = 16f
+                    gravity = Gravity.CENTER
+                    setTextColor(SleepAlarmUi.muted)
+                }
             } else {
-                getString(R.string.sleep_alarm_wake_message)
-            }
-            textSize = 16f
+                Chronometer(this).apply {
+                    base = SystemClock.elapsedRealtime() +
+                        (snapshot.alarmAtMillis - System.currentTimeMillis())
+                    isCountDown = true
+                    format = getString(R.string.sleep_alarm_rings_again_in)
+                    textSize = 16f
+                    gravity = Gravity.CENTER
+                    setTextColor(SleepAlarmUi.muted)
+                    start()
+                }
+            },
+            wrap(),
+        )
+
+        root.addView(TextView(this).apply {
+            text = getString(
+                when {
+                    mission && ringing -> R.string.sleep_alarm_mission_body
+                    mission -> R.string.sleep_alarm_snoozed_mission_body
+                    ringing -> R.string.sleep_alarm_wake_message
+                    else -> R.string.sleep_alarm_snoozed_dismiss_body
+                },
+            )
+            textSize = 15f
             gravity = Gravity.CENTER
-            setTextColor(Color.rgb(218, 215, 237))
-        }, margins(top = 4))
-        if (protectedAlarm && missionError != null) {
+            setLineSpacing(0f, 1.15f)
+            setTextColor(SleepAlarmUi.muted)
+        }, wrap(top = 28))
+
+        val error = missionError
+        if (mission && error != null) {
             root.addView(TextView(this).apply {
-                text = missionError
+                text = error
                 textSize = 15f
                 gravity = Gravity.CENTER
-                setTextColor(Color.rgb(255, 190, 190))
-            }, margins(top = 12))
+                setTextColor(SleepAlarmUi.error)
+            }, wrap(top = 12))
             if (showCameraSettings) {
-                root.addView(Button(this).apply {
-                    text = getString(R.string.sleep_alarm_open_camera_settings)
-                    isAllCaps = false
-                    setOnClickListener {
+                root.addView(
+                    SleepAlarmUi.textButton(this, getString(R.string.sleep_alarm_open_camera_settings)) {
                         startActivity(
                             Intent(
                                 Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                                 android.net.Uri.parse("package:$packageName"),
                             ),
                         )
-                    }
-                }, margins(top = 8))
+                    },
+                    wrap(),
+                )
             }
         }
-        root.addView(View(this), LinearLayout.LayoutParams(1, 0, 1f))
-        if (SleepAlarmScheduler.canSnooze(this)) {
-            root.addView(Button(this).apply {
-                text = getString(R.string.sleep_alarm_snooze_detail)
-                textSize = 16f
-                isAllCaps = false
-                setOnClickListener {
-                    SleepAlarmRingingService.snooze(this@SleepAlarmActivity)
+
+        root.addView(View(this), LinearLayout.LayoutParams(1, 0, 1.3f))
+
+        if (ringing && SleepAlarmScheduler.canSnooze(this)) {
+            val left = snapshot.maxSnoozes - snapshot.snoozeCount
+            root.addView(
+                SleepAlarmUi.pillButton(
+                    this,
+                    getString(R.string.sleep_alarm_snooze_left, left),
+                    filled = false,
+                ) {
+                    SleepAlarmRingingService.snooze(this)
                     finishAndRemoveTask()
-                }
-            }, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(52),
-            ))
+                },
+                button(),
+            )
         }
-        if (protectedAlarm) {
-            root.addView(Button(this).apply {
-                text = getString(R.string.sleep_alarm_open_mission)
-                textSize = 17f
-                isAllCaps = false
-                setTextColor(Color.rgb(35, 31, 63))
-                backgroundTintList = ColorStateList.valueOf(Color.rgb(226, 222, 255))
-                setOnClickListener { openScanner() }
-            }, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(56),
-            ))
-            root.addView(Button(this).apply {
-                text = getString(R.string.sleep_alarm_emergency_open)
-                textSize = 15f
-                isAllCaps = false
-                setOnClickListener { openEmergencyChallenge() }
-            }, margins(top = 12).apply {
-                width = LinearLayout.LayoutParams.MATCH_PARENT
-                height = dp(52)
-            })
-        } else {
-            root.addView(Button(this).apply {
-                text = getString(R.string.sleep_alarm_dismiss)
-                textSize = 17f
-                isAllCaps = false
-                setTextColor(Color.rgb(35, 31, 63))
-                backgroundTintList = ColorStateList.valueOf(Color.rgb(226, 222, 255))
-                setOnClickListener {
-                    SleepAlarmRingingService.dismiss(this@SleepAlarmActivity)
-                    finishAndRemoveTask()
+        root.addView(
+            SleepAlarmUi.pillButton(
+                this,
+                getString(
+                    when {
+                        mission -> R.string.sleep_alarm_scan_code
+                        ringing -> R.string.sleep_alarm_dismiss
+                        else -> R.string.sleep_alarm_dismiss_now
+                    },
+                ),
+                filled = true,
+            ) {
+                when {
+                    mission -> openScanner()
+                    ringing -> {
+                        SleepAlarmRingingService.dismiss(this)
+                        finishAndRemoveTask()
+                    }
+                    else -> {
+                        if (SleepAlarmScheduler.dismissSnooze(this) != null) {
+                            SleepMonitoringService.alarmDismissed(
+                                this,
+                                SleepMonitorSessionDismiss.BUTTON,
+                            )
+                        }
+                        finishAndRemoveTask()
+                    }
                 }
-            }, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(56),
-            ))
+            },
+            button(top = 12),
+        )
+        if (mission) {
+            root.addView(
+                SleepAlarmUi.textButton(this, getString(R.string.sleep_alarm_emergency_short)) {
+                    openEmergencyChallenge()
+                },
+                wrap(top = 8),
+            )
+        }
+        if (!ringing) {
+            root.addView(
+                SleepAlarmUi.textButton(this, getString(R.string.sleep_alarm_back_to_snooze)) {
+                    finishAndRemoveTask()
+                },
+                wrap(top = if (mission) 0 else 8),
+            )
         }
         setContentView(root)
+    }
+
+    /** Alarm icon on a soft circle that pulses while ringing. */
+    private fun halo(ringing: Boolean): View {
+        val frame = FrameLayout(this)
+        val ring = View(this).apply {
+            background = SleepAlarmUi.circle(Color.argb(70, 226, 222, 255))
+        }
+        // Room around the ring so its pulse is never clipped.
+        frame.addView(ring, FrameLayout.LayoutParams(dp(112), dp(112), Gravity.CENTER))
+        frame.addView(View(this).apply {
+            background = SleepAlarmUi.circle(Color.argb(46, 226, 222, 255))
+        }, FrameLayout.LayoutParams(dp(88), dp(88), Gravity.CENTER))
+        frame.addView(ImageView(this).apply {
+            setImageResource(android.R.drawable.ic_lock_idle_alarm)
+            imageTintList = ColorStateList.valueOf(SleepAlarmUi.accent)
+        }, FrameLayout.LayoutParams(dp(44), dp(44), Gravity.CENTER))
+        if (ringing) {
+            pulse = AnimatorSet().apply {
+                playTogether(
+                    ObjectAnimator.ofFloat(ring, View.SCALE_X, 0.8f, 1.25f).repeating(),
+                    ObjectAnimator.ofFloat(ring, View.SCALE_Y, 0.8f, 1.25f).repeating(),
+                    ObjectAnimator.ofFloat(ring, View.ALPHA, 0.9f, 0f).repeating(),
+                )
+                duration = 1600L
+                start()
+            }
+        } else {
+            ring.alpha = 0.35f
+        }
+        return frame
+    }
+
+    /** The current time while ringing; the next ring while snoozed. */
+    private fun bigTime(ringing: Boolean, alarmAtMillis: Long): View {
+        val view = if (ringing) {
+            TextClock(this).apply {
+                format24Hour = SleepSnoozeNotification.bigClockPattern(this@SleepAlarmActivity, true)
+                format12Hour = SleepSnoozeNotification.bigClockPattern(this@SleepAlarmActivity, false)
+            }
+        } else {
+            TextView(this).apply {
+                text = SleepSnoozeNotification.clock(this@SleepAlarmActivity, alarmAtMillis, big = true)
+            }
+        }
+        return view.apply {
+            textSize = 84f
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            setTextColor(SleepAlarmUi.onNight)
+            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+            letterSpacing = -0.02f
+        }
+    }
+
+    private fun longDate(): String {
+        val locale = locale()
+        val pattern = android.text.format.DateFormat.getBestDateTimePattern(locale, "EEEEdMMMM")
+        return SimpleDateFormat(pattern, locale).format(Date())
+            .replaceFirstChar { it.titlecase(locale) }
     }
 
     private fun openEmergencyChallenge() {
@@ -229,20 +323,35 @@ class SleepAlarmActivity : Activity() {
         if (SleepAlarmScheduler.isBarcodePauseActive(this)) {
             SleepAlarmRingingService.pauseForBarcode(this)
         }
+        @Suppress("DEPRECATION")
         startActivityForResult(
             Intent(this, BarcodeScannerActivity::class.java).apply {
                 putExtra(BarcodeScannerActivity.EXTRA_ENROLLMENT, false)
             },
-            BarcodeScannerActivity.RESULT_SUCCESS + 9000,
+            SCAN_REQUEST,
         )
     }
 
-    private fun margins(top: Int = 0): LinearLayout.LayoutParams =
+    private fun ObjectAnimator.repeating(): ObjectAnimator = apply {
+        repeatCount = ValueAnimator.INFINITE
+        repeatMode = ValueAnimator.RESTART
+    }
+
+    private fun locale(): Locale = resources.configuration.locales[0] ?: Locale.getDefault()
+
+    private fun wrap(top: Int = 0): LinearLayout.LayoutParams =
         LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT,
         ).apply { topMargin = dp(top) }
 
-    private fun dp(value: Int): Int =
-        (value * resources.displayMetrics.density).toInt()
+    private fun button(top: Int = 0): LinearLayout.LayoutParams =
+        LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(60))
+            .apply { topMargin = dp(top) }
+
+    private fun dp(value: Int): Int = SleepAlarmUi.dp(this, value)
+
+    private companion object {
+        const val SCAN_REQUEST = BarcodeScannerActivity.RESULT_SUCCESS + 9000
+    }
 }
