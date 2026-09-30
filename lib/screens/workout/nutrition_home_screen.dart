@@ -427,7 +427,17 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
         .toList();
     final empty = _mealTypes.isEmpty && orphanMeals.isEmpty && _meals.isEmpty;
     if (empty) {
-      return [SliverToBoxAdapter(child: _NutritionHomeEmptyMeals())];
+      return [
+        SliverToBoxAdapter(
+          child: AppEmptyCard(
+            icon: Icons.restaurant_outlined,
+            title: AppLocalizations.of(context)!.nutritionHomeEmptyMeals,
+            subtitle: AppLocalizations.of(
+              context,
+            )!.nutritionHomeEmptyMealsSubtitle,
+          ),
+        ),
+      ];
     }
     return [
       for (final type in _mealTypes)
@@ -1060,60 +1070,6 @@ class _NutritionToolTile extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// First-time / empty state for the "today" meals list. Shown when
-/// the meal catalog is empty AND no meals have been logged yet.
-class _NutritionHomeEmptyMeals extends StatelessWidget {
-  const _NutritionHomeEmptyMeals();
-
-  @override
-  Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withAlpha(28),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.restaurant_outlined,
-                color: theme.colorScheme.primary,
-                size: 26,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              loc.nutritionHomeEmptyMeals,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              loc.nutritionHomeEmptyMealsSubtitle,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
         ),
       ),
     );

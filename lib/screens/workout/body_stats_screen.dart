@@ -4,7 +4,7 @@ import 'package:workout_notes/models/body_measurement_types.dart';
 import 'package:workout_notes/screens/workout/body_stats_controller.dart';
 import 'package:workout_notes/widgets/body_tracker/stats/body_stats_cards.dart';
 import 'package:workout_notes/widgets/body_tracker/stats/body_stats_primitives.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Progress statistics for body measurements: Sunday-to-Sunday weekly
 /// averages, week-over-week comparison, rate of change, goal tracking and
@@ -72,7 +72,7 @@ class _BodyStatsScreenState extends State<BodyStatsScreen> {
                       if (analytics.isEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 48),
-                          child: EmptyStatePlaceholder(
+                          child: AppEmptyState(
                             icon: Icons.insights_outlined,
                             title: loc.bodyStatsEmptyTitle,
                             subtitle: loc.bodyStatsEmptySubtitle,

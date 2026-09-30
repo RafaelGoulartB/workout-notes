@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/strength_insights_calculator.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_exercises_section.dart';
 import 'package:workout_notes/widgets/strength/insights/strength_frequency_sections.dart';
@@ -96,13 +95,13 @@ class _StrengthInsightsScreenState extends State<StrengthInsightsScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _failed || data == null
-          ? EmptyStatePlaceholder(
+          ? AppEmptyState(
               icon: Icons.error_outline_rounded,
               title: loc.strengthInsightsLoadError,
               subtitle: '',
             )
           : data.isEmpty
-          ? EmptyStatePlaceholder(
+          ? AppEmptyState(
               icon: Icons.insights_outlined,
               title: loc.strengthInsightsEmptyTitle,
               subtitle: loc.strengthInsightsEmptySubtitle,

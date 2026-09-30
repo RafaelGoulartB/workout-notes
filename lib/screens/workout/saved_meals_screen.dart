@@ -5,7 +5,6 @@ import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/saved_meal.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
 
 import 'saved_meal_editor_screen.dart';
@@ -184,7 +183,7 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _meals.isEmpty
-          ? EmptyStatePlaceholder(
+          ? AppEmptyState(
               icon: Icons.restaurant_menu_outlined,
               title: loc.nutritionSavedMealsEmptyTitle,
               subtitle: loc.nutritionSavedMealsEmptySubtitle,

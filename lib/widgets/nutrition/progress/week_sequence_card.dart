@@ -4,6 +4,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/widgets/nutrition/progress/progress_shared.dart';
 import 'package:workout_notes/models/nutrition/nutrition_progress.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 Color _colorForStatus(BalanceStatus s, ThemeData theme) {
   return switch (s) {
@@ -224,7 +225,7 @@ class WeekSequenceCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               if (!hasGoal)
-                ProgressEmptyNote(text: loc.nutritionProgressNoGoal)
+                AppBanner.note(loc.nutritionProgressNoGoal)
               else if (logged == 0)
                 Text(
                   loc.nutritionBalanceNoDaysLogged,
@@ -243,61 +244,6 @@ class WeekSequenceCard extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class BalanceMetric extends StatelessWidget {
-  final String label;
-  final String value;
-  final String? sub;
-  final Color? valueColor;
-
-  const BalanceMetric({
-    super.key,
-    required this.label,
-    required this.value,
-    this.sub,
-    this.valueColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: valueColor ?? theme.colorScheme.onSurface,
-            height: 1.0,
-          ),
-        ),
-        if (sub != null) ...[
-          const SizedBox(height: 3),
-          Text(
-            sub!,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontSize: 10,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ],
     );
   }
 }

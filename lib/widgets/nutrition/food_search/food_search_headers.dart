@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class FoodSearchHistoryHeader extends StatelessWidget {
   final String title;
@@ -65,28 +66,9 @@ class FoodSearchInfoBanner extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withAlpha(70),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                text,
-                style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-              ),
-            ),
-          ],
-        ),
-      ),
+      child: AppBanner.note(text, icon: icon),
     );
   }
 }

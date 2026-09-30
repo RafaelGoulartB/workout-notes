@@ -15,7 +15,6 @@ import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'package:workout_notes/services/sleep_goal_service.dart';
 
 import 'package:workout_notes/utils/load_generation.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/load_error_view.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
@@ -274,7 +273,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
           ..._incompleteSessionCards(loc),
           SizedBox(
             height: MediaQuery.sizeOf(context).height * .5,
-            child: EmptyStatePlaceholder(
+            child: AppEmptyState(
               icon: Icons.nightlight_round,
               title: loc.sleepEmptyTitle,
               subtitle: loc.sleepEmptySubtitle,

@@ -14,7 +14,6 @@ import 'package:workout_notes/widgets/body_tracker/chart_cards.dart';
 import 'package:workout_notes/widgets/body_tracker/derived_stats_card.dart';
 import 'package:workout_notes/widgets/body_tracker/measurement_card.dart';
 import 'package:workout_notes/widgets/body_tracker_type_selector.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class BodyTrackerScreen extends StatefulWidget {
@@ -397,7 +396,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       child: SizedBox(
         height: MediaQuery.of(context).size.height * 0.6,
-        child: EmptyStatePlaceholder(
+        child: AppEmptyState(
           icon: Icons.accessibility_new,
           title: loc.bodyTrackerEmptyTitle,
           subtitle: loc.bodyTrackerEmptySubtitle,

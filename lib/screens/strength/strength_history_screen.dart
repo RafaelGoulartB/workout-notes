@@ -9,9 +9,9 @@ import 'package:workout_notes/screens/workout/active_workout_screen.dart';
 import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/strength/history/strength_history_filter_bar.dart';
 import 'package:workout_notes/widgets/strength/history/strength_history_row.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Searchable, filterable history of finished gym workouts.
 class StrengthHistoryScreen extends StatefulWidget {
@@ -219,7 +219,7 @@ class _StrengthHistoryScreenState extends State<StrengthHistoryScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : isEmptyHistory
-          ? EmptyStatePlaceholder(
+          ? AppEmptyState(
               icon: Icons.fitness_center_rounded,
               title: loc.strengthHistoryEmptyTitle,
               subtitle: loc.strengthHistoryEmptySubtitle,
@@ -254,7 +254,7 @@ class _StrengthHistoryScreenState extends State<StrengthHistoryScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
           const SizedBox(height: 48),
-          EmptyStatePlaceholder(
+          AppEmptyState(
             icon: Icons.search_off_rounded,
             title: loc.strengthHistoryNoResultsTitle,
             subtitle: loc.strengthHistoryNoResultsSubtitle,

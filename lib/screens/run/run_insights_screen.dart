@@ -10,7 +10,6 @@ import 'package:workout_notes/screens/run/run_gear_screen.dart';
 import 'package:workout_notes/utils/run_calendar_stats.dart';
 import 'package:workout_notes/utils/run_fitness_analytics.dart';
 import 'package:workout_notes/utils/run_training_load_analytics.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/run/insights/run_insights_fitness_sections.dart';
 import 'package:workout_notes/widgets/run/insights/run_insights_year_sections.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
@@ -186,7 +185,7 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _activities.isEmpty
-          ? EmptyStatePlaceholder(
+          ? AppEmptyState(
               icon: Icons.insights_outlined,
               title: loc.runInsightsEmptyTitle,
               subtitle: loc.runInsightsEmptySubtitle,

@@ -54,6 +54,9 @@ class AppStatTile extends StatelessWidget {
   final String value;
   final String? unit;
 
+  /// Smaller value and a label that may wrap to two lines (hero grids).
+  final bool dense;
+
   const AppStatTile({
     super.key,
     this.icon,
@@ -61,6 +64,7 @@ class AppStatTile extends StatelessWidget {
     required this.label,
     required this.value,
     this.unit,
+    this.dense = false,
   });
 
   @override
@@ -77,16 +81,24 @@ class AppStatTile extends StatelessWidget {
             textBaseline: TextBaseline.alphabetic,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 15, color: color ?? theme.colorScheme.primary),
-                const SizedBox(width: 4),
+                Icon(
+                  icon,
+                  size: dense ? 14 : 15,
+                  color: color ?? theme.colorScheme.primary,
+                ),
+                SizedBox(width: dense ? 3 : 4),
               ],
               Text(
                 value,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  height: 1.1,
-                  fontFeatures: AppUi.tabular,
-                ),
+                style:
+                    (dense
+                            ? theme.textTheme.titleSmall
+                            : theme.textTheme.titleMedium)
+                        ?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          height: 1.1,
+                          fontFeatures: AppUi.tabular,
+                        ),
               ),
               if (unit != null) ...[
                 const SizedBox(width: 2),
@@ -101,15 +113,16 @@ class AppStatTile extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 4),
+        SizedBox(height: dense ? 3 : 4),
         Text(
           label,
-          maxLines: 1,
+          maxLines: dense ? 2 : 1,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,
           style: theme.textTheme.labelSmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
-            fontSize: 11,
+            fontSize: dense ? 10 : 11,
+            height: dense ? 1.2 : null,
           ),
         ),
       ],

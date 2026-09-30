@@ -741,7 +741,16 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
     if (_mealTypes.isEmpty && orphanMeals.isEmpty) {
       return [
         SliverToBoxAdapter(
-          child: _EmptyDayCard(onConfigureMeals: _openSettings),
+          child: AppEmptyCard(
+            icon: Icons.restaurant_outlined,
+            title: loc.nutritionNoMealsTitle,
+            subtitle: loc.nutritionNoMealsSubtitle,
+            action: FilledButton.tonalIcon(
+              onPressed: _openSettings,
+              icon: const Icon(Icons.settings_outlined, size: 18),
+              label: Text(loc.nutritionDiaryManageMeals),
+            ),
+          ),
         ),
       ];
     }

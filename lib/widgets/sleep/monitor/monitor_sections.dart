@@ -10,6 +10,7 @@ import 'package:workout_notes/widgets/sleep/monitor/monitor_alarm_cards.dart';
 import 'package:workout_notes/widgets/sleep/monitor/monitor_mode_widgets.dart';
 import 'package:workout_notes/widgets/sleep/monitor/monitor_status_widgets.dart';
 import 'package:workout_notes/widgets/sleep/monitor/sleep_monitor_texts.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Body of the sleep monitor while idle: wake time, mode picker, tips and any
 /// permission/validity warnings.
@@ -98,9 +99,9 @@ class SleepMonitorReadyContent extends StatelessWidget {
         ),
         if (!valid) ...[
           const SizedBox(height: 10),
-          WarningBanner(
+          AppBanner.warning(
+            loc.sleepAlarmInvalidWindow,
             icon: Icons.schedule_rounded,
-            text: loc.sleepAlarmInvalidWindow,
           ),
         ],
         if (selectedMode.hasAlarm && !state.exactAlarmGranted) ...[

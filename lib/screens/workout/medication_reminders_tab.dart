@@ -130,7 +130,14 @@ class _MedicationRemindersTabState extends State<MedicationRemindersTab> {
     final loc = AppLocalizations.of(context)!;
     if (_loading) return const Center(child: CircularProgressIndicator());
     final medications = _service.medications;
-    if (medications.isEmpty) return const _EmptyMedications();
+    if (medications.isEmpty) {
+      return AppEmptyState(
+        compact: true,
+        icon: Icons.medication_outlined,
+        title: loc.medicationEmptyTitle,
+        subtitle: loc.medicationEmptyBody,
+      );
+    }
     final today = _service.todayItems();
     final taken = today
         .where((item) => item.state == MedicationDoseState.taken)
@@ -193,35 +200,6 @@ class _MedicationRemindersTabState extends State<MedicationRemindersTab> {
             const SizedBox(height: 10),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _EmptyMedications extends StatelessWidget {
-  const _EmptyMedications();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final loc = AppLocalizations.of(context)!;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.medication_outlined,
-              size: 56,
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(height: 16),
-            Text(loc.medicationEmptyTitle, style: theme.textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Text(loc.medicationEmptyBody, textAlign: TextAlign.center),
-          ],
-        ),
       ),
     );
   }

@@ -4,7 +4,6 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
@@ -200,7 +199,7 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _foods.isEmpty
-          ? EmptyStatePlaceholder(
+          ? AppEmptyState(
               icon: Icons.restaurant_menu_outlined,
               title: loc.nutritionFoodLibraryEmptyTitle,
               subtitle: loc.nutritionFoodLibraryEmptySubtitle,
@@ -240,7 +239,7 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
   Widget _buildList(AppLocalizations loc) {
     final foods = _visibleFoods;
     if (foods.isEmpty) {
-      return EmptyStatePlaceholder(
+      return AppEmptyState(
         icon: Icons.search_off_rounded,
         title: loc.nutritionFoodLibraryNoResults,
         subtitle: loc.nutritionFoodLibraryNoResultsSubtitle,

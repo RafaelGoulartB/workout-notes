@@ -37,10 +37,10 @@ class RollingAverageCard extends StatelessWidget {
           if (hasData)
             Row(
               children: [
-                RollingStat(
+                BalanceMetric(
                   label: loc.nutritionBalanceRollingCurrent,
                   value: '${currentAvg.round()} kcal',
-                  color: diff == null
+                  valueColor: diff == null
                       ? theme.colorScheme.onSurface
                       : diff < 0
                       ? kDeficitColor
@@ -48,17 +48,17 @@ class RollingAverageCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 if (goalKcal != null)
-                  RollingStat(
+                  BalanceMetric(
                     label: loc.nutritionBalanceGoalLabel,
                     value: '${goalKcal.round()} kcal',
-                    color: theme.colorScheme.onSurfaceVariant,
+                    valueColor: theme.colorScheme.onSurfaceVariant,
                   ),
                 const SizedBox(width: 12),
                 if (diff != null)
-                  RollingStat(
+                  BalanceMetric(
                     label: loc.nutritionBalanceRollingDelta,
                     value: '${diff < 0 ? '' : '+'}${diff.round()} kcal',
-                    color: diff < 0 ? kDeficitColor : kSurplusColor,
+                    valueColor: diff < 0 ? kDeficitColor : kSurplusColor,
                   ),
               ],
             ),
@@ -83,44 +83,6 @@ class RollingAverageCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class RollingStat extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  const RollingStat({
-    super.key,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: color,
-            height: 1.0,
-          ),
-        ),
-      ],
     );
   }
 }

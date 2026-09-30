@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/widgets/nutrition/progress/progress_shared.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class MealDistributionCard extends StatelessWidget {
   final List<MealTypeCalories> distribution;
@@ -17,7 +18,7 @@ class MealDistributionCard extends StatelessWidget {
         icon: Icons.restaurant_outlined,
         iconColor: theme.colorScheme.secondary,
         title: loc.nutritionBalanceMealDistribution,
-        child: ProgressEmptyNote(text: loc.nutritionBalanceMealEmpty),
+        child: AppBanner.note(loc.nutritionBalanceMealEmpty),
       );
     }
     final total = distribution.fold<double>(0, (s, m) => s + m.totalCalories);
@@ -197,7 +198,7 @@ class TopContributorsCard extends StatelessWidget {
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [
           if (!hasData)
-            ProgressEmptyNote(text: loc.nutritionBalanceTopEmpty)
+            AppBanner.note(loc.nutritionBalanceTopEmpty)
           else
             Column(
               children: [

@@ -180,7 +180,12 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
     return _loading
         ? const Center(child: CircularProgressIndicator())
         : _service.alarms.isEmpty
-        ? const _EmptyAlarms()
+        ? AppEmptyState(
+            compact: true,
+            icon: Icons.alarm_off_rounded,
+            title: AppLocalizations.of(context)!.alarmEmptyTitle,
+            subtitle: AppLocalizations.of(context)!.alarmEmptyBody,
+          )
         : ListView.separated(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
             itemCount: _service.alarms.length,
@@ -202,37 +207,6 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
             },
           );
   }
-}
-
-class _EmptyAlarms extends StatelessWidget {
-  const _EmptyAlarms();
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.alarm_off_rounded,
-            size: 56,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            AppLocalizations.of(context)!.alarmEmptyTitle,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            AppLocalizations.of(context)!.alarmEmptyBody,
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    ),
-  );
 }
 
 class _AlarmCard extends StatelessWidget {

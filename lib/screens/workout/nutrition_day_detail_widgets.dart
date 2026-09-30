@@ -49,56 +49,6 @@ class _MealMenu extends StatelessWidget {
   }
 }
 
-/// Shown when no meal types are configured and nothing was logged.
-class _EmptyDayCard extends StatelessWidget {
-  final VoidCallback onConfigureMeals;
-
-  const _EmptyDayCard({required this.onConfigureMeals});
-
-  @override
-  Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          children: [
-            AppIconBadge(Icons.restaurant_outlined),
-            const SizedBox(height: 12),
-            Text(
-              loc.nutritionNoMealsTitle,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              loc.nutritionNoMealsSubtitle,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 14),
-            FilledButton.tonalIcon(
-              onPressed: onConfigureMeals,
-              icon: const Icon(Icons.settings_outlined, size: 18),
-              label: Text(loc.nutritionDiaryManageMeals),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// One nutrient of the statistics tab.
 class _Nutrient {
   final String id;

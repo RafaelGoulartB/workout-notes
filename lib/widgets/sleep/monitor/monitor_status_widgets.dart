@@ -239,34 +239,6 @@ class TipsCard extends StatelessWidget {
   }
 }
 
-class WarningBanner extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const WarningBanner({super.key, required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: scheme.onErrorContainer),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(text, style: TextStyle(color: scheme.onErrorContainer)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class PermissionRow extends StatelessWidget {
   final bool granted;
   final String label;

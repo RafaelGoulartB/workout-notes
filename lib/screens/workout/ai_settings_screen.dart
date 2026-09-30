@@ -8,7 +8,6 @@ import '../../services/ai_service.dart';
 import '../../state/ai_settings_notifier.dart';
 import '../../utils/ai_error_localizer.dart';
 import '../../widgets/ai/ai_provider_picker_sheet.dart';
-import '../../widgets/empty_state_placeholder.dart';
 import '../../widgets/settings/settings.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
@@ -149,7 +148,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
         if (settings.providers.isEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: EmptyStatePlaceholder(
+            child: AppEmptyState(
               icon: Icons.cloud_off_rounded,
               title: l10n.aiSettingsNoProviders,
               subtitle: l10n.aiSettingsNoProvidersSubtitle,

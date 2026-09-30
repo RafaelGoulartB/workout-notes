@@ -6,6 +6,7 @@ import 'package:workout_notes/widgets/nutrition/progress/progress_shared.dart';
 import 'package:workout_notes/models/nutrition/nutrition_progress.dart';
 import 'package:workout_notes/widgets/nutrition/progress/average_nutrients_card.dart';
 import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class MacroBalanceCard extends StatelessWidget {
   final MacroSummary? summary;
@@ -27,7 +28,7 @@ class MacroBalanceCard extends StatelessWidget {
         icon: Icons.pie_chart_outline_rounded,
         iconColor: theme.colorScheme.primary,
         title: loc.nutritionBalanceMacros,
-        child: ProgressEmptyNote(text: loc.nutritionBalanceMacrosEmpty),
+        child: AppBanner.note(loc.nutritionBalanceMacrosEmpty),
       );
     }
     final proteinKcal = data.proteinG * 4;

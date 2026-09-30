@@ -4,7 +4,6 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_gear.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Shoe list with mileage, wear bar and replacement hints.
@@ -114,7 +113,7 @@ class _RunGearScreenState extends State<RunGearScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _items.isEmpty
-          ? EmptyStatePlaceholder(
+          ? AppEmptyState(
               icon: Icons.directions_walk_rounded,
               title: loc.runGearEmptyTitle,
               subtitle: loc.runGearEmptySubtitle,

@@ -173,7 +173,8 @@ class BodyStatsWeekHero extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: HeroMetric(
+                child: AppStatTile(
+                  dense: true,
                   icon: Icons.show_chart_rounded,
                   color: c.currentType.color,
                   label: loc.bodyStatsPeriodAverage,
@@ -182,7 +183,8 @@ class BodyStatsWeekHero extends StatelessWidget {
               ),
               AppStatDivider(height: 34, color: divider),
               Expanded(
-                child: HeroMetric(
+                child: AppStatTile(
+                  dense: true,
                   icon: Icons.south_rounded,
                   color: colors.secondary,
                   label: loc.bodyStatsMin,
@@ -191,7 +193,8 @@ class BodyStatsWeekHero extends StatelessWidget {
               ),
               AppStatDivider(height: 34, color: divider),
               Expanded(
-                child: HeroMetric(
+                child: AppStatTile(
+                  dense: true,
                   icon: Icons.north_rounded,
                   color: colors.tertiary,
                   label: loc.bodyStatsMax,
@@ -200,7 +203,8 @@ class BodyStatsWeekHero extends StatelessWidget {
               ),
               AppStatDivider(height: 34, color: divider),
               Expanded(
-                child: HeroMetric(
+                child: AppStatTile(
+                  dense: true,
                   icon: Icons.height_rounded,
                   color: colors.onSurfaceVariant,
                   label: loc.bodyStatsAmplitude,
@@ -396,7 +400,8 @@ class BodyStatsRateCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: HeroMetric(
+                  child: AppStatTile(
+                    dense: true,
                     icon: Icons.swap_vert_rounded,
                     color: c.currentType.color,
                     label: loc.bodyStatsTotalChange,
@@ -404,9 +409,13 @@ class BodyStatsRateCard extends StatelessWidget {
                     unit: c.unit,
                   ),
                 ),
-                AppStatDivider(height: 34, color: colors.outlineVariant.withAlpha(80)),
+                AppStatDivider(
+                  height: 34,
+                  color: colors.outlineVariant.withAlpha(80),
+                ),
                 Expanded(
-                  child: HeroMetric(
+                  child: AppStatTile(
+                    dense: true,
                     icon: Icons.timeline_rounded,
                     color: colors.tertiary,
                     label: loc.bodyStatsProjection,
@@ -415,9 +424,13 @@ class BodyStatsRateCard extends StatelessWidget {
                   ),
                 ),
                 if (c.bmi(a.lastValue) case final bmi?) ...[
-                  AppStatDivider(height: 34, color: colors.outlineVariant.withAlpha(80)),
+                  AppStatDivider(
+                    height: 34,
+                    color: colors.outlineVariant.withAlpha(80),
+                  ),
                   Expanded(
-                    child: HeroMetric(
+                    child: AppStatTile(
+                      dense: true,
                       icon: Icons.accessibility_new_rounded,
                       color: colors.secondary,
                       label: loc.bodyStatsBmi,
@@ -601,34 +614,47 @@ class BodyStatsConsistencyCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: HeroMetric(
+                child: AppStatTile(
+                  dense: true,
                   icon: Icons.event_repeat_outlined,
                   color: c.currentType.color,
                   label: loc.bodyStatsConsistencyWeeks,
                   value: '${a.weeksWithData}/${a.weeks.length}',
                 ),
               ),
-              AppStatDivider(height: 34, color: colors.outlineVariant.withAlpha(80)),
+              AppStatDivider(
+                height: 34,
+                color: colors.outlineVariant.withAlpha(80),
+              ),
               Expanded(
-                child: HeroMetric(
+                child: AppStatTile(
+                  dense: true,
                   icon: Icons.local_fire_department_outlined,
                   color: Colors.deepOrange,
                   label: loc.bodyStatsStreak,
                   value: loc.bodyStatsStreakWeeks(a.weekStreak),
                 ),
               ),
-              AppStatDivider(height: 34, color: colors.outlineVariant.withAlpha(80)),
+              AppStatDivider(
+                height: 34,
+                color: colors.outlineVariant.withAlpha(80),
+              ),
               Expanded(
-                child: HeroMetric(
+                child: AppStatTile(
+                  dense: true,
                   icon: Icons.receipt_long_outlined,
                   color: colors.secondary,
                   label: loc.bodyStatsEntriesPerWeek,
                   value: a.entriesPerWeek.toStringAsFixed(1),
                 ),
               ),
-              AppStatDivider(height: 34, color: colors.outlineVariant.withAlpha(80)),
+              AppStatDivider(
+                height: 34,
+                color: colors.outlineVariant.withAlpha(80),
+              ),
               Expanded(
-                child: HeroMetric(
+                child: AppStatTile(
+                  dense: true,
                   icon: Icons.history_toggle_off_outlined,
                   color: colors.tertiary,
                   label: loc.bodyStatsDaysSinceLast,

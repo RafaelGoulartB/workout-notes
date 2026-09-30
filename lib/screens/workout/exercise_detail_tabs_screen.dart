@@ -6,7 +6,6 @@ import 'package:workout_notes/repositories/exercise_repository.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/screens/workout/exercise_form_screen.dart';
 import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/strength/exercise/exercise_charts_card.dart';
 import 'package:workout_notes/widgets/strength/exercise/exercise_detail_header.dart';
@@ -175,7 +174,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _failed || _exercise == null
-            ? EmptyStatePlaceholder(
+            ? AppEmptyState(
                 icon: Icons.error_outline_rounded,
                 title: loc.strengthInsightsLoadError,
                 subtitle: '',

@@ -8,7 +8,6 @@ import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/services/run_pace_calculator.dart';
 import 'package:workout_notes/utils/run_achievement_engine.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/run/run_achievements_section.dart';
 import 'package:workout_notes/widgets/run/run_medal_badge.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
@@ -69,7 +68,7 @@ class _RunAchievementsScreenState extends State<RunAchievementsScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : !hasRecords
-          ? EmptyStatePlaceholder(
+          ? AppEmptyState(
               icon: Icons.emoji_events_outlined,
               title: loc.runAchievementsEmptyTitle,
               subtitle: loc.runAchievementsEmptySubtitle,
