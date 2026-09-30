@@ -131,7 +131,13 @@ void main() {
     expect(find.text('Feito'), findsNWidgets(2));
     expect(find.text('SEUS TREINOS'), findsOneWidget);
     // Only the finished workout counts (the planned one does not).
-    expect(find.text('1 treino esta semana'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('workout-home-ring-strength')),
+        matching: find.text('1'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Nenhum treino ainda'), findsNothing);
     _expectOnlyMissingPlugins(tester);
   });
@@ -202,7 +208,13 @@ void main() {
       );
     });
     await _pumpHome(tester);
-    expect(find.text('1 treino esta semana'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('workout-home-ring-strength')),
+        matching: find.text('1'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.runAsync(
       () => database.execute(

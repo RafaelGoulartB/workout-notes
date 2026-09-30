@@ -58,18 +58,24 @@ class RingPainter extends CustomPainter {
 }
 
 /// Dashed rounded-rectangle outline with a faint fill, used for the planned
-/// ("ghost") bars of the week strips.
+/// ("ghost") bars of the week strips. A [radius] of half the side draws a
+/// dashed circle.
 class DashedRRectPainter extends CustomPainter {
   final Color color;
   final Color fill;
+  final double radius;
 
-  const DashedRRectPainter({required this.color, required this.fill});
+  const DashedRRectPainter({
+    required this.color,
+    required this.fill,
+    this.radius = 6,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     final rrect = RRect.fromRectAndRadius(
       (Offset.zero & size).deflate(0.75),
-      const Radius.circular(6),
+      Radius.circular(radius),
     );
     canvas.drawRRect(rrect, Paint()..color = fill);
     final paint = Paint()
@@ -89,5 +95,5 @@ class DashedRRectPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(DashedRRectPainter old) =>
-      old.color != color || old.fill != fill;
+      old.color != color || old.fill != fill || old.radius != radius;
 }

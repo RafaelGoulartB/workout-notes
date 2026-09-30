@@ -422,9 +422,6 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                 icon: Icons.fitness_center,
                 color: colors.primary,
                 title: loc.workoutHomeHubStrengthTitle,
-                line1: loc.workoutHomeHubStrengthWeek(
-                  _controller.overview.strengthSessions,
-                ),
                 onTap: _openStrengthHub,
               ),
             ),
@@ -435,11 +432,6 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                 icon: Icons.directions_run,
                 color: colors.tertiary,
                 title: loc.workoutHomeHubRunTitle,
-                line1: loc.workoutHomeHubRunWeek(
-                  RunFormatters.distanceWithUnit(
-                    _controller.overview.runMeters,
-                  ),
-                ),
                 onTap: _openRunHub,
               ),
             ),
