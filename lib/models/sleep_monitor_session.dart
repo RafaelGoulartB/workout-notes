@@ -52,6 +52,10 @@ class SleepMonitorSession {
   final int? sleepingMinutes;
   final int? deepSleepMinutes;
   final int? unknownMinutes;
+
+  /// Sleep minutes in stretches with repeated movement (bedside v6+).
+  final int? restlessSleepMinutes;
+  final int? snoreMinutes;
   final int? awakeningCount;
   final double? sleepEfficiency;
   final double? stageConfidence;
@@ -88,6 +92,8 @@ class SleepMonitorSession {
     this.sleepingMinutes,
     this.deepSleepMinutes,
     this.unknownMinutes,
+    this.restlessSleepMinutes,
+    this.snoreMinutes,
     this.awakeningCount,
     this.sleepEfficiency,
     this.stageConfidence,
@@ -133,6 +139,8 @@ class SleepMonitorSession {
     int? sleepingMinutes,
     int? deepSleepMinutes,
     int? unknownMinutes,
+    int? restlessSleepMinutes,
+    int? snoreMinutes,
     int? awakeningCount,
     double? sleepEfficiency,
     double? stageConfidence,
@@ -170,6 +178,8 @@ class SleepMonitorSession {
       sleepingMinutes: sleepingMinutes ?? this.sleepingMinutes,
       deepSleepMinutes: deepSleepMinutes ?? this.deepSleepMinutes,
       unknownMinutes: unknownMinutes ?? this.unknownMinutes,
+      restlessSleepMinutes: restlessSleepMinutes ?? this.restlessSleepMinutes,
+      snoreMinutes: snoreMinutes ?? this.snoreMinutes,
       awakeningCount: awakeningCount ?? this.awakeningCount,
       sleepEfficiency: sleepEfficiency ?? this.sleepEfficiency,
       stageConfidence: stageConfidence ?? this.stageConfidence,
@@ -225,6 +235,10 @@ class SleepMonitorSession {
       map['deep_sleep_minutes'] = deepSleepMinutes;
     }
     if (unknownMinutes != null) map['unknown_minutes'] = unknownMinutes;
+    if (restlessSleepMinutes != null) {
+      map['restless_sleep_minutes'] = restlessSleepMinutes;
+    }
+    if (snoreMinutes != null) map['snore_minutes'] = snoreMinutes;
     if (awakeningCount != null) map['awakening_count'] = awakeningCount;
     if (sleepEfficiency != null) map['sleep_efficiency'] = sleepEfficiency;
     if (stageConfidence != null) map['stage_confidence'] = stageConfidence;
@@ -279,6 +293,8 @@ class SleepMonitorSession {
       sleepingMinutes: (map['sleeping_minutes'] as num?)?.toInt(),
       deepSleepMinutes: (map['deep_sleep_minutes'] as num?)?.toInt(),
       unknownMinutes: (map['unknown_minutes'] as num?)?.toInt(),
+      restlessSleepMinutes: (map['restless_sleep_minutes'] as num?)?.toInt(),
+      snoreMinutes: (map['snore_minutes'] as num?)?.toInt(),
       awakeningCount: (map['awakening_count'] as num?)?.toInt(),
       sleepEfficiency: (map['sleep_efficiency'] as num?)?.toDouble(),
       stageConfidence: (map['stage_confidence'] as num?)?.toDouble(),

@@ -299,7 +299,7 @@ class SleepMonitoringService : Service() {
             "utc_offset_start_minutes" to offset,
             "utc_offset_end_minutes" to null,
             "sensor_mode" to "audio_bedside",
-            "algorithm_version" to "audio-features-v4",
+            "algorithm_version" to "audio-features-v5",
             "battery_start" to batterySnapshot(),
             "time_in_bed_minutes" to null,
             "quiet_minutes" to null,

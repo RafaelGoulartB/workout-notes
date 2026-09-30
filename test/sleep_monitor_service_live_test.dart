@@ -13,7 +13,7 @@ void main() {
       addTearDown(() {
         debugDefaultTargetPlatformOverride = null;
       });
-      var latest = 18;
+      var latest = 3;
       var reads = 0;
       final messenger =
           TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -45,17 +45,24 @@ void main() {
       });
       final service = SleepMonitorService.instance;
       await service.getState();
-      // Replayed from the first window, so the user is known awake until the
-      // 10 min breathing confirmation completes.
+      // Replayed from the first window, so the user is known awake at first.
       expect(service.liveDecision!.epoch.stage, SleepStageType.awake);
       for (var i = 0; i < 5; i++) {
         await service.getState();
       }
       expect(service.liveDecision!.epoch.stage, SleepStageType.awake);
       expect(reads, 1);
-      latest = 19;
-      await service.getState();
-      expect(service.liveDecision!.epoch.stage, SleepStageType.sleeping);
+      // Each new window extends the live estimate; silence with audible
+      // breathing becomes sleep within minutes. The spool is read only once.
+      var asleepAt = -1;
+      while (latest < 60 && asleepAt < 0) {
+        latest++;
+        await service.getState();
+        if (service.liveDecision!.epoch.stage == SleepStageType.sleeping) {
+          asleepAt = latest;
+        }
+      }
+      expect(asleepAt, inInclusiveRange(8, 40));
       expect(reads, 1);
     },
   );

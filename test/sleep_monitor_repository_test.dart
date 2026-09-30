@@ -24,11 +24,13 @@ void main() {
       expect(imported.estimatedSleepMinutes, greaterThan(210));
       expect(imported.estimatedSleepMinutes, lessThan(240));
       expect(imported.sleepOnsetAt, isNotNull);
-      // Onset is dated to the middle of the ~20 min quiet confirmation
-      // window; the user is known awake from the moment recording started.
-      expect(imported.sleepLatencyMinutes, inInclusiveRange(9, 11));
+      // The user is known awake when recording starts; silence becomes sleep
+      // a few minutes later (the settling prior of the model).
+      expect(imported.sleepLatencyMinutes, inInclusiveRange(4, 10));
       expect(imported.unknownMinutes, 0);
-      expect(imported.awakeMinutes, inInclusiveRange(9, 11));
+      expect(imported.awakeMinutes, inInclusiveRange(4, 10));
+      expect(imported.restlessSleepMinutes, 0);
+      expect(imported.snoreMinutes, 0);
       expect(imported.deepSleepMinutes, isNull);
       expect(imported.stageConfidence, isNull);
       expect(imported.sleepEntryId, isNotNull);
@@ -50,7 +52,7 @@ void main() {
         ],
       });
       expect(imported.estimatedSleepMinutes, greaterThan(45));
-      expect(imported.stageAlgorithmVersion, 'sleep-wake-bedside-v5');
+      expect(imported.stageAlgorithmVersion, 'sleep-wake-bedside-v6');
       expect(imported.finalWakeAt, isNull);
       expect(imported.deepSleepMinutes, isNull);
       expect(imported.sleepEntryId, isNotNull);
@@ -114,7 +116,7 @@ void main() {
       );
       final result = await repository.reprocessDiagnostic(archive);
       expect(result!.estimatedSleepMinutes, greaterThan(0));
-      expect(result.stageAlgorithmVersion, 'sleep-wake-bedside-v5');
+      expect(result.stageAlgorithmVersion, 'sleep-wake-bedside-v6');
       expect(result.alarmDismissedAt, dismissedAt);
       expect(await repository.reprocessDiagnostic(archive), isNull);
       expect(await database.query('sleep_entries'), hasLength(1));
@@ -181,7 +183,7 @@ void main() {
         ).map((s) => s.toMap()).toList(),
       };
       final repaired = await repository.reprocessDiagnostic(archive);
-      expect(repaired!.stageAlgorithmVersion, 'sleep-wake-bedside-v5');
+      expect(repaired!.stageAlgorithmVersion, 'sleep-wake-bedside-v6');
       expect(repaired.estimatedSleepMinutes, isNotNull);
       expect(repaired.unknownMinutes, lessThan(369 * 0.2));
       expect(await repository.getUnestimatedSessions(), isEmpty);

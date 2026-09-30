@@ -12,6 +12,8 @@ abstract final class SleepUi {
   static const Color sleeping = Colors.lightBlue;
   static const Color deep = Colors.indigo;
   static const Color unknown = Colors.grey;
+  static const Color restless = Colors.deepPurple;
+  static const Color snoring = Colors.teal;
 
   /// Inner padding of the sleep cards (an [AppSoftCard]).
   static const EdgeInsets cardPadding = EdgeInsets.fromLTRB(20, 18, 16, 16);

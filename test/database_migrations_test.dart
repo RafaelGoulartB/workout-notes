@@ -9,7 +9,7 @@ import 'package:workout_notes/services/run_route_codec.dart';
 import 'support/schema_snapshot.dart';
 import 'support/test_db.dart';
 
-const _latest = 57;
+const _latest = 58;
 const _now = '2026-08-01T08:00:00.000';
 
 /// Upgrade coverage for every step from the v37 migration floor to the current
@@ -664,6 +664,30 @@ void main() {
       expect(local['started_at'], '2026-05-11T07:00:00.000');
       expect(local['ended_at'], isNull);
       expect(local['created_at'], '2026-05-11T08:00:00.000');
+    });
+  });
+
+  group('v58', () {
+    test('adds restless-sleep and snoring minutes to monitor sessions', () async {
+      final database = await openAt(57);
+      await database.insert('sleep_monitor_sessions', {
+        'id': 'night',
+        'status': 'completed',
+        'started_at': '2026-05-10T23:00:00.000Z',
+        'utc_offset_start_minutes': -180,
+        'algorithm_version': 'audio-features-v4',
+        'created_at': '2026-05-10T23:00:00.000Z',
+      });
+
+      await DatabaseSchema.onUpgrade(database, 57, 58);
+      // Idempotent: a repeated step must not fail on existing columns.
+      await DatabaseSchema.onUpgrade(database, 57, 58);
+
+      final columns = await columnNames(database, 'sleep_monitor_sessions');
+      expect(columns, containsAll(['restless_sleep_minutes', 'snore_minutes']));
+      final row = (await database.query('sleep_monitor_sessions')).single;
+      expect(row['restless_sleep_minutes'], isNull);
+      expect(row['snore_minutes'], isNull);
     });
   });
 }

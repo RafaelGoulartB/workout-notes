@@ -219,6 +219,8 @@ abstract final class DatabaseSchema {
         sleeping_minutes INTEGER,
         deep_sleep_minutes INTEGER,
         unknown_minutes INTEGER,
+        restless_sleep_minutes INTEGER,
+        snore_minutes INTEGER,
         awakening_count INTEGER,
         sleep_efficiency REAL,
         stage_confidence REAL,

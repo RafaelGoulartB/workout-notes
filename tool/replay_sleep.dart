@@ -6,6 +6,7 @@ import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/models/sleep_stage_epoch.dart';
 import 'package:workout_notes/models/sleep_stage_type.dart';
+import 'package:workout_notes/services/sleep_stage_analysis_service.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
 
 /// dart run tool/replay_sleep.dart diagnostic.json [labels.json]
@@ -71,12 +72,32 @@ void main(List<String> args) {
       session.startedAt,
       labels.map((v) => Map<String, dynamic>.from(v as Map)).toList(),
     );
+    final summary = const SleepStageAnalysisService().summarize(
+      sessionStart: session.startedAt,
+      sessionEnd: session.endedAt!,
+      epochs: result.epochs,
+    );
     stdout.writeln(
       const JsonEncoder.withIndent('  ').convert({
         'engine_version': result.epochs.firstOrNull?.algorithmVersion,
         'recorded_engine_version': diagnostic['engine_version'],
         'parameters': SleepWakeEngine.parameters,
         'coverage': result.coverage,
+        'summary': summary == null
+            ? null
+            : {
+                'sleep_onset_at': summary.sleepOnsetAt?.toIso8601String(),
+                'final_wake_at': summary.finalWakeAt?.toIso8601String(),
+                'sleep_latency_minutes': summary.sleepLatencyMinutes,
+                'awake_minutes': summary.awakeMinutes,
+                'sleeping_minutes': summary.sleepingMinutes,
+                'unknown_minutes': summary.unknownMinutes,
+                'restless_sleep_minutes': summary.restlessSleepMinutes,
+                'snore_minutes': summary.snoreMinutes,
+                'awakening_count': summary.awakeningCount,
+                'sleep_efficiency': summary.sleepEfficiency,
+                'stage_confidence': summary.stageConfidence,
+              },
         'validation': validation,
         'epochs': [
           for (final e in result.epochs)

@@ -234,6 +234,15 @@ abstract final class DatabaseMigrations {
     if (step(57)) {
       await normalizeRunTimestamps(db);
     }
+    if (step(58)) {
+      // Bedside sleep engine v6: restless-sleep and snoring minutes.
+      for (final column in const ['restless_sleep_minutes', 'snore_minutes']) {
+        await tryExecute(
+          db,
+          'ALTER TABLE sleep_monitor_sessions ADD COLUMN $column INTEGER',
+        );
+      }
+    }
   }
 
   /// Statements that create the v56 indexes. Also used by `onCreate`.

@@ -29,6 +29,32 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets('bedside result shows restless sleep and snoring at 320 px', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final session = bedsideSession(minutes: 420).copyWith(
+      analysisStatus: SleepMonitorSession.analysisAvailable,
+      awakeMinutes: 40,
+      sleepingMinutes: 380,
+      unknownMinutes: 0,
+      restlessSleepMinutes: 65,
+      snoreMinutes: 12,
+    );
+    await tester.pumpWidget(_app(SleepStageCard(session: session)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sono agitado'), findsOneWidget);
+    expect(find.text('1h 5min'), findsOneWidget);
+    expect(find.text('Ronco'), findsOneWidget);
+    expect(find.text('12 min'), findsOneWidget);
+    expect(find.text('Sono profundo estimado'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('renders the three estimated stage aggregates at 320 px', (
     tester,
   ) async {

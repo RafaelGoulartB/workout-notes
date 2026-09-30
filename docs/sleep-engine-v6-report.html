@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Motor de sono v6: o que mudou</title>
+<style>
+.viz-root {
+  color-scheme: light;
+  --surface-0: #f4f3f0;
+  --surface-1: #fcfcfb;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --grid: #e4e3df;
+  --border: #dddcd7;
+  --sleep: #2a78d6;
+  --awake: #eb6834;
+  --ambient: #1baf7a;
+  --unknown: #bdbcb6;
+  --before: #9a9994;
+  --after: #4a3aa7;
+  --person: #52514e;
+  --code-bg: #efeeea;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) .viz-root {
+    color-scheme: dark;
+    --surface-0: #111110;
+    --surface-1: #1a1a19;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e87;
+    --grid: #30302e;
+    --border: #3a3a37;
+    --sleep: #3987e5;
+    --awake: #d95926;
+    --ambient: #199e70;
+    --unknown: #5d5c58;
+    --before: #8a8984;
+    --after: #9085e9;
+    --person: #c3c2b7;
+    --code-bg: #262624;
+  }
+}
+:root[data-theme="dark"] .viz-root {
+  color-scheme: dark;
+  --surface-0: #111110; --surface-1: #1a1a19; --text-primary: #ffffff;
+  --text-secondary: #c3c2b7; --text-muted: #8f8e87; --grid: #30302e;
+  --border: #3a3a37; --sleep: #3987e5; --awake: #d95926; --ambient: #199e70;
+  --unknown: #5d5c58; --before: #8a8984; --after: #9085e9; --person: #c3c2b7;
+  --code-bg: #262624;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+.viz-root {
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font: 15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+  padding: 32px 16px 64px;
+}
+main { max-width: 1040px; margin: 0 auto; }
+h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.01em; }
+h2 { font-size: 21px; margin: 44px 0 10px; }
+h3 { font-size: 16px; margin: 0 0 6px; }
+p { margin: 0 0 12px; color: var(--text-secondary); }
+p strong, li strong { color: var(--text-primary); }
+.lede { font-size: 17px; max-width: 760px; }
+code { font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; color: var(--text-primary); }
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin: 16px 0; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 20px; }
+.tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.tile .label { font-size: 13px; color: var(--text-secondary); }
+.tile .value { font-size: 26px; font-weight: 700; line-height: 1.2; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.tile .was { font-size: 13px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.tile .was s { text-decoration-thickness: 1px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--text-secondary); margin: 4px 0 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.sw.line { height: 3px; border-radius: 2px; width: 16px; }
+.sw.dash { height: 0; border-top: 2px dashed var(--text-muted); width: 16px; border-radius: 0; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--text-secondary); font-size: 12px; font-family: inherit; }
+.chart .axis-label { fill: var(--text-muted); font-size: 11px; }
+.chart .row-label { fill: var(--text-primary); font-size: 12px; font-weight: 600; }
+.tooltip { position: absolute; pointer-events: none; background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; line-height: 1.45; box-shadow: 0 4px 16px rgba(0,0,0,.14); color: var(--text-primary); min-width: 190px; opacity: 0; transition: opacity .08s; z-index: 5; }
+.tooltip .t-head { font-weight: 700; margin-bottom: 2px; }
+.tooltip .t-row { display: flex; gap: 8px; align-items: center; color: var(--text-secondary); }
+.tooltip .t-row b { color: var(--text-primary); font-weight: 600; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+th { color: var(--text-secondary); font-weight: 600; font-size: 13px; }
+td.num { text-align: right; white-space: nowrap; }
+td .old { color: var(--text-muted); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.change { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.change .tag { font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
+.change p { font-size: 14px; margin-bottom: 8px; }
+.change .ba { display: grid; grid-template-columns: 64px 1fr; gap: 2px 10px; font-size: 13.5px; margin-top: 6px; }
+.change .ba .k { color: var(--text-muted); font-weight: 600; }
+.change .ba .v { color: var(--text-secondary); }
+ul { color: var(--text-secondary); padding-left: 20px; }
+li { margin-bottom: 6px; }
+.note { font-size: 13px; color: var(--text-muted); }
+.toggle { float: right; font: inherit; font-size: 13px; background: var(--surface-1); color: var(--text-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="viz-root">
+<main>
+<button class="toggle" id="theme-toggle" type="button">Alternar tema</button>
+<h1>Motor de processamento do sono: antes e depois</h1>
+<p class="lede">O motor de cabeceira passou da versão <code>sleep-wake-bedside-v5</code> (contadores + remendos) para a <code>v6</code> (modelo probabilístico com contexto da noite inteira), e o lado nativo passou a gravar <code>audio-features-v5</code>. Abaixo, o que mudou, por quê, e como isso aparece na sua noite de 30/09.</p>
+
+<div class="tiles" id="tiles"></div>
+<p class="note" style="margin-top:10px">Noite de 30/09 (02:46–09:00), mesmos dados de áudio processados pelos dois motores. Não existe “gabarito” dessa noite: “melhor” aqui significa mais coerente com o áudio, não uma precisão medida.</p>
+
+<h2>A sua noite, janela por janela</h2>
+<p>Cada faixa é a noite inteira, uma janela de 30 s por coluna. Passe o mouse para ver o que cada motor concluiu e por quê.</p>
+<div class="card">
+  <div class="legend">
+    <span><i class="sw" style="background:var(--awake)"></i>Acordado</span>
+    <span><i class="sw" style="background:var(--sleep)"></i>Dormindo</span>
+    <span><i class="sw" style="background:var(--unknown)"></i>Sem dados</span>
+    <span><i class="sw" style="background:var(--person)"></i>Som atribuído à pessoa</span>
+    <span><i class="sw" style="background:var(--ambient)"></i>Som ambiente (v6)</span>
+  </div>
+  <div class="chart" id="hypno"><div class="tooltip"></div></div>
+</div>
+<p><strong>O que ler aqui:</strong> no motor antigo, os dois blocos longos de “acordado” (05:02–05:41 e 06:31–07:11) são em grande parte silêncio esperando 20 min de confirmação. Entre 05:20 e 06:30 quase toda a “atividade” é som fraco de 4–8 kHz, pouco acima do fundo do quarto: o coro de pássaros do amanhecer. O motor novo reconhece isso como ambiente e mantém o sono. Mantém acordado o que tem cara de pessoa: sons altos e graves às 04:59–05:17 e 06:28–06:33.</p>
+
+<h2>O que mudou e por quê</h2>
+<div class="grid2" id="changes"></div>
+
+<h2>Detector de respiração (nativo)</h2>
+<p>Na sua noite, o detector antigo marcou respiração regular em <strong>1 de 744 janelas</strong>. O motivo é que ele media o envelope de <em>todas</em> as frequências, e num quarto a −76 dBFS quem domina é o chiado do microfone (4–8 kHz) e o zumbido da rede elétrica. O novo mede só a faixa do ar da respiração (150–2000 Hz), sobre 60 s de histórico, com interpolação da frequência.</p>
+<div class="card">
+  <div class="legend">
+    <span><i class="sw" style="background:var(--before)"></i>Antes (envelope de banda larga, 30 s)</span>
+    <span><i class="sw" style="background:var(--after)"></i>Depois (150–2000 Hz, 60 s)</span>
+    <span><i class="sw dash"></i>Limite usado pelo motor (0,45)</span>
+  </div>
+  <div class="chart" id="breath"><div class="tooltip"></div></div>
+</div>
+<p class="note">Sinais sintéticos gerados nos testes Kotlin (respiração a −70 dBFS; chiado −66; zumbido −58 ou −45). Nos casos com respiração, o novo acerta a frequência com erro ≤ 0,001 Hz. Nos casos sem respiração, fica em 0,14–0,31, abaixo do limite. Isto ainda não foi validado com noites reais gravadas em v5.</p>
+
+<h2>Referência de ruído do quarto (nativo)</h2>
+<p>Toda “atividade” é medida em relação ao fundo do quarto. O fundo antigo calibrava em 2,5 s e só aceitava sons até +6 dB acima dele, então um ventilador que liga e sobe o nível em 10 dB <em>nunca</em> era absorvido e virava “movimento” pelo resto da noite. O novo usa o percentil 10 dos últimos 5 min.</p>
+<div class="card">
+  <div class="legend">
+    <span><i class="sw dash"></i>Fundo real</span>
+    <span><i class="sw line" style="background:var(--before)"></i>Referência antiga</span>
+    <span><i class="sw line" style="background:var(--after)"></i>Referência nova</span>
+  </div>
+  <div class="chart" id="base"><div class="tooltip"></div></div>
+  <div class="legend" style="margin-top:18px">
+    <span><i class="sw line" style="background:var(--before)"></i>Antes</span>
+    <span><i class="sw line" style="background:var(--after)"></i>Depois</span>
+    <span><i class="sw dash"></i>Ideal (só as rajadas reais)</span>
+  </div>
+  <div class="chart" id="noisy"><div class="tooltip"></div></div>
+</div>
+<p class="note">Simulação: fundo em −78 dBFS, ventilador (+10 dB) dos 10 aos 30 min, rajadas de 5 s a +30 dB a cada 2,5 min. Durante o ventilador, o antigo contou <span id="old-noisy"></span> dos blocos como ruído; o novo, <span id="new-noisy"></span>. Isso é só o tempo de absorção (~5 min); depois disso, sobram apenas as rajadas reais. Por ser um percentil baixo, a referência nova fica ~1,3 dB abaixo do fundo médio, o que torna o <code>noise_score</code> ~1 dB maior que antes; o motor usa margens de 10–15 dB, então isso não muda as decisões.</p>
+
+<h2>As três noites reais que temos</h2>
+<p>Além da sua noite, o projeto tem duas noites reais gravadas nos testes. Mesmos dados, os dois motores:</p>
+<div class="card" style="overflow-x:auto"><table id="nights"></table></div>
+<p class="note">“Sono agitado” e “ronco” não existiam no motor antigo. Nas noites antigas, o total acordado subiu na noite “quantizada”: o motor novo passa a reconhecer despertares curtos com som contínuo que antes se perdiam entre as confirmações.</p>
+
+<h2>Limites que continuam existindo</h2>
+<ul>
+  <li><strong>Acordado em silêncio parece sono.</strong> Nenhum microfone resolve isso. O modelo agora assume que você adormece alguns minutos (~6) depois do último movimento, e esse valor vem de uma suposição, não de uma medida. A latência que o app mostra é uma estimativa.</li>
+  <li><strong>Sem gabarito.</strong> Os parâmetros foram calibrados com raciocínio e com 3 noites reais sem rótulos. Para medir a precisão de verdade, é preciso comparar com uma referência: um relógio via Health Connect ou um diário de “acordei às…”. O <code>tool/replay_sleep.dart</code> já aceita esses rótulos.</li>
+  <li><strong>O v5 nativo só foi testado com sinais sintéticos.</strong> As próximas noites gravadas vão mostrar como a nova detecção de respiração se comporta num quarto real.</li>
+  <li><strong>Sono agitado e ronco são heurísticos.</strong> Agitado = sono com ≥ 5 janelas de movimento em ±5 min. Ronco = som alto, grave e periódico no ritmo da respiração. Não são fases do sono.</li>
+  <li><strong>Não há fases (leve/profundo/REM).</strong> Com áudio de cabeceira isso não é validável, e o app continua não prometendo.</li>
+</ul>
+
+<h2>Correção sobre a minha avaliação anterior</h2>
+<p>Eu disse que a “confiança” exibida era arbitrária. Na prática, o app já escondia esse percentual nas noites de cabeceira, então o problema era menor do que descrevi. Por outro lado, encontrei outro problema no card “Última noite”: ele mostrava <strong>“Profundo 0 min”</strong> nas noites de cabeceira. Agora mostra o sono agitado.</p>
+
+<h2>Como foi verificado</h2>
+<ul>
+  <li><code>flutter analyze</code>: sem problemas. <code>flutter test</code>: 1396 testes passando, incluindo 28 novos do motor, a migração v58 e o card de sono.</li>
+  <li><code>./gradlew :app:testDebugUnitTest</code>: 134 testes Kotlin passando (referência de ruído, detector de respiração, contagem de rajadas).</li>
+  <li>A sua noite virou teste de regressão (<code>test/fixtures/sleep_dawn_bedside.json</code>): começo acordado sem “sem dados”, coro dos pássaros tratado como ambiente e sono, eventos altos reais como despertar.</li>
+</ul>
+</main>
+</div>
+
+<script>
+const DATA = {"start_local":"02:46:45","start_minutes":166.75,"end_seconds":22394,"epochs":[[0,30,"u","a","activity_pending","audio_activity",0.0,3.2],[30,30,"u","a","activity_pending","audio_activity",0.007,10.1],[60,30,"u","a","sleep_pending","quiet_audio",0.052,0.8],[90,30,"u","a","activity_pending","audio_activity",0.081,7.5],[120,30,"u","a","sleep_pending","quiet_audio",0.135,0.8],[150,30,"u","a","sleep_pending","quiet_audio",0.177,0.5],[180,30,"u","a","sleep_pending","quiet_audio",0.215,0.1],[210,30,"u","a","sleep_pending","quiet_audio",0.25,0.1],[240,31,"u","a","sleep_pending","quiet_audio",0.282,0.1],[271,30,"u","a","activity_pending","audio_activity",0.31,3.1],[301,30,"u","a","sleep_pending","audio_activity",0.345,1.2],[331,30,"u","a","sleep_pending","quiet_audio",0.381,0],[361,30,"u","a","sleep_pending","quiet_audio",0.415,0.1],[391,30,"u","a","sleep_pending","quiet_audio",0.447,0],[421,30,"u","a","sleep_pending","quiet_audio",0.477,0],[451,30,"u","s","sleep_pending","quiet_audio",0.505,0],[481,30,"u","s","sleep_pending","quiet_audio",0.531,0.1],[511,30,"u","s","sleep_pending","quiet_audio",0.556,0],[541,31,"u","s","sleep_pending","quiet_audio",0.58,0],[572,30,"u","s","sleep_pending","quiet_audio",0.602,0],[602,30,"u","s","sleep_pending","quiet_audio",0.622,0],[632,30,"u","s","sleep_pending","quiet_audio",0.642,0],[662,30,"u","s","sleep_pending","quiet_audio",0.66,0],[692,30,"u","s","sleep_pending","quiet_audio",0.678,0],[722,30,"u","s","sleep_pending","quiet_audio",0.694,0],[752,30,"u","s","sleep_pending","soft_audio_activity",0.708,1.6],[782,31,"u","s","sleep_pending","quiet_audio",0.724,0.8],[813,30,"s","s","onset_within_confirmation","quiet_audio",0.738,0.6],[843,30,"s","s","onset_within_confirmation","quiet_audio",0.752,0],[873,30,"s","s","onset_within_confirmation","quiet_audio",0.765,0],[903,30,"s","s","onset_within_confirmation","quiet_audio",0.777,0],[933,30,"s","s","onset_within_confirmation","quiet_audio",0.789,0],[963,30,"s","s","onset_within_confirmation","quiet_audio",0.8,0],[993,30,"s","s","onset_within_confirmation","quiet_audio",0.81,0.1],[1023,31,"s","s","onset_within_confirmation","quiet_audio",0.819,0],[1054,30,"s","s","onset_within_confirmation","quiet_audio",0.828,0],[1084,30,"s","s","onset_within_confirmation","quiet_audio",0.837,0],[1114,30,"s","s","onset_within_confirmation","quiet_audio",0.845,0],[1144,30,"s","s","onset_within_confirmation","quiet_audio",0.853,0],[1174,31,"s","s","onset_within_confirmation","quiet_audio",0.86,0],[1205,30,"s","s","onset_within_confirmation","quiet_audio",0.866,0],[1235,30,"s","s","onset_within_confirmation","quiet_audio",0.873,0],[1265,30,"s","s","onset_within_confirmation","quiet_audio",0.879,0],[1295,30,"s","s","onset_within_confirmation","quiet_audio",0.884,0],[1325,30,"s","s","onset_within_confirmation","quiet_audio",0.89,0],[1355,30,"s","s","sustained_low_audio_activity","quiet_audio",0.895,0],[1385,30,"s","s","sustained_low_audio_activity","quiet_audio",0.9,0],[1415,30,"s","s","sustained_low_audio_activity","quiet_audio",0.904,0],[1445,30,"s","s","sustained_low_audio_activity","quiet_audio",0.908,0],[1475,31,"s","s","sustained_low_audio_activity","quiet_audio",0.912,0],[1506,30,"s","s","sustained_low_audio_activity","quiet_audio",0.916,0.4],[1536,30,"s","s","sustained_low_audio_activity","quiet_audio",0.919,0.4],[1566,30,"s","s","sustained_low_audio_activity","quiet_audio",0.923,0],[1596,30,"s","s","sustained_low_audio_activity","quiet_audio",0.926,0.4],[1626,31,"s","s","sustained_low_audio_activity","quiet_audio",0.929,0],[1657,30,"s","s","sustained_low_audio_activity","quiet_audio",0.931,0],[1687,30,"s","s","sustained_low_audio_activity","environmental_sound",0.934,2.4],[1717,30,"s","s","sustained_low_audio_activity","quiet_audio",0.936,0.6],[1747,30,"s","s","sustained_low_audio_activity","quiet_audio",0.939,0.2],[1777,30,"s","s","sustained_low_audio_activity","quiet_audio",0.941,0],[1807,30,"s","s","sustained_low_audio_activity","quiet_audio",0.943,0],[1837,30,"s","s","sustained_low_audio_activity","quiet_audio",0.945,0],[1867,30,"s","s","sustained_low_audio_activity","quiet_audio",0.947,0],[1897,31,"s","s","sustained_low_audio_activity","quiet_audio",0.949,0],[1928,30,"s","s","sustained_low_audio_activity","quiet_audio",0.951,0],[1958,30,"s","s","sustained_low_audio_activity","quiet_audio",0.952,0],[1988,30,"s","s","sustained_low_audio_activity","quiet_audio",0.954,0],[2018,30,"s","s","sustained_low_audio_activity","quiet_audio",0.955,0.1],[2048,30,"s","s","sustained_low_audio_activity","quiet_audio",0.957,0],[2078,31,"s","s","sustained_low_audio_activity","quiet_audio",0.958,0],[2109,30,"s","s","sustained_low_audio_activity","quiet_audio",0.959,0],[2139,30,"s","s","sustained_low_audio_activity","quiet_audio",0.96,0],[2169,30,"s","s","sustained_low_audio_activity","quiet_audio",0.961,0],[2199,30,"s","s","sustained_low_audio_activity","quiet_audio",0.962,0],[2229,30,"s","s","sustained_low_audio_activity","quiet_audio",0.963,0.2],[2259,30,"s","s","sustained_low_audio_activity","quiet_audio",0.964,0],[2289,31,"s","s","sustained_low_audio_activity","quiet_audio",0.965,0],[2320,30,"s","s","sustained_low_audio_activity","quiet_audio",0.966,0],[2350,30,"s","s","sustained_low_audio_activity","quiet_audio",0.966,0],[2380,30,"s","s","sustained_low_audio_activity","quiet_audio",0.967,0.1],[2410,30,"s","s","sustained_low_audio_activity","quiet_audio",0.968,0],[2440,31,"s","s","sustained_low_audio_activity","quiet_audio",0.968,0],[2471,30,"s","s","sustained_low_audio_activity","quiet_audio",0.969,0.1],[2501,30,"s","s","sustained_low_audio_activity","quiet_audio",0.97,0],[2531,30,"s","s","sustained_low_audio_activity","quiet_audio",0.97,0],[2561,30,"s","s","sustained_low_audio_activity","quiet_audio",0.971,0],[2591,30,"s","s","sustained_low_audio_activity","quiet_audio",0.971,0],[2621,31,"s","s","sustained_low_audio_activity","quiet_audio",0.972,0.1],[2652,30,"s","s","sustained_low_audio_activity","quiet_audio",0.972,0],[2682,30,"s","s","sustained_low_audio_activity","quiet_audio",0.972,0],[2712,30,"s","s","sustained_low_audio_activity","quiet_audio",0.973,0.1],[2742,30,"s","s","sustained_low_audio_activity","quiet_audio",0.973,0],[2772,30,"s","s","sustained_low_audio_activity","quiet_audio",0.973,0.1],[2802,30,"s","s","sustained_low_audio_activity","quiet_audio",0.974,0],[2832,31,"s","s","sustained_low_audio_activity","quiet_audio",0.974,0],[2863,30,"s","s","sustained_low_audio_activity","quiet_audio",0.974,0],[2893,30,"s","s","sustained_low_audio_activity","quiet_audio",0.975,0],[2923,30,"s","s","sustained_low_audio_activity","quiet_audio",0.975,0],[2953,30,"s","s","sustained_low_audio_activity","quiet_audio",0.975,0],[2983,30,"s","s","sustained_low_audio_activity","quiet_audio",0.975,0],[3013,31,"s","s","sustained_low_audio_activity","quiet_audio",0.975,0],[3044,30,"s","s","sustained_low_audio_activity","quiet_audio",0.976,0],[3074,30,"s","s","sustained_low_audio_activity","quiet_audio",0.976,0],[3104,30,"s","s","sustained_low_audio_activity","quiet_audio",0.976,0.1],[3134,30,"s","s","sustained_low_audio_activity","quiet_audio",0.976,0.1],[3164,30,"s","s","sustained_low_audio_activity","quiet_audio",0.976,0],[3194,30,"s","s","sustained_low_audio_activity","quiet_audio",0.976,0],[3224,31,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0],[3255,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0],[3285,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0],[3315,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0.2],[3345,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0.8],[3375,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0.1],[3405,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0],[3435,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0.1],[3465,31,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0],[3496,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[3526,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[3556,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[3586,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[3616,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[3646,31,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[3677,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[3707,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[3737,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[3767,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[3797,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0.1],[3827,31,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0.1],[3858,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[3888,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[3918,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[3948,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[3978,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[4008,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[4038,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[4068,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[4098,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[4128,31,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[4159,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[4189,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[4219,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[4249,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[4279,30,"s","s","sustained_low_audio_activity","quiet_audio",0.979,0],[4309,30,"s","s","sustained_low_audio_activity","quiet_audio",0.979,0],[4339,30,"s","s","sustained_low_audio_activity","quiet_audio",0.979,0.1],[4369,30,"s","s","sustained_low_audio_activity","quiet_audio",0.979,0],[4399,31,"s","s","sustained_low_audio_activity","quiet_audio",0.979,0],[4430,30,"s","s","sustained_low_audio_activity","quiet_audio",0.979,0],[4460,30,"s","s","sustained_low_audio_activity","quiet_audio",0.979,0.2],[4490,30,"s","s","sustained_low_audio_activity","quiet_audio",0.979,0.9],[4520,30,"s","s","sustained_low_audio_activity","quiet_audio",0.979,0],[4550,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[4580,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[4610,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0.8],[4640,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0.4],[4670,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[4700,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[4730,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[4760,31,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0.1],[4791,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0.6],[4821,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[4851,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[4881,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[4911,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0.1],[4941,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0],[4971,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.975,1.6],[5001,30,"s","s","sustained_low_audio_activity","quiet_audio",0.976,0],[5031,30,"s","s","sustained_low_audio_activity","quiet_audio",0.976,0],[5061,30,"s","s","sustained_low_audio_activity","quiet_audio",0.976,0],[5091,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.975,1],[5121,30,"s","s","sustained_low_audio_activity","quiet_audio",0.975,0.2],[5151,31,"s","s","sustained_low_audio_activity","quiet_audio",0.976,0],[5182,30,"s","s","sustained_low_audio_activity","quiet_audio",0.976,0],[5212,30,"s","s","sustained_low_audio_activity","quiet_audio",0.976,0],[5242,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0],[5272,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0],[5302,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0.2],[5332,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0],[5362,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0.5],[5392,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0],[5422,31,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0],[5453,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0.1],[5483,30,"s","s","sustained_low_audio_activity","environmental_sound",0.976,1.1],[5513,30,"s","s","sustained_low_audio_activity","quiet_audio",0.976,0.9],[5543,30,"s","s","sustained_low_audio_activity","quiet_audio",0.976,0],[5573,31,"s","s","environmental_sound","environmental_sound",0.975,8.1],[5604,30,"s","s","sustained_low_audio_activity","audio_activity",0.973,2.2],[5634,30,"s","s","sustained_low_audio_activity","environmental_sound",0.973,1.4],[5664,30,"s","s","sustained_low_audio_activity","quiet_audio",0.974,0],[5694,30,"s","s","sustained_low_audio_activity","quiet_audio",0.975,0],[5724,30,"s","s","sustained_low_audio_activity","quiet_audio",0.975,0],[5754,30,"s","s","sustained_low_audio_activity","quiet_audio",0.976,0.5],[5784,30,"s","s","sustained_low_audio_activity","quiet_audio",0.976,0.1],[5814,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0.5],[5844,31,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0.2],[5875,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0],[5905,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[5935,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[5965,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[5995,31,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[6026,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[6056,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[6086,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0.4],[6116,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[6146,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[6176,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[6206,30,"s","s","sustained_low_audio_activity","quiet_audio",0.979,0],[6236,30,"s","s","sustained_low_audio_activity","quiet_audio",0.979,0],[6266,30,"s","s","sustained_low_audio_activity","quiet_audio",0.979,0],[6296,30,"s","s","sustained_low_audio_activity","quiet_audio",0.979,0],[6326,30,"s","s","sustained_low_audio_activity","quiet_audio",0.979,0],[6356,31,"s","s","sustained_low_audio_activity","quiet_audio",0.979,0],[6387,30,"s","s","sustained_low_audio_activity","quiet_audio",0.979,0],[6417,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[6447,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[6477,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[6507,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[6537,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[6567,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[6597,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[6627,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[6657,31,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0.2],[6688,30,"s","s","sustained_low_audio_activity","quiet_audio",0.978,0],[6718,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0],[6748,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0],[6778,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0],[6808,30,"s","s","sustained_low_audio_activity","quiet_audio",0.977,0],[6838,30,"s","s","sustained_low_audio_activity","quiet_audio",0.976,0],[6868,30,"s","s","sustained_low_audio_activity","quiet_audio",0.976,0],[6898,30,"s","s","sustained_low_audio_activity","quiet_audio",0.975,0],[6928,30,"s","s","sustained_low_audio_activity","quiet_audio",0.975,0],[6958,30,"s","s","sustained_low_audio_activity","quiet_audio",0.974,0],[6988,31,"s","s","sustained_low_audio_activity","quiet_audio",0.973,0],[7019,30,"s","s","sustained_low_audio_activity","environmental_sound",0.971,1.1],[7049,30,"s","s","sustained_low_audio_activity","quiet_audio",0.97,0],[7079,30,"s","s","sustained_low_audio_activity","quiet_audio",0.968,0.1],[7109,30,"s","s","activity_pending","audio_activity",0.96,3.2],[7139,30,"s","s","sustained_low_audio_activity","quiet_audio",0.961,0.1],[7169,30,"s","s","sustained_low_audio_activity","quiet_audio",0.961,0.2],[7199,31,"s","s","sustained_low_audio_activity","quiet_audio",0.96,0.9],[7230,30,"s","s","activity_pending","audio_activity",0.954,7.4],[7260,30,"s","s","sustained_low_audio_activity","quiet_audio",0.955,0],[7290,30,"s","s","sustained_low_audio_activity","quiet_audio",0.956,0],[7320,30,"s","s","sustained_low_audio_activity","quiet_audio",0.956,0],[7350,30,"s","s","sustained_low_audio_activity","quiet_audio",0.955,0],[7380,30,"s","s","sustained_low_audio_activity","quiet_audio",0.951,0],[7410,30,"s","s","activity_pending","audio_activity",0.931,13.4],[7440,30,"s","s","sustained_low_audio_activity","quiet_audio",0.933,0.1],[7470,30,"s","s","sustained_low_audio_activity","quiet_audio",0.934,0],[7500,30,"s","s","sustained_low_audio_activity","quiet_audio",0.935,0],[7530,30,"s","s","sustained_low_audio_activity","quiet_audio",0.934,0],[7560,30,"s","s","sustained_low_audio_activity","quiet_audio",0.933,0],[7590,31,"s","s","sustained_low_audio_activity","quiet_audio",0.93,0.5],[7621,30,"s","s","sustained_low_audio_activity","quiet_audio",0.927,0.4],[7651,30,"s","s","sustained_low_audio_activity","quiet_audio",0.923,0.5],[7681,30,"s","s","sustained_low_audio_activity","quiet_audio",0.917,0.8],[7711,30,"s","s","sustained_low_audio_activity","quiet_audio",0.907,0.9],[7741,30,"s","s","sustained_low_audio_activity","environmental_sound",0.885,2.4],[7771,30,"s","s","sustained_low_audio_activity","quiet_audio",0.844,0.4],[7801,31,"s","s","ambiguous_audio","soft_audio_activity",0.687,12],[7832,30,"s","s","sustained_low_audio_activity","quiet_audio",0.628,0.5],[7862,30,"s","a","ambiguous_audio","soft_audio_activity",0.384,3.6],[7892,30,"s","a","ambiguous_audio","soft_audio_activity",0.235,6.1],[7922,30,"s","a","sustained_low_audio_activity","soft_audio_activity",0.144,1.8],[7952,30,"s","a","activity_pending","audio_activity",0.048,3.2],[7982,30,"s","a","activity_pending","audio_activity",0.017,9],[8012,31,"s","a","ambiguous_audio","soft_audio_activity",0.007,6],[8043,30,"s","a","activity_pending","audio_activity",0.001,12.9],[8073,30,"s","a","activity_pending","audio_activity",0.0,24.8],[8103,30,"s","a","activity_pending","audio_activity",0.0,10.8],[8133,30,"s","a","activity_pending","audio_activity",0.0,7.5],[8163,30,"a","a","sustained_audio_activity","audio_activity",0.0,12.2],[8193,30,"a","a","sustained_audio_activity","audio_activity",0.0,13],[8223,31,"a","a","ambiguous_audio","environmental_sound",0.001,3.5],[8254,30,"a","a","sustained_audio_activity","audio_activity",0.0,12.5],[8284,30,"a","a","sustained_audio_activity","audio_activity",0.0,12.6],[8314,30,"a","a","sustained_audio_activity","audio_activity",0.0,12.5],[8344,30,"a","a","sustained_audio_activity","environmental_sound",0.001,3.4],[8374,30,"a","a","sustained_audio_activity","audio_activity",0.001,12.2],[8404,30,"a","a","sleep_pending","environmental_sound",0.001,2.2],[8434,30,"a","a","sustained_audio_activity","audio_activity",0.001,10.1],[8464,30,"a","a","sustained_audio_activity","audio_activity",0.001,17.8],[8494,30,"a","a","ambiguous_audio","environmental_sound",0.007,4.1],[8524,30,"a","a","sleep_pending","environmental_sound",0.012,1.5],[8554,30,"a","a","sustained_audio_activity","environmental_sound",0.013,10.5],[8584,31,"a","a","sustained_audio_activity","audio_activity",0.005,9.1],[8615,30,"a","a","sustained_audio_activity","audio_activity",0.002,6.6],[8645,30,"a","a","sustained_audio_activity","audio_activity",0.0,10.5],[8675,30,"a","a","sustained_audio_activity","audio_activity",0.0,15.1],[8705,30,"a","a","sleep_pending","environmental_sound",0.001,1.2],[8735,30,"a","a","sustained_audio_activity","audio_activity",0.0,14.2],[8765,30,"a","a","sustained_audio_activity","audio_activity",0.001,12.6],[8795,30,"a","a","ambiguous_audio","environmental_sound",0.005,5],[8825,30,"a","a","ambiguous_audio","environmental_sound",0.009,3.2],[8855,30,"a","a","sustained_audio_activity","audio_activity",0.009,3.6],[8885,30,"a","a","sustained_audio_activity","audio_activity",0.011,15.8],[8915,31,"a","a","sleep_pending","quiet_audio",0.024,0.6],[8946,30,"a","a","sleep_pending","environmental_sound",0.032,1.1],[8976,30,"a","a","ambiguous_audio","soft_audio_activity",0.033,11.2],[9006,30,"a","a","sustained_audio_activity","audio_activity",0.037,9.5],[9036,30,"a","a","sustained_audio_activity","audio_activity",0.049,4.1],[9066,30,"a","a","sleep_pending","environmental_sound",0.079,2.9],[9096,30,"a","a","ambiguous_audio","soft_audio_activity",0.107,4.8],[9126,30,"a","a","sustained_audio_activity","audio_activity",0.144,5.5],[9156,30,"a","a","sleep_pending","quiet_audio",0.22,0],[9186,31,"a","a","sleep_pending","quiet_audio",0.283,0],[9217,30,"a","a","sleep_pending","environmental_sound",0.332,1.1],[9247,30,"a","a","sustained_audio_activity","audio_activity",0.364,13.2],[9277,30,"a","a","sleep_pending","quiet_audio",0.415,0.6],[9307,30,"a","a","sustained_audio_activity","audio_activity",0.454,5],[9337,30,"a","s","sleep_pending","soft_audio_activity",0.506,2],[9367,30,"a","s","sleep_pending","environmental_sound",0.561,1.1],[9397,31,"a","s","sleep_pending","quiet_audio",0.61,1],[9428,30,"a","s","sleep_pending","quiet_audio",0.651,0.9],[9458,30,"a","s","sustained_audio_activity","audio_activity",0.683,9],[9488,30,"a","s","sleep_pending","quiet_audio",0.72,0.5],[9518,30,"a","s","sleep_pending","soft_audio_activity",0.752,1.6],[9548,30,"a","s","sleep_pending","environmental_sound",0.781,1.4],[9578,30,"a","s","sleep_pending","environmental_sound",0.806,2.1],[9608,30,"a","s","sleep_pending","quiet_audio",0.829,0.8],[9638,30,"a","s","sleep_pending","environmental_sound",0.847,1.6],[9668,30,"a","s","sleep_pending","quiet_audio",0.864,0.4],[9698,30,"a","s","sleep_pending","environmental_sound",0.877,1],[9728,30,"a","s","sleep_pending","quiet_audio",0.889,0.9],[9758,30,"a","s","sleep_pending","soft_audio_activity",0.897,1.5],[9788,30,"a","s","environmental_sound","environmental_sound",0.905,4.2],[9818,30,"a","s","sleep_pending","environmental_sound",0.913,2],[9848,30,"a","s","sleep_pending","environmental_sound",0.919,2.9],[9878,30,"a","s","sleep_pending","environmental_sound",0.923,1.4],[9908,31,"a","s","environmental_sound","environmental_sound",0.926,3.4],[9939,30,"a","s","ambiguous_audio","soft_audio_activity",0.927,8.2],[9969,30,"a","s","environmental_sound","environmental_sound",0.932,4.5],[9999,30,"a","s","environmental_sound","environmental_sound",0.936,5.9],[10029,30,"a","s","environmental_sound","environmental_sound",0.939,4.5],[10059,30,"a","s","sleep_pending","environmental_sound",0.941,2.1],[10089,30,"a","s","environmental_sound","environmental_sound",0.943,4],[10119,30,"a","s","sleep_pending","environmental_sound",0.943,1.5],[10149,31,"a","s","ambiguous_audio","soft_audio_activity",0.94,5.2],[10180,30,"a","s","sleep_pending","environmental_sound",0.941,2.5],[10210,30,"a","s","environmental_sound","environmental_sound",0.941,3.8],[10240,30,"a","s","sustained_audio_activity","audio_activity",0.938,8],[10270,30,"a","s","environmental_sound","environmental_sound",0.943,3.4],[10300,30,"a","s","sleep_pending","quiet_audio",0.948,0.4],[10330,30,"a","s","sleep_pending","quiet_audio",0.952,0.1],[10360,30,"a","s","sleep_pending","quiet_audio",0.955,0.2],[10390,30,"a","s","sleep_pending","quiet_audio",0.958,0.5],[10420,30,"a","s","sleep_pending","quiet_audio",0.961,0.2],[10450,30,"s","s","onset_within_confirmation","quiet_audio",0.962,0.9],[10480,30,"s","s","onset_within_confirmation","quiet_audio",0.964,0],[10510,31,"s","s","onset_within_confirmation","quiet_audio",0.965,0],[10541,30,"s","s","onset_within_confirmation","quiet_audio",0.966,0],[10571,30,"s","s","onset_within_confirmation","environmental_sound",0.966,1.2],[10601,30,"s","s","onset_within_confirmation","quiet_audio",0.967,0.6],[10631,30,"s","s","onset_within_confirmation","quiet_audio",0.967,0.1],[10661,30,"s","s","sustained_low_audio_activity","quiet_audio",0.967,0],[10691,30,"s","s","sustained_low_audio_activity","quiet_audio",0.966,0.6],[10721,30,"s","s","ambiguous_audio","environmental_sound",0.963,4.1],[10751,30,"s","s","environmental_sound","environmental_sound",0.958,3.4],[10781,30,"s","s","activity_pending","audio_activity",0.948,9.4],[10811,30,"s","s","sustained_low_audio_activity","environmental_sound",0.949,1.1],[10841,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.948,1.9],[10871,30,"s","s","sustained_low_audio_activity","quiet_audio",0.95,0.9],[10901,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.949,2.8],[10931,30,"s","s","ambiguous_audio","environmental_sound",0.95,5.2],[10961,30,"s","s","environmental_sound","environmental_sound",0.95,9],[10991,31,"s","s","environmental_sound","environmental_sound",0.949,5.5],[11022,30,"s","s","ambiguous_audio","environmental_sound",0.946,6],[11052,30,"s","s","activity_pending","audio_activity",0.937,7.5],[11082,30,"s","s","activity_pending","environmental_sound",0.939,10.2],[11112,30,"s","s","ambiguous_audio","soft_audio_activity",0.939,3.4],[11142,30,"s","s","sustained_low_audio_activity","quiet_audio",0.944,0],[11172,30,"s","s","sustained_low_audio_activity","quiet_audio",0.947,0],[11202,30,"s","s","environmental_sound","environmental_sound",0.947,3.2],[11232,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.943,2.8],[11262,30,"s","s","ambiguous_audio","soft_audio_activity",0.939,5.8],[11292,30,"s","s","ambiguous_audio","soft_audio_activity",0.941,3.9],[11322,30,"s","s","sustained_low_audio_activity","environmental_sound",0.947,2.4],[11352,31,"s","s","sustained_low_audio_activity","environmental_sound",0.953,2.6],[11383,30,"s","s","sustained_low_audio_activity","environmental_sound",0.957,1.4],[11413,30,"s","s","sustained_low_audio_activity","environmental_sound",0.959,1],[11443,30,"s","s","activity_pending","audio_activity",0.954,5.6],[11473,30,"s","s","activity_pending","audio_activity",0.959,17.2],[11503,30,"s","s","activity_pending","snoring",0.986,8.5],[11533,30,"s","s","environmental_sound","environmental_sound",0.982,7.2],[11563,30,"s","s","activity_pending","environmental_sound",0.979,5.1],[11593,30,"s","s","activity_pending","environmental_sound",0.976,8.4],[11623,30,"s","s","activity_pending","environmental_sound",0.973,10.6],[11653,30,"s","s","activity_pending","environmental_sound",0.97,9.2],[11683,31,"s","s","activity_pending","environmental_sound",0.968,7.8],[11714,30,"s","s","ambiguous_audio","environmental_sound",0.965,5.9],[11744,30,"s","s","ambiguous_audio","environmental_sound",0.961,3.2],[11774,30,"s","s","sustained_low_audio_activity","quiet_audio",0.958,0.6],[11804,30,"s","s","sustained_low_audio_activity","environmental_sound",0.951,2.4],[11834,30,"s","s","environmental_sound","environmental_sound",0.938,3],[11864,30,"s","s","ambiguous_audio","soft_audio_activity",0.913,3.8],[11894,30,"s","s","sustained_low_audio_activity","environmental_sound",0.9,2.1],[11924,30,"s","s","activity_pending","audio_activity",0.874,9.2],[11954,30,"s","s","environmental_sound","environmental_sound",0.869,5.9],[11984,30,"s","s","sustained_low_audio_activity","environmental_sound",0.858,1.5],[12014,31,"s","s","ambiguous_audio","soft_audio_activity",0.832,4.8],[12045,30,"s","s","sustained_low_audio_activity","environmental_sound",0.819,2],[12075,30,"s","s","ambiguous_audio","soft_audio_activity",0.788,5],[12105,30,"s","s","ambiguous_audio","soft_audio_activity",0.772,4],[12135,30,"s","s","ambiguous_audio","soft_audio_activity",0.767,3.4],[12165,30,"s","s","ambiguous_audio","environmental_sound",0.771,4.5],[12195,30,"u","s","activity_pending","audio_activity",0.769,8.1],[12225,30,"u","s","activity_pending","environmental_sound",0.783,7.2],[12255,30,"u","s","ambiguous_audio","soft_audio_activity",0.793,7.6],[12285,30,"s","s","onset_within_confirmation","environmental_sound",0.811,5],[12315,30,"s","s","environmental_sound","environmental_sound",0.826,6.2],[12345,30,"s","s","environmental_sound","environmental_sound",0.84,5.6],[12375,30,"s","s","environmental_sound","environmental_sound",0.851,13.6],[12405,30,"s","s","environmental_sound","environmental_sound",0.859,3.9],[12435,30,"s","s","ambiguous_audio","soft_audio_activity",0.864,5.5],[12465,30,"s","s","environmental_sound","environmental_sound",0.872,5.2],[12495,30,"s","s","environmental_sound","environmental_sound",0.878,8.5],[12525,30,"s","s","ambiguous_audio","soft_audio_activity",0.881,8.1],[12555,30,"s","s","environmental_sound","environmental_sound",0.888,3.9],[12585,30,"s","s","sustained_low_audio_activity","environmental_sound",0.894,2.2],[12615,31,"s","s","sustained_low_audio_activity","quiet_audio",0.899,0.6],[12646,30,"s","s","sustained_low_audio_activity","quiet_audio",0.902,0.6],[12676,30,"s","s","ambiguous_audio","soft_audio_activity",0.898,3.6],[12706,30,"s","s","sustained_low_audio_activity","environmental_sound",0.899,1.5],[12736,30,"s","s","sustained_low_audio_activity","environmental_sound",0.899,2],[12766,30,"s","s","environmental_sound","environmental_sound",0.894,3.8],[12796,30,"s","s","ambiguous_audio","soft_audio_activity",0.881,7.2],[12826,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.877,1.5],[12856,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.875,2],[12886,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.874,1.4],[12916,31,"s","s","sustained_low_audio_activity","quiet_audio",0.876,0.9],[12947,30,"s","s","ambiguous_audio","environmental_sound",0.876,3],[12977,30,"s","s","ambiguous_audio","environmental_sound",0.875,3.5],[13007,30,"s","s","sustained_low_audio_activity","quiet_audio",0.872,0.1],[13037,30,"s","s","sustained_low_audio_activity","environmental_sound",0.866,1.2],[13067,30,"s","s","sustained_low_audio_activity","environmental_sound",0.856,1.4],[13097,30,"s","s","sustained_low_audio_activity","quiet_audio",0.839,0.6],[13127,30,"s","s","sustained_low_audio_activity","audio_activity",0.78,1.4],[13157,30,"s","s","environmental_sound","environmental_sound",0.727,4.5],[13187,30,"s","s","ambiguous_audio","environmental_sound",0.615,5.5],[13217,30,"s","a","ambiguous_audio","soft_audio_activity",0.363,5.4],[13247,30,"s","a","ambiguous_audio","soft_audio_activity",0.209,6.6],[13277,30,"s","a","activity_pending","audio_activity",0.115,5.1],[13307,31,"s","a","activity_pending","audio_activity",0.086,10],[13338,30,"s","a","environmental_sound","environmental_sound",0.078,5.4],[13368,30,"s","a","ambiguous_audio","environmental_sound",0.056,3.8],[13398,30,"s","a","activity_pending","audio_activity",0.003,20.5],[13428,30,"s","a","activity_pending","audio_activity",0.0,20.9],[13458,30,"a","a","sustained_audio_activity","audio_activity",0.0,22.2],[13488,30,"a","a","sustained_audio_activity","audio_activity",0.0,26.9],[13518,30,"a","a","sustained_audio_activity","audio_activity",0.0,29.9],[13548,30,"a","a","sustained_audio_activity","audio_activity",0.001,21.1],[13578,30,"a","a","ambiguous_audio","soft_audio_activity",0.016,3.8],[13608,30,"a","a","sleep_pending","quiet_audio",0.049,0.6],[13638,30,"a","a","ambiguous_audio","soft_audio_activity",0.075,5.4],[13668,30,"a","a","sustained_audio_activity","audio_activity",0.106,6],[13698,30,"a","a","ambiguous_audio","soft_audio_activity",0.161,6.4],[13728,31,"a","a","environmental_sound","environmental_sound",0.248,4.1],[13759,30,"a","a","sustained_audio_activity","environmental_sound",0.332,7],[13789,30,"a","a","ambiguous_audio","environmental_sound",0.408,5.6],[13819,30,"a","a","sleep_pending","environmental_sound",0.475,1.9],[13849,30,"a","s","sleep_pending","quiet_audio",0.533,0.2],[13879,30,"a","s","sleep_pending","quiet_audio",0.583,0],[13909,30,"a","s","sleep_pending","quiet_audio",0.625,0],[13939,31,"a","s","sleep_pending","quiet_audio",0.66,1],[13970,30,"a","s","sleep_pending","quiet_audio",0.69,0.1],[14000,30,"a","s","sleep_pending","quiet_audio",0.714,0.8],[14030,30,"a","s","sleep_pending","quiet_audio",0.733,0.1],[14060,30,"a","s","sleep_pending","soft_audio_activity",0.74,1.4],[14090,31,"a","s","sustained_audio_activity","audio_activity",0.747,4.9],[14121,30,"a","s","sleep_pending","environmental_sound",0.763,1],[14151,30,"a","s","sleep_pending","environmental_sound",0.777,1],[14181,30,"a","s","sleep_pending","soft_audio_activity",0.788,1],[14211,30,"a","s","sleep_pending","quiet_audio",0.799,0.6],[14241,30,"a","s","sleep_pending","quiet_audio",0.806,0],[14271,30,"a","s","sleep_pending","quiet_audio",0.801,0],[14301,30,"a","s","sleep_pending","soft_audio_activity",0.748,2.1],[14331,30,"a","s","sustained_audio_activity","audio_activity",0.692,8.2],[14361,30,"a","s","sustained_audio_activity","audio_activity",0.681,8.4],[14391,31,"a","s","sustained_audio_activity","audio_activity",0.689,3.2],[14422,30,"a","s","sleep_pending","environmental_sound",0.719,1.4],[14452,30,"a","s","sleep_pending","quiet_audio",0.749,0.8],[14482,30,"a","s","ambiguous_audio","environmental_sound",0.774,4.8],[14512,30,"a","s","sleep_pending","quiet_audio",0.796,0],[14542,30,"a","s","sleep_pending","soft_audio_activity",0.813,2.2],[14572,30,"a","s","sleep_pending","quiet_audio",0.83,0.6],[14602,30,"a","s","sleep_pending","environmental_sound",0.843,1],[14632,30,"a","s","sleep_pending","audio_activity",0.854,2.6],[14662,30,"a","s","sleep_pending","quiet_audio",0.865,0],[14692,30,"a","s","sleep_pending","quiet_audio",0.874,0.1],[14722,30,"a","s","sleep_pending","environmental_sound",0.881,1],[14752,30,"a","s","environmental_sound","environmental_sound",0.885,4],[14782,30,"a","s","environmental_sound","environmental_sound",0.888,7.6],[14812,30,"a","s","environmental_sound","environmental_sound",0.887,8.5],[14842,30,"a","s","ambiguous_audio","soft_audio_activity",0.881,7.2],[14872,30,"a","s","sleep_pending","environmental_sound",0.881,1.2],[14902,30,"a","s","ambiguous_audio","soft_audio_activity",0.877,8.9],[14932,30,"a","s","environmental_sound","environmental_sound",0.878,5.2],[14962,31,"a","s","sleep_pending","soft_audio_activity",0.878,2.2],[14993,30,"a","s","environmental_sound","environmental_sound",0.879,3.5],[15023,30,"a","s","sleep_pending","quiet_audio",0.88,0.4],[15053,30,"a","s","sleep_pending","environmental_sound",0.876,1.5],[15083,30,"a","s","sleep_pending","environmental_sound",0.869,1.4],[15113,30,"a","s","sleep_pending","environmental_sound",0.856,1.2],[15143,30,"a","s","sleep_pending","quiet_audio",0.829,0],[15173,30,"a","s","sustained_audio_activity","audio_activity",0.712,11.9],[15203,30,"a","s","sleep_pending","quiet_audio",0.7,0],[15233,30,"a","s","sleep_pending","soft_audio_activity",0.653,1.9],[15263,30,"a","s","sleep_pending","quiet_audio",0.605,0.9],[15293,30,"a","a","ambiguous_audio","soft_audio_activity",0.389,6.9],[15323,30,"a","a","sustained_audio_activity","audio_activity",0.258,8.8],[15353,31,"a","a","sustained_audio_activity","audio_activity",0.217,10.9],[15384,30,"a","a","sustained_audio_activity","audio_activity",0.221,8.8],[15414,30,"a","a","sleep_pending","environmental_sound",0.25,1.5],[15444,30,"a","a","sleep_pending","quiet_audio",0.279,0.9],[15474,30,"a","a","sustained_audio_activity","audio_activity",0.292,10],[15504,30,"a","a","sleep_pending","environmental_sound",0.333,1.6],[15534,30,"a","a","environmental_sound","environmental_sound",0.371,6.8],[15564,31,"a","a","ambiguous_audio","environmental_sound",0.405,6],[15595,30,"a","a","environmental_sound","environmental_sound",0.432,9.1],[15625,30,"a","a","sustained_audio_activity","environmental_sound",0.451,4.9],[15655,30,"a","a","environmental_sound","environmental_sound",0.456,4.9],[15685,30,"a","a","ambiguous_audio","environmental_sound",0.436,6.1],[15715,30,"a","a","ambiguous_audio","soft_audio_activity",0.359,7.6],[15745,30,"a","a","sustained_audio_activity","audio_activity",0.314,9.8],[15775,30,"a","a","sustained_audio_activity","audio_activity",0.307,23.5],[15805,30,"a","a","sleep_pending","audio_activity",0.363,2.2],[15835,30,"a","a","sleep_pending","quiet_audio",0.451,0.6],[15865,31,"s","s","onset_within_confirmation","quiet_audio",0.527,0.1],[15896,30,"s","s","onset_within_confirmation","quiet_audio",0.592,0.4],[15926,30,"s","s","onset_within_confirmation","quiet_audio",0.647,0.2],[15956,30,"s","s","onset_within_confirmation","quiet_audio",0.693,0.6],[15986,30,"s","s","sustained_low_audio_activity","quiet_audio",0.733,0],[16016,30,"s","s","sustained_low_audio_activity","quiet_audio",0.767,0.2],[16046,30,"s","s","sustained_low_audio_activity","quiet_audio",0.796,0.1],[16076,30,"s","s","sustained_low_audio_activity","quiet_audio",0.82,0],[16106,30,"s","s","sustained_low_audio_activity","quiet_audio",0.841,0],[16136,31,"s","s","sustained_low_audio_activity","quiet_audio",0.858,0],[16167,30,"s","s","sustained_low_audio_activity","quiet_audio",0.873,0.1],[16197,30,"s","s","sustained_low_audio_activity","quiet_audio",0.885,0.1],[16227,30,"s","s","sustained_low_audio_activity","environmental_sound",0.894,2.1],[16257,30,"s","s","ambiguous_audio","soft_audio_activity",0.899,5.9],[16287,30,"s","s","sustained_low_audio_activity","environmental_sound",0.908,1.2],[16317,30,"s","s","sustained_low_audio_activity","environmental_sound",0.915,2.9],[16347,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.922,1.6],[16377,30,"s","s","sustained_low_audio_activity","quiet_audio",0.929,0.1],[16407,30,"s","s","sustained_low_audio_activity","quiet_audio",0.934,0.2],[16437,30,"s","s","sustained_low_audio_activity","environmental_sound",0.939,1],[16467,31,"s","s","sustained_low_audio_activity","environmental_sound",0.942,1.5],[16498,30,"s","s","sustained_periodic_audio","soft_audio_activity",0.944,1.2],[16528,30,"s","s","sustained_low_audio_activity","quiet_audio",0.948,0.2],[16558,30,"s","s","environmental_sound","environmental_sound",0.951,5.9],[16588,30,"s","s","environmental_sound","environmental_sound",0.953,3.5],[16618,30,"s","s","sustained_low_audio_activity","quiet_audio",0.955,0.8],[16648,30,"s","s","sustained_low_audio_activity","quiet_audio",0.957,0.2],[16678,30,"s","s","sustained_low_audio_activity","quiet_audio",0.958,0.5],[16708,30,"s","s","sustained_low_audio_activity","quiet_audio",0.959,0.2],[16738,30,"s","s","sustained_low_audio_activity","quiet_audio",0.96,0.8],[16768,30,"s","s","sustained_low_audio_activity","quiet_audio",0.959,0.1],[16798,30,"s","s","sustained_low_audio_activity","quiet_audio",0.958,0],[16828,30,"s","s","sustained_low_audio_activity","quiet_audio",0.954,0.4],[16858,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.935,1.9],[16888,30,"s","s","ambiguous_audio","soft_audio_activity",0.918,5.2],[16918,31,"s","s","activity_pending","audio_activity",0.91,6.1],[16949,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.913,1.8],[16979,30,"s","s","sustained_low_audio_activity","quiet_audio",0.921,0.2],[17009,30,"s","s","sustained_low_audio_activity","quiet_audio",0.926,0.5],[17039,30,"s","s","sustained_low_audio_activity","quiet_audio",0.931,0.4],[17069,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.933,1],[17099,30,"s","s","sustained_low_audio_activity","quiet_audio",0.937,0.5],[17129,30,"s","s","sustained_low_audio_activity","environmental_sound",0.939,1.9],[17159,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.94,1.4],[17189,30,"s","s","sustained_low_audio_activity","quiet_audio",0.942,0.8],[17219,30,"s","s","sustained_low_audio_activity","quiet_audio",0.944,0.1],[17249,30,"s","s","ambiguous_audio","environmental_sound",0.943,6.5],[17279,30,"s","s","activity_pending","environmental_sound",0.941,9.5],[17309,31,"s","s","ambiguous_audio","soft_audio_activity",0.936,9],[17340,30,"s","s","environmental_sound","environmental_sound",0.936,4.2],[17370,30,"s","s","environmental_sound","environmental_sound",0.935,3],[17400,30,"s","s","ambiguous_audio","soft_audio_activity",0.932,6.2],[17430,30,"s","s","sustained_low_audio_activity","quiet_audio",0.934,0],[17460,30,"s","s","sustained_low_audio_activity","quiet_audio",0.934,0],[17490,30,"s","s","sustained_low_audio_activity","quiet_audio",0.934,0.2],[17520,30,"s","s","sustained_low_audio_activity","quiet_audio",0.932,0.1],[17550,30,"s","s","sustained_low_audio_activity","quiet_audio",0.929,0.8],[17580,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.921,1.5],[17610,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.915,1],[17640,31,"s","s","sustained_low_audio_activity","quiet_audio",0.912,0.8],[17671,30,"s","s","sustained_low_audio_activity","quiet_audio",0.905,0.6],[17701,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.89,2.8],[17731,30,"s","s","sustained_low_audio_activity","quiet_audio",0.877,0.4],[17761,30,"s","s","ambiguous_audio","soft_audio_activity",0.838,3.5],[17791,30,"s","s","sustained_low_audio_activity","quiet_audio",0.816,0],[17821,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.735,2.5],[17851,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.653,2.1],[17881,30,"s","s","sustained_low_audio_activity","quiet_audio",0.57,0],[17911,31,"s","a","activity_pending","audio_activity",0.204,7.8],[17942,30,"s","a","activity_pending","audio_activity",0.085,17.1],[17972,30,"s","a","activity_pending","audio_activity",0.072,16.2],[18002,30,"s","a","activity_pending","audio_activity",0.081,7.5],[18032,30,"s","a","activity_pending","audio_activity",0.118,9.5],[18062,30,"s","a","sustained_low_audio_activity","quiet_audio",0.237,0.6],[18092,30,"s","a","sustained_low_audio_activity","quiet_audio",0.338,0.6],[18122,31,"s","a","sustained_low_audio_activity","quiet_audio",0.425,1],[18153,30,"s","a","sustained_low_audio_activity","quiet_audio",0.498,0],[18183,30,"s","s","sustained_low_audio_activity","quiet_audio",0.561,0],[18213,30,"s","s","sustained_low_audio_activity","quiet_audio",0.614,0],[18243,30,"s","s","environmental_sound","environmental_sound",0.658,3],[18273,30,"s","s","ambiguous_audio","soft_audio_activity",0.695,4],[18303,30,"s","s","sustained_low_audio_activity","environmental_sound",0.732,2.2],[18333,30,"s","s","sustained_low_audio_activity","quiet_audio",0.764,0.6],[18363,30,"s","s","sustained_low_audio_activity","environmental_sound",0.791,1],[18393,30,"s","s","sustained_low_audio_activity","environmental_sound",0.814,1.5],[18423,30,"s","s","environmental_sound","environmental_sound",0.834,3.2],[18453,30,"s","s","ambiguous_audio","soft_audio_activity",0.85,6.2],[18483,30,"s","s","sustained_low_audio_activity","quiet_audio",0.868,0.9],[18513,30,"s","s","sustained_low_audio_activity","quiet_audio",0.883,0.2],[18543,30,"s","s","sustained_low_audio_activity","quiet_audio",0.896,0],[18573,30,"s","s","sustained_low_audio_activity","quiet_audio",0.907,0],[18603,31,"s","s","sustained_low_audio_activity","quiet_audio",0.916,0],[18634,30,"s","s","sustained_low_audio_activity","quiet_audio",0.924,0],[18664,30,"s","s","sustained_low_audio_activity","quiet_audio",0.93,0.1],[18694,30,"s","s","sustained_low_audio_activity","quiet_audio",0.935,0.2],[18724,30,"s","s","ambiguous_audio","soft_audio_activity",0.936,3.2],[18754,30,"s","s","ambiguous_audio","environmental_sound",0.941,3.9],[18784,30,"s","s","environmental_sound","environmental_sound",0.945,9.5],[18814,30,"s","s","sustained_low_audio_activity","environmental_sound",0.948,2.4],[18844,30,"s","s","sustained_low_audio_activity","environmental_sound",0.951,2.4],[18874,30,"s","s","sustained_low_audio_activity","environmental_sound",0.954,1.8],[18904,30,"s","s","sustained_low_audio_activity","quiet_audio",0.957,0.1],[18934,30,"s","s","sustained_low_audio_activity","quiet_audio",0.959,0.1],[18964,30,"s","s","sustained_low_audio_activity","quiet_audio",0.961,0.8],[18994,30,"s","s","sustained_low_audio_activity","quiet_audio",0.963,0.4],[19024,31,"s","s","sustained_low_audio_activity","quiet_audio",0.964,0.4],[19055,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.963,2.4],[19085,30,"s","s","sustained_low_audio_activity","quiet_audio",0.964,0.1],[19115,30,"s","s","sustained_low_audio_activity","environmental_sound",0.964,2.5],[19145,30,"s","s","ambiguous_audio","environmental_sound",0.963,8.4],[19175,30,"s","s","ambiguous_audio","environmental_sound",0.962,4.6],[19205,30,"s","s","environmental_sound","environmental_sound",0.958,4.1],[19235,30,"s","s","activity_pending","environmental_sound",0.95,6.9],[19265,30,"s","s","activity_pending","audio_activity",0.933,10.5],[19295,31,"s","s","sustained_low_audio_activity","environmental_sound",0.937,1.4],[19326,30,"s","s","sustained_low_audio_activity","environmental_sound",0.941,2.9],[19356,30,"s","s","sustained_low_audio_activity","quiet_audio",0.945,0],[19386,30,"s","s","sustained_low_audio_activity","quiet_audio",0.949,0],[19416,30,"s","s","sustained_low_audio_activity","quiet_audio",0.952,0.1],[19446,31,"s","s","sustained_low_audio_activity","quiet_audio",0.953,0.6],[19477,30,"s","s","activity_pending","audio_activity",0.95,9.1],[19507,30,"s","s","sustained_low_audio_activity","quiet_audio",0.954,0.5],[19537,30,"s","s","environmental_sound","environmental_sound",0.957,4],[19567,30,"s","s","environmental_sound","environmental_sound",0.959,3.4],[19597,30,"s","s","sustained_low_audio_activity","quiet_audio",0.962,0.9],[19627,30,"s","s","sustained_low_audio_activity","quiet_audio",0.964,0],[19657,30,"s","s","sustained_low_audio_activity","quiet_audio",0.966,0],[19687,30,"s","s","sustained_low_audio_activity","quiet_audio",0.968,0.1],[19717,30,"s","s","sustained_low_audio_activity","quiet_audio",0.969,0.2],[19747,31,"s","s","sustained_low_audio_activity","quiet_audio",0.97,0.4],[19778,30,"s","s","sustained_low_audio_activity","quiet_audio",0.971,0.1],[19808,30,"s","s","sustained_low_audio_activity","quiet_audio",0.971,0],[19838,30,"s","s","sustained_low_audio_activity","environmental_sound",0.971,1.6],[19868,30,"s","s","sustained_low_audio_activity","quiet_audio",0.972,0.1],[19898,30,"s","s","sustained_low_audio_activity","quiet_audio",0.972,0],[19928,30,"s","s","sustained_low_audio_activity","quiet_audio",0.972,0],[19958,30,"s","s","sustained_low_audio_activity","quiet_audio",0.972,0.2],[19988,30,"s","s","sustained_low_audio_activity","quiet_audio",0.972,0.2],[20018,30,"s","s","sustained_low_audio_activity","quiet_audio",0.971,0],[20048,30,"s","s","sustained_low_audio_activity","quiet_audio",0.969,0],[20078,30,"s","s","activity_pending","audio_activity",0.96,7.8],[20108,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.96,2.2],[20138,31,"s","s","sustained_low_audio_activity","quiet_audio",0.963,0],[20169,30,"s","s","sustained_low_audio_activity","quiet_audio",0.964,0.4],[20199,30,"s","s","sustained_low_audio_activity","environmental_sound",0.966,2],[20229,30,"s","s","sustained_low_audio_activity","quiet_audio",0.967,0.5],[20259,30,"s","s","sustained_low_audio_activity","environmental_sound",0.968,1],[20289,30,"s","s","sustained_low_audio_activity","quiet_audio",0.969,0],[20319,31,"s","s","sustained_low_audio_activity","quiet_audio",0.97,0],[20350,30,"s","s","sustained_low_audio_activity","environmental_sound",0.97,2],[20380,30,"s","s","sustained_low_audio_activity","quiet_audio",0.971,0.9],[20410,30,"s","s","sustained_low_audio_activity","quiet_audio",0.971,0],[20440,30,"s","s","sustained_low_audio_activity","quiet_audio",0.972,0.1],[20470,30,"s","s","sustained_low_audio_activity","quiet_audio",0.972,0.9],[20500,30,"s","s","sustained_low_audio_activity","quiet_audio",0.972,0],[20530,30,"s","s","sustained_low_audio_activity","quiet_audio",0.972,0],[20560,30,"s","s","sustained_low_audio_activity","quiet_audio",0.971,0],[20590,30,"s","s","sustained_low_audio_activity","quiet_audio",0.971,0.1],[20620,31,"s","s","sustained_low_audio_activity","quiet_audio",0.969,0],[20651,30,"s","s","sustained_low_audio_activity","quiet_audio",0.967,0.5],[20681,30,"s","s","ambiguous_audio","soft_audio_activity",0.959,3.4],[20711,30,"s","s","sustained_low_audio_activity","environmental_sound",0.956,1.5],[20741,30,"s","s","activity_pending","audio_activity",0.951,4.6],[20771,30,"s","s","sustained_low_audio_activity","quiet_audio",0.953,0.9],[20801,30,"s","s","sustained_low_audio_activity","quiet_audio",0.955,0.1],[20831,30,"s","s","ambiguous_audio","environmental_sound",0.956,3.9],[20861,30,"s","s","sustained_low_audio_activity","environmental_sound",0.956,1],[20891,31,"s","s","sustained_low_audio_activity","environmental_sound",0.957,2.9],[20922,30,"s","s","sustained_low_audio_activity","quiet_audio",0.957,0.2],[20952,30,"s","s","sustained_low_audio_activity","quiet_audio",0.957,0.6],[20982,30,"s","s","sustained_low_audio_activity","environmental_sound",0.956,1.4],[21012,30,"s","s","environmental_sound","environmental_sound",0.954,4.1],[21042,30,"s","s","sustained_low_audio_activity","environmental_sound",0.95,1.2],[21072,30,"s","s","sustained_low_audio_activity","environmental_sound",0.944,2.1],[21102,30,"s","s","environmental_sound","environmental_sound",0.933,8.5],[21132,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.908,1.8],[21162,30,"s","s","activity_pending","audio_activity",0.884,4.4],[21192,30,"s","s","activity_pending","audio_activity",0.881,4.6],[21222,31,"s","s","sustained_low_audio_activity","quiet_audio",0.89,0],[21253,30,"s","s","sustained_low_audio_activity","environmental_sound",0.897,1.6],[21283,30,"s","s","sustained_low_audio_activity","environmental_sound",0.902,1.6],[21313,30,"s","s","sustained_low_audio_activity","audio_activity",0.906,2.8],[21343,30,"s","s","sustained_low_audio_activity","quiet_audio",0.912,0.8],[21373,30,"s","s","sustained_low_audio_activity","environmental_sound",0.916,1.4],[21403,30,"s","s","environmental_sound","environmental_sound",0.919,5.1],[21433,30,"s","s","sustained_low_audio_activity","environmental_sound",0.921,2.6],[21463,30,"s","s","sustained_low_audio_activity","environmental_sound",0.923,2.8],[21493,31,"s","s","sustained_low_audio_activity","quiet_audio",0.924,0],[21524,30,"s","s","sustained_low_audio_activity","quiet_audio",0.925,0],[21554,30,"s","s","sustained_low_audio_activity","quiet_audio",0.924,0.5],[21584,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.919,1.2],[21614,30,"s","s","sustained_low_audio_activity","quiet_audio",0.917,0.5],[21644,30,"s","s","sustained_low_audio_activity","environmental_sound",0.91,1.2],[21674,30,"s","s","ambiguous_audio","soft_audio_activity",0.9,4.8],[21704,30,"s","s","sustained_low_audio_activity","quiet_audio",0.896,0.4],[21734,30,"s","s","sustained_low_audio_activity","quiet_audio",0.886,0.5],[21764,31,"s","s","sustained_low_audio_activity","quiet_audio",0.854,0.5],[21795,30,"s","s","activity_pending","audio_activity",0.721,10.5],[21825,30,"s","s","sustained_low_audio_activity","quiet_audio",0.707,0.6],[21855,30,"s","s","sustained_low_audio_activity","soft_audio_activity",0.651,2.4],[21885,30,"s","s","sustained_low_audio_activity","quiet_audio",0.595,0.5],[21915,30,"s","a","ambiguous_audio","soft_audio_activity",0.346,5.9],[21945,30,"s","a","activity_pending","audio_activity",0.194,13.4],[21975,31,"s","a","activity_pending","audio_activity",0.178,10],[22006,30,"s","a","activity_pending","audio_activity",0.18,5.1],[22036,30,"s","a","sustained_low_audio_activity","environmental_sound",0.202,2.6],[22066,30,"s","a","activity_pending","audio_activity",0.222,7.8],[22096,30,"s","a","sustained_low_audio_activity","quiet_audio",0.265,0.1],[22126,30,"s","a","activity_pending","environmental_sound",0.298,3.6],[22156,30,"s","a","ambiguous_audio","soft_audio_activity",0.32,3.4],[22186,30,"s","a","activity_pending","audio_activity",0.346,14.4],[22216,30,"s","a","sustained_low_audio_activity","quiet_audio",0.41,0.1],[22246,30,"s","a","sustained_low_audio_activity","quiet_audio",0.465,0],[22276,30,"s","s","activity_pending","audio_activity",0.509,4.2],[22306,30,"s","s","sustained_low_audio_activity","quiet_audio",0.562,0.9],[22336,30,"s","s","sustained_low_audio_activity","quiet_audio",0.607,0],[22366,28,"s","s","sustained_low_audio_activity","quiet_audio",0.644,0]],"nights":{"dawn":{"old":{"onset":"2026-09-30T06:00:19.000Z","latency":13,"awake":78,"sleep":280,"unknown":15,"awakenings":2,"efficiency":75.00669822273824,"restless":0,"snore":0},"new":{"onset":"2026-09-30T05:54:17.000Z","latency":7,"awake":63,"sleep":311,"unknown":0,"awakenings":5,"efficiency":83.196391890685,"restless":66,"snore":1}},"quantized":{"old":{"onset":"2026-09-01T23:25:48.000Z","latency":85,"awake":86,"sleep":334,"unknown":6,"awakenings":0,"efficiency":78.49019607843137,"restless":0,"snore":0},"new":{"onset":"2026-09-01T23:07:13.000Z","latency":67,"awake":96,"sleep":328,"unknown":1,"awakenings":3,"efficiency":77.3003966539685,"restless":80,"snore":2}},"ambiguous":{"old":{"onset":"2026-09-01T22:34:07.000Z","latency":34,"awake":76,"sleep":291,"unknown":2,"awakenings":2,"efficiency":78.78500451671184,"restless":0,"snore":0},"new":{"onset":"2026-09-01T22:24:05.000Z","latency":24,"awake":69,"sleep":300,"unknown":0,"awakenings":5,"efficiency":81.29437836371038,"restless":90,"snore":2}}},"breathing":[{"s":"breath 0.25 Hz (15 bpm) -70 dBFS + hiss -66 + hum50 -58","old":0.0,"new":0.9875,"rate":0.2502666666666667,"true":0.25},{"s":"breath 0.20 Hz (12 bpm) same interference","old":0.0,"new":0.9876,"rate":0.20020000000000002,"true":0.2},{"s":"breath 0.40 Hz (24 bpm) same interference","old":0.0,"new":0.9858,"rate":0.3998333333333333,"true":0.4},{"s":"shallow breath 0.25 Hz (modulation depth 0.4) same interference","old":0.0,"new":0.9704,"rate":0.2506,"true":0.25},{"s":"breath 0.25 Hz + hum60 -58 + hiss -66","old":0.0,"new":0.9846,"rate":0.2503,"true":0.25},{"s":"breath 0.25 Hz + strong hum50 -45 dBFS","old":0.0,"new":0.9725,"rate":0.25046666666666667,"true":0.25},{"s":"breath 0.25 Hz clean (mic self-noise only)","old":0.9987,"new":0.9962,"rate":0.25016666666666665,"true":0.25},{"s":"breath 0.25 Hz at 44.1 kHz fallback","old":0.0,"new":0.9772,"rate":0.25025,"true":0.25},{"s":"no breath: hiss -66 + hum50 -58 (+mic -85)","old":0.0,"new":0.1507,"rate":null,"true":null},{"s":"no breath: hiss -66 + hum60 -58 (+mic -85)","old":0.0,"new":0.2489,"rate":null,"true":null},{"s":"no breath: hiss -66 + hum50 -45 (+mic -75)","old":0.0,"new":0.1489,"rate":null,"true":null}],"baseline":[{"t_s":30,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.0614,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":60,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.7942,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":90,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.7955,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":120,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.0349,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.1667,"new_noisy_fraction":0.1667,"ideal_noisy_fraction":0.1667},{"t_s":150,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.058,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":180,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9204,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":210,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.1894,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":240,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9861,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":270,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.8899,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.1667,"new_noisy_fraction":0.1667,"ideal_noisy_fraction":0.1667},{"t_s":300,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.0025,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":330,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9531,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":360,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.0304,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":390,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":420,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.1112,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.1667,"new_noisy_fraction":0.1667,"ideal_noisy_fraction":0.1667},{"t_s":450,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.0178,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":480,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.0103,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":510,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.0459,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":540,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.0184,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":570,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.0618,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.1667,"new_noisy_fraction":0.1667,"ideal_noisy_fraction":0.1667},{"t_s":600,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":630,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.5,"new_noisy_fraction":0.9208,"ideal_noisy_fraction":0.0},{"t_s":660,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.5125,"new_noisy_fraction":0.8708,"ideal_noisy_fraction":0.0},{"t_s":690,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.4958,"new_noisy_fraction":0.8917,"ideal_noisy_fraction":0.0},{"t_s":720,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.5833,"new_noisy_fraction":0.9292,"ideal_noisy_fraction":0.1667},{"t_s":750,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-78.75,"old_noisy_fraction":0.5542,"new_noisy_fraction":0.8292,"ideal_noisy_fraction":0.0},{"t_s":780,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-78.75,"old_noisy_fraction":0.4583,"new_noisy_fraction":0.7625,"ideal_noisy_fraction":0.0},{"t_s":810,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-78.25,"old_noisy_fraction":0.5,"new_noisy_fraction":0.6958,"ideal_noisy_fraction":0.0},{"t_s":840,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-77.75,"old_noisy_fraction":0.5042,"new_noisy_fraction":0.6125,"ideal_noisy_fraction":0.0},{"t_s":870,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-75.25,"old_noisy_fraction":0.6417,"new_noisy_fraction":0.4125,"ideal_noisy_fraction":0.1667},{"t_s":900,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.5208,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":930,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.4458,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":960,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.525,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":990,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.4875,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1020,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.5875,"new_noisy_fraction":0.1667,"ideal_noisy_fraction":0.1667},{"t_s":1050,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.5167,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1080,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.5542,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1110,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.4667,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1140,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.4625,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1170,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.5792,"new_noisy_fraction":0.1667,"ideal_noisy_fraction":0.1667},{"t_s":1200,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.5208,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1230,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.475,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1260,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.4792,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1290,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.4667,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1320,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.5667,"new_noisy_fraction":0.1667,"ideal_noisy_fraction":0.1667},{"t_s":1350,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.5625,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1380,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.5042,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1410,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.4667,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1440,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.4875,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1470,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.5875,"new_noisy_fraction":0.1667,"ideal_noisy_fraction":0.1667},{"t_s":1500,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.4917,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1530,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.4458,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1560,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.4792,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1590,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.5292,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1620,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.5833,"new_noisy_fraction":0.1667,"ideal_noisy_fraction":0.1667},{"t_s":1650,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.5417,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1680,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.5208,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1710,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.5,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1740,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.4792,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1770,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.6208,"new_noisy_fraction":0.1667,"ideal_noisy_fraction":0.1667},{"t_s":1800,"floor_dbfs":-68.0,"old_baseline_dbfs":-77.9895,"new_baseline_dbfs":-69.25,"old_noisy_fraction":0.5,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1830,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9479,"new_baseline_dbfs":-71.75,"old_noisy_fraction":0.0042,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1860,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.8846,"new_baseline_dbfs":-77.75,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1890,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9098,"new_baseline_dbfs":-78.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1920,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.123,"new_baseline_dbfs":-78.75,"old_noisy_fraction":0.1667,"new_noisy_fraction":0.1667,"ideal_noisy_fraction":0.1667},{"t_s":1950,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.0155,"new_baseline_dbfs":-78.75,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":1980,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.1677,"new_baseline_dbfs":-78.75,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2010,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9668,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2040,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.882,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2070,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.1312,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.1667,"new_noisy_fraction":0.1667,"ideal_noisy_fraction":0.1667},{"t_s":2100,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.1198,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2130,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.0495,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2160,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9136,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2190,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.0455,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2220,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9709,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.1667,"new_noisy_fraction":0.1667,"ideal_noisy_fraction":0.1667},{"t_s":2250,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.991,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2280,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.0145,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2310,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.1869,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2340,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9166,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2370,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.0757,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.1667,"new_noisy_fraction":0.1667,"ideal_noisy_fraction":0.1667},{"t_s":2400,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9353,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2430,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9979,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2460,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9256,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2490,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.1223,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2520,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9639,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.1667,"new_noisy_fraction":0.1667,"ideal_noisy_fraction":0.1667},{"t_s":2550,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.0388,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2580,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.8657,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2610,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.8066,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2640,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.8758,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2670,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9418,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.1667,"new_noisy_fraction":0.1667,"ideal_noisy_fraction":0.1667},{"t_s":2700,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.0229,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2730,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9922,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2760,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9778,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2790,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.0627,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2820,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.0092,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.1667,"new_noisy_fraction":0.1667,"ideal_noisy_fraction":0.1667},{"t_s":2850,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.1522,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2880,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9917,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2910,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9187,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2940,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.8368,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0},{"t_s":2970,"floor_dbfs":-78.0,"old_baseline_dbfs":-78.0083,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.1667,"new_noisy_fraction":0.1667,"ideal_noisy_fraction":0.1667},{"t_s":3000,"floor_dbfs":-78.0,"old_baseline_dbfs":-77.9612,"new_baseline_dbfs":-79.25,"old_noisy_fraction":0.0,"new_noisy_fraction":0.0,"ideal_noisy_fraction":0.0}],"baseline_phase":{"before_step_0_10min":{"old_noisy_fraction":0.0333,"new_noisy_fraction":0.0333,"ideal_noisy_fraction":0.0333},"during_step_10_30min":{"old_noisy_fraction":0.5176,"new_noisy_fraction":0.1981,"ideal_noisy_fraction":0.0333},"after_step_30_50min":{"old_noisy_fraction":0.0334,"new_noisy_fraction":0.0333,"ideal_noisy_fraction":0.0333}}};
+const NS = 'http://www.w3.org/2000/svg';
+const css = (v) => getComputedStyle(document.querySelector('.viz-root')).getPropertyValue(v).trim();
+function el(tag, attrs = {}, parent) {
+  const n = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+const fmtNum = (v, d = 0) => v == null ? '–' : v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+const clock = (offsetSeconds) => {
+  const m = Math.floor(DATA.start_minutes + offsetSeconds / 60);
+  return String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+};
+const minutes = (m) => m == null ? '–' : (m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}min` : `${m} min`);
+
+const STAGE = { a: 'Acordado', s: 'Dormindo', u: 'Sem dados', d: 'Profundo' };
+const STAGE_VAR = { a: '--awake', s: '--sleep', u: '--unknown', d: '--sleep' };
+const REASON = {
+  sustained_low_audio_activity: 'silêncio sustentado',
+  sleep_pending: 'silêncio, aguardando 20 min de confirmação',
+  ambiguous_audio: 'áudio ambíguo',
+  activity_pending: 'atividade, aguardando 60 s',
+  environmental_sound: 'som ambiente',
+  sustained_audio_activity: 'atividade sustentada',
+  onset_within_confirmation: 'início datado para trás',
+  bridged_within_sleep: 'lacuna preenchida',
+  sustained_periodic_audio: 'respiração periódica',
+  missing_capture: 'sem captura',
+  invalid_capture: 'captura inválida',
+  quiet_audio: 'silêncio',
+  audio_activity: 'som da pessoa (alto)',
+  soft_audio_activity: 'som da pessoa (fraco)',
+  snoring: 'ronco',
+  periodic_breathing: 'respiração periódica',
+  steady_background: 'fundo constante',
+  no_activity_measure: 'sem medida de atividade',
+};
+
+// ---------- tiles ----------
+(function tiles() {
+  const o = DATA.nights.dawn.old, n = DATA.nights.dawn.new;
+  const items = [
+    ['Latência para dormir', minutes(n.latency), minutes(o.latency)],
+    ['Tempo acordado', minutes(n.awake), minutes(o.awake)],
+    ['Tempo dormindo', minutes(n.sleep), minutes(o.sleep)],
+    ['Sem dados', minutes(n.unknown), minutes(o.unknown)],
+    ['Eficiência', fmtNum(n.efficiency) + '%', fmtNum(o.efficiency) + '%'],
+    ['Despertares', String(n.awakenings), String(o.awakenings)],
+    ['Sono agitado', minutes(n.restless), 'não existia'],
+  ];
+  const root = document.getElementById('tiles');
+  for (const [label, value, was] of items) {
+    const t = document.createElement('div');
+    t.className = 'tile';
+    t.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div><div class="was">antes: <s>${was}</s></div>`;
+    root.appendChild(t);
+  }
+})();
+
+// ---------- hypnogram ----------
+function drawHypno() {
+  const host = document.getElementById('hypno');
+  host.querySelectorAll('svg').forEach((s) => s.remove());
+  const tip = host.querySelector('.tooltip');
+  const W = 1000, L = 96, R = 12, plotW = W - L - R;
+  const rows = { old: [8, 30], neu: [48, 30], p: [98, 64], act: [186, 58] };
+  const H = 272;
+  const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Hipnograma antes e depois da noite de 30/09' });
+  host.insertBefore(svg, tip);
+  const end = DATA.end_seconds;
+  const x = (s) => L + (s / end) * plotW;
+  const ep = DATA.epochs;
+
+  // hour grid
+  for (let m = Math.ceil(DATA.start_minutes / 60) * 60; m <= DATA.start_minutes + end / 60; m += 60) {
+    const sx = x((m - DATA.start_minutes) * 60);
+    el('line', { x1: sx, x2: sx, y1: 4, y2: H - 22, stroke: css('--grid'), 'stroke-width': 1 }, svg);
+    const t = el('text', { x: sx, y: H - 6, 'text-anchor': 'middle', class: 'axis-label' }, svg);
+    t.textContent = String(Math.floor(m / 60) % 24).padStart(2, '0') + ':00';
+  }
+  // stage rows as merged runs with a hairline surface gap between runs
+  function stageRow(idx, [y, h], label) {
+    const lab = el('text', { x: L - 10, y: y + h / 2 + 4, 'text-anchor': 'end', class: 'row-label' }, svg);
+    lab.textContent = label;
+    let i = 0;
+    while (i < ep.length) {
+      let j = i;
+      while (j + 1 < ep.length && ep[j + 1][idx] === ep[i][idx]) j++;
+      const x0 = x(ep[i][0]), x1 = x(ep[j][0] + ep[j][1]);
+      const w = Math.max(0.6, x1 - x0 - 1);
+      el('rect', { x: x0, y, width: w, height: h, rx: 2, fill: css(STAGE_VAR[ep[i][idx]]) }, svg);
+      i = j + 1;
+    }
+  }
+  stageRow(2, rows.old, 'Antes (v5)');
+  stageRow(3, rows.neu, 'Depois (v6)');
+
+  // p(sleep) line
+  const [py, ph] = rows.p;
+  const pl = el('text', { x: L - 10, y: py + ph / 2 - 2, 'text-anchor': 'end', class: 'row-label' }, svg);
+  pl.textContent = 'P(dormindo)';
+  const pl2 = el('text', { x: L - 10, y: py + ph / 2 + 13, 'text-anchor': 'end', class: 'axis-label' }, svg);
+  pl2.textContent = 'depois';
+  for (const v of [0, 0.5, 1]) {
+    const yy = py + ph - v * ph;
+    el('line', { x1: L, x2: W - R, y1: yy, y2: yy, stroke: css('--grid'), 'stroke-dasharray': v === 0.5 ? '3 3' : '', 'stroke-width': 1 }, svg);
+  }
+  let d = '';
+  ep.forEach((e, i) => {
+    if (e[6] == null) return;
+    const xx = x(e[0] + e[1] / 2), yy = py + ph - e[6] * ph;
+    d += (d === '' || ep[i - 1]?.[6] == null ? 'M' : 'L') + xx.toFixed(1) + ' ' + yy.toFixed(1);
+  });
+  el('path', { d, fill: 'none', stroke: css('--sleep'), 'stroke-width': 2, 'stroke-linejoin': 'round' }, svg);
+
+  // activity bars
+  const [ay, ah] = rows.act;
+  const al = el('text', { x: L - 10, y: ay + ah / 2 - 2, 'text-anchor': 'end', class: 'row-label' }, svg);
+  al.textContent = 'Som ativo';
+  const al2 = el('text', { x: L - 10, y: ay + ah / 2 + 13, 'text-anchor': 'end', class: 'axis-label' }, svg);
+  al2.textContent = 's / 30 s';
+  el('line', { x1: L, x2: W - R, y1: ay + ah, y2: ay + ah, stroke: css('--grid') }, svg);
+  for (const e of ep) {
+    if (e[7] < 0.5) continue;
+    const hh = Math.min(30, e[7]) / 30 * ah;
+    const ambient = e[5] === 'environmental_sound';
+    el('rect', { x: x(e[0]), y: ay + ah - hh, width: Math.max(0.8, x(e[0] + e[1]) - x(e[0]) - 0.4), height: hh, fill: css(ambient ? '--ambient' : '--person') }, svg);
+  }
+
+  // hover
+  const cross = el('line', { y1: 4, y2: H - 22, stroke: css('--text-muted'), 'stroke-width': 1, opacity: 0 }, svg);
+  const hit = el('rect', { x: L, y: 0, width: plotW, height: H - 22, fill: 'transparent' }, svg);
+  hit.addEventListener('pointermove', (ev) => {
+    const r = svg.getBoundingClientRect();
+    const sx = (ev.clientX - r.left) * (W / r.width);
+    const s = (sx - L) / plotW * end;
+    let k = ep.findIndex((e) => e[0] + e[1] > s);
+    if (k < 0) k = ep.length - 1;
+    const e = ep[k];
+    cross.setAttribute('x1', x(e[0] + e[1] / 2)); cross.setAttribute('x2', x(e[0] + e[1] / 2)); cross.setAttribute('opacity', 1);
+    tip.innerHTML = `<div class="t-head">${clock(e[0])}</div>
+      <div class="t-row"><i class="sw" style="background:${css(STAGE_VAR[e[2]])}"></i>Antes: <b>${STAGE[e[2]]}</b></div>
+      <div class="t-row" style="padding-left:18px">${REASON[e[4]] ?? e[4]}</div>
+      <div class="t-row"><i class="sw" style="background:${css(STAGE_VAR[e[3]])}"></i>Depois: <b>${STAGE[e[3]]}</b></div>
+      <div class="t-row" style="padding-left:18px">${REASON[e[5]] ?? e[5]}</div>
+      <div class="t-row">P(dormindo): <b>${e[6] == null ? '–' : fmtNum(e[6] * 100) + '%'}</b></div>
+      <div class="t-row">Som ativo: <b>${fmtNum(e[7], 1)} s</b></div>`;
+    placeTip(host, tip, ev);
+  });
+  hit.addEventListener('pointerleave', () => { tip.style.opacity = 0; cross.setAttribute('opacity', 0); });
+}
+
+function placeTip(host, tip, ev) {
+  const r = host.getBoundingClientRect();
+  let left = ev.clientX - r.left + 14, top = ev.clientY - r.top + 14;
+  tip.style.opacity = 1;
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  if (left + tw > r.width) left = ev.clientX - r.left - tw - 14;
+  if (top + th > r.height + 40) top = ev.clientY - r.top - th - 10;
+  tip.style.left = left + 'px'; tip.style.top = top + 'px';
+}
+
+// ---------- breathing bars ----------
+const SCEN = [
+  'Respiração 15/min + chiado + zumbido 50 Hz',
+  'Respiração 12/min + chiado + zumbido',
+  'Respiração 24/min + chiado + zumbido',
+  'Respiração rasa 15/min + chiado + zumbido',
+  'Respiração 15/min + zumbido 60 Hz',
+  'Respiração 15/min + zumbido forte',
+  'Respiração 15/min, sem interferência',
+  'Respiração 15/min, gravação a 44,1 kHz',
+  'Sem respiração: chiado + zumbido 50 Hz',
+  'Sem respiração: chiado + zumbido 60 Hz',
+  'Sem respiração: chiado + zumbido forte',
+];
+function drawBreath() {
+  const host = document.getElementById('breath');
+  host.querySelectorAll('svg').forEach((s) => s.remove());
+  const tip = host.querySelector('.tooltip');
+  const rowsN = DATA.breathing.length, rowH = 30, bar = 10, gap = 2;
+  const W = 1000, L = 300, R = 40, top = 8, H = top + rowsN * rowH + 30;
+  const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Regularidade de respiração antes e depois' });
+  host.insertBefore(svg, tip);
+  const x = (v) => L + v * (W - L - R);
+  for (const v of [0, 0.25, 0.5, 0.75, 1]) {
+    el('line', { x1: x(v), x2: x(v), y1: top, y2: H - 24, stroke: css('--grid') }, svg);
+    const t = el('text', { x: x(v), y: H - 8, 'text-anchor': 'middle', class: 'axis-label' }, svg);
+    t.textContent = fmtNum(v, 2);
+  }
+  DATA.breathing.forEach((b, i) => {
+    const y = top + i * rowH + 4;
+    const lab = el('text', { x: L - 12, y: y + bar + 4, 'text-anchor': 'end' }, svg);
+    lab.textContent = SCEN[i] ?? b.s;
+    const hitG = el('g', {}, svg);
+    for (const [k, v, dy] of [['--before', b.old, 0], ['--after', b.new, bar + gap]]) {
+      const w = Math.max(0, x(v) - L);
+      if (w > 0) el('rect', { x: L, y: y + dy, width: Math.max(w, 2), height: bar, rx: 2, fill: css(k) }, hitG);
+      else el('rect', { x: L, y: y + dy + bar / 2 - 1, width: 3, height: 2, fill: css(k) }, hitG);
+    }
+    const hit = el('rect', { x: 0, y: y - 4, width: W, height: rowH, fill: 'transparent' }, svg);
+    hit.addEventListener('pointermove', (ev) => {
+      tip.innerHTML = `<div class="t-head">${SCEN[i]}</div>
+        <div class="t-row"><i class="sw" style="background:${css('--before')}"></i>Antes: <b>${fmtNum(b.old, 2)}</b></div>
+        <div class="t-row"><i class="sw" style="background:${css('--after')}"></i>Depois: <b>${fmtNum(b.new, 2)}</b></div>
+        ${b.rate ? `<div class="t-row">Frequência medida: <b>${fmtNum(b.rate, 3)} Hz</b>${b.true ? ` (real ${fmtNum(b.true, 2)})` : ''}</div>` : ''}`;
+      placeTip(host, tip, ev);
+    });
+    hit.addEventListener('pointerleave', () => { tip.style.opacity = 0; });
+  });
+  el('line', { x1: x(0.45), x2: x(0.45), y1: top - 4, y2: H - 24, stroke: css('--text-muted'), 'stroke-dasharray': '4 3', 'stroke-width': 1.5 }, svg);
+}
+
+// ---------- baseline lines ----------
+function lineChart(id, series, { yMin, yMax, yFmt, yTicks, shade, label }) {
+  const host = document.getElementById(id);
+  host.querySelectorAll('svg').forEach((s) => s.remove());
+  const tip = host.querySelector('.tooltip');
+  const W = 1000, L = 64, R = 70, top = 10, H = 230, bottom = 28;
+  const pts = DATA.baseline;
+  const tMax = pts[pts.length - 1].t_s;
+  const x = (t) => L + t / tMax * (W - L - R);
+  const y = (v) => top + (1 - (v - yMin) / (yMax - yMin)) * (H - top - bottom);
+  const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': label });
+  host.insertBefore(svg, tip);
+  if (shade) {
+    el('rect', { x: x(shade[0]), y: top, width: x(shade[1]) - x(shade[0]), height: H - top - bottom, fill: css('--grid'), opacity: 0.6 }, svg);
+    const t = el('text', { x: (x(shade[0]) + x(shade[1])) / 2, y: top + 14, 'text-anchor': 'middle', class: 'axis-label' }, svg);
+    t.textContent = 'ventilador ligado (+10 dB)';
+  }
+  for (const v of yTicks) {
+    el('line', { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: css('--grid') }, svg);
+    const t = el('text', { x: L - 8, y: y(v) + 4, 'text-anchor': 'end', class: 'axis-label' }, svg);
+    t.textContent = yFmt(v);
+  }
+  for (let m = 0; m <= tMax / 60; m += 10) {
+    const t = el('text', { x: x(m * 60), y: H - 8, 'text-anchor': 'middle', class: 'axis-label' }, svg);
+    t.textContent = m + ' min';
+  }
+  for (const s of series) {
+    const d = pts.map((p, i) => (i ? 'L' : 'M') + x(p.t_s).toFixed(1) + ' ' + y(p[s.key]).toFixed(1)).join('');
+    el('path', { d, fill: 'none', stroke: css(s.color), 'stroke-width': 2, 'stroke-dasharray': s.dash ?? '', 'stroke-linejoin': 'round' }, svg);
+    if (s.label) {
+      const last = pts[pts.length - 1];
+      const t = el('text', { x: W - R + 6, y: y(last[s.key]) + 4 + (s.nudge ?? 0) }, svg);
+      t.textContent = s.label;
+    }
+  }
+  const cross = el('line', { y1: top, y2: H - bottom, stroke: css('--text-muted'), opacity: 0 }, svg);
+  const hit = el('rect', { x: L, y: 0, width: W - L - R, height: H - bottom, fill: 'transparent' }, svg);
+  hit.addEventListener('pointermove', (ev) => {
+    const r = svg.getBoundingClientRect();
+    const t = ((ev.clientX - r.left) * (W / r.width) - L) / (W - L - R) * tMax;
+    const p = pts.reduce((a, b) => Math.abs(b.t_s - t) < Math.abs(a.t_s - t) ? b : a);
+    cross.setAttribute('x1', x(p.t_s)); cross.setAttribute('x2', x(p.t_s)); cross.setAttribute('opacity', 1);
+    tip.innerHTML = `<div class="t-head">${fmtNum(p.t_s / 60, 1)} min</div>` + series.map((s) =>
+      `<div class="t-row"><i class="sw line" style="background:${css(s.color)}"></i>${s.name}: <b>${yFmt(p[s.key], true)}</b></div>`).join('');
+    placeTip(host, tip, ev);
+  });
+  hit.addEventListener('pointerleave', () => { tip.style.opacity = 0; cross.setAttribute('opacity', 0); });
+}
+function drawBaselines() {
+  lineChart('base', [
+    { key: 'floor_dbfs', color: '--text-muted', dash: '5 4', name: 'Fundo real' },
+    { key: 'old_baseline_dbfs', color: '--before', name: 'Antiga', label: 'antiga', nudge: -6 },
+    { key: 'new_baseline_dbfs', color: '--after', name: 'Nova', label: 'nova', nudge: 8 },
+  ], { yMin: -81, yMax: -66, yTicks: [-80, -76, -72, -68], yFmt: (v, p) => fmtNum(v, p ? 1 : 0) + ' dBFS', shade: [600, 1800], label: 'Referência de ruído antiga e nova' });
+  lineChart('noisy', [
+    { key: 'ideal_noisy_fraction', color: '--text-muted', dash: '5 4', name: 'Ideal' },
+    { key: 'old_noisy_fraction', color: '--before', name: 'Antes' },
+    { key: 'new_noisy_fraction', color: '--after', name: 'Depois' },
+  ], { yMin: 0, yMax: 1, yTicks: [0, 0.25, 0.5, 0.75, 1], yFmt: (v) => fmtNum(v * 100) + '%', shade: [600, 1800], label: 'Fração de blocos contados como ruído' });
+  const ph = DATA.baseline_phase.during_step_10_30min;
+  document.getElementById('old-noisy').textContent = fmtNum(ph.old_noisy_fraction * 100) + '%';
+  document.getElementById('new-noisy').textContent = fmtNum(ph.new_noisy_fraction * 100) + '%';
+}
+
+// ---------- nights table ----------
+(function nights() {
+  const names = { dawn: 'Sua noite (30/09, v4)', quantized: 'Noite “quantizada” (fixture, v3)', ambiguous: 'Noite “ambígua” (fixture, v3)' };
+  const rows = [
+    ['Latência', (s) => minutes(s.latency)],
+    ['Acordado', (s) => minutes(s.awake)],
+    ['Dormindo', (s) => minutes(s.sleep)],
+    ['Sem dados', (s) => minutes(s.unknown)],
+    ['Eficiência', (s) => fmtNum(s.efficiency) + '%'],
+    ['Despertares', (s) => String(s.awakenings)],
+    ['Sono agitado', (s, isNew) => isNew ? minutes(s.restless) : '—'],
+    ['Ronco', (s, isNew) => isNew ? minutes(s.snore) : '—'],
+  ];
+  const keys = Object.keys(DATA.nights);
+  let html = '<thead><tr><th></th>' + keys.map((k) => `<th class="num" colspan="1">${names[k]}</th>`).join('') + '</tr></thead><tbody>';
+  for (const [label, f] of rows) {
+    html += `<tr><th>${label}</th>` + keys.map((k) => {
+      const n = DATA.nights[k];
+      return `<td class="num"><span class="old">${f(n.old, false)} →</span> <b>${f(n.new, true)}</b></td>`;
+    }).join('') + '</tr>';
+  }
+  document.getElementById('nights').innerHTML = html + '</tbody>';
+})();
+
+// ---------- change cards ----------
+(function changes() {
+  const items = [
+    ['Modelo', 'Um modelo probabilístico no lugar de contadores',
+     'O motor antigo somava segundos de silêncio e de barulho em contadores com limites fixos e depois corrigia os erros previsíveis com remendos. O novo é um modelo oculto de Markov com 5 estados (acomodando ativo/quieto, acordado depois de dormir ativo/quieto, dormindo), que ao vivo usa só o passado e depois da noite usa a noite inteira.',
+     'Início do sono datado na metade da janela de confirmação; despertar sempre atrasado; buracos preenchidos por regra.',
+     'Início e despertar ficam onde a evidência muda, nos dois sentidos, e cada janela ganha uma probabilidade de sono.'],
+    ['Voltar a dormir', 'Re-adormecer não custa mais 20 min',
+     'Depois de um despertar, o antigo exigia de novo 20 min de silêncio. O novo separa o “acomodando para dormir” do começo da noite (~6 min após o último movimento) do “voltar a dormir” (~3 min).',
+     'Cada despertar confirmado custava ≥ 10 min acordado.',
+     'Um despertar curto custa o tempo que durou.'],
+    ['Som ambiente', 'Pássaros, ventilador e trânsito não são você',
+     'Cada janela é comparada com o espectro de fundo do próprio quarto (percentil baixo dos últimos 20 min, por faixa). Um som fraco cujo excesso está só acima de 1,5 kHz (pássaros, insetos, eletrônicos) ou só abaixo de 200 Hz (ar-condicionado, trânsito) é ambiente. Um som que já dura o suficiente para virar fundo também é.',
+     '48 janelas reconhecidas como ambiente na sua noite, só pela regra absoluta.',
+     '167 janelas; o coro do amanhecer deixa de virar “acordado”.'],
+    ['Ronco', 'Ronco conta como sono',
+     'Som alto, grave e periódico no ritmo da respiração agora é evidência forte de sono. Antes, qualquer som alto e variável somava para “acordado”, e quem ronca ganhava horas acordado.',
+     'Ronco = atividade = acordado.',
+     'Ronco = sono, e os minutos de ronco aparecem no resumo.'],
+    ['Bug', 'O começo da gravação voltou a contar como acordado',
+     'Se a primeira janela começava 69 ms depois do início da sessão, o motor offline tratava isso como uma lacuna e apagava a informação de que você estava acordado. A tela ao vivo tinha tolerância de 1 s; o offline, não.',
+     '13,6 min “sem dados” no começo da sua noite.',
+     'Acordado desde o início; 0 min sem dados.'],
+    ['Resumo', 'Sono agitado, ronco e contas mais justas',
+     'Sono agitado = sono com movimentos repetidos por perto (≥ 5 janelas em ±5 min). A eficiência passou a ser calculada sobre o tempo classificado, e um trecho sem dados no meio de um despertar não o divide mais em dois. O card “Última noite” não mostra mais “Profundo 0 min” para gravação de cabeceira.',
+     'Só acordado / dormindo / sem dados.',
+     'Mais o sono agitado (schema v58) e o ronco; a IA também recebe os dois.'],
+    ['Nativo', 'Referência de ruído que se adapta',
+     'O percentil 10 dos últimos 5 min substitui a média móvel travada em +6 dB. Uma rajada ou uma conversa não sobem a referência; uma mudança de nível sustentada é absorvida em ~5 min em vez de nunca.',
+     'Ventilador ligando = “movimento” até o fim da noite.',
+     'Absorvido em ~5 min.'],
+    ['Nativo', 'Respiração medida na faixa certa',
+     'A energia de 150–2000 Hz de cada quadro de FFT substitui a média de todas as frequências; o histórico passou de 30 s para 60 s, a frequência tem interpolação e há proteção contra batidas e zumbido.',
+     'Regularidade 0 em qualquer sinal com chiado ou zumbido.',
+     '0,97–0,99 com respiração; ≤ 0,31 sem respiração.'],
+    ['Validação', 'Noites reais como teste de regressão',
+     'A sua noite entrou como fixture ao lado das duas que já existiam, e o <code>replay_sleep.dart</code> agora imprime o resumo da noite. Mudar um parâmetro e piorar essas noites quebra a suíte.',
+     'Testes cobriam quase só sinais sintéticos.',
+     '28 testes do motor, incluindo 3 noites reais.'],
+  ];
+  const root = document.getElementById('changes');
+  for (const [tag, title, body, before, after] of items) {
+    const c = document.createElement('div');
+    c.className = 'change';
+    c.innerHTML = `<div class="tag">${tag}</div><h3>${title}</h3><p>${body}</p>
+      <div class="ba"><span class="k">Antes</span><span class="v">${before}</span><span class="k">Depois</span><span class="v">${after}</span></div>`;
+    root.appendChild(c);
+  }
+})();
+
+function drawAll() { drawHypno(); drawBreath(); drawBaselines(); }
+drawAll();
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+    (!document.documentElement.hasAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.setAttribute('data-theme', dark ? 'light' : 'dark');
+  drawAll();
+});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawAll);
+</script>
+</body>
+</html>

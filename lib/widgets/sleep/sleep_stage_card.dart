@@ -66,6 +66,12 @@ class SleepStageCard extends StatelessWidget {
             _UnavailableState(session: session)
           else ...[
             _Breakdown(session: session),
+            if (SleepWakeEngine.supports(session) &&
+                (session.restlessSleepMinutes != null ||
+                    session.snoreMinutes != null)) ...[
+              const SizedBox(height: 12),
+              _SleepQuality(session: session),
+            ],
             if (SleepWakeEngine.supports(session)) ...[
               const SizedBox(height: 12),
               Text(loc.sleepBedsideEstimateBody),
@@ -175,6 +181,37 @@ class _Breakdown extends StatelessWidget {
                 : session.deepSleepMinutes ?? 0,
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// Bedside nights only: how much of the sleep was restless, and snoring.
+class _SleepQuality extends StatelessWidget {
+  final SleepMonitorSession session;
+
+  const _SleepQuality({required this.session});
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    return Row(
+      children: [
+        Expanded(
+          child: _StageValue(
+            color: SleepUi.restless,
+            label: loc.sleepStageRestless,
+            minutes: session.restlessSleepMinutes ?? 0,
+          ),
+        ),
+        Expanded(
+          child: _StageValue(
+            color: SleepUi.snoring,
+            label: loc.sleepSnoring,
+            minutes: session.snoreMinutes ?? 0,
+          ),
+        ),
+        const Spacer(),
       ],
     );
   }

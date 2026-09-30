@@ -5,6 +5,11 @@ class SleepStageSummary {
   final int sleepingMinutes;
   final int deepSleepMinutes;
   final int unknownMinutes;
+
+  /// Sleep minutes spent in stretches with repeated movement (a subset of
+  /// [sleepingMinutes] + [deepSleepMinutes]).
+  final int restlessSleepMinutes;
+  final int snoreMinutes;
   final int sleepLatencyMinutes;
   final int awakeningCount;
   final double sleepEfficiency;
@@ -18,6 +23,8 @@ class SleepStageSummary {
     required this.sleepingMinutes,
     required this.deepSleepMinutes,
     required this.unknownMinutes,
+    this.restlessSleepMinutes = 0,
+    this.snoreMinutes = 0,
     required this.sleepLatencyMinutes,
     required this.awakeningCount,
     required this.sleepEfficiency,

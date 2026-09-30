@@ -13,10 +13,26 @@ import kotlin.math.sin
  * FFT frames. Only aggregate statistics leave this class; raw samples and
  * spectrograms are never persisted.
  */
-class SpectralAnalyzer(private val sampleRate: Int = 16_000) {
+class SpectralAnalyzer(
+    private val sampleRate: Int = 16_000,
+    /**
+     * Called once per hop (every ~125 ms) with the power in the breath band
+     * ([BREATH_BAND_LOW_HZ], [BREATH_BAND_HIGH_HZ]). All-zero frames skip the
+     * FFT but still report 0.0 so a consumer's timeline stays continuous.
+     */
+    private val onFrame: ((bandPower: Double) -> Unit)? = null,
+) {
     companion object {
         const val FFT_SIZE = 1024
         const val MAX_FRAMES_PER_SECOND = 8
+        /** Excludes mains hum / rumble below and microphone hiss above. */
+        const val BREATH_BAND_LOW_HZ = 150.0
+        const val BREATH_BAND_HIGH_HZ = 2000.0
+
+        /** Samples between frame starts; bounds FFT work at any sample rate. */
+        fun hopSizeFor(sampleRate: Int): Int =
+            maxOf(FFT_SIZE, (sampleRate + MAX_FRAMES_PER_SECOND - 1) / MAX_FRAMES_PER_SECOND)
+
         private const val POWER_FLOOR = 1e-24
         val BANDS = listOf(
             0.0 to 200.0, // snore fundamental, HVAC rumble
@@ -42,7 +58,8 @@ class SpectralAnalyzer(private val sampleRate: Int = 16_000) {
     private var pendingHasSignal = false
     private var skipSamples = 0
     // Bound FFT work to the same cadence at 16 kHz and the 44.1 kHz fallback.
-    private val hopSize = maxOf(FFT_SIZE, (sampleRate + MAX_FRAMES_PER_SECOND - 1) / MAX_FRAMES_PER_SECOND)
+    private val hopSize = hopSizeFor(sampleRate)
+    private var framePower = 0.0
     internal var processedFrames = 0L
         private set
 
@@ -70,6 +87,9 @@ class SpectralAnalyzer(private val sampleRate: Int = 16_000) {
                 accumulate()
                 frameCount++
                 processedFrames++
+                onFrame?.invoke(framePower)
+            } else {
+                onFrame?.invoke(0.0)
             }
             pendingSamples = 0
             pendingHasSignal = false
@@ -80,7 +100,7 @@ class SpectralAnalyzer(private val sampleRate: Int = 16_000) {
     /** Returns per-window aggregates, or an empty map if no complete frame ran. */
     fun snapshot(): Map<String, Double> {
         if (frameCount == 0 || powerSum <= 0.0) {
-            reset()
+            resetAggregates()
             return emptyMap()
         }
         val result = mutableMapOf<String, Double>()
@@ -101,15 +121,17 @@ class SpectralAnalyzer(private val sampleRate: Int = 16_000) {
         } else {
             0.0
         }
-        reset()
+        resetAggregates()
         return result
     }
 
     private fun accumulate() {
+        framePower = 0.0
         for (k in 1 until FFT_SIZE / 2) {
             val power = (re[k] * re[k] + im[k] * im[k]) / (FFT_SIZE.toDouble() * FFT_SIZE)
             val freq = k * sampleRate.toDouble() / FFT_SIZE
             if (freq >= 8_000.0) continue
+            if (freq >= BREATH_BAND_LOW_HZ && freq < BREATH_BAND_HIGH_HZ) framePower += power
             for (band in BANDS.indices) {
                 if (freq >= BANDS[band].first && freq < BANDS[band].second) {
                     bandSum[band] += power
@@ -125,16 +147,17 @@ class SpectralAnalyzer(private val sampleRate: Int = 16_000) {
         }
     }
 
-    private fun reset() {
+    /**
+     * Clears the window aggregates only. Frame alignment (partial frame and
+     * hop skip) is kept so the frame timeline is continuous across snapshots.
+     */
+    private fun resetAggregates() {
         bandSum.fill(0.0)
         flatnessLogSum = 0.0
         powerSum = 0.0
         centroidSum = 0.0
         binCount = 0
         frameCount = 0
-        pendingSamples = 0
-        pendingHasSignal = false
-        skipSamples = 0
     }
 
     /** Iterative radix-2 FFT, in-place on [re]/[im]. */

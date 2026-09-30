@@ -469,6 +469,7 @@ class SleepMonitorService extends ChangeNotifier {
             'sleep-wake-bedside-v2',
             'sleep-wake-bedside-v3',
             'sleep-wake-bedside-v4',
+            'sleep-wake-bedside-v5',
           }.contains(session.stageAlgorithmVersion)) {
             continue;
           }
@@ -537,6 +538,8 @@ class SleepMonitorService extends ChangeNotifier {
       // awake; a cursor joining mid-night must not invent that evidence.
       _liveCursor = SleepWakeCursor(
         sessionId: segment.sessionId,
+        // Live sessions are recorded by the native side shipped with this app.
+        featureVersion: SleepWakeEngine.currentFeatureVersion,
         startsAwake:
             started != null &&
             segment.startedAt.difference(started).inSeconds.abs() <= 1,

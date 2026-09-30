@@ -11,12 +11,17 @@ internal class SleepAudioFeatures(val sampleRate: Int) {
     private val block = ShortArray(sampleRate / 8)
     private var blockSize = 0
     private val baseline = AdaptiveNoiseBaseline()
-    private val spectral = SpectralAnalyzer(sampleRate)
+    // Breathing reads the per-frame breath-band energy of the spectral FFT, so
+    // it must exist first and never sees raw samples.
     private val breathing = BreathingAnalyzer(sampleRate)
+    private val spectral = SpectralAnalyzer(sampleRate, onFrame = breathing::addFrame)
     private var samples = 0L
     private var squares = 0.0
     private var peak = 0.0
     private var noisySeconds = 0.0
+    private var noiseBursts = 0
+    // Carried across snapshots so an episode straddling two windows counts once.
+    private var previousBlockNoisy = false
     private var digitalSilenceSamples = 0L
     private var levelCount = 0
     private var levelMean = 0.0
@@ -68,12 +73,15 @@ internal class SleepAudioFeatures(val sampleRate: Int) {
         baseline.observe(db)
         liveBaselineDbfs = baseline.value
         liveDbfs = db
-        if (baseline.isCalibrated && db > baseline.value + AudioSignalProcessor.NOISE_DELTA_DB) {
+        val noisy = baseline.isCalibrated &&
+            db > baseline.value + AudioSignalProcessor.NOISE_DELTA_DB
+        if (noisy) {
             noisySeconds += blockSize / sampleRate.toDouble()
+            if (!previousBlockNoisy) noiseBursts++
         }
+        previousBlockNoisy = noisy
         // Keep zero samples in the timeline rather than compressing pauses.
         spectral.add(block, blockSize)
-        breathing.add(block, blockSize)
         blockSize = 0
     }
 
@@ -85,8 +93,8 @@ internal class SleepAudioFeatures(val sampleRate: Int) {
             "audio_rms_dbfs" to rmsDb,
             "audio_peak_dbfs" to AudioSignalProcessor.dbfs(peak),
             "noise_score" to baseline.noiseScore(rmsDb),
-            // v3 uses a duration, not a count of device-dependent buffers.
-            "noise_burst_count" to 0,
+            // Distinct noisy episodes (quiet -> noisy transitions), not buffers.
+            "noise_burst_count" to noiseBursts,
             "noise_active_seconds" to noisySeconds,
             "audio_sample_rate" to sampleRate,
             "audio_sample_count" to samples,
@@ -103,6 +111,7 @@ internal class SleepAudioFeatures(val sampleRate: Int) {
         squares = 0.0
         peak = 0.0
         noisySeconds = 0.0
+        noiseBursts = 0
         digitalSilenceSamples = 0
         levelCount = 0
         levelMean = 0.0

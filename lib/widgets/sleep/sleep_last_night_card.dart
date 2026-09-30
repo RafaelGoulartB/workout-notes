@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
+import 'package:workout_notes/services/sleep_wake_engine.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
@@ -118,11 +119,20 @@ class SleepLastNightCard extends StatelessWidget {
                     label: loc.sleepStageSleeping,
                     minutes: session!.sleepingMinutes,
                   ),
-                  _StageAmount(
-                    color: SleepUi.deep,
-                    label: loc.sleepStageDeepShort,
-                    minutes: session!.deepSleepMinutes,
-                  ),
+                  // Bedside nights never estimate deep sleep; show the
+                  // restless share of the sleep instead of a fake 0 min.
+                  if (SleepWakeEngine.supports(session!))
+                    _StageAmount(
+                      color: SleepUi.restless,
+                      label: loc.sleepStageRestless,
+                      minutes: session!.restlessSleepMinutes,
+                    )
+                  else
+                    _StageAmount(
+                      color: SleepUi.deep,
+                      label: loc.sleepStageDeepShort,
+                      minutes: session!.deepSleepMinutes,
+                    ),
                 ],
               ),
             ],

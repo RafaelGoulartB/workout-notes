@@ -66,4 +66,31 @@ class SleepAudioFeaturesTest {
         assertTrue(analyzer.snapshot().containsKey("spectral_centroid_hz"))
         assertEquals(8L, analyzer.processedFrames)
     }
+
+    private fun noise(rate: Int, seconds: Double, dbfs: Double, random: java.util.Random): ShortArray {
+        val amplitude = Math.pow(10.0, dbfs / 20.0) * Short.MAX_VALUE * 1.732 // uniform -> rms
+        return ShortArray((rate * seconds).toInt()) { ((random.nextDouble() * 2 - 1) * amplitude).toInt().toShort() }
+    }
+
+    @Test fun countsDistinctNoisyEpisodesAcrossWindows() {
+        val rate = 16_000
+        val random = java.util.Random(3)
+        val features = SleepAudioFeatures(rate)
+        fun feed(seconds: Double, dbfs: Double) {
+            val samples = noise(rate, seconds, dbfs, random)
+            features.add(samples, samples.size)
+        }
+        // Window 1: floor, a 2 s burst, floor, a 1 s burst, then a burst that
+        // runs into window 2.
+        feed(15.0, -75.0); feed(2.0, -40.0); feed(3.0, -75.0); feed(1.0, -40.0)
+        feed(7.0, -75.0); feed(2.0, -40.0)
+        val first = features.snapshot()
+        assertEquals(3, (first["noise_burst_count"] as Number).toInt())
+        // Window 2 starts inside the same episode: no new burst.
+        feed(2.0, -40.0); feed(10.0, -75.0); feed(3.0, -40.0); feed(15.0, -75.0)
+        val second = features.snapshot()
+        assertEquals(1, (second["noise_burst_count"] as Number).toInt())
+        assertEquals(5.0, (second["noise_active_seconds"] as Number).toDouble(), 0.3)
+        assertEquals(0, (features.snapshot()["noise_burst_count"] as? Number)?.toInt() ?: 0)
+    }
 }

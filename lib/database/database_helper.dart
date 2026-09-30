@@ -27,7 +27,7 @@ import 'package:workout_notes/repositories/workout_repository.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 57;
+  static const _dbVersion = 58;
 
   static DatabaseHelper? _instance;
   static Database? _database;
