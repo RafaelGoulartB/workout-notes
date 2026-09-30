@@ -1,6 +1,6 @@
-import 'food.dart';
-import 'food_serving.dart';
-import 'food_variant.dart';
+import 'package:workout_notes/models/nutrition/food.dart';
+import 'package:workout_notes/models/nutrition/food_serving.dart';
+import 'package:workout_notes/models/nutrition/food_variant.dart';
 
 /// A single result row used in the food search screen.
 ///

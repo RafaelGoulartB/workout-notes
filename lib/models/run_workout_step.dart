@@ -56,9 +56,6 @@ class RunWorkoutStep {
 
   bool get isDistance => metric == RunIntervalMetric.distance;
 
-  bool get hasPaceTarget =>
-      targetPaceMinSecPerKm != null || targetPaceMaxSecPerKm != null;
-
   RunWorkoutStep copyWith({
     int? orderIndex,
     RunStepRole? role,

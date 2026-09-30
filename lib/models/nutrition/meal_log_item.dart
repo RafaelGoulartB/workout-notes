@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'nutrition_values.dart';
+import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 
 /// Immutable snapshot of a [Food]/[FoodVariant] at the moment the user
 /// logged it. Stored as JSON on the [MealLogItem] row so that future

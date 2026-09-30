@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
 import 'package:workout_notes/utils/body_tracker_utils.dart';
-import 'package:workout_notes/widgets/body_tracker_badges.dart';
+import 'package:workout_notes/widgets/body_tracker/body_tracker_badges.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// A single measurement entry in the history list.
 class BodyMeasurementCard extends StatelessWidget {
@@ -39,14 +40,10 @@ class BodyMeasurementCard extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(60),
-          ),
-        ),
+      child: AppSectionCard(
+        margin: const EdgeInsets.all(4),
+        radius: 12,
+        padding: EdgeInsets.zero,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onLongPress: onLongPress,

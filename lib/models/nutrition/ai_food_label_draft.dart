@@ -1,4 +1,4 @@
-import 'nutrition_values.dart';
+import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 
 /// One serving extracted from a nutrition label photo.
 class AiFoodLabelServingDraft {
@@ -99,7 +99,9 @@ class AiFoodLabelDraft {
             servings.add(
               AiFoodLabelServingDraft.fromJson(item.cast<String, dynamic>()),
             );
-          } catch (_) {}
+          } catch (_) {
+            // Skip a malformed serving and keep the rest of the draft.
+          }
         }
       }
     }

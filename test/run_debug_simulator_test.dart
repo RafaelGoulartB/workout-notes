@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:workout_notes/services/run_debug_simulator.dart';
+import 'package:workout_notes/dev_tools/run_debug_simulator.dart';
 
 void main() {
   test('debug simulator accumulates distance and emits km splits', () {
@@ -30,7 +30,10 @@ void main() {
 
     final minSpeed = speeds.reduce((a, b) => a < b ? a : b);
     final maxSpeed = speeds.reduce((a, b) => a > b ? a : b);
-    expect(minSpeed, greaterThanOrEqualTo(RunDebugSimulator.minMetersPerSecond));
+    expect(
+      minSpeed,
+      greaterThanOrEqualTo(RunDebugSimulator.minMetersPerSecond),
+    );
     expect(maxSpeed, lessThanOrEqualTo(RunDebugSimulator.maxMetersPerSecond));
     // Real variation — not a flat cruise.
     expect(maxSpeed - minSpeed, greaterThan(4.0));
@@ -38,15 +41,16 @@ void main() {
     // Still quick enough for QA (~1 km / minute order of magnitude).
     expect(sim.distanceMeters / sim.elapsedSeconds, greaterThan(10.0));
 
-    final paces = [
-      for (final s in speeds) 1000.0 / s,
-    ];
+    final paces = [for (final s in speeds) 1000.0 / s];
     final minPace = paces.reduce((a, b) => a < b ? a : b);
     final maxPace = paces.reduce((a, b) => a > b ? a : b);
     expect(maxPace - minPace, greaterThan(20.0));
 
     final activity = sim.toSpoolPayload()['activity'] as Map;
-    expect(activity['max_pace_sec_per_km'], lessThan(activity['avg_pace_sec_per_km']));
+    expect(
+      activity['max_pace_sec_per_km'],
+      lessThan(activity['avg_pace_sec_per_km']),
+    );
   });
 
   test('speedForTick is deterministic', () {
@@ -58,5 +62,34 @@ void main() {
       RunDebugSimulator.create().speedForTick(1),
       isNot(RunDebugSimulator.create().speedForTick(20)),
     );
+  });
+
+  test('debug simulator marks manual laps and exports them in the spool', () {
+    final sim = RunDebugSimulator.create();
+    for (var i = 0; i < 30; i++) {
+      sim.tick();
+    }
+    final first = sim.markLap();
+    expect(first, isNotNull);
+    expect(first!.index, 1);
+    expect(first.durationSeconds, 30);
+    expect(first.distanceMeters, closeTo(sim.distanceMeters, 0.001));
+
+    // A second tap right away is an accident, not a lap.
+    expect(sim.markLap(), isNull);
+
+    for (var i = 0; i < 20; i++) {
+      sim.tick();
+    }
+    final state = sim.toState(locationGranted: true);
+    expect(state.laps, hasLength(1));
+    expect(state.currentLap!.index, 2);
+    expect(state.currentLap!.durationSeconds, 20);
+    expect(state.currentLap!.startDistanceMeters, first.distanceMeters);
+
+    final laps = (sim.toSpoolPayload()['activity'] as Map)['laps'] as List;
+    // The open remainder becomes the last lap.
+    expect(laps, hasLength(2));
+    expect((laps.last as Map)['lap_index'], 2);
   });
 }

@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'ai_image_attachment.dart';
-import 'ai_message_role.dart';
-import 'ai_tool_call.dart';
+import 'package:workout_notes/models/ai_image_attachment.dart';
+import 'package:workout_notes/models/ai_message_role.dart';
+import 'package:workout_notes/models/ai_tool_call.dart';
 
 /// A single chat message, persisted in `ai_chat_messages`.
 class AiChatMessage {
@@ -33,7 +33,6 @@ class AiChatMessage {
   bool get isUser => role == AiMessageRole.user;
   bool get isAssistant => role == AiMessageRole.assistant;
   bool get isTool => role == AiMessageRole.tool;
-  bool get isSystem => role == AiMessageRole.system;
 
   AiChatMessage copyWith({
     String? content,
@@ -84,7 +83,9 @@ class AiChatMessage {
             }
           }
         }
-      } catch (_) {}
+      } catch (_) {
+        // Unreadable tool calls: show the message without them.
+      }
     }
 
     final attachments = <AiImageAttachment>[];
@@ -101,7 +102,9 @@ class AiChatMessage {
             }
           }
         }
-      } catch (_) {}
+      } catch (_) {
+        // Unreadable attachments: show the message without them.
+      }
     }
 
     return AiChatMessage(

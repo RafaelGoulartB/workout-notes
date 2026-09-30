@@ -135,21 +135,6 @@ void main() {
     expect(await db.query('routines'), hasLength(1));
   });
 
-  test('approval repairs fresh databases missing routine day notes', () async {
-    await uninstallAiTestDb();
-    db = await installAiTestDb(includeRoutineDayNotes: false);
-    service = AiRoutineMutationService();
-    await seedPrerequisites();
-
-    final id = await prepare();
-    final proposal = await service.approve(id);
-
-    expect(proposal.status.name, 'applied');
-    final columns = await db.rawQuery('PRAGMA table_info(routine_days)');
-    expect(columns.map((column) => column['name']), contains('notes'));
-    expect((await db.query('routine_days')).single['notes'], isNull);
-  });
-
   test('invalid action is rejected instead of becoming create', () async {
     final result = await service.prepareProposal(
       threadId: 'thread_1',

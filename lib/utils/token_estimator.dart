@@ -4,8 +4,13 @@ class TokenEstimator {
 
   static int estimateText(String? text) {
     if (text == null || text.isEmpty) return 0;
-    return (text.length / charsPerToken).ceil();
+    return estimateChars(text.length);
   }
+
+  /// Same estimate from a length already known, so large payloads that were
+  /// encoded once are not encoded again just to be measured.
+  static int estimateChars(int length) =>
+      length <= 0 ? 0 : (length / charsPerToken).ceil();
 
   static int estimateMessage({
     required String role,

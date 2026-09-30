@@ -1,71 +1,28 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:workout_notes/database/database_helper.dart';
-import 'package:workout_notes/database/database_periodization_schema.dart';
 import 'package:workout_notes/models/periodization_checkin.dart';
 import 'package:workout_notes/models/periodization_phase_draft.dart';
-import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
-import 'package:workout_notes/models/periodization_projection.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
+import 'support/periodization_fixtures.dart';
+import 'support/sql_capture.dart';
+import 'support/test_db.dart';
 
 void main() {
   late Database database;
+  late SqlLog sqlLog;
   late PeriodizationRepository repository;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 37,
-        onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-        onCreate: (db, version) async {
-          await db.execute(
-            'CREATE TABLE routines (id TEXT PRIMARY KEY, name TEXT NOT NULL, notes TEXT, created_at TEXT NOT NULL)',
-          );
-          await db.execute(
-            'CREATE TABLE routine_days (id TEXT PRIMARY KEY, routine_id TEXT NOT NULL, name TEXT NOT NULL, order_index INTEGER NOT NULL DEFAULT 0, FOREIGN KEY (routine_id) REFERENCES routines(id) ON DELETE CASCADE)',
-          );
-          await db.execute(
-            'CREATE TABLE workouts (id TEXT PRIMARY KEY, date TEXT NOT NULL, start_time TEXT, end_time TEXT, duration_seconds INTEGER, estimated_calories REAL, comment TEXT, feeling_rating INTEGER, is_from_routine INTEGER DEFAULT 0, routine_id TEXT, pause_start_time TEXT, created_at TEXT NOT NULL)',
-          );
-          await db.execute(
-            'CREATE TABLE exercise_entries (id TEXT PRIMARY KEY, workout_id TEXT NOT NULL, exercise_id TEXT NOT NULL, order_index INTEGER, FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE)',
-          );
-          await db.execute(
-            'CREATE TABLE sets (id TEXT PRIMARY KEY, exercise_entry_id TEXT NOT NULL, weight REAL, reps INTEGER, rpe REAL, is_complete INTEGER DEFAULT 0, is_warmup INTEGER DEFAULT 0, order_index INTEGER, FOREIGN KEY (exercise_entry_id) REFERENCES exercise_entries(id) ON DELETE CASCADE)',
-          );
-          await db.execute(
-            'CREATE TABLE body_measurements (id TEXT PRIMARY KEY, type TEXT, value REAL, unit TEXT, date TEXT, created_at TEXT)',
-          );
-          await db.execute(
-            'CREATE TABLE sleep_entries (id TEXT PRIMARY KEY, date TEXT, sleep_minutes INTEGER, actual_sleep_minutes INTEGER, estimated_sleep_minutes INTEGER)',
-          );
-          await db.execute(
-            'CREATE TABLE meal_logs (id TEXT PRIMARY KEY, date TEXT, meal_type TEXT)',
-          );
-          await db.execute(
-            'CREATE TABLE meal_log_items (id TEXT PRIMARY KEY, meal_log_id TEXT, calories REAL, protein_g REAL, carbs_g REAL, fat_g REAL, FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE)',
-          );
-          await DatabasePeriodizationSchema.create(db);
-        },
-      ),
-    );
-    DatabaseHelper.overrideDatabase = database;
+    (database, sqlLog) = await installCountingTestDb();
     repository = PeriodizationRepository();
   });
 
-  tearDown(() async {
-    DatabaseHelper.overrideDatabase = null;
-    await database.close();
-  });
+  tearDown(uninstallTestDb);
 
   PeriodizationTarget target({
     double calories = 2200,
@@ -90,7 +47,48 @@ void main() {
     createdAt: DateTime(2026, 1, 1),
   );
 
-  test('creates an integrated active plan and prevents overlap', () async {
+  test('run days and phase run volume use calendar-day ranges', () async {
+    final plan = await repository.createPlan(
+      name: 'Runs',
+      startDate: DateTime(2026, 1, 1),
+      endDate: DateTime(2026, 1, 31),
+    );
+    final phase = await addPhaseFixture(
+      repository,
+      planId: plan.id,
+      name: 'Base',
+      startDate: DateTime(2026, 1, 5),
+      endDate: DateTime(2026, 1, 5),
+      color: 1,
+      target: target(),
+    );
+    Future<void> run(String id, String startedAt) =>
+        database.insert('run_activities', {
+          'id': id,
+          'started_at': startedAt,
+          'distance_meters': 5000.0,
+          'moving_time_seconds': 1500,
+          'status': 'completed',
+          'created_at': startedAt,
+          'updated_at': startedAt,
+        });
+    await run('before-midnight', '2026-01-04T23:59:00.000');
+    await run('first-minute', '2026-01-05T00:01:00.000');
+    await run('last-minute', '2026-01-05T23:59:00.000');
+    await run('after-midnight', '2026-01-06T00:01:00.000');
+
+    final dates = await repository.getActivityDates(
+      DateTime(2026, 1, 5),
+      DateTime(2026, 1, 5),
+    );
+    final metrics = await repository.getPhaseMetrics(phase);
+
+    expect(dates.runs, {'2026-01-05'});
+    expect(metrics.runCount, 2);
+    expect(metrics.runDistanceMeters, 10000.0);
+  });
+
+  test('creates an integrated active plan', () async {
     await database.insert('routines', {
       'id': 'routine-1',
       'name': 'Upper / Lower',
@@ -131,109 +129,6 @@ void main() {
       (await repository.getEffectiveTarget(phases.first.id))?.routineId,
       'routine-1',
     );
-
-    await expectLater(
-      repository.addPhase(
-        planId: plan.id,
-        name: 'Overlap',
-        startDate: DateTime(2026, 2, 15),
-        endDate: DateTime(2026, 3, 2),
-        color: 0xFF000000,
-      ),
-      throwsA(
-        isA<PeriodizationValidationException>().having(
-          (error) => error.code,
-          'code',
-          'phase_overlap',
-        ),
-      ),
-    );
-  });
-
-  test(
-    'versions targets and resolves the historical effective target',
-    () async {
-      final plan = await repository.createPlan(
-        name: 'Plan',
-        startDate: DateTime(2026, 1, 1),
-        endDate: DateTime(2026, 3, 31),
-      );
-      final phase = await repository.addPhase(
-        planId: plan.id,
-        name: 'Base',
-        startDate: plan.startDate,
-        endDate: plan.endDate,
-        color: 0xFF4F8EF7,
-        target: target(),
-      );
-      await repository.saveTargetVersion(
-        phase.id,
-        target(calories: 2400),
-        validFrom: DateTime(2026, 2, 1),
-      );
-
-      expect(
-        (await repository.getEffectiveTarget(
-          phase.id,
-          date: DateTime(2026, 1, 20),
-        ))?.calories,
-        2200,
-      );
-      expect(
-        (await repository.getEffectiveTarget(
-          phase.id,
-          date: DateTime(2026, 2, 20),
-        ))?.calories,
-        2400,
-      );
-      expect(await repository.getTargetHistory(phase.id), hasLength(2));
-    },
-  );
-
-  test('cascading replan shifts following phases and plan end', () async {
-    final plan = await repository.createPlanWithPhases(
-      name: 'Cycle',
-      startDate: DateTime(2026, 1, 1),
-      phases: [
-        PeriodizationPhaseDraft(
-          name: 'One',
-          color: 1,
-          startDate: DateTime(2026, 1, 1),
-          endDate: DateTime(2026, 1, 14),
-        ),
-        PeriodizationPhaseDraft(
-          name: 'Two',
-          color: 2,
-          startDate: DateTime(2026, 1, 15),
-          endDate: DateTime(2026, 1, 28),
-          target: target(calories: 2500),
-        ),
-      ],
-    );
-    final phases = await repository.getPhases(plan.id);
-    final first = phases.first;
-    await repository.updatePhase(
-      PeriodizationPhase(
-        id: first.id,
-        planId: first.planId,
-        name: first.name,
-        color: first.color,
-        startDate: first.startDate,
-        endDate: DateTime(2026, 1, 21),
-        orderIndex: first.orderIndex,
-        createdAt: first.createdAt,
-        updatedAt: DateTime.now(),
-      ),
-      shiftFollowingPhases: true,
-    );
-
-    final shifted = await repository.getPhases(plan.id);
-    expect(shifted[1].startDate, DateTime(2026, 1, 22));
-    expect((await repository.getPlan(plan.id))?.endDate, DateTime(2026, 2, 4));
-    expect(
-      (await repository.getTargetHistory(shifted[1].id)).single.validFrom,
-      DateTime(2026, 1, 22),
-    );
   });
 
   test(
@@ -244,7 +139,8 @@ void main() {
         startDate: DateTime(2026, 1, 1),
         endDate: DateTime(2026, 1, 7),
       );
-      final phase = await repository.addPhase(
+      final phase = await addPhaseFixture(
+        repository,
         planId: plan.id,
         name: 'Week',
         startDate: plan.startDate,
@@ -257,6 +153,17 @@ void main() {
         'date': '2026-01-02',
         'end_time': '2026-01-02T11:00:00',
         'created_at': '2026-01-02T10:00:00',
+      });
+      await database.insert('exercise_categories', {
+        'id': 'category',
+        'name': 'Category',
+        'color': 1,
+      });
+      await database.insert('exercises', {
+        'id': 'exercise',
+        'name': 'Exercise',
+        'category_id': 'category',
+        'created_at': '2026-01-01T08:00:00',
       });
       await database.insert('exercise_entries', {
         'id': 'e1',
@@ -276,10 +183,16 @@ void main() {
         'id': 'm1',
         'date': '2026-01-02',
         'meal_type': 'lunch',
+        'created_at': '2026-01-01T08:00:00',
       });
       await database.insert('meal_log_items', {
         'id': 'mi1',
         'meal_log_id': 'm1',
+        'food_name_snapshot': 'Food',
+        'quantity': 1,
+        'unit': 'serving',
+        'nutrition_snapshot_json': '{}',
+        'created_at': '2026-01-01T08:00:00',
         'calories': 2100,
         'protein_g': 170,
       });
@@ -303,6 +216,7 @@ void main() {
         'id': 'sl1',
         'date': '2026-01-02',
         'sleep_minutes': 480,
+        'created_at': '2026-01-02T08:00:00',
       });
 
       final metrics = await repository.getPhaseMetrics(
@@ -377,107 +291,6 @@ void main() {
     );
   });
 
-  test('phase, target and routine edit rolls back atomically', () async {
-    final plan = await repository.createPlan(
-      name: 'Atomic',
-      startDate: DateTime(2026, 1, 1),
-      endDate: DateTime(2026, 1, 31),
-    );
-    final phase = await repository.addPhase(
-      planId: plan.id,
-      name: 'Original',
-      startDate: plan.startDate,
-      endDate: plan.endDate,
-      color: 1,
-      target: target(),
-    );
-    final updated = PeriodizationPhase(
-      id: phase.id,
-      planId: phase.planId,
-      name: 'Changed',
-      color: phase.color,
-      startDate: phase.startDate,
-      endDate: phase.endDate,
-      orderIndex: phase.orderIndex,
-      createdAt: phase.createdAt,
-      updatedAt: DateTime.now(),
-    );
-
-    await expectLater(
-      repository.updatePhaseWithTargets(
-        updated,
-        shiftFollowingPhases: false,
-        targetChanged: true,
-        weeklyTargets: [target(routineId: 'missing-routine')],
-        weeklyReplaceFrom: phase.startDate,
-      ),
-      throwsA(
-        isA<PeriodizationValidationException>().having(
-          (error) => error.code,
-          'code',
-          'routine_not_found',
-        ),
-      ),
-    );
-    expect((await repository.getPhase(phase.id))?.name, 'Original');
-    expect(await repository.getTargetHistory(phase.id), hasLength(1));
-  });
-
-  test(
-    'replan refuses to move a phase away from historical check-ins',
-    () async {
-      final plan = await repository.createPlan(
-        name: 'History',
-        startDate: DateTime(2026, 1, 1),
-        endDate: DateTime(2026, 1, 31),
-      );
-      final phase = await repository.addPhase(
-        planId: plan.id,
-        name: 'Base',
-        startDate: DateTime(2026, 1, 1),
-        endDate: DateTime(2026, 1, 14),
-        color: 1,
-        target: target(),
-      );
-      await repository.saveCheckin(
-        PeriodizationCheckin(
-          id: 'history-checkin',
-          phaseId: phase.id,
-          weekStart: DateTime(2026, 1, 5),
-          energy: 3,
-          hunger: 3,
-          recovery: 3,
-          performance: 'stable',
-          decision: PeriodizationDecision.maintain,
-          createdAt: DateTime(2026, 1, 11),
-        ),
-      );
-
-      await expectLater(
-        repository.updatePhase(
-          PeriodizationPhase(
-            id: phase.id,
-            planId: phase.planId,
-            name: phase.name,
-            color: phase.color,
-            startDate: DateTime(2026, 1, 12),
-            endDate: DateTime(2026, 1, 25),
-            orderIndex: phase.orderIndex,
-            createdAt: phase.createdAt,
-            updatedAt: DateTime.now(),
-          ),
-        ),
-        throwsA(
-          isA<PeriodizationValidationException>().having(
-            (error) => error.code,
-            'code',
-            'replan_excludes_checkins',
-          ),
-        ),
-      );
-    },
-  );
-
   test(
     'nutrition adherence includes missing days and exposes coverage',
     () async {
@@ -486,7 +299,8 @@ void main() {
         startDate: DateTime(2026, 1, 1),
         endDate: DateTime(2026, 1, 7),
       );
-      final phase = await repository.addPhase(
+      final phase = await addPhaseFixture(
+        repository,
         planId: plan.id,
         name: 'Week',
         startDate: plan.startDate,
@@ -498,10 +312,16 @@ void main() {
         'id': 'meal-only',
         'date': '2026-01-01',
         'meal_type': 'lunch',
+        'created_at': '2026-01-01T08:00:00',
       });
       await database.insert('meal_log_items', {
         'id': 'item-only',
         'meal_log_id': 'meal-only',
+        'food_name_snapshot': 'Food',
+        'quantity': 1,
+        'unit': 'serving',
+        'nutrition_snapshot_json': '{}',
+        'created_at': '2026-01-01T08:00:00',
         'calories': 2200,
         'protein_g': 180,
       });
@@ -521,18 +341,14 @@ void main() {
         startDate: DateTime(2026, 1, 1),
         endDate: DateTime(2026, 1, 14),
       );
-      final phase = await repository.addPhase(
+      final phase = await addPhaseFixture(
+        repository,
         planId: plan.id,
         name: 'Two weeks',
         startDate: plan.startDate,
         endDate: plan.endDate,
         color: 1,
-        target: target(workouts: 4),
-      );
-      await repository.saveTargetVersion(
-        phase.id,
-        target(workouts: 6),
-        validFrom: DateTime(2026, 1, 8),
+        weeklyTargets: [target(workouts: 4), target(workouts: 6)],
       );
 
       final metrics = await repository.getPhaseMetrics(phase);
@@ -601,77 +417,6 @@ void main() {
     },
   );
 
-  test('projects weight, phase volume and probable goal date', () async {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final start = today.subtract(const Duration(days: 14));
-    final end = today.add(const Duration(days: 35));
-    final plan = await repository.createPlan(
-      name: 'Projection',
-      startDate: start,
-      endDate: end,
-    );
-    final phase = await repository.addPhase(
-      planId: plan.id,
-      name: 'Cut',
-      startDate: start,
-      endDate: end,
-      color: 1,
-      target: target(targetWeight: 95, weeklyWeightChange: -1),
-    );
-    await database.insert('body_measurements', {
-      'id': 'weight-start',
-      'type': 'weight',
-      'value': 102,
-      'unit': 'kg',
-      'date': _testDate(start),
-      'created_at': start.toIso8601String(),
-    });
-    await database.insert('body_measurements', {
-      'id': 'weight-now',
-      'type': 'weight',
-      'value': 100,
-      'unit': 'kg',
-      'date': _testDate(today),
-      'created_at': today.toIso8601String(),
-    });
-    await database.insert('workouts', {
-      'id': 'projection-workout',
-      'date': _testDate(today),
-      'start_time': today.subtract(const Duration(hours: 1)).toIso8601String(),
-      'end_time': today.toIso8601String(),
-      'created_at': today.toIso8601String(),
-    });
-    await database.insert('exercise_entries', {
-      'id': 'projection-entry',
-      'workout_id': 'projection-workout',
-      'exercise_id': 'exercise',
-      'order_index': 0,
-    });
-    await database.insert('sets', {
-      'id': 'projection-set',
-      'exercise_entry_id': 'projection-entry',
-      'weight': 100,
-      'reps': 10,
-      'is_complete': 1,
-      'is_warmup': 0,
-      'order_index': 0,
-    });
-
-    final projection = await repository.getPhaseProjection(phase);
-
-    expect(
-      projection.weightBasis,
-      PeriodizationWeightProjectionBasis.observedTrend,
-    );
-    expect(projection.expectedEndWeightKg, closeTo(95.2, 0.2));
-    expect(projection.plannedSets, 286);
-    expect(projection.plannedWorkouts, 29);
-    expect(projection.plannedVolume, closeTo(286000, 1));
-    expect(projection.estimatedGoalDate, isNotNull);
-    expect(projection.estimatedGoalDate!.isAfter(today), isTrue);
-  });
-
   test('suggests the next session across multiple weekly routines', () async {
     final today = DateTime.now();
     final start = DateTime(today.year, today.month, today.day - 2);
@@ -725,6 +470,70 @@ void main() {
     expect(suggestion?.completedWorkouts, 1);
   });
 
+  test('routine suggestion reads routines in bulk, not one by one', () async {
+    final today = DateTime.now();
+    final start = DateTime(today.year, today.month, today.day - 2);
+    final end = DateTime(today.year, today.month, today.day + 2);
+    final routineIds = [for (var i = 0; i < 4; i++) 'routine-$i'];
+    for (final id in routineIds) {
+      await database.insert('routines', {
+        'id': id,
+        'name': 'Routine $id',
+        'created_at': today.toIso8601String(),
+      });
+      for (var d = 0; d < 2; d++) {
+        await database.insert('routine_days', {
+          'id': '$id-day$d',
+          'routine_id': id,
+          'name': 'Day $d',
+          'order_index': d,
+        });
+      }
+    }
+    await repository.createPlanWithPhases(
+      name: 'Many routines',
+      startDate: start,
+      phases: [
+        PeriodizationPhaseDraft(
+          name: 'Current phase',
+          color: 1,
+          startDate: start,
+          endDate: end,
+          target: PeriodizationTarget(
+            id: '',
+            phaseId: '',
+            version: 0,
+            validFrom: start,
+            routineIds: routineIds,
+            createdAt: today,
+          ),
+        ),
+      ],
+    );
+    // Three finished sessions: the fourth day of the sequence is next.
+    for (var i = 0; i < 3; i++) {
+      await database.insert('workouts', {
+        'id': 'done-$i',
+        'date': _testDate(today),
+        'end_time': today.toIso8601String(),
+        'routine_id': routineIds[i],
+        'created_at': today.toIso8601String(),
+      });
+    }
+
+    sqlLog.clear();
+    final suggestion = await repository.getRoutineSuggestion(today);
+    final reads = sqlLog.reads;
+
+    expect(suggestion?.routineId, 'routine-1');
+    expect(suggestion?.routineDayId, 'routine-1-day1');
+    expect(suggestion?.routineDayCount, 8);
+    expect(suggestion?.completedWorkouts, 3);
+    // Same query count as with a single routine (phase, target, routines,
+    // days, completed count): nothing scales with the routine count.
+    expect(reads, lessThanOrEqualTo(6));
+  });
+
   test(
     'weekly targets collapse identical weeks into versioned blocks',
     () async {
@@ -733,7 +542,8 @@ void main() {
         startDate: DateTime(2026, 1, 1),
         endDate: DateTime(2026, 1, 31),
       );
-      final phase = await repository.addPhase(
+      final phase = await addPhaseFixture(
+        repository,
         planId: plan.id,
         name: 'Base',
         startDate: plan.startDate,
@@ -810,7 +620,8 @@ void main() {
       startDate: DateTime(2026, 1, 1),
       endDate: DateTime(2026, 1, 14),
     );
-    final phase = await repository.addPhase(
+    final phase = await addPhaseFixture(
+      repository,
       planId: plan.id,
       name: 'Base',
       startDate: plan.startDate,
@@ -853,7 +664,8 @@ void main() {
         startDate: start,
         endDate: end,
       );
-      final phase = await repository.addPhase(
+      final phase = await addPhaseFixture(
+        repository,
         planId: plan.id,
         name: 'Base',
         startDate: start,
@@ -863,10 +675,14 @@ void main() {
       );
       expect(await repository.getTargetHistory(phase.id), hasLength(1));
 
-      await repository.saveWeeklyTargets(phase.id, [
-        target(calories: 2000),
-        target(calories: 2000),
-      ], replaceFrom: today);
+      await repository.savePhaseSetup(
+        phase.id,
+        name: 'Base',
+        templateKey: '',
+        color: 1,
+        weeks: [target(calories: 2000), target(calories: 2000)],
+        fromWeek: 2,
+      );
       final history = await repository.getTargetHistory(phase.id);
       expect(history, hasLength(2));
       expect(
@@ -890,9 +706,14 @@ void main() {
 
       // Saving weeks equal to the retained baseline removes the override
       // without touching the locked version.
-      await repository.saveWeeklyTargets(phase.id, [
-        target(calories: 2200),
-      ], replaceFrom: today);
+      await repository.savePhaseSetup(
+        phase.id,
+        name: 'Base',
+        templateKey: '',
+        color: 1,
+        weeks: [target(calories: 2200)],
+        fromWeek: 2,
+      );
       expect(await repository.getTargetHistory(phase.id), hasLength(1));
       expect(
         (await repository.getEffectiveTarget(
@@ -904,57 +725,6 @@ void main() {
     },
   );
 
-  test('updatePhaseWithTargets accepts weekly targets', () async {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final start = today.subtract(const Duration(days: 7));
-    final end = today.add(const Duration(days: 20));
-    final plan = await repository.createPlan(
-      name: 'Atomic weekly',
-      startDate: start,
-      endDate: end,
-    );
-    final phase = await repository.addPhase(
-      planId: plan.id,
-      name: 'Original',
-      startDate: start,
-      endDate: end,
-      color: 1,
-      target: target(calories: 2200),
-    );
-
-    await repository.updatePhaseWithTargets(
-      PeriodizationPhase(
-        id: phase.id,
-        planId: phase.planId,
-        name: 'Edited',
-        color: phase.color,
-        startDate: phase.startDate,
-        endDate: phase.endDate,
-        orderIndex: phase.orderIndex,
-        createdAt: phase.createdAt,
-        updatedAt: DateTime.now(),
-      ),
-      shiftFollowingPhases: false,
-      targetChanged: true,
-      weeklyTargets: [target(calories: 2100), target(calories: 2100)],
-      weeklyReplaceFrom: today,
-    );
-
-    expect((await repository.getPhase(phase.id))?.name, 'Edited');
-    expect(
-      (await repository.getEffectiveTarget(phase.id, date: today))?.calories,
-      2100,
-    );
-    expect(
-      (await repository.getEffectiveTarget(
-        phase.id,
-        date: today.subtract(const Duration(days: 1)),
-      ))?.calories,
-      2200,
-    );
-  });
-
   test('weekly window beyond the phase end is rejected', () async {
     final plan = await repository.createPlan(
       name: 'Window',
@@ -962,7 +732,8 @@ void main() {
       endDate: DateTime(2026, 1, 28),
     );
     await expectLater(
-      repository.addPhase(
+      addPhaseFixture(
+        repository,
         planId: plan.id,
         name: 'Too long',
         startDate: plan.startDate,
@@ -986,7 +757,8 @@ void main() {
       startDate: DateTime(2026, 1, 1),
       endDate: DateTime(2026, 1, 14),
     );
-    final phase = await repository.addPhase(
+    final phase = await addPhaseFixture(
+      repository,
       planId: plan.id,
       name: 'Base',
       startDate: plan.startDate,

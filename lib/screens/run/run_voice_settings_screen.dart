@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
+import 'package:workout_notes/services/run_native_voice_service.dart';
 import 'package:workout_notes/services/run_voice_settings_store.dart';
-import 'package:workout_notes/services/run_voice_coach.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class RunVoiceSettingsScreen extends StatefulWidget {
   const RunVoiceSettingsScreen({super.key});
@@ -77,9 +79,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
       ).showSnackBar(SnackBar(content: Text(loc.runVoiceTestDisabled)));
       return;
     }
-    final coach = RunVoiceCoach();
-    coach.settingsOverride = _settings;
-    final ok = await coach.speakTestAnnouncement();
+    final ok = await RunNativeVoiceService.instance.speakTest(_settings);
     if (!mounted) return;
     if (!ok) {
       ScaffoldMessenger.of(
@@ -165,7 +165,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                             for (var s = 0; s < 60; s += 5)
                               DropdownMenuItem(
                                 value: s,
-                                child: Text(s.toString().padLeft(2, '0')),
+                                child: Text(DurationFormat.twoDigits(s)),
                               ),
                           ],
                           onChanged: (v) {
@@ -205,6 +205,35 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
       await _persist(_settings.copyWith(clearTargetPace: true));
     } else if (action.seconds != null) {
       await _persist(_settings.copyWith(targetPaceSecPerKm: action.seconds));
+    }
+  }
+
+  String _countdownLabel(AppLocalizations loc, int seconds) => seconds <= 0
+      ? loc.runVoiceCountdownOff
+      : loc.runVoiceCountdownSeconds(seconds);
+
+  Future<void> _pickCountdown() async {
+    final loc = AppLocalizations.of(context)!;
+    final choice = await showModalBottomSheet<int>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final seconds in RunVoiceSettings.countdownOptions)
+              ListTile(
+                title: Text(_countdownLabel(loc, seconds)),
+                trailing: seconds == _settings.countdownSeconds
+                    ? const Icon(Icons.check)
+                    : null,
+                onTap: () => Navigator.pop(ctx, seconds),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (choice != null) {
+      await _persist(_settings.copyWith(countdownSeconds: choice));
     }
   }
 
@@ -338,7 +367,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
         return RunFormatters.duration(value);
       }
       return value >= 1000
-          ? '${(value / 1000).toStringAsFixed(1)} km'
+          ? '${RunFormatters.decimal(value / 1000, 1)} km'
           : '$value m';
     }
 
@@ -368,7 +397,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                SettingsSectionHeader(text: loc.runVoiceSectionGeneral),
+                AppSectionHeader(loc.runVoiceSectionGeneral, padding: AppSectionHeader.compactPadding),
                 SettingsCard(
                   children: [
                     SettingsSwitchTile(
@@ -410,7 +439,27 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                     ),
                   ],
                 ),
-                SettingsSectionHeader(text: loc.runVoiceSectionAnnouncements),
+                AppSectionHeader(loc.runVoiceSectionRunning, padding: AppSectionHeader.compactPadding),
+                SettingsCard(
+                  children: [
+                    SettingsSwitchTile(
+                      icon: Icons.pause_circle_outline,
+                      title: loc.runAutoPauseSetting,
+                      subtitle: loc.runAutoPauseSettingSubtitle,
+                      value: s.autoPause,
+                      onChanged: (v) => _persist(s.copyWith(autoPause: v)),
+                    ),
+                    const SettingsCardDivider(),
+                    SettingsLinkTile(
+                      icon: Icons.timer_outlined,
+                      title: loc.runVoiceCountdown,
+                      subtitle:
+                          '${_countdownLabel(loc, s.countdownSeconds)} · ${loc.runVoiceCountdownSubtitle}',
+                      onTap: _pickCountdown,
+                    ),
+                  ],
+                ),
+                AppSectionHeader(loc.runVoiceSectionAnnouncements, padding: AppSectionHeader.compactPadding),
                 SettingsCard(
                   children: [
                     SettingsSwitchTile(
@@ -482,6 +531,23 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                     ),
                     const SettingsCardDivider(),
                     SettingsSwitchTile(
+                      icon: Icons.pause_circle_outline,
+                      title: loc.runVoiceAnnounceAutoPause,
+                      subtitle: loc.runVoiceAnnounceAutoPauseSubtitle,
+                      value: s.announceAutoPause,
+                      onChanged: (v) =>
+                          _persist(s.copyWith(announceAutoPause: v)),
+                    ),
+                    const SettingsCardDivider(),
+                    SettingsSwitchTile(
+                      icon: Icons.flag_circle_outlined,
+                      title: loc.runVoiceAnnounceLaps,
+                      subtitle: loc.runVoiceAnnounceLapsSubtitle,
+                      value: s.announceLaps,
+                      onChanged: (v) => _persist(s.copyWith(announceLaps: v)),
+                    ),
+                    const SettingsCardDivider(),
+                    SettingsSwitchTile(
                       icon: Icons.av_timer,
                       title: loc.runVoiceAnnounceIntervals,
                       subtitle: loc.runVoiceAnnounceIntervalsSubtitle,
@@ -491,7 +557,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                     ),
                   ],
                 ),
-                SettingsSectionHeader(text: loc.runVoiceSectionIntervals),
+                AppSectionHeader(loc.runVoiceSectionIntervals, padding: AppSectionHeader.compactPadding),
                 SettingsCard(
                   children: [
                     SettingsSwitchTile(

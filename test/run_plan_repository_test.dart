@@ -3,9 +3,6 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:workout_notes/database/database_helper.dart';
-import 'package:workout_notes/database/database_periodization_schema.dart';
-import 'package:workout_notes/database/database_run_plan_schema.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
@@ -13,46 +10,21 @@ import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
+import 'support/run_plan_fixtures.dart';
+import 'support/test_db.dart';
 
 void main() {
   late Database database;
   late RunPlanRepository repository;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 45,
-        onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-        onCreate: (db, version) async {
-          await db.execute(
-            'CREATE TABLE routines (id TEXT PRIMARY KEY, name TEXT NOT NULL, notes TEXT, created_at TEXT NOT NULL)',
-          );
-          await db.execute(
-            'CREATE TABLE run_activities (id TEXT PRIMARY KEY, started_at TEXT NOT NULL, ended_at TEXT, '
-            'duration_seconds INTEGER NOT NULL DEFAULT 0, moving_time_seconds INTEGER NOT NULL DEFAULT 0, '
-            'distance_meters REAL NOT NULL DEFAULT 0, avg_pace_sec_per_km REAL, max_pace_sec_per_km REAL, '
-            'calories INTEGER, title TEXT, notes TEXT, status TEXT NOT NULL DEFAULT \'completed\', '
-            'polyline_summary TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, plan_workout_id TEXT)',
-          );
-          await DatabasePeriodizationSchema.create(db);
-          await DatabaseRunPlanSchema.create(db);
-        },
-      ),
-    );
-    DatabaseHelper.overrideDatabase = database;
+    database = await installTestDb();
     repository = RunPlanRepository();
   });
 
-  tearDown(() async {
-    DatabaseHelper.overrideDatabase = null;
-    await database.close();
-  });
+  tearDown(uninstallTestDb);
 
   Future<RunPlan> seedPlan({int weeks = 4}) => repository.createPlan(
     name: '10 km em 12 semanas',
@@ -341,26 +313,6 @@ void main() {
       expect(steps.last.role, RunStepRole.warmup);
     });
 
-    test('replaceSteps swaps the whole block and renumbers', () async {
-      final plan = await seedPlan();
-      final session = await seedIntervalSession(plan.id);
-      await repository.replaceSteps(session.id, [
-        RunWorkoutStep(
-          id: '',
-          runPlanWorkoutId: session.id,
-          orderIndex: 9,
-          role: RunStepRole.steady,
-          metric: RunIntervalMetric.time,
-          value: 1800,
-        ),
-      ]);
-
-      final steps = await repository.getSteps(session.id);
-      expect(steps.length, 1);
-      expect(steps.single.orderIndex, 0);
-      expect(steps.single.value, 1800);
-    });
-
     test('deleting a step leaves the rest intact', () async {
       final plan = await seedPlan();
       final session = await seedIntervalSession(plan.id);
@@ -425,7 +377,7 @@ void main() {
     test('attaching an activity marks the scheduled run completed', () async {
       final plan = await seedPlan();
       final session = await seedIntervalSession(plan.id);
-      final scheduled = await repository.scheduleRun(
+      final scheduled = await scheduleRunFixture(repository, 
         date: DateTime(2026, 1, 6),
         runPlanId: plan.id,
         runPlanWorkoutId: session.id,
@@ -454,7 +406,7 @@ void main() {
       'deleting the activity clears the link but keeps the schedule',
       () async {
         final plan = await seedPlan();
-        final scheduled = await repository.scheduleRun(
+        final scheduled = await scheduleRunFixture(repository, 
           date: DateTime(2026, 1, 6),
           runPlanId: plan.id,
         );
@@ -484,7 +436,7 @@ void main() {
 
     test('a skipped run keeps its status', () async {
       final plan = await seedPlan();
-      final scheduled = await repository.scheduleRun(
+      final scheduled = await scheduleRunFixture(repository, 
         date: DateTime(2026, 1, 6),
         runPlanId: plan.id,
       );
@@ -501,7 +453,7 @@ void main() {
     test('deleting a plan cascades its scheduled runs', () async {
       final plan = await seedPlan();
       final session = await seedIntervalSession(plan.id);
-      await repository.scheduleRun(
+      await scheduleRunFixture(repository, 
         date: DateTime(2026, 1, 6),
         runPlanId: plan.id,
         runPlanWorkoutId: session.id,
@@ -602,6 +554,39 @@ void main() {
       expect(active.isActivated, isTrue);
     });
 
+    test('a race plan is anchored so its last week is race week', () async {
+      final today = DateTime.now();
+      final monday = DateTime(
+        today.year,
+        today.month,
+        today.day,
+      ).subtract(Duration(days: today.weekday - 1));
+      // Race on the Saturday eight weeks from now; the plan is three weeks.
+      final race = monday.add(const Duration(days: 7 * 8 + 5));
+      final plan = await repository.createPlan(
+        name: '5 km',
+        goalKind: RunPlanGoalKind.fiveK,
+        weeks: 3,
+        raceDate: race,
+      );
+      for (var week = 0; week < 3; week++) {
+        await repository.addWorkout(
+          planId: plan.id,
+          weekIndex: week,
+          name: 'Rodagem',
+          kind: RunWorkoutKind.easy,
+          dayOfWeek: 3,
+          targetDistanceMeters: 5000,
+        );
+      }
+      await repository.activatePlan(plan.id);
+      final active = (await repository.getPlan(plan.id))!;
+      expect(active.activatedAt, monday.add(const Duration(days: 7 * 6)));
+      expect(active.activeWeekIndexOn(race), 2);
+      // Not started yet: nothing is due this week.
+      expect(active.activeWeekIndexOn(today), isNull);
+    });
+
     test('activating schedules the remaining weeks only once', () async {
       final plan = await seedPlan(weeks: 3);
       for (var week = 0; week < 3; week++) {
@@ -683,7 +668,7 @@ void main() {
           dayOfWeek: 2,
         );
         // Planned three weeks out: running today is a different session.
-        await repository.scheduleRun(
+        await scheduleRunFixture(repository, 
           date: DateTime.now().add(const Duration(days: 21)),
           runPlanId: plan.id,
           runPlanWorkoutId: session.id,
@@ -920,7 +905,7 @@ void main() {
       expect((await repository.getPlanProgress(plan.id)).completedSessions, 1);
     });
 
-    test('activeWeekIndexOn counts and wraps from the activation week', () {
+    test('activeWeekIndexOn counts from the activation week and ends', () {
       final plan = RunPlan(
         id: 'p',
         name: 'p',
@@ -934,7 +919,9 @@ void main() {
 
       expect(plan.activeWeekIndexOn(DateTime(2026, 8, 5)), 0);
       expect(plan.activeWeekIndexOn(DateTime(2026, 8, 10)), 1);
-      expect(plan.activeWeekIndexOn(DateTime(2026, 8, 31)), 0, reason: 'wraps');
+      // A goal plan is over after its last week; it does not restart.
+      expect(plan.activeWeekIndexOn(DateTime(2026, 8, 31)), isNull);
+      expect(plan.isFinishedOn(DateTime(2026, 8, 31)), isTrue);
       expect(plan.activeWeekIndexOn(DateTime(2026, 7, 27)), isNull);
     });
 
@@ -977,6 +964,147 @@ void main() {
       });
 
       expect(await repository.isLinkedToPeriodization(plan.id), isTrue);
+    });
+  });
+
+  group('ledger and batch reads', () {
+    test('getPlanLedger points at the run and its distance', () async {
+      final plan = await seedPlan(weeks: 1);
+      final done = await repository.addWorkout(
+        planId: plan.id,
+        weekIndex: 0,
+        name: 'Rodagem',
+        dayOfWeek: DateTime.now().weekday,
+        targetDistanceMeters: 6000,
+      );
+      final pending = await repository.addWorkout(
+        planId: plan.id,
+        weekIndex: 0,
+        name: 'Longão',
+        dayOfWeek: DateTime.now().weekday == 7 ? 6 : 7,
+        targetDistanceMeters: 12000,
+      );
+      await repository.activatePlan(plan.id);
+      final now = DateTime.now().toIso8601String();
+      await database.insert('run_activities', {
+        'id': 'ledger-act',
+        'started_at': now,
+        'created_at': now,
+        'updated_at': now,
+        'status': 'completed',
+        'distance_meters': 6120.0,
+        'avg_pace_sec_per_km': 340.0,
+      });
+      await repository.markPlanWorkoutCompleted(
+        planWorkoutId: done.id,
+        date: DateTime.now(),
+        runActivityId: 'ledger-act',
+      );
+
+      final ledger = await repository.getPlanLedger(plan.id);
+      expect(ledger[done.id]!.isCompleted, isTrue);
+      expect(ledger[done.id]!.runActivityId, 'ledger-act');
+      expect(ledger[done.id]!.actualDistanceMeters, 6120.0);
+      expect(ledger[done.id]!.actualPaceSecPerKm, 340.0);
+      expect(ledger[pending.id]!.status, ScheduledRunStatus.planned);
+      expect(ledger[pending.id]!.scheduledRunId, isNotNull);
+    });
+
+    test(
+      'getPlanLedger is empty for a plan that was never scheduled',
+      () async {
+        final plan = await seedPlan(weeks: 1);
+        await repository.addWorkout(planId: plan.id, weekIndex: 0, name: 'A');
+        expect(await repository.getPlanLedger(plan.id), isEmpty);
+      },
+    );
+
+    test('getPlanProgressBatch matches getPlanProgress per plan', () async {
+      final first = await seedPlan(weeks: 1);
+      final second = await seedPlan(weeks: 1);
+      final session = await repository.addWorkout(
+        planId: first.id,
+        weekIndex: 0,
+        name: 'A',
+        dayOfWeek: DateTime.now().weekday,
+      );
+      await repository.addWorkout(
+        planId: first.id,
+        weekIndex: 0,
+        name: 'B',
+        dayOfWeek: DateTime.now().weekday == 7 ? 6 : 7,
+      );
+      await repository.activatePlan(first.id);
+      final now = DateTime.now().toIso8601String();
+      await database.insert('run_activities', {
+        'id': 'batch-act',
+        'started_at': now,
+        'created_at': now,
+        'updated_at': now,
+        'status': 'completed',
+      });
+      await repository.markPlanWorkoutCompleted(
+        planWorkoutId: session.id,
+        date: DateTime.now(),
+        runActivityId: 'batch-act',
+      );
+
+      final batch = await repository.getPlanProgressBatch([
+        first.id,
+        second.id,
+      ]);
+      for (final id in [first.id, second.id]) {
+        final single = await repository.getPlanProgress(id);
+        expect(batch[id]!.totalSessions, single.totalSessions);
+        expect(batch[id]!.completedSessions, single.completedSessions);
+        expect(batch[id]!.plannedSessions, single.plannedSessions);
+        expect(batch[id]!.skippedSessions, single.skippedSessions);
+      }
+      expect(batch[first.id]!.completedSessions, 1);
+      expect(batch[second.id]!.totalSessions, 0);
+      expect(await repository.getPlanProgressBatch(const []), isEmpty);
+    });
+
+    test('getPlanningLinkedIds returns only plans a phase links', () async {
+      final linked = await seedPlan();
+      final free = await seedPlan();
+      final now = DateTime.now().toIso8601String();
+      await database.insert('periodization_plans', {
+        'id': 'per-batch',
+        'name': 'Ciclo',
+        'start_date': '2026-08-01',
+        'end_date': '2026-12-01',
+        'created_at': now,
+        'updated_at': now,
+      });
+      await database.insert('periodization_phases', {
+        'id': 'phase-batch',
+        'plan_id': 'per-batch',
+        'name': 'Base',
+        'color': 0xFF36B7AA,
+        'start_date': '2026-08-01',
+        'end_date': '2026-10-01',
+        'order_index': 0,
+        'created_at': now,
+        'updated_at': now,
+      });
+      await database.insert('phase_targets', {
+        'id': 'target-batch',
+        'phase_id': 'phase-batch',
+        'version': 1,
+        'valid_from': '2026-08-01',
+        'training_json': jsonEncode({
+          'run': {
+            'run_plan_ids': [linked.id],
+          },
+        }),
+        'created_at': now,
+      });
+
+      expect(await repository.getPlanningLinkedIds([linked.id, free.id]), {
+        linked.id,
+      });
+      expect(await repository.getPlanningLinkedIds(const []), isEmpty);
     });
   });
 }

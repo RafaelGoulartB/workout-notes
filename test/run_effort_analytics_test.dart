@@ -62,7 +62,7 @@ void main() {
     final fastStart = start.add(const Duration(seconds: 800));
     final fast = _straightRun(meters: 2000, paceSecPerKm: 280, start: fastStart);
     // Continue latitude from end of slow (~2000m + overshoot).
-    final latOffset =
+    const latOffset =
         2020 / (RunPaceAnalytics.earthRadiusMeters * 3.141592653589793 / 180.0);
     final shiftedFast = [
       for (var i = 0; i < fast.length; i++)

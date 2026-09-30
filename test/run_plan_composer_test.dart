@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:workout_notes/models/run_plan_template.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/services/run_pace_calculator.dart';
@@ -11,7 +12,8 @@ bool _isQuality(RunWorkoutKind kind) =>
     kind == RunWorkoutKind.tempo ||
     kind == RunWorkoutKind.fartlek ||
     kind == RunWorkoutKind.hills ||
-    kind == RunWorkoutKind.progression;
+    kind == RunWorkoutKind.progression ||
+    kind == RunWorkoutKind.test;
 
 void main() {
   RunPlanBuildConfig config({
@@ -307,9 +309,9 @@ void main() {
       );
       final built = RunPlanComposer.compose(
         RunPlanTemplates.fiveK,
-        RunPlanBuildConfig(
+        const RunPlanBuildConfig(
           sessionsPerWeek: 4,
-          availableDays: const [2, 4, 5, 7],
+          availableDays: [2, 4, 5, 7],
           intent: RunPlanIntent.pb,
           calibration: goal,
           paceSource: RunPlanPaceSource.goal,
@@ -333,12 +335,28 @@ void main() {
                 s.kind == RunWorkoutKind.race,
           );
       expect(raceWork, isNotEmpty);
-      final racePace = raceWork.first.targetPaceSecPerKm;
-      expect(racePace, isNotNull);
-      expect(
-        racePace,
-        closeTo(goal.paces.racePaceFor(RunPaceCalculator.fiveKMeters), 2),
+      // 28:00 → 22:00 in ten weeks is not reachable, so race-pace work aims
+      // at the time the plan can actually deliver: faster than today, slower
+      // than the typed goal.
+      final racePace = raceWork.first.targetPaceSecPerKm!;
+      final fitnessRace = fitness.paces.racePaceFor(
+        RunPaceCalculator.fiveKMeters,
       );
+      final goalRace = goal.paces.racePaceFor(RunPaceCalculator.fiveKMeters);
+      expect(racePace, lessThan(fitnessRace - 5));
+      expect(racePace, greaterThan(goalRace + 20));
+      final readiness = RunPlanComposer.assess(
+        RunPlanTemplates.fiveK,
+        const RunPlanBuildConfig(
+          sessionsPerWeek: 4,
+          availableDays: [2, 4, 5, 7],
+          intent: RunPlanIntent.pb,
+          calibration: goal,
+          paceSource: RunPlanPaceSource.goal,
+          fitnessCalibration: fitness,
+        ),
+      );
+      expect(readiness.goalAssessment, RunPlanGoalAssessment.unrealistic);
     });
   });
 }

@@ -4,12 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:workout_notes/models/ai_provider.dart';
 import 'package:workout_notes/models/ai_chat_error_details.dart';
 import 'package:workout_notes/models/ai_chat_message.dart';
 import 'package:workout_notes/models/ai_chat_state.dart';
 import 'package:workout_notes/models/ai_image_attachment.dart';
 import 'package:workout_notes/models/ai_message_role.dart';
+import 'package:workout_notes/models/ai_provider.dart';
 import 'package:workout_notes/models/ai_settings.dart';
 import 'package:workout_notes/models/ai_tool_call.dart';
 import 'package:workout_notes/services/ai_service.dart';
@@ -447,10 +447,10 @@ void main() {
       expect(c.arguments, isEmpty);
     });
     test('round-trips through toJson', () {
-      final c = AiToolCall(
+      const c = AiToolCall(
         id: 'call_3',
         name: 'list_recent_workouts',
-        arguments: const {'limit': 5},
+        arguments: {'limit': 5},
       );
       final back = AiToolCall.fromJson(c.toJson());
       expect(back.id, c.id);

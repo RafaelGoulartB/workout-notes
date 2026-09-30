@@ -3,22 +3,24 @@ import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/duration_format.dart';
+import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
+/// Weekly bed → wake windows, one column per day. Time runs downward (evening
+/// at the top, morning at the bottom) and the dashed lines mark the average
+/// bedtime and wake-up time of the week.
 class SleepScheduleChart extends StatelessWidget {
   final List<SleepEntry> entries;
   final List<DateTime> days;
-  final VoidCallback? onPreviousWeek;
-  final VoidCallback? onNextWeek;
 
   const SleepScheduleChart({
     super.key,
     required this.entries,
     required this.days,
-    required this.onPreviousWeek,
-    required this.onNextWeek,
   });
 
   @override
@@ -26,12 +28,10 @@ class SleepScheduleChart extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
-    final byDate = {
-      for (final entry in entries) _dateString(entry.date): entry,
-    };
+    final byDate = {for (final entry in entries) dateKey(entry.date): entry};
     final windows = <({int index, double start, double end})>[];
     for (var index = 0; index < days.length; index++) {
-      final entry = byDate[_dateString(days[index])];
+      final entry = byDate[dateKey(days[index])];
       if (entry?.bedtimeMinutes == null || entry?.wakeTimeMinutes == null) {
         continue;
       }
@@ -45,8 +45,29 @@ class SleepScheduleChart extends StatelessWidget {
         windows.add((index: index, start: start, end: end));
       }
     }
-    final minY = windows.isEmpty ? 18.0 : _minY(windows);
-    final maxY = windows.isEmpty ? 34.0 : _maxY(windows);
+    if (windows.isEmpty) {
+      return SizedBox(
+        height: 118,
+        width: double.infinity,
+        child: Center(
+          child: Text(
+            loc.sleepScheduleNoTimes,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Hours are negated so that later times sit lower on the chart.
+    final earliest = _earliest(windows);
+    final latest = _latest(windows);
+    final avgStart =
+        windows.map((w) => w.start).reduce((a, b) => a + b) / windows.length;
+    final avgEnd =
+        windows.map((w) => w.end).reduce((a, b) => a + b) / windows.length;
     final windowsByIndex = {for (final window in windows) window.index: window};
     final groups = List.generate(days.length, (index) {
       final window = windowsByIndex[index];
@@ -55,187 +76,158 @@ class SleepScheduleChart extends StatelessWidget {
         x: index,
         barRods: [
           BarChartRodData(
-            fromY: hasWindow ? window.start : minY,
-            toY: hasWindow ? window.end : minY + .01,
-            width: 20,
+            fromY: hasWindow ? -window.end : -earliest,
+            toY: hasWindow ? -window.start : -earliest - .01,
+            width: 18,
             color: hasWindow ? null : Colors.transparent,
             gradient: hasWindow
                 ? LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [colors.primary, colors.tertiary],
+                    colors: [colors.tertiary, colors.primary],
                   )
                 : null,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(7),
             backDrawRodData: BackgroundBarChartRodData(
               show: true,
-              fromY: minY,
-              toY: maxY,
-              color: colors.surfaceContainerHighest,
+              fromY: -latest,
+              toY: -earliest,
+              color: colors.surfaceContainerHighest.withAlpha(140),
             ),
           ),
         ],
       );
     });
 
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.bedtime_rounded, color: colors.primary, size: 21),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        loc.sleepScheduleChart,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          key: const Key('sleep-schedule-chart'),
+          container: true,
+          label: loc.sleepScheduleSemantics(windows.length),
+          child: SizedBox(
+            height: 210,
+            child: BarChart(
+              BarChartData(
+                minY: -latest,
+                maxY: -earliest,
+                alignment: BarChartAlignment.spaceAround,
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  handleBuiltInTouches: true,
+                  // The background rod represents the whole day column. Let it
+                  // receive touches too, so a tap on a day without a recorded
+                  // window still explains that there is no sleep record.
+                  allowTouchBarBackDraw: true,
+                  touchTooltipData: BarTouchTooltipData(
+                    tooltipPadding: const EdgeInsets.all(10),
+                    tooltipMargin: 8,
+                    fitInsideHorizontally: true,
+                    fitInsideVertically: true,
+                    getTooltipColor: (_) => colors.inverseSurface,
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      final index = group.x;
+                      if (index < 0 || index >= days.length) return null;
+                      final entry = byDate[dateKey(days[index])];
+                      return BarTooltipItem(
+                        _tooltipFor(loc, days[index], entry),
+                        TextStyle(
+                          color: colors.onInverseSurface,
+                          fontWeight: FontWeight.w600,
+                          height: 1.35,
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _formatRange(days.first, days.last),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+                        textAlign: TextAlign.left,
+                      );
+                    },
                   ),
                 ),
-                IconButton(
-                  key: const Key('sleep-previous-week'),
-                  tooltip: loc.sleepPreviousWeek,
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onPreviousWeek,
-                  icon: const Icon(Icons.chevron_left_rounded),
+                barGroups: groups,
+                extraLinesData: ExtraLinesData(
+                  horizontalLines: [
+                    _averageLine(-avgStart, colors.tertiary),
+                    _averageLine(-avgEnd, colors.primary),
+                  ],
                 ),
-                IconButton(
-                  key: const Key('sleep-next-week'),
-                  tooltip: loc.sleepNextWeek,
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onNextWeek,
-                  icon: const Icon(Icons.chevron_right_rounded),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: 2,
+                  getDrawingHorizontalLine: (_) => FlLine(
+                    color: colors.outlineVariant.withAlpha(70),
+                    strokeWidth: 1,
+                  ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (windows.isEmpty)
-              _EmptyChart(message: loc.sleepScheduleNoTimes)
-            else
-              Semantics(
-                key: const Key('sleep-schedule-chart'),
-                container: true,
-                label: loc.sleepScheduleSemantics(windows.length),
-                child: SizedBox(
-                  height: 220,
-                  child: BarChart(
-                    BarChartData(
-                      minY: minY,
-                      maxY: maxY,
-                      alignment: BarChartAlignment.spaceAround,
-                      barTouchData: BarTouchData(
-                        enabled: true,
-                        handleBuiltInTouches: true,
-                        // The background rod represents the whole day column.
-                        // Let it receive touches too, so a tap on a day without
-                        // a recorded window still explains that there is no
-                        // sleep record instead of doing nothing.
-                        allowTouchBarBackDraw: true,
-                        touchTooltipData: BarTouchTooltipData(
-                          tooltipPadding: const EdgeInsets.all(10),
-                          tooltipMargin: 8,
-                          fitInsideHorizontally: true,
-                          fitInsideVertically: true,
-                          getTooltipColor: (_) => colors.inverseSurface,
-                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                            final index = group.x;
-                            if (index < 0 || index >= days.length) return null;
-                            final entry = byDate[_dateString(days[index])];
-                            return BarTooltipItem(
-                              _tooltipFor(loc, days[index], entry),
-                              TextStyle(
-                                color: colors.onInverseSurface,
-                                fontWeight: FontWeight.w600,
-                                height: 1.35,
-                              ),
-                              textAlign: TextAlign.left,
-                            );
-                          },
-                        ),
-                      ),
-                      barGroups: groups,
-                      gridData: FlGridData(
-                        show: true,
-                        drawVerticalLine: false,
-                        horizontalInterval: 2,
-                        getDrawingHorizontalLine: (_) => FlLine(
-                          color: colors.outlineVariant.withAlpha(120),
-                          strokeWidth: 1,
-                          dashArray: [4, 5],
-                        ),
-                      ),
-                      borderData: FlBorderData(show: false),
-                      titlesData: FlTitlesData(
-                        topTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        rightTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        leftTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 39,
-                            interval: 2,
-                            getTitlesWidget: (value, meta) => Text(
-                              _formatHour(value),
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: colors.onSurfaceVariant,
-                              ),
-                            ),
+                borderData: FlBorderData(show: false),
+                titlesData: FlTitlesData(
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 38,
+                      interval: 2,
+                      getTitlesWidget: (value, meta) {
+                        if (value == meta.min || value == meta.max) {
+                          return const SizedBox.shrink();
+                        }
+                        return Text(
+                          _formatHour(-value),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                            fontFeatures: AppUi.tabular,
                           ),
-                        ),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 28,
-                            getTitlesWidget: (value, meta) {
-                              final index = value.toInt();
-                              if (index < 0 || index >= days.length) {
-                                return const SizedBox();
-                              }
-                              return SideTitleWidget(
-                                meta: meta,
-                                child: Text(
-                                  DateFormat(
-                                    'E',
-                                    Intl.defaultLocale,
-                                  ).format(days[index]).substring(0, 1),
-                                  style: theme.textTheme.labelMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
+                        );
+                      },
+                    ),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 34,
+                      getTitlesWidget: (value, meta) =>
+                          SleepDayLabel(meta: meta, days: days, value: value),
                     ),
                   ),
                 ),
               ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 16,
+          runSpacing: 6,
+          alignment: WrapAlignment.center,
+          children: [
+            AppLegendItem(
+              color: colors.tertiary,
+              dashed: true,
+              label: loc.sleepAverageBedtime(
+                SleepUi.clock((avgStart * 60).round()),
+              ),
+            ),
+            AppLegendItem(
+              color: colors.primary,
+              dashed: true,
+              label: loc.sleepAverageWake(SleepUi.clock((avgEnd * 60).round())),
+            ),
           ],
         ),
-      ),
+      ],
     );
   }
+
+  static HorizontalLine _averageLine(double y, Color color) => HorizontalLine(
+    y: y,
+    color: color.withAlpha(170),
+    strokeWidth: 1.5,
+    dashArray: [5, 4],
+  );
 
   static String _tooltipFor(
     AppLocalizations loc,
@@ -247,78 +239,91 @@ class SleepScheduleChart extends StatelessWidget {
       lines.add(loc.sleepNoRecordForDay);
       return lines.join('\n');
     }
-    lines.add('${loc.sleepBedtime}: ${_formatTime(entry.bedtimeMinutes)}');
-    lines.add('${loc.sleepWakeTime}: ${_formatTime(entry.wakeTimeMinutes)}');
+    lines.add('${loc.sleepBedtime}: ${SleepUi.clock(entry.bedtimeMinutes)}');
+    lines.add('${loc.sleepWakeTime}: ${SleepUi.clock(entry.wakeTimeMinutes)}');
     lines.add(
-      '${loc.sleepChartRecorded}: ${_formatMinutes(entry.sleepMinutes, loc)}',
+      '${loc.sleepChartRecorded}: ${SleepUi.duration(loc, entry.sleepMinutes)}',
     );
     final actual = entry.actualSleepMinutes ?? entry.estimatedSleepMinutes;
     if (actual != null) {
       lines.add(
-        '${loc.sleepChartActualOrEstimated}: ${_formatMinutes(actual, loc)}',
+        '${loc.sleepChartActualOrEstimated}: ${SleepUi.duration(loc, actual)}',
       );
     }
     return lines.join('\n');
   }
 
-  static double _minY(List<({int index, double start, double end})> windows) {
+  static double _earliest(
+    List<({int index, double start, double end})> windows,
+  ) {
     final minimum = windows.map((window) => window.start).reduce(math.min);
-    return math.max(12, (minimum / 2).floorToDouble() * 2 - 2);
+    return math.max(12, (minimum / 2).floorToDouble() * 2 - 1);
   }
 
-  static double _maxY(List<({int index, double start, double end})> windows) {
+  static double _latest(List<({int index, double start, double end})> windows) {
     final maximum = windows.map((window) => window.end).reduce(math.max);
-    return math.min(40, (maximum / 2).ceilToDouble() * 2 + 2);
-  }
-
-  static String _formatRange(DateTime start, DateTime end) {
-    final startText = DateFormat.MMMd(Intl.defaultLocale).format(start);
-    final endText = DateFormat.yMMMd(Intl.defaultLocale).format(end);
-    return '$startText - $endText';
+    return math.min(40, (maximum / 2).ceilToDouble() * 2 + 1);
   }
 
   static String _formatHour(double value) {
     final minutes = (value * 60).round() % 1440;
     final hour = minutes ~/ 60;
     final minute = minutes % 60;
-    if (minute == 0) return '${hour.toString().padLeft(2, '0')}h';
-    return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+    if (minute == 0) return '${DurationFormat.twoDigits(hour)}h';
+    return DurationFormat.hhmm(minutes);
   }
-
-  static String _formatTime(int? minutes) {
-    if (minutes == null) return '--';
-    return '${(minutes ~/ 60).toString().padLeft(2, '0')}:${(minutes % 60).toString().padLeft(2, '0')}';
-  }
-
-  static String _formatMinutes(int minutes, AppLocalizations loc) {
-    return loc.sleepDurationValue(minutes ~/ 60, minutes % 60);
-  }
-
-  static String _dateString(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
 }
 
-class _EmptyChart extends StatelessWidget {
-  final String message;
+/// Two-line x-axis label for the weekly sleep charts: weekday initial over
+/// the day of the month; today is highlighted.
+class SleepDayLabel extends StatelessWidget {
+  final TitleMeta meta;
+  final List<DateTime> days;
+  final double value;
 
-  const _EmptyChart({required this.message});
+  const SleepDayLabel({
+    super.key,
+    required this.meta,
+    required this.days,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 118,
-      width: double.infinity,
-      child: Center(
-        child: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+    final index = value.toInt();
+    if (index < 0 || index >= days.length || value != index) {
+      return const SizedBox.shrink();
+    }
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final day = days[index];
+    final now = DateTime.now();
+    final isToday =
+        day.year == now.year && day.month == now.month && day.day == now.day;
+    final weekday = DateFormat('E', Intl.defaultLocale).format(day);
+    return SideTitleWidget(
+      meta: meta,
+      space: 6,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            weekday.substring(0, 1).toUpperCase(),
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              height: 1.1,
+              color: isToday ? colors.primary : null,
+            ),
           ),
-        ),
+          Text(
+            '${day.day}',
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontSize: 10,
+              height: 1.1,
+              color: isToday ? colors.primary : colors.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }

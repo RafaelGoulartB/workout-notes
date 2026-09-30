@@ -1,3 +1,5 @@
+import 'package:workout_notes/utils/date_utils.dart';
+
 class PeriodizationPhase {
   final String id;
   final String planId;
@@ -29,7 +31,7 @@ class PeriodizationPhase {
   int get totalWeeks => (totalDays / 7).ceil();
 
   bool contains(DateTime date) {
-    final day = DateTime(date.year, date.month, date.day);
+    final day = dayOf(date);
     return !day.isBefore(startDate) && !day.isAfter(endDate);
   }
 
@@ -50,8 +52,8 @@ class PeriodizationPhase {
     'name': name,
     'template_key': templateKey,
     'color': color,
-    'start_date': _date(startDate),
-    'end_date': _date(endDate),
+    'start_date': dateKey(startDate),
+    'end_date': dateKey(endDate),
     'intent': intent,
     'order_index': orderIndex,
     'created_at': createdAt.toIso8601String(),
@@ -73,9 +75,4 @@ class PeriodizationPhase {
         updatedAt: DateTime.parse(map['updated_at'] as String),
       );
 
-  static String _date(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
 }

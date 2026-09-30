@@ -1,5 +1,5 @@
 import 'package:sqflite/sqflite.dart';
-import '../database/database_helper.dart';
+import 'package:workout_notes/database/database_helper.dart';
 
 /// Base class for all domain repositories.
 /// Provides access to the database connection from [DatabaseHelper].

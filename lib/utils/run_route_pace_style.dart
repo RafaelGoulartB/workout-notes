@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/models/run_track_point.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
 
 /// Converts GPS pace into a route color relative to the activity's average.
@@ -55,7 +56,10 @@ class RunRoutePaceStyle {
           1000;
       double? pace;
       if (distance >= _minimumWindowMeters && elapsedSeconds > 0) {
-        final candidate = elapsedSeconds / (distance / 1000);
+        final candidate = RunFormatters.paceSecondsPerKm(
+          distance,
+          elapsedSeconds,
+        );
         if (candidate.isFinite &&
             candidate >= RunPaceAnalytics.minPaceSecPerKm) {
           pace = candidate;
@@ -111,24 +115,115 @@ class RunRoutePaceStyle {
   static Color colorForPace({
     required double? paceSecPerKm,
     required double? averagePaceSecPerKm,
+  }) => colorForFraction(
+    fasterFraction(
+      paceSecPerKm: paceSecPerKm,
+      averagePaceSecPerKm: averagePaceSecPerKm,
+    ),
+  );
+
+  /// How much faster than average a pace is, eased into 0 (average or
+  /// slower) .. 1 (20% faster or more).
+  static double fasterFraction({
+    required double? paceSecPerKm,
+    required double? averagePaceSecPerKm,
   }) {
     if (paceSecPerKm == null ||
         averagePaceSecPerKm == null ||
         paceSecPerKm <= 0 ||
         averagePaceSecPerKm <= 0) {
-      return averageColor;
+      return 0;
     }
-
     final fasterDifference =
         ((averagePaceSecPerKm - paceSecPerKm) / averagePaceSecPerKm).clamp(
           0.0,
           _fullColorDifference,
         );
     final normalized = fasterDifference / _fullColorDifference;
-    final eased = normalized * normalized * (3 - 2 * normalized);
+    return normalized * normalized * (3 - 2 * normalized);
+  }
+
+  /// Colour for an eased fraction from [fasterFraction].
+  static Color colorForFraction(double eased) {
+    if (eased <= 0) return averageColor;
     if (eased <= 0.5) {
       return Color.lerp(averageColor, transitionColor, eased * 2)!;
     }
     return Color.lerp(transitionColor, fastColor, (eased - 0.5) * 2)!;
   }
+
+  /// Legend stops from "average or slower" to "fastest".
+  static const List<Color> legendColors = [
+    averageColor,
+    transitionColor,
+    fastColor,
+  ];
+
+  /// Pace at which the route reaches [fastColor] for a run averaging
+  /// [averagePaceSecPerKm].
+  static double fastestLegendPace(double averagePaceSecPerKm) =>
+      averagePaceSecPerKm * (1 - _fullColorDifference);
+
+  /// Groups consecutive segments of the same colour into one polyline, so a
+  /// long run is drawn with dozens of polylines instead of thousands.
+  /// Segment `i` joins point `i` to point `i + 1`; a run covers segments
+  /// `startSegment..endSegment` (inclusive), i.e. points
+  /// `startSegment..endSegment + 1`.
+  static List<RunRouteColorRun> colorRuns(
+    List<double?> segmentPaces, {
+    required double? averagePaceSecPerKm,
+    int buckets = 24,
+  }) {
+    final runs = <RunRouteColorRun>[];
+    int? currentBucket;
+    var start = 0;
+    for (var i = 0; i < segmentPaces.length; i++) {
+      final fraction = fasterFraction(
+        paceSecPerKm: segmentPaces[i],
+        averagePaceSecPerKm: averagePaceSecPerKm,
+      );
+      final bucket = (fraction * buckets).round();
+      if (currentBucket == null) {
+        currentBucket = bucket;
+        start = i;
+      } else if (bucket != currentBucket) {
+        runs.add(
+          RunRouteColorRun(
+            startSegment: start,
+            endSegment: i - 1,
+            color: colorForFraction(currentBucket / buckets),
+          ),
+        );
+        currentBucket = bucket;
+        start = i;
+      }
+    }
+    if (currentBucket != null) {
+      runs.add(
+        RunRouteColorRun(
+          startSegment: start,
+          endSegment: segmentPaces.length - 1,
+          color: colorForFraction(currentBucket / buckets),
+        ),
+      );
+    }
+    return runs;
+  }
+}
+
+/// A stretch of the route drawn in one colour.
+class RunRouteColorRun {
+  final int startSegment;
+  final int endSegment;
+  final Color color;
+
+  const RunRouteColorRun({
+    required this.startSegment,
+    required this.endSegment,
+    required this.color,
+  });
+
+  /// Point indexes (inclusive) the polyline of this run passes through.
+  int get firstPoint => startSegment;
+  int get lastPoint => endSegment + 1;
 }

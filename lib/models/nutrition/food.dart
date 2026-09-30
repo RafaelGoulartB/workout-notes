@@ -1,4 +1,3 @@
-import 'dart:convert';
 
 /// Source of a food record.
 ///
@@ -167,12 +166,6 @@ class Food {
     }
     return buf.toString();
   }
-
-  /// JSON encoding helper used to embed a [Food] inside a snapshot.
-  String encodeJson() => jsonEncode(toMap());
-
-  static Food decodeJson(String source) =>
-      Food.fromMap(jsonDecode(source) as Map<String, dynamic>);
 
   @override
   bool operator ==(Object other) =>

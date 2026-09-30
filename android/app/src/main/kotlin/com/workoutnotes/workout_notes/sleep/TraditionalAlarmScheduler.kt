@@ -5,8 +5,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import java.util.Calendar
+import com.workoutnotes.workout_notes.common.PendingIntentFlags
 
 /** Durable, multi-alarm companion to the single sleep-monitor scheduler. */
 object TraditionalAlarmScheduler {
@@ -186,7 +186,7 @@ object TraditionalAlarmScheduler {
     }
 
     private fun setSystemAlarm(context: Context, snapshot: Snapshot) {
-        val showIntent = PendingIntent.getActivity(context, requestCode(snapshot.id), Intent(context, com.workoutnotes.workout_notes.MainActivity::class.java), PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag())
+        val showIntent = PendingIntent.getActivity(context, requestCode(snapshot.id), Intent(context, com.workoutnotes.workout_notes.MainActivity::class.java), PendingIntentFlags.UPDATE_IMMUTABLE)
         context.getSystemService(AlarmManager::class.java).setAlarmClock(AlarmManager.AlarmClockInfo(snapshot.alarmAtMillis, showIntent), fireIntent(context, snapshot))
     }
 
@@ -194,7 +194,7 @@ object TraditionalAlarmScheduler {
         context, requestCode(snapshot.id), Intent(context, TraditionalAlarmReceiver::class.java).apply {
             action = ACTION_FIRE; data = Uri.parse("traditional-alarm://${snapshot.id}")
             putExtra(EXTRA_ID, snapshot.id); putExtra(EXTRA_ALARM_AT, snapshot.alarmAtMillis)
-        }, PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag(),
+        }, PendingIntentFlags.UPDATE_IMMUTABLE,
     )
 
     private fun nextOccurrence(snapshot: Snapshot, now: Long): Long {
@@ -212,7 +212,6 @@ object TraditionalAlarmScheduler {
     private fun ids(context: Context): Set<String> = index(context).getStringSet(KEY_IDS, mutableSetOf()) ?: emptySet()
     private fun index(context: Context) = storage(context).getSharedPreferences(INDEX_PREFS, Context.MODE_PRIVATE)
     private fun preferences(context: Context, id: String) = storage(context).getSharedPreferences("traditional_alarm_$id", Context.MODE_PRIVATE)
-    private fun storage(context: Context): Context = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) context.createDeviceProtectedStorageContext() else context
+    private fun storage(context: Context): Context = context.createDeviceProtectedStorageContext()
     private fun requestCode(id: String) = 20_000 + (id.hashCode() and 0x3fffffff)
-    private fun immutableFlag() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
 }

@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/main.dart';
 import 'package:workout_notes/models/ai_settings.dart';
-import 'package:workout_notes/screens/workout/ai_settings_screen.dart';
+import 'package:workout_notes/screens/settings/ai_settings_screen.dart';
 import 'package:workout_notes/state/ai_settings_notifier.dart';
 
 void main() {

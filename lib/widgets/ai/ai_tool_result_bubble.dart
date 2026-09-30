@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
-import '../../l10n/app_localizations.dart';
-import '../../models/ai_chat_message.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/ai_chat_message.dart';
 
 class AiToolResultBubble extends StatefulWidget {
   final AiChatMessage message;

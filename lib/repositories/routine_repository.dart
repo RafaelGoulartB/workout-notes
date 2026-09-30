@@ -1,8 +1,8 @@
-import 'dart:convert';
-
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
-import 'base_repository.dart';
+import 'package:workout_notes/repositories/base_repository.dart';
+import 'package:workout_notes/repositories/phase_target_training.dart';
+import 'package:workout_notes/utils/strength_routine_summary.dart';
 
 double _normalizeRoutineDecimal(double value, int decimals) =>
     double.tryParse(value.toStringAsFixed(decimals)) ?? 0;
@@ -45,6 +45,132 @@ class RoutineRepository extends BaseRepository {
     return result;
   }
 
+  /// Every routine (or just [routineId]) with days, exercise counts, weekly
+  /// sets per muscle, estimated durations and last-trained dates, loaded with
+  /// four queries in total regardless of how many routines exist.
+  Future<List<RoutineSummary>> getRoutineSummaries({String? routineId}) async {
+    final db = await this.db;
+    final routineWhere = routineId == null ? '' : ' WHERE id = ?';
+    final routineArgs = routineId == null ? const [] : [routineId];
+    final routines = await db.rawQuery(
+      'SELECT * FROM routines$routineWhere ORDER BY created_at DESC',
+      routineArgs,
+    );
+    if (routines.isEmpty) return const [];
+
+    final dayWhere = routineId == null ? '' : ' WHERE routine_id = ?';
+    final days = await db.rawQuery(
+      'SELECT * FROM routine_days$dayWhere ORDER BY routine_id, order_index',
+      routineArgs,
+    );
+    final setRows = await db.rawQuery('''
+      SELECT rd.routine_id AS routine_id, rd.id AS day_id,
+        re.id AS routine_exercise_id, re.rest_time_seconds AS rest_time_seconds,
+        e.category_id AS category_id, ec.name AS category_name,
+        ec.color AS category_color, ec.energy_system AS category_energy,
+        e.type AS exercise_type,
+        ps.id AS set_id, ps.weight AS weight, ps.reps AS reps,
+        ps.time_seconds AS time_seconds, ps.is_warmup AS is_warmup
+      FROM routine_days rd
+      JOIN routine_exercises re ON re.routine_day_id = rd.id
+      JOIN exercises e ON e.id = re.exercise_id
+      LEFT JOIN exercise_categories ec ON ec.id = e.category_id
+      LEFT JOIN predefined_sets ps ON ps.routine_exercise_id = re.id
+      ${routineId == null ? '' : 'WHERE rd.routine_id = ?'}
+      ORDER BY rd.routine_id, rd.order_index, re.order_index, ps.order_index
+      ''', routineArgs);
+
+    // Older workouts may only carry the (inferred) routine day, so resolve
+    // the routine through routine_days when routine_id is missing.
+    const routineExpr = 'COALESCE(w.routine_id, rd.routine_id)';
+    final lastRows = await db.rawQuery('''
+      SELECT $routineExpr AS routine_id,
+        w.routine_day_id AS routine_day_id,
+        MAX(w.date) AS last_date
+      FROM workouts w
+      LEFT JOIN routine_days rd ON rd.id = w.routine_day_id
+      WHERE w.end_time IS NOT NULL AND $routineExpr IS NOT NULL
+        ${routineId == null ? '' : 'AND $routineExpr = ?'}
+      GROUP BY 1, 2
+      ''', routineArgs);
+
+    return StrengthRoutineSummaryBuilder.build(
+      routines: routines,
+      days: days,
+      setRows: setRows,
+      lastTrainedRows: lastRows,
+    );
+  }
+
+  Future<RoutineSummary?> getRoutineSummary(String id) async {
+    final all = await getRoutineSummaries(routineId: id);
+    return all.isEmpty ? null : all.first;
+  }
+
+  /// Copies a routine with its days, exercises and preset sets. Returns the
+  /// new routine id, or null when [id] does not exist.
+  Future<String?> duplicateRoutine(String id, String newName) async {
+    final db = await this.db;
+    const uuid = Uuid();
+    return db.transaction((txn) async {
+      final source = await txn.query(
+        'routines',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      if (source.isEmpty) return null;
+      final newId = uuid.v4();
+      await txn.insert('routines', {
+        'id': newId,
+        'name': newName,
+        'notes': source.first['notes'],
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      final days = await txn.query(
+        'routine_days',
+        where: 'routine_id = ?',
+        whereArgs: [id],
+        orderBy: 'order_index ASC',
+      );
+      for (final day in days) {
+        final newDayId = uuid.v4();
+        await txn.insert('routine_days', {
+          ...day,
+          'id': newDayId,
+          'routine_id': newId,
+        });
+        final exercises = await txn.query(
+          'routine_exercises',
+          where: 'routine_day_id = ?',
+          whereArgs: [day['id']],
+          orderBy: 'order_index ASC',
+        );
+        for (final exercise in exercises) {
+          final newExerciseId = uuid.v4();
+          await txn.insert('routine_exercises', {
+            ...exercise,
+            'id': newExerciseId,
+            'routine_day_id': newDayId,
+          });
+          final sets = await txn.query(
+            'predefined_sets',
+            where: 'routine_exercise_id = ?',
+            whereArgs: [exercise['id']],
+            orderBy: 'order_index ASC',
+          );
+          for (final set in sets) {
+            await txn.insert('predefined_sets', {
+              ...set,
+              'id': uuid.v4(),
+              'routine_exercise_id': newExerciseId,
+            });
+          }
+        }
+      }
+      return newId;
+    });
+  }
+
   Future<Map<String, dynamic>?> getRoutine(String id) async {
     final db = await this.db;
     final result = await db.query('routines', where: 'id = ?', whereArgs: [id]);
@@ -66,23 +192,7 @@ class RoutineRepository extends BaseRepository {
     await db.transaction((txn) async {
       // Weekly targets store the routine id in JSON, so clear references
       // before the routine's FK-backed rows are cascaded.
-      final targets = await txn.query(
-        'phase_targets',
-        columns: ['id', 'training_json'],
-      );
-      for (final target in targets) {
-        final raw = target['training_json'] as String?;
-        if (raw == null) continue;
-        final training = Map<String, dynamic>.from(jsonDecode(raw) as Map);
-        if (training['routine_id'] != id) continue;
-        training.remove('routine_id');
-        await txn.update(
-          'phase_targets',
-          {'training_json': jsonEncode(training)},
-          where: 'id = ?',
-          whereArgs: [target['id']],
-        );
-      }
+      await PhaseTargetTraining.removeRoutine(txn, id);
       await txn.delete('routines', where: 'id = ?', whereArgs: [id]);
     });
   }
@@ -148,7 +258,8 @@ class RoutineRepository extends BaseRepository {
     return db.rawQuery(
       '''
       SELECT re.*, e.name as exercise_name, e.locale_key as exercise_locale_key, e.category_id,
-      ec.name as category_name, ec.color as category_color, e.type as exercise_type,
+      ec.name as category_name, ec.color as category_color,
+      ec.energy_system as category_energy, e.type as exercise_type,
       e.weight_increment
       FROM routine_exercises re
       JOIN exercises e ON re.exercise_id = e.id
@@ -222,6 +333,28 @@ class RoutineRepository extends BaseRepository {
       where: 'id = ?',
       whereArgs: [routineExerciseId],
     );
+  }
+
+  /// Preset sets of every exercise of a day in one query, keyed by routine
+  /// exercise id (replaces one `getPredefinedSets` call per exercise).
+  Future<Map<String, List<Map<String, dynamic>>>> getPredefinedSetsForDay(
+    String routineDayId,
+  ) async {
+    final db = await this.db;
+    final rows = await db.rawQuery(
+      '''
+      SELECT ps.* FROM predefined_sets ps
+      JOIN routine_exercises re ON re.id = ps.routine_exercise_id
+      WHERE re.routine_day_id = ?
+      ORDER BY ps.routine_exercise_id, ps.order_index ASC
+      ''',
+      [routineDayId],
+    );
+    final result = <String, List<Map<String, dynamic>>>{};
+    for (final row in rows) {
+      (result[row['routine_exercise_id'] as String] ??= []).add(row);
+    }
+    return result;
   }
 
   Future<List<Map<String, dynamic>>> getPredefinedSets(

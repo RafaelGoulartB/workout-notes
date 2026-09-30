@@ -3,26 +3,25 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
-
-import '../database/database_helper.dart';
-import '../models/ai_chat_message.dart';
-import '../models/ai_chat_error_details.dart';
-import '../models/ai_image_attachment.dart';
-import '../models/ai_chat_state.dart';
-import '../models/ai_chat_thread.dart';
-import '../models/ai_message_role.dart';
-import '../models/ai_provider.dart';
-import '../models/ai_routine_proposal.dart';
-import '../models/ai_tool_call.dart';
-import '../models/nutrition/ai_manual_food_proposal.dart';
-import '../services/ai_context_service.dart';
-import '../services/ai_image_attachment_store.dart';
-import '../services/ai_routine_mutation_service.dart';
-import '../services/ai_service.dart';
-import '../services/ai_tool_registry.dart';
-import '../utils/token_estimator.dart';
-import '../utils/text_sanitizer.dart';
-import 'ai_settings_notifier.dart';
+import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/models/ai_chat_error_details.dart';
+import 'package:workout_notes/models/ai_chat_message.dart';
+import 'package:workout_notes/models/ai_chat_state.dart';
+import 'package:workout_notes/models/ai_chat_thread.dart';
+import 'package:workout_notes/models/ai_image_attachment.dart';
+import 'package:workout_notes/models/ai_message_role.dart';
+import 'package:workout_notes/models/ai_provider.dart';
+import 'package:workout_notes/models/ai_routine_proposal.dart';
+import 'package:workout_notes/models/ai_tool_call.dart';
+import 'package:workout_notes/models/nutrition/ai_manual_food_proposal.dart';
+import 'package:workout_notes/services/ai_context_service.dart';
+import 'package:workout_notes/services/ai_image_attachment_store.dart';
+import 'package:workout_notes/services/ai_routine_mutation_service.dart';
+import 'package:workout_notes/services/ai_service.dart';
+import 'package:workout_notes/services/ai_tool_registry.dart';
+import 'package:workout_notes/state/ai_settings_notifier.dart';
+import 'package:workout_notes/utils/text_sanitizer.dart';
+import 'package:workout_notes/utils/token_estimator.dart';
 
 part 'ai_chat_persistence.dart';
 part 'ai_chat_threads.dart';
@@ -109,15 +108,19 @@ class AiChatService extends ChangeNotifier {
   AiChatService._();
 
   final DatabaseHelper _db = DatabaseHelper.instance;
-  AiService _service = AiService();
+  AiService _service = AiService.shared;
   AiToolRegistry _tools = AiToolRegistry();
   AiContextService _context = AiContextService();
   AiRoutineMutationService _routineMutations = AiRoutineMutationService();
-  AiImageAttachmentStore _imageStore = AiImageAttachmentStore();
+  AiImageAttachmentStore _imageStore = const AiImageAttachmentStore();
   AiSettingsNotifier? _settings;
   bool _isReady = false;
   Future<void>? _readyFuture;
-  final Map<String, String> _persistedMessageSignatures = {};
+
+  /// Last persisted instance and row signature per message id. Messages are
+  /// immutable, so an identical instance is known-clean without re-encoding.
+  final Map<String, ({AiChatMessage message, String signature})>
+  _persistedMessages = {};
   _AiTurnDiagnostics? _activeTurnDiagnostics;
   String? _activeReasoningEffort;
 
@@ -197,7 +200,9 @@ class AiChatService extends ChangeNotifier {
         }
       }
       await _imageStore.deleteOrphans(retained);
-    } catch (_) {}
+    } catch (_) {
+      // Orphan image cleanup is best-effort; retried on the next run.
+    }
   }
 
   // ===========================================================================
@@ -275,7 +280,7 @@ class AiChatService extends ChangeNotifier {
       attachments: attachments,
       createdAt: now,
     );
-    var messages = [..._state.messages, userMsg];
+    final messages = [..._state.messages, userMsg];
 
     _state = _state.copyWith(activeThreadId: threadId);
 
@@ -513,10 +518,11 @@ class AiChatService extends ChangeNotifier {
       names: const {'propose_manual_food_creation'},
       includeRoutineProposal: false,
     );
+    final fullSchemaChars = _tools.chatToolsSchemaCharacters();
     final historyBudget = _historyBudgetFor(
       systemPrompt: systemPrompt,
       contextJson: contextJson,
-      toolsSchema: fullSchema,
+      toolsSchemaChars: fullSchemaChars,
     );
     final threadSummary = manualFoodTextTurn
         ? null
@@ -543,11 +549,14 @@ class AiChatService extends ChangeNotifier {
       final wire = manualFoodRound
           ? _buildManualFoodProposalWire(current)
           : _buildWireMessages(current, options);
+      // The request is encoded once per round; every estimate and the
+      // diagnostics reuse this length (the schema length is cached).
+      final wireChars = jsonEncode(wire).length;
       // Tools stay available while the request fits the turn budget. Beyond
       // that (or past the round cap) the model must answer with what it has.
       final inputExceeded =
           (lastPromptTokens ?? 0) > kMaxTurnInputTokens ||
-          _estimateWireTokens(wire, fullSchema) > kMaxTurnInputTokens;
+          _estimateWireTokens(wireChars, fullSchemaChars) > kMaxTurnInputTokens;
       final allowTools = round < kMaxToolRounds && !inputExceeded;
       final toolsSchema = !allowTools
           ? null
@@ -576,7 +585,7 @@ class AiChatService extends ChangeNotifier {
             : 'followup_provider_request',
         round: round + 1,
         schemaToolCount: toolsSchema?.length ?? 0,
-        requestCharacters: jsonEncode(wire).length,
+        requestCharacters: wireChars,
         tools: toolsSchema == null
             ? const []
             : (toolsSchema
@@ -603,8 +612,12 @@ class AiChatService extends ChangeNotifier {
               hasImages: imageDataUrls.isNotEmpty,
             );
       _calibrateTokenScale(
-        wire: wire,
-        toolsSchema: toolsSchema,
+        wireChars: wireChars,
+        toolsSchemaChars: toolsSchema == null
+            ? 0
+            : identical(toolsSchema, fullSchema)
+            ? fullSchemaChars
+            : jsonEncode(toolsSchema).length,
         promptTokens: completion.promptTokens,
       );
       lastPromptTokens = completion.promptTokens;
@@ -801,8 +814,10 @@ class AiChatService extends ChangeNotifier {
     if (threadId == null) return null;
     Map<String, dynamic>? existing;
     try {
-      existing = await _db.getAiChatThreadSummary(threadId);
-    } catch (_) {}
+      existing = await _db.aiChatRepo.getAiChatThreadSummary(threadId);
+    } catch (_) {
+      // Without a stored summary the thread is summarized from scratch.
+    }
     final existingSummary = existing?['summary'] as String?;
     final existingThrough = existing?['through_message_id'] as String?;
 
@@ -848,7 +863,7 @@ class AiChatService extends ChangeNotifier {
       if (text == null || text.isEmpty) return existingSummary;
       final summary = TextSanitizer.sanitize(text).trim();
       if (summary.isEmpty) return existingSummary;
-      await _db.upsertAiChatThreadSummary(
+      await _db.aiChatRepo.upsertAiChatThreadSummary(
         threadId: threadId,
         summary: summary,
         throughMessageId: dropped.last.id,
@@ -878,6 +893,9 @@ class AiChatService extends ChangeNotifier {
     }
     return buffer.toString();
   }
+
+  @visibleForTesting
+  Future<void> persistCurrentThreadForTest() => _persistCurrentThread();
 
   @visibleForTesting
   String transcriptForSummaryForTest(List<AiChatMessage> messages) =>
@@ -1015,7 +1033,9 @@ class AiChatService extends ChangeNotifier {
       final decoded = jsonDecode(cleaned);
       if (decoded is Map<String, dynamic>) return decoded;
       if (decoded is Map) return decoded.cast<String, dynamic>();
-    } catch (_) {}
+    } catch (_) {
+      // Falls through to the invalid-draft error below.
+    }
     throw const AiServiceException(
       'The provider returned an invalid manual-food draft.',
       code: 'invalid_response',

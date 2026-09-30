@@ -2,18 +2,26 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Pace-over-distance area chart (faster pace at the top).
+///
+/// The Y axis ignores the extreme few percent of samples (see
+/// [RunPaceAxis]) and values outside it are clipped to the edge, so a stop or
+/// a GPS glitch cannot squash the rest of the curve. Touching the chart
+/// reports the distance through [selectedDistance] so a map can follow.
 class RunPaceChart extends StatelessWidget {
   final List<RunPaceSample> samples;
   final double? avgPaceSecPerKm;
   final String emptyLabel;
+  final ValueNotifier<double?>? selectedDistance;
 
   const RunPaceChart({
     super.key,
     required this.samples,
     required this.avgPaceSecPerKm,
     required this.emptyLabel,
+    this.selectedDistance,
   });
 
   @override
@@ -34,30 +42,22 @@ class RunPaceChart extends StatelessWidget {
       );
     }
 
-    // Plot negative pace so lower sec/km (faster) sits higher on the chart.
+    final avg = avgPaceSecPerKm != null && avgPaceSecPerKm!.isFinite
+        ? avgPaceSecPerKm
+        : null;
+    final axis = RunPaceAxis.compute(samples, averagePace: avg);
+    final maxKm = samples.last.distanceMeters / 1000.0;
+    final maxX = maxKm <= 0 ? 1.0 : maxKm;
+    final xInterval = niceKmInterval(maxX);
+
+    // Negated so lower sec/km (faster) sits higher; clipped to the axis.
     final spots = [
       for (final s in samples)
-        FlSpot(s.distanceMeters / 1000.0, -s.paceSecPerKm),
+        FlSpot(
+          s.distanceMeters / 1000.0,
+          -s.paceSecPerKm.clamp(axis.minPace, axis.maxPace),
+        ),
     ];
-
-    var minPace = samples.first.paceSecPerKm;
-    var maxPace = samples.first.paceSecPerKm;
-    for (final s in samples) {
-      if (s.paceSecPerKm < minPace) minPace = s.paceSecPerKm;
-      if (s.paceSecPerKm > maxPace) maxPace = s.paceSecPerKm;
-    }
-    final avg = avgPaceSecPerKm;
-    if (avg != null && avg.isFinite) {
-      if (avg < minPace) minPace = avg;
-      if (avg > maxPace) maxPace = avg;
-    }
-
-    final pad = ((maxPace - minPace) * 0.12).clamp(8.0, 60.0);
-    final chartMinPace = (minPace - pad).clamp(30.0, maxPace);
-    final chartMaxPace = maxPace + pad;
-    final maxX = samples.last.distanceMeters / 1000.0;
-    final xInterval = _xInterval(maxX);
-    final yInterval = _yInterval(chartMaxPace - chartMinPace);
 
     final primary = theme.colorScheme.primary;
     final muted = theme.colorScheme.onSurfaceVariant;
@@ -67,13 +67,22 @@ class RunPaceChart extends StatelessWidget {
       child: LineChart(
         LineChartData(
           minX: 0,
-          maxX: maxX <= 0 ? 1 : maxX,
-          // Faster pace (lower sec/km) sits higher — plot negated Y.
-          minY: -chartMaxPace,
-          maxY: -chartMinPace,
+          maxX: maxX,
+          minY: -axis.maxPace,
+          maxY: -axis.minPace,
           clipData: const FlClipData.all(),
           lineTouchData: LineTouchData(
             handleBuiltInTouches: true,
+            touchCallback: (event, response) {
+              final notifier = selectedDistance;
+              if (notifier == null) return;
+              final spot = response?.lineBarSpots?.firstOrNull;
+              if (!event.isInterestedForInteractions || spot == null) {
+                notifier.value = null;
+                return;
+              }
+              notifier.value = samples[spot.spotIndex].distanceMeters;
+            },
             touchTooltipData: LineTouchTooltipData(
               tooltipBorderRadius: BorderRadius.circular(10),
               tooltipPadding: const EdgeInsets.symmetric(
@@ -82,17 +91,16 @@ class RunPaceChart extends StatelessWidget {
               ),
               getTooltipColor: (_) => primary,
               getTooltipItems: (touched) => touched.map((spot) {
-                final pace = -spot.y;
-                final km = spot.x;
+                final sample = samples[spot.spotIndex];
                 return LineTooltipItem(
-                  '${RunFormatters.pace(pace)} /km\n'
-                  '${km.toStringAsFixed(km < 10 ? 2 : 1)} km',
+                  '${RunFormatters.paceShort(sample.paceSecPerKm)} /km\n'
+                  '${RunFormatters.distanceKm(sample.distanceMeters)} km',
                   TextStyle(
                     color: theme.colorScheme.onPrimary,
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
                     height: 1.25,
-                    fontFeatures: const [FontFeature.tabularFigures()],
+                    fontFeatures: AppUi.tabular,
                   ),
                 );
               }).toList(),
@@ -129,18 +137,21 @@ class RunPaceChart extends StatelessWidget {
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 40,
-                interval: yInterval,
+                reservedSize: 44,
+                interval: axis.interval,
                 getTitlesWidget: (value, meta) {
                   final pace = -value;
-                  if (pace < chartMinPace - 1 || pace > chartMaxPace + 1) {
+                  if (pace < axis.minPace - 1 || pace > axis.maxPace + 1) {
                     return const SizedBox.shrink();
                   }
-                  return Text(
-                    RunFormatters.pace(pace),
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: muted,
-                      fontFeatures: const [FontFeature.tabularFigures()],
+                  return SideTitleWidget(
+                    meta: meta,
+                    child: Text(
+                      RunFormatters.paceShort(pace),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: muted,
+                        fontFeatures: AppUi.tabular,
+                      ),
                     ),
                   );
                 },
@@ -155,15 +166,14 @@ class RunPaceChart extends StatelessWidget {
                   if (value < 0 || value > maxX + 0.01) {
                     return const SizedBox.shrink();
                   }
-                  final nearEdge = value < 0.01 || (maxX - value).abs() < 0.01;
-                  final onStep =
-                      (value / xInterval - (value / xInterval).round()).abs() <
-                      0.02;
-                  if (!nearEdge && !onStep) return const SizedBox.shrink();
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 4),
+                  // Skip a label that would collide with the last tick.
+                  if (value > 0.01 && (maxX - value) < xInterval * 0.3) {
+                    return const SizedBox.shrink();
+                  }
+                  return SideTitleWidget(
+                    meta: meta,
                     child: Text(
-                      value.toStringAsFixed(1),
+                      RunFormatters.distanceKmShort(value * 1000),
                       style: theme.textTheme.labelSmall?.copyWith(color: muted),
                     ),
                   );
@@ -175,24 +185,19 @@ class RunPaceChart extends StatelessWidget {
           gridData: FlGridData(
             show: true,
             drawHorizontalLine: true,
-            drawVerticalLine: true,
-            horizontalInterval: yInterval,
-            verticalInterval: xInterval,
+            drawVerticalLine: false,
+            horizontalInterval: axis.interval,
             getDrawingHorizontalLine: (_) => FlLine(
               color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
               strokeWidth: 1,
             ),
-            getDrawingVerticalLine: (_) => FlLine(
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.25),
-              strokeWidth: 1,
-            ),
           ),
-          extraLinesData: avg == null || !avg.isFinite
+          extraLinesData: avg == null
               ? const ExtraLinesData()
               : ExtraLinesData(
                   horizontalLines: [
                     HorizontalLine(
-                      y: -avg,
+                      y: -avg.clamp(axis.minPace, axis.maxPace),
                       color: theme.colorScheme.onSurface.withValues(
                         alpha: 0.75,
                       ),
@@ -205,9 +210,9 @@ class RunPaceChart extends StatelessWidget {
             LineChartBarData(
               spots: spots,
               isCurved: true,
-              curveSmoothness: 0.18,
+              curveSmoothness: 0.2,
               preventCurveOverShooting: true,
-              barWidth: 2.2,
+              barWidth: 2.4,
               color: primary,
               isStrokeCapRound: true,
               dotData: const FlDotData(show: false),
@@ -217,8 +222,8 @@ class RunPaceChart extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    primary.withValues(alpha: 0.45),
-                    primary.withValues(alpha: 0.08),
+                    primary.withValues(alpha: 0.4),
+                    primary.withValues(alpha: 0.05),
                   ],
                 ),
               ),
@@ -230,18 +235,12 @@ class RunPaceChart extends StatelessWidget {
     );
   }
 
-  static double _xInterval(double maxX) {
-    if (maxX <= 1.2) return 0.5;
-    if (maxX <= 3) return 0.5;
-    if (maxX <= 8) return 1.0;
-    if (maxX <= 20) return 2.0;
-    return 5.0;
-  }
-
-  static double _yInterval(double spanSec) {
-    if (spanSec <= 90) return 30;
-    if (spanSec <= 180) return 60;
-    if (spanSec <= 360) return 120;
-    return 180;
+  /// Km tick spacing that keeps the axis to about 4-6 labels.
+  static double niceKmInterval(double maxKm) {
+    const steps = [0.5, 1.0, 2.0, 5.0, 10.0, 20.0];
+    for (final step in steps) {
+      if (maxKm / step <= 6) return step;
+    }
+    return 50;
   }
 }

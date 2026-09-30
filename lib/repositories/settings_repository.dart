@@ -1,5 +1,5 @@
 import 'package:sqflite/sqflite.dart';
-import 'base_repository.dart';
+import 'package:workout_notes/repositories/base_repository.dart';
 
 /// Repository for app settings CRUD operations.
 class SettingsRepository extends BaseRepository {
@@ -33,9 +33,5 @@ class SettingsRepository extends BaseRepository {
   Future<bool> getIsDistanceKm() async {
     final val = await getSetting('distance_unit');
     return val != 'mi';
-  }
-
-  Future<void> setDistanceUnitKm(bool isKm) async {
-    await setSetting('distance_unit', isKm ? 'km' : 'mi');
   }
 }

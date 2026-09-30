@@ -1,7 +1,7 @@
 package com.workoutnotes.workout_notes.sleep
 
 import android.content.Context
-import org.json.JSONArray
+import com.workoutnotes.workout_notes.common.JsonMaps
 import org.json.JSONObject
 import java.io.File
 
@@ -40,13 +40,6 @@ class SleepSessionSpool(
         val directory = File(root, segment["session_id"].toString())
         directory.mkdirs()
         File(directory, "segments.ndjson").appendText(codec.encode(segment) + "\n")
-    }
-
-    @Synchronized
-    fun appendStage(stage: Map<String, Any?>) {
-        val directory = File(root, stage["session_id"].toString())
-        directory.mkdirs()
-        File(directory, "stages.ndjson").appendText(codec.encode(stage) + "\n")
     }
 
     @Synchronized
@@ -128,24 +121,7 @@ class SleepSessionSpool(
             override fun encode(value: Map<String, Any?>): String = JSONObject(value).toString()
 
             override fun decode(value: String): Map<String, Any?> =
-                jsonObjectToMap(JSONObject(value))
-        }
-
-        private fun jsonObjectToMap(value: JSONObject): Map<String, Any?> {
-            val result = mutableMapOf<String, Any?>()
-            val keys = value.keys()
-            while (keys.hasNext()) {
-                val key = keys.next()
-                result[key] = jsonValue(value.get(key))
-            }
-            return result
-        }
-
-        private fun jsonValue(value: Any?): Any? = when (value) {
-            JSONObject.NULL -> null
-            is JSONObject -> jsonObjectToMap(value)
-            is JSONArray -> (0 until value.length()).map { jsonValue(value.get(it)) }
-            else -> value
+                JsonMaps.toMap(JSONObject(value))
         }
     }
 }

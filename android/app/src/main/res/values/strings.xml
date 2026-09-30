@@ -24,6 +24,22 @@
     <string name="sleep_alarm_mission_camera_denied">Camera access is needed to read the mission.</string>
     <string name="sleep_alarm_mission_timeout">Time ran out. Try the mission again.</string>
     <string name="sleep_alarm_open_camera_settings">Open camera settings</string>
+    <string name="sleep_alarm_snoozed_label">Snoozed until</string>
+    <string name="sleep_alarm_rings_again_in" formatted="false">Rings again in %s</string>
+    <string name="sleep_alarm_snoozed_mission_body">Awake already? Complete the mission now to turn the alarm off.</string>
+    <string name="sleep_alarm_snoozed_dismiss_body">Awake already? Turn the alarm off now.</string>
+    <string name="sleep_alarm_scan_code">Scan code</string>
+    <string name="sleep_alarm_emergency_short">Emergency · 500 taps</string>
+    <string name="sleep_alarm_snooze_left">Snooze 5 min · %1$d left</string>
+    <string name="sleep_alarm_back_to_snooze">Back to snooze</string>
+    <string name="sleep_alarm_dismiss_now">Turn off alarm</string>
+    <string name="sleep_alarm_complete_mission_now">Complete mission now</string>
+    <string name="sleep_alarm_snooze_channel_name">Snoozed alarm</string>
+    <string name="sleep_alarm_snooze_channel_description">Shows a snoozed wake-up alarm so you can turn it off early</string>
+    <string name="sleep_alarm_snooze_notification_title">Alarm snoozed until %1$s</string>
+    <string name="sleep_alarm_snooze_notification_mission">Complete the mission now to turn it off.</string>
+    <string name="sleep_alarm_snooze_notification_plain">Tap to turn it off early.</string>
+    <string name="sleep_alarm_emergency_cancel_hint_snoozed">If time runs out, the snooze simply continues.</string>
     <string name="barcode_scanner_instruction">Point the camera at a barcode</string>
     <string name="barcode_scanner_flashlight">Flashlight</string>
     <string name="barcode_scanner_flashlight_off">Turn off flashlight</string>
@@ -41,4 +57,19 @@
     <string name="traditional_alarm_snooze_detail">Snooze for %1$d min (%2$d/%3$d)</string>
     <string name="traditional_alarm_mission_cancelled">Mission not completed. Scan the code to dismiss the alarm.</string>
     <string name="traditional_alarm_mission_wrong_code">That code does not match. Try again.</string>
+    <string name="medication_reminder_channel_name">Medication reminders</string>
+    <string name="medication_reminder_channel_description">Reminders to take your medication</string>
+    <string name="medication_alarm_channel_name">Medication alarms</string>
+    <string name="medication_alarm_channel_description">Rings when a dose was not confirmed in time</string>
+    <string name="medication_reminder_title">Time for your medication</string>
+    <string name="medication_reminder_confirm_hint">Tap to confirm you took it.</string>
+    <string name="medication_alarm_title">Medication not confirmed</string>
+    <string name="medication_alarm_body">This dose was not confirmed yet. Take it and confirm to stop the alarm.</string>
+    <string name="medication_confirm_body">Did you take this dose?</string>
+    <string name="medication_already_logged">This dose is already logged.</string>
+    <string name="medication_dose_time">Dose at %1$s</string>
+    <string name="medication_taken">I took it</string>
+    <string name="medication_skip">Skip this dose</string>
+    <string name="medication_not_now">Not now</string>
+    <string name="medication_open_confirmation">Confirm dose</string>
 </resources>

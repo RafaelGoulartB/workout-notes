@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../l10n/app_localizations.dart';
-import '../../models/ai_chat_thread.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/ai_chat_thread.dart';
 
 enum _ThreadMenuAction { rename, togglePin, delete }
 
@@ -115,13 +115,10 @@ class AiHistoryThreadCard extends StatelessWidget {
                   switch (action) {
                     case _ThreadMenuAction.rename:
                       onRename();
-                      break;
                     case _ThreadMenuAction.togglePin:
                       onTogglePinned();
-                      break;
                     case _ThreadMenuAction.delete:
                       onDelete();
-                      break;
                   }
                 },
                 itemBuilder: (_) => [

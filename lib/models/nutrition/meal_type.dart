@@ -1,6 +1,6 @@
 import 'package:workout_notes/l10n/app_localizations.dart';
 
-import 'meal_log.dart';
+import 'package:workout_notes/models/nutrition/meal_log.dart';
 
 /// A user-defined meal type from the nutrition catalog.
 ///

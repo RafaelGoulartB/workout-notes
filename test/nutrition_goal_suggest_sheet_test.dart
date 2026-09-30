@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
-import 'package:workout_notes/screens/workout/nutrition_goal_suggest_sheet.dart';
+import 'package:workout_notes/screens/nutrition/nutrition_goal_suggest_sheet.dart';
 
 class _BodyRepository extends BodyMeasurementRepository {
   @override

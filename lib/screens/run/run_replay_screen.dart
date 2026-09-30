@@ -6,9 +6,13 @@ import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
+import 'package:workout_notes/utils/run_route_geometry.dart';
 import 'package:workout_notes/utils/run_route_pace_style.dart';
+import 'package:workout_notes/widgets/run/run_route_map.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
-/// A short, accelerated playback of a completed run's GPS trail.
+/// A short, accelerated playback of a completed run's GPS trail, with a
+/// scrub slider and a speed selector.
 class RunReplayScreen extends StatefulWidget {
   final RunActivity activity;
   final List<RunTrackPoint> points;
@@ -21,10 +25,17 @@ class RunReplayScreen extends StatefulWidget {
     this.showMapTiles = true,
   }) : assert(points.length >= 2);
 
-  /// Replays the activity at 60x speed: every real minute takes one second.
+  static const int defaultSpeed = 60;
+  static const List<int> speeds = [30, 60, 120];
+
+  /// Playback length at [speed]x (default 60x: every real minute takes one
+  /// second).
   @visibleForTesting
-  static Duration replayDurationFor(int movingTimeSeconds) {
-    final milliseconds = (movingTimeSeconds * 1000 / 60).round();
+  static Duration replayDurationFor(
+    int movingTimeSeconds, {
+    int speed = defaultSpeed,
+  }) {
+    final milliseconds = (movingTimeSeconds * 1000 / speed).round();
     return Duration(milliseconds: milliseconds < 1 ? 1 : milliseconds);
   }
 
@@ -32,31 +43,84 @@ class RunReplayScreen extends StatefulWidget {
   State<RunReplayScreen> createState() => _RunReplayScreenState();
 }
 
+/// Where the runner is at one instant of the replay.
+class _ReplayFrame {
+  final int index;
+  final double fraction;
+  final LatLng position;
+
+  const _ReplayFrame(this.index, this.fraction, this.position);
+}
+
 class _RunReplayScreenState extends State<RunReplayScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final List<RunTrackPoint> _points;
+  late final List<LatLng> _trail;
   late final List<double> _timeline;
-  late final List<double> _cumulativeDistance;
-  late final List<double?> _segmentPaces;
+  late final RunRouteGeometry _geometry;
+  late final List<RunRouteColorRun> _runs;
+  late final List<Polyline> _runPolylines;
+  late final List<RunPaceSample> _paceSamples;
+  late final Polyline _ghost;
+  late final bool _hasAltitude;
+  late final int _movingSeconds;
+
+  int _speed = RunReplayScreen.defaultSpeed;
+
+  /// Completed-run layer, rebuilt only when another colour run finishes.
+  int _completedCount = -1;
+  List<Polyline> _completedLayer = const [];
 
   @override
   void initState() {
     super.initState();
     _points = List<RunTrackPoint>.of(widget.points)
       ..sort((a, b) => a.seq.compareTo(b.seq));
+    _trail = [for (final p in _points) LatLng(p.lat, p.lng)];
     _timeline = _buildTimeline(_points);
-    _cumulativeDistance = _buildCumulativeDistance(_points);
-    _segmentPaces = RunRoutePaceStyle.segmentPaces(
+    final profile = RunTrackProfile.fromPoints(_points);
+    _geometry = RunRouteGeometry.fromPoints(_points, profile: profile);
+    _hasAltitude = _points.any((p) => p.altitude != null);
+    _movingSeconds = widget.activity.movingTimeSeconds > 0
+        ? widget.activity.movingTimeSeconds
+        : widget.activity.durationSeconds;
+    _paceSamples = RunPaceAnalytics.fromTrackPoints(
       _points,
-      averagePaceSecPerKm: widget.activity.avgPaceSecPerKm,
+      profile: profile,
+    ).samples;
+
+    final average = widget.activity.avgPaceSecPerKm;
+    final paces = RunRoutePaceStyle.segmentPaces(
+      _points,
+      averagePaceSecPerKm: average,
     );
+    _runs = RunRoutePaceStyle.colorRuns(paces, averagePaceSecPerKm: average);
+    _runPolylines = [
+      for (final run in _runs)
+        Polyline(
+          points: _trail.sublist(run.firstPoint, run.lastPoint + 1),
+          color: run.color,
+          strokeWidth: RunRoutePaceStyle.routeStrokeWidth,
+          strokeCap: StrokeCap.round,
+          strokeJoin: StrokeJoin.round,
+        ),
+    ];
+    _ghost = Polyline(
+      points: _trail,
+      color: Colors.grey.withValues(alpha: 0.45),
+      strokeWidth: RunRoutePaceStyle.routeStrokeWidth - 1,
+      strokeCap: StrokeCap.round,
+      strokeJoin: StrokeJoin.round,
+    );
+
     _controller = AnimationController(
       vsync: this,
       duration: RunReplayScreen.replayDurationFor(
-        widget.activity.movingTimeSeconds,
+        _movingSeconds,
+        speed: _speed,
       ),
-    )..addListener(_onTick);
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _controller.forward();
     });
@@ -64,13 +128,9 @@ class _RunReplayScreenState extends State<RunReplayScreen>
 
   @override
   void dispose() {
-    _controller
-      ..removeListener(_onTick)
-      ..dispose();
+    _controller.dispose();
     super.dispose();
   }
-
-  void _onTick() => setState(() {});
 
   void _togglePlayback() {
     if (_controller.isAnimating) {
@@ -81,6 +141,22 @@ class _RunReplayScreenState extends State<RunReplayScreen>
       _controller.forward();
     }
     setState(() {});
+  }
+
+  /// Changes the playback speed keeping the current position.
+  void _setSpeed(int speed) {
+    if (speed == _speed) return;
+    final wasPlaying = _controller.isAnimating;
+    final value = _controller.value;
+    setState(() => _speed = speed);
+    _controller.duration = RunReplayScreen.replayDurationFor(
+      _movingSeconds,
+      speed: speed,
+    );
+    // Setting the duration rescales the ticker, so restart from the same
+    // position to keep the runner where they are.
+    _controller.value = value;
+    if (wasPlaying) _controller.forward();
   }
 
   static List<double> _buildTimeline(List<RunTrackPoint> points) {
@@ -107,23 +183,6 @@ class _RunReplayScreenState extends State<RunReplayScreen>
     return timeline;
   }
 
-  static List<double> _buildCumulativeDistance(List<RunTrackPoint> points) {
-    if (points.isEmpty) return const [];
-    final result = <double>[0];
-    for (var index = 1; index < points.length; index++) {
-      final previous = points[index - 1];
-      final current = points[index];
-      final segment = RunPaceAnalytics.haversineMeters(
-        lat1: previous.lat,
-        lng1: previous.lng,
-        lat2: current.lat,
-        lng2: current.lng,
-      );
-      result.add(result.last + segment);
-    }
-    return result;
-  }
-
   int _pointIndexAt(double progress) {
     var low = 0;
     var high = _timeline.length - 1;
@@ -138,134 +197,134 @@ class _RunReplayScreenState extends State<RunReplayScreen>
     return low;
   }
 
-  double _segmentFraction(int index, double progress) {
-    if (index >= _points.length - 1) return 0;
+  _ReplayFrame _frameAt(double progress) {
+    final index = _pointIndexAt(progress);
+    final current = _points[index];
+    if (index >= _points.length - 1) {
+      return _ReplayFrame(index, 0, LatLng(current.lat, current.lng));
+    }
     final start = _timeline[index];
     final end = _timeline[index + 1];
-    if (end <= start) return 0;
-    return ((progress - start) / (end - start)).clamp(0.0, 1.0);
-  }
-
-  LatLng _interpolatedPosition(int index, double fraction) {
-    final current = _points[index];
-    if (index >= _points.length - 1) return LatLng(current.lat, current.lng);
+    final fraction = end <= start
+        ? 0.0
+        : ((progress - start) / (end - start)).clamp(0.0, 1.0);
     final next = _points[index + 1];
-    return LatLng(
-      current.lat + (next.lat - current.lat) * fraction,
-      current.lng + (next.lng - current.lng) * fraction,
+    return _ReplayFrame(
+      index,
+      fraction,
+      LatLng(
+        current.lat + (next.lat - current.lat) * fraction,
+        current.lng + (next.lng - current.lng) * fraction,
+      ),
     );
   }
 
-  double _distanceAt(int index, double fraction) {
-    if (_cumulativeDistance.isEmpty) return 0;
-    var gpsDistance = _cumulativeDistance[index];
-    if (index < _cumulativeDistance.length - 1) {
-      gpsDistance +=
-          (_cumulativeDistance[index + 1] - _cumulativeDistance[index]) *
-          fraction;
+  double _gpsDistanceAt(_ReplayFrame frame) {
+    final cumulative = _geometry.cumulativeMeters;
+    var distance = cumulative[frame.index];
+    if (frame.index < cumulative.length - 1) {
+      distance +=
+          (cumulative[frame.index + 1] - cumulative[frame.index]) *
+          frame.fraction;
     }
-    final totalGpsDistance = _cumulativeDistance.last;
-    if (totalGpsDistance <= 0) return widget.activity.distanceMeters;
-    return widget.activity.distanceMeters * (gpsDistance / totalGpsDistance);
+    return distance;
   }
 
-  double? _paceAt(int index) {
-    final speed = _points[index].speed;
-    if (speed != null && speed > 0.55) {
-      return (1000 / speed).clamp(
-        RunPaceAnalytics.minPaceSecPerKm,
-        RunPaceAnalytics.maxPaceSecPerKm,
-      );
-    }
+  /// Reported distance: GPS distance scaled to the recorded total, so the
+  /// counter ends exactly on the activity's distance.
+  double _distanceAt(double gpsDistance) {
+    final total = _geometry.totalMeters;
+    if (total <= 0) return widget.activity.distanceMeters;
+    return widget.activity.distanceMeters * (gpsDistance / total);
+  }
 
-    final startIndex = (index - 5).clamp(0, index);
-    final distance =
-        _cumulativeDistance[index] - _cumulativeDistance[startIndex];
-    final seconds =
-        _points[index].recordedAt
-            .difference(_points[startIndex].recordedAt)
-            .inMilliseconds /
-        1000;
-    if (distance >= 5 && seconds > 0) {
-      final pace = seconds / (distance / 1000);
-      if (pace >= RunPaceAnalytics.minPaceSecPerKm &&
-          pace <= RunPaceAnalytics.maxPaceSecPerKm) {
-        return pace;
+  /// Smoothed pace of the sample closest to [gpsDistance].
+  double? _paceAt(double gpsDistance) {
+    if (_paceSamples.isEmpty) return widget.activity.avgPaceSecPerKm;
+    var low = 0;
+    var high = _paceSamples.length - 1;
+    while (low < high) {
+      final mid = (low + high) ~/ 2;
+      if (_paceSamples[mid].distanceMeters < gpsDistance) {
+        low = mid + 1;
+      } else {
+        high = mid;
       }
     }
-    return widget.activity.avgPaceSecPerKm;
+    if (low > 0 &&
+        (gpsDistance - _paceSamples[low - 1].distanceMeters) <
+            (_paceSamples[low].distanceMeters - gpsDistance)) {
+      low--;
+    }
+    return _paceSamples[low].paceSecPerKm;
   }
 
-  LatLngBounds? _routeBounds() {
-    if (_points.length < 2) return null;
-    var minLat = _points.first.lat;
-    var maxLat = minLat;
-    var minLng = _points.first.lng;
-    var maxLng = minLng;
-    for (final point in _points.skip(1)) {
-      if (point.lat < minLat) minLat = point.lat;
-      if (point.lat > maxLat) maxLat = point.lat;
-      if (point.lng < minLng) minLng = point.lng;
-      if (point.lng > maxLng) maxLng = point.lng;
+  double? _altitudeAt(_ReplayFrame frame) {
+    final current = _points[frame.index].altitude;
+    if (current == null || frame.index >= _points.length - 1) return current;
+    final next = _points[frame.index + 1].altitude;
+    if (next == null) return current;
+    return current + (next - current) * frame.fraction;
+  }
+
+  /// Polylines for the colour runs already covered, plus the partial one.
+  List<Widget> _routeLayers(_ReplayFrame frame) {
+    final covered = frame.index + frame.fraction;
+    var complete = 0;
+    while (complete < _runs.length && _runs[complete].lastPoint <= covered) {
+      complete++;
     }
-    if ((maxLat - minLat) < 1e-4 && (maxLng - minLng) < 1e-4) {
-      return null;
+    if (complete != _completedCount) {
+      _completedCount = complete;
+      _completedLayer = _runPolylines.sublist(0, complete);
     }
-    return LatLngBounds(LatLng(minLat, minLng), LatLng(maxLat, maxLng));
+    final partial = <Polyline>[];
+    if (complete < _runs.length) {
+      final run = _runs[complete];
+      final upTo = frame.index.clamp(run.firstPoint, run.lastPoint);
+      final points = [..._trail.sublist(run.firstPoint, upTo + 1)];
+      if (frame.fraction > 0 || points.length == 1) points.add(frame.position);
+      if (points.length >= 2) {
+        partial.add(
+          Polyline(
+            points: points,
+            color: run.color,
+            strokeWidth: RunRoutePaceStyle.routeStrokeWidth,
+            strokeCap: StrokeCap.round,
+            strokeJoin: StrokeJoin.round,
+          ),
+        );
+      }
+    }
+    return [
+      if (_completedLayer.isNotEmpty) PolylineLayer(polylines: _completedLayer),
+      if (partial.isNotEmpty) PolylineLayer(polylines: partial),
+    ];
   }
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final progress = _controller.value;
-    final index = _pointIndexAt(progress);
-    final fraction = _segmentFraction(index, progress);
-    final position = _interpolatedPosition(index, fraction);
-    final revealedSegments = <Polyline>[
-      for (var segment = 0; segment < index; segment++)
-        Polyline(
-          points: [
-            LatLng(_points[segment].lat, _points[segment].lng),
-            LatLng(_points[segment + 1].lat, _points[segment + 1].lng),
-          ],
-          color: RunRoutePaceStyle.colorForPace(
-            paceSecPerKm: _segmentPaces[segment],
-            averagePaceSecPerKm: widget.activity.avgPaceSecPerKm,
-          ),
-          strokeWidth: RunRoutePaceStyle.routeStrokeWidth,
-          strokeCap: StrokeCap.butt,
-        ),
-      if (index < _points.length - 1 && fraction > 0)
-        Polyline(
-          points: [LatLng(_points[index].lat, _points[index].lng), position],
-          color: RunRoutePaceStyle.colorForPace(
-            paceSecPerKm: _segmentPaces[index],
-            averagePaceSecPerKm: widget.activity.avgPaceSecPerKm,
-          ),
-          strokeWidth: RunRoutePaceStyle.routeStrokeWidth,
-          strokeCap: StrokeCap.butt,
-        ),
-    ];
-    final bounds = _routeBounds();
-    final elapsedSeconds = (widget.activity.durationSeconds * progress).round();
-    final pace = _paceAt(index);
-    final distance = _distanceAt(index, fraction);
+    final bounds = RunRouteMap.boundsFor(_trail);
+    final start = _trail.first;
 
     return Scaffold(
       appBar: AppBar(title: Text(loc.runReplayTitle)),
       body: Stack(
         fit: StackFit.expand,
         children: [
+          // The map and its ghost route are built once; only the layers that
+          // depend on playback listen to the controller.
           FlutterMap(
             options: MapOptions(
-              initialCenter: position,
+              initialCenter: start,
               initialZoom: bounds == null ? 15 : 14,
               initialCameraFit: bounds == null
                   ? null
                   : CameraFit.bounds(
                       bounds: bounds,
-                      padding: const EdgeInsets.fromLTRB(28, 120, 28, 230),
+                      padding: const EdgeInsets.fromLTRB(28, 120, 28, 250),
                       minZoom: 3,
                       maxZoom: 17,
                     ),
@@ -279,30 +338,44 @@ class _RunReplayScreenState extends State<RunReplayScreen>
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.workoutnotes.workout_notes',
                 ),
-              if (revealedSegments.isNotEmpty)
-                PolylineLayer(polylines: revealedSegments),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: position,
-                    width: 28,
-                    height: 28,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 3),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black38,
-                            blurRadius: 5,
-                            offset: Offset(0, 2),
+              PolylineLayer(polylines: [_ghost]),
+              AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) {
+                  final frame = _frameAt(_controller.value);
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ..._routeLayers(frame),
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: frame.position,
+                            width: 28,
+                            height: 28,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 3,
+                                ),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black38,
+                                    blurRadius: 5,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  ),
-                ],
+                    ],
+                  );
+                },
               ),
             ],
           ),
@@ -310,13 +383,41 @@ class _RunReplayScreenState extends State<RunReplayScreen>
             left: 16,
             right: 16,
             top: 16,
-            child: _ReplayStats(
-              elapsedLabel: loc.runReplayTime,
-              elapsed: RunFormatters.duration(elapsedSeconds),
-              paceLabel: loc.runReplayPace,
-              pace: RunFormatters.paceWithUnit(pace),
-              distanceLabel: loc.runRecordDistance,
-              distance: RunFormatters.distanceWithUnit(distance),
+            child: RepaintBoundary(
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) {
+                  final progress = _controller.value;
+                  final frame = _frameAt(progress);
+                  final gpsDistance = _gpsDistanceAt(frame);
+                  final altitude = _hasAltitude ? _altitudeAt(frame) : null;
+                  return _ReplayStats(
+                    items: [
+                      (
+                        loc.runReplayTime,
+                        RunFormatters.duration(
+                          (_movingSeconds * progress).round(),
+                        ),
+                      ),
+                      (
+                        loc.runReplayPace,
+                        RunFormatters.paceWithUnit(_paceAt(gpsDistance)),
+                      ),
+                      (
+                        loc.runRecordDistance,
+                        RunFormatters.distanceWithUnit(
+                          _distanceAt(gpsDistance),
+                        ),
+                      ),
+                      if (_hasAltitude)
+                        (
+                          loc.runReplayDistanceGain,
+                          RunFormatters.elevation(altitude),
+                        ),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
           Positioned(
@@ -326,13 +427,10 @@ class _RunReplayScreenState extends State<RunReplayScreen>
             child: SafeArea(
               top: false,
               child: _ReplayControls(
-                progress: progress,
-                isPlaying: _controller.isAnimating,
-                isCompleted: _controller.isCompleted,
-                playLabel: loc.runReplayPlay,
-                pauseLabel: loc.runReplayPause,
-                replayLabel: loc.runReplayAgain,
-                onPressed: _togglePlayback,
+                controller: _controller,
+                speed: _speed,
+                onSpeedChanged: _setSpeed,
+                onTogglePlayback: _togglePlayback,
               ),
             ),
           ),
@@ -343,21 +441,9 @@ class _RunReplayScreenState extends State<RunReplayScreen>
 }
 
 class _ReplayStats extends StatelessWidget {
-  final String elapsedLabel;
-  final String elapsed;
-  final String paceLabel;
-  final String pace;
-  final String distanceLabel;
-  final String distance;
+  final List<(String, String)> items;
 
-  const _ReplayStats({
-    required this.elapsedLabel,
-    required this.elapsed,
-    required this.paceLabel,
-    required this.pace,
-    required this.distanceLabel,
-    required this.distance,
-  });
+  const _ReplayStats({required this.items});
 
   @override
   Widget build(BuildContext context) {
@@ -366,18 +452,13 @@ class _ReplayStats extends StatelessWidget {
       elevation: 5,
       color: theme.colorScheme.surface.withValues(alpha: 0.94),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
         child: Row(
           children: [
-            Expanded(
-              child: _ReplayStat(label: elapsedLabel, value: elapsed),
-            ),
-            Expanded(
-              child: _ReplayStat(label: paceLabel, value: pace),
-            ),
-            Expanded(
-              child: _ReplayStat(label: distanceLabel, value: distance),
-            ),
+            for (final (label, value) in items)
+              Expanded(
+                child: _ReplayStat(label: label, value: value),
+              ),
           ],
         ),
       ),
@@ -405,12 +486,15 @@ class _ReplayStat extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 3),
-        Text(
-          value,
-          maxLines: 1,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-            fontFeatures: const [FontFeature.tabularFigures()],
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            maxLines: 1,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              fontFeatures: AppUi.tabular,
+            ),
           ),
         ),
       ],
@@ -419,55 +503,74 @@ class _ReplayStat extends StatelessWidget {
 }
 
 class _ReplayControls extends StatelessWidget {
-  final double progress;
-  final bool isPlaying;
-  final bool isCompleted;
-  final String playLabel;
-  final String pauseLabel;
-  final String replayLabel;
-  final VoidCallback onPressed;
+  final AnimationController controller;
+  final int speed;
+  final ValueChanged<int> onSpeedChanged;
+  final VoidCallback onTogglePlayback;
 
   const _ReplayControls({
-    required this.progress,
-    required this.isPlaying,
-    required this.isCompleted,
-    required this.playLabel,
-    required this.pauseLabel,
-    required this.replayLabel,
-    required this.onPressed,
+    required this.controller,
+    required this.speed,
+    required this.onSpeedChanged,
+    required this.onTogglePlayback,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final label = isPlaying
-        ? pauseLabel
-        : (isCompleted ? replayLabel : playLabel);
+    final loc = AppLocalizations.of(context)!;
     return Card(
       elevation: 5,
       color: theme.colorScheme.surface.withValues(alpha: 0.94),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+        padding: const EdgeInsets.fromLTRB(14, 6, 14, 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            LinearProgressIndicator(
-              value: progress,
-              minHeight: 5,
-              borderRadius: BorderRadius.circular(3),
+            AnimatedBuilder(
+              animation: controller,
+              builder: (context, _) => Semantics(
+                label: loc.runReplaySeek,
+                child: Slider(
+                  key: const ValueKey('run-replay-slider'),
+                  value: controller.value.clamp(0.0, 1.0),
+                  onChangeStart: (_) => controller.stop(),
+                  onChanged: (value) => controller.value = value,
+                ),
+              ),
+            ),
+            AnimatedBuilder(
+              animation: controller,
+              builder: (context, _) {
+                final playing = controller.isAnimating;
+                final completed = controller.isCompleted;
+                return FilledButton.icon(
+                  key: const ValueKey('run-replay-control'),
+                  onPressed: onTogglePlayback,
+                  icon: Icon(
+                    playing
+                        ? Icons.pause_rounded
+                        : (completed
+                              ? Icons.replay_rounded
+                              : Icons.play_arrow_rounded),
+                  ),
+                  label: Text(
+                    playing
+                        ? loc.runReplayPause
+                        : (completed ? loc.runReplayAgain : loc.runReplayPlay),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 10),
-            FilledButton.icon(
-              key: const ValueKey('run-replay-control'),
-              onPressed: onPressed,
-              icon: Icon(
-                isPlaying
-                    ? Icons.pause_rounded
-                    : (isCompleted
-                          ? Icons.replay_rounded
-                          : Icons.play_arrow_rounded),
+            Semantics(
+              label: loc.runReplaySpeed,
+              child: AppSegmentedTabs<int>(
+                values: RunReplayScreen.speeds,
+                selected: speed,
+                labelOf: (value) => '$value×',
+                onChanged: onSpeedChanged,
               ),
-              label: Text(label),
             ),
           ],
         ),

@@ -71,6 +71,10 @@ data class RunVoiceSettings(
     val announceIntervals: Boolean = true,
     val intervalsEnabledByDefault: Boolean = false,
     val interval: RunIntervalPreset = RunIntervalPreset(),
+    /** Stops the moving clock while the runner is standing still. */
+    val autoPause: Boolean = true,
+    val announceAutoPause: Boolean = true,
+    val announceLaps: Boolean = true,
 ) {
     companion object {
         const val STORAGE_KEY = "run_voice_settings_v1"
@@ -111,6 +115,9 @@ data class RunVoiceSettings(
                 announceIntervals = json.optBoolean("announceIntervals", true),
                 intervalsEnabledByDefault = json.optBoolean("intervalsEnabledByDefault", false),
                 interval = RunIntervalPreset.fromJson(intervalObj),
+                autoPause = json.optBoolean("autoPause", true),
+                announceAutoPause = json.optBoolean("announceAutoPause", true),
+                announceLaps = json.optBoolean("announceLaps", true),
             )
         }
 
@@ -137,6 +144,9 @@ data class RunVoiceSettings(
                 announceIntervals = map["announceIntervals"] as? Boolean ?: true,
                 intervalsEnabledByDefault = map["intervalsEnabledByDefault"] as? Boolean ?: false,
                 interval = RunIntervalPreset.fromMap(intervalRaw),
+                autoPause = map["autoPause"] as? Boolean ?: true,
+                announceAutoPause = map["announceAutoPause"] as? Boolean ?: true,
+                announceLaps = map["announceLaps"] as? Boolean ?: true,
             )
         }
     }
@@ -156,13 +166,23 @@ data class RunVoiceSettings(
         put("announceIntervals", announceIntervals)
         put("intervalsEnabledByDefault", intervalsEnabledByDefault)
         put("interval", interval.toJson())
+        put("autoPause", autoPause)
+        put("announceAutoPause", announceAutoPause)
+        put("announceLaps", announceLaps)
     }
 }
 
+/**
+ * Per-run goal. [enabled]/[metric]/[value] is the distance or time target;
+ * [paceTargetSecPerKm] (+ [paceTolerancePercent]) is an independent pace goal
+ * that drives the pace warnings for this session only.
+ */
 data class RunSessionGoal(
     val enabled: Boolean = false,
     val metric: RunIntervalMetric = RunIntervalMetric.distance,
     val value: Int = 5000,
+    val paceTargetSecPerKm: Int? = null,
+    val paceTolerancePercent: Int = 5,
 ) {
     companion object {
         fun disabled() = RunSessionGoal(enabled = false)
@@ -171,7 +191,9 @@ data class RunSessionGoal(
             val enabled = map["enabled"] as? Boolean ?: false
             val metric = if (map["metric"] == "time") RunIntervalMetric.time else RunIntervalMetric.distance
             val value = (map["value"] as? Number)?.toInt() ?: 5000
-            return RunSessionGoal(enabled, metric, value)
+            val pace = (map["pace_target_sec_per_km"] as? Number)?.toInt()?.takeIf { it > 0 }
+            val tolerance = (map["pace_tolerance_percent"] as? Number)?.toInt()?.coerceIn(2, 50) ?: 5
+            return RunSessionGoal(enabled, metric, value, pace, tolerance)
         }
 
         fun fromJson(json: JSONObject?): RunSessionGoal {
@@ -179,7 +201,10 @@ data class RunSessionGoal(
             val enabled = json.optBoolean("enabled", false)
             val metric = if (json.optString("metric") == "time") RunIntervalMetric.time else RunIntervalMetric.distance
             val value = json.optInt("value", 5000)
-            return RunSessionGoal(enabled, metric, value)
+            val pace = if (json.isNull("pace_target_sec_per_km")) null
+            else json.optInt("pace_target_sec_per_km").takeIf { it > 0 }
+            val tolerance = json.optInt("pace_tolerance_percent", 5).coerceIn(2, 50)
+            return RunSessionGoal(enabled, metric, value, pace, tolerance)
         }
     }
 
@@ -196,5 +221,7 @@ data class RunSessionGoal(
         put("enabled", enabled)
         put("metric", metric.name)
         put("value", value)
+        put("pace_target_sec_per_km", paceTargetSecPerKm ?: JSONObject.NULL)
+        put("pace_tolerance_percent", paceTolerancePercent)
     }
 }

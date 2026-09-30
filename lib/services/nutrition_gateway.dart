@@ -15,7 +15,6 @@ class NutritionGatewayResult<T> {
   const NutritionGatewayResult._(this.data, this.error);
 
   bool get ok => error == null;
-  bool get notConfigured => error?.code == 'not_configured';
 
   factory NutritionGatewayResult.ok(T data) =>
       NutritionGatewayResult<T>._(data, null);
@@ -38,6 +37,10 @@ class NutritionGatewayError {
 /// Results are rich: each [FoodSearchResult] carries the food plus its
 /// primary variant (with the nutrition values) and any servings, so
 /// the UI can persist and display provider data without a second call.
+///
+/// Lifecycle: a gateway is handed to screens by its owner (normally the
+/// shared `OpenFoodFactsGateway.instance`). Screens and child routes only use
+/// it; they never close it.
 abstract class NutritionGateway {
   Future<NutritionGatewayResult<List<FoodSearchResult>>> search(
     String query, {
@@ -124,7 +127,9 @@ class NutritionGatewayFoodPayload {
         if (item is Map) {
           try {
             variants.add(_parseVariant(item.cast<String, dynamic>()));
-          } catch (_) {}
+          } catch (_) {
+            // Skip a malformed variant from the remote payload.
+          }
         }
       }
     }
@@ -148,7 +153,9 @@ class NutritionGatewayFoodPayload {
           try {
             final serving = _parseServing(item.cast<String, dynamic>());
             servings.putIfAbsent(variants.first.id, () => []).add(serving);
-          } catch (_) {}
+          } catch (_) {
+            // Skip a malformed serving from the remote payload.
+          }
         }
       }
     }

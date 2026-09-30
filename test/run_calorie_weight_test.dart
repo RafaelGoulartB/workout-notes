@@ -3,15 +3,13 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/database/database_schema.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
+import 'support/test_db.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Database database;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(

@@ -66,16 +66,6 @@ class GoalFormatters {
     }
   }
 
-  /// Short period label (e.g. "Jun 2026" or "W23 Jun").
-  static String shortPeriodLabel(GoalPeriod period, DateTime start,
-      {bool isPortuguese = true}) {
-    final loc = isPortuguese ? 'pt_BR' : 'en_US';
-    if (period == GoalPeriod.weekly) {
-      return DateFormat('d MMM', loc).format(start);
-    }
-    return DateFormat('MMM yyyy', loc).format(start);
-  }
-
   /// Returns a motivational hint based on completion percentage.
   static String motivation(double percent) {
     if (percent >= 1.0) return 'goalMotivationDone';

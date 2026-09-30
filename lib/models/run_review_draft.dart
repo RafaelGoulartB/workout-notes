@@ -1,6 +1,9 @@
 import 'package:workout_notes/models/run_activity.dart';
+import 'package:workout_notes/models/run_lap.dart';
 import 'package:workout_notes/models/run_split.dart';
+import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 
 /// A completed native spool that has not been accepted into run history yet.
 /// Keeping the source payload makes saving idempotent and lets Android recover
@@ -23,6 +26,47 @@ class RunReviewDraft {
   });
 
   String get id => activity.id;
+
+  /// GPS points carried by the spool, in recording order. Empty for indoor
+  /// sessions. Parsed on every call, so read it once.
+  List<RunTrackPoint> get trackPoints {
+    final rows = (spool['points'] as List? ?? const []).whereType<Map>();
+    final points = <RunTrackPoint>[];
+    var index = 0;
+    for (final row in rows) {
+      final lat = (row['lat'] as num?)?.toDouble();
+      final lng = (row['lng'] as num?)?.toDouble();
+      if (lat == null || lng == null) continue;
+      points.add(
+        RunTrackPoint(
+          id: row['id'] as String? ?? '$id-$index',
+          activityId: id,
+          seq: (row['seq'] as num?)?.toInt() ?? index,
+          lat: lat,
+          lng: lng,
+          altitude: (row['altitude'] as num?)?.toDouble(),
+          accuracy: (row['accuracy'] as num?)?.toDouble(),
+          speed: (row['speed'] as num?)?.toDouble(),
+          recordedAt:
+              DateTime.tryParse(row['recorded_at'] as String? ?? '') ??
+              activity.startedAt.add(Duration(seconds: index)),
+        ),
+      );
+      index++;
+    }
+    return points;
+  }
+
+  /// Manual laps marked while recording (empty when none).
+  List<RunLap> get laps {
+    final rawActivity = spool['activity'];
+    final raw = rawActivity is Map ? rawActivity['laps'] : null;
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((row) => RunLap.fromMap(Map<String, dynamic>.from(row)))
+        .toList(growable: false);
+  }
 
   factory RunReviewDraft.fromSpool({
     required RunActivity activity,
@@ -53,13 +97,9 @@ class RunReviewDraft {
                 ?.toDouble(),
             actualDistanceMeters: distance,
             actualDurationSeconds: duration,
-            actualPaceSecPerKm:
-                distance == null ||
-                    distance < 1 ||
-                    duration == null ||
-                    duration <= 0
+            actualPaceSecPerKm: distance == null || duration == null
                 ? null
-                : duration / (distance / 1000),
+                : RunFormatters.paceOrNull(distance, duration),
           );
         })
         .toList(growable: false);

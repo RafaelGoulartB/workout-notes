@@ -1,13 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
+import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/models/sleep_stage_type.dart';
-import 'package:workout_notes/services/sleep_stage_engine.dart';
 import 'package:workout_notes/services/sleep_stage_analysis_service.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
 import 'support/sleep_bedside_fixture.dart';
 
 void main() {
-  const engine = SleepStageEngine();
+  const engine = SleepWakeEngine();
 
   SleepMonitorSegment ambiguous(int index) => SleepMonitorSegment.fromMap({
     ...bedsideSegment(index).toMap(),
@@ -75,11 +75,27 @@ void main() {
       expect(result.coverage, greaterThan(0.8));
       expect(result.validEpochs, segments.length);
       expect(result.unknownEpochs, greaterThan(0));
-      final cursor = SleepWakeCursor(sessionId: 'bedside');
+      final causal = engine.run(
+        session: bedsideSession(minutes: 369),
+        segments: segments,
+      );
+      final cursor = SleepWakeCursor(sessionId: 'bedside', startsAwake: true);
       expect(
-        result.epochs.take(segments.length).map((e) => e.stage),
+        const SleepWakeEngine()
+            .run(
+              session: bedsideSession(minutes: 369),
+              segments: segments,
+              refine: false,
+            )
+            .epochs
+            .take(segments.length)
+            .map((e) => e.stage),
         segments.map((s) => cursor.add(s).epoch.stage),
       );
+      // The offline pass only ever turns neutral time into sleep.
+      for (final (i, e) in result.epochs.indexed) {
+        if (e.stage != causal.epochs[i].stage) expect(e.isSleep, true);
+      }
     },
   );
 
@@ -147,7 +163,16 @@ void main() {
       ],
     );
     expect(result.epochs.last.stage, SleepStageType.sleeping);
-    expect(result.epochs.any((e) => e.stage == SleepStageType.awake), false);
+    expect(
+      result.epochs
+          .skipWhile((e) => !e.isSleep)
+          .any((e) => e.stage == SleepStageType.awake),
+      false,
+    );
+    expect(
+      result.decisionReasons.values,
+      isNot(contains('sustained_audio_activity')),
+    );
   });
 
   test('invalid zero-sample fractions and near-total silence are rejected', () {
@@ -172,7 +197,70 @@ void main() {
         }),
     ];
     final result = engine.run(session: bedsideSession(), segments: segments);
-    expect(result.epochs.every((e) => e.stage == SleepStageType.unknown), true);
+    expect(
+      result.decisionReasons.values,
+      isNot(contains('sustained_audio_activity')),
+    );
+    // Only the known-awake start is held briefly; then evidence expires.
+    expect(
+      result.epochs.skip(5).every((e) => e.stage == SleepStageType.unknown),
+      true,
+    );
+  });
+
+  test('narrowband ambient sound near the floor is not wake evidence', () {
+    // Compressor/HVAC rumble: >90% below 200 Hz, peaks ~20 dB over the floor.
+    SleepMonitorSegment rumble(int i) => SleepMonitorSegment.fromMap({
+      ...bedsideSegment(i).toMap(),
+      'noise_active_seconds': 16.0,
+      'noise_score': 12.0,
+      'audio_level_stddev_db': 6.0,
+      'audio_peak_dbfs': -62.0,
+      'audio_baseline_dbfs': -84.0,
+      'spectral_band_energy_0': 97.0,
+      'spectral_band_energy_1': 2.0,
+      'spectral_band_energy_2': 0.5,
+      'spectral_band_energy_3': 0.3,
+      'spectral_band_energy_4': 0.2,
+    });
+    final cursor = SleepWakeCursor(sessionId: 'bedside');
+    for (var i = 0; i < 40; i++) {
+      cursor.add(bedsideSegment(i));
+    }
+    for (var i = 40; i < 60; i++) {
+      final decision = cursor.add(rumble(i));
+      expect(decision.reason, 'environmental_sound');
+      expect(decision.epoch.stage, SleepStageType.sleeping);
+    }
+    // The same activity from a loud broadband source still wakes.
+    SleepMonitorSegment movement(int i) => SleepMonitorSegment.fromMap({
+      ...rumble(i).toMap(),
+      'audio_peak_dbfs': -20.0,
+      'spectral_band_energy_0': 30.0,
+      'spectral_band_energy_3': 40.0,
+    });
+    // 16 s of activity per window: the 60 s wake threshold is met on the 4th.
+    for (var i = 60; i < 63; i++) {
+      expect(cursor.add(movement(i)).epoch.stage, SleepStageType.sleeping);
+    }
+    expect(cursor.add(movement(63)).epoch.stage, SleepStageType.awake);
+  });
+
+  test('a few noisy seconds cost only their duration of quiet support', () {
+    SleepMonitorSegment brief(int i) => SleepMonitorSegment.fromMap({
+      ...bedsideSegment(i).toMap(),
+      'noise_active_seconds': 4.0,
+      'noise_score': 6.0,
+    });
+    // Awake, then quiet windows with a brief sound every third window. The
+    // old rule charged 30 s per brief sound, so this pattern never confirmed.
+    final cursor = SleepWakeCursor(sessionId: 'bedside', startsAwake: true);
+    var confirmedAt = -1;
+    for (var i = 0; i < 120 && confirmedAt < 0; i++) {
+      final d = cursor.add(i % 3 == 2 ? brief(i) : bedsideSegment(i));
+      if (d.epoch.isSleep) confirmedAt = i;
+    }
+    expect(confirmedAt, inInclusiveRange(40, 70));
   });
 
   test('a quiet bedside night remains estimable without audible breathing', () {
@@ -184,11 +272,13 @@ void main() {
         ],
       );
       expect(result.ran, true);
+      // Known awake at the start; onset dated to the middle of the 20 min
+      // quiet window that confirmed it (causally confirmed at epoch 39).
       expect(
-        result.epochs.take(39).every((e) => e.stage == SleepStageType.unknown),
+        result.epochs.take(19).every((e) => e.stage == SleepStageType.awake),
         true,
       );
-      expect(result.epochs.skip(39).every((e) => e.isSleep), true);
+      expect(result.epochs.skip(19).every((e) => e.isSleep), true);
       expect(result.coverage, greaterThan(0.95));
       expect(result.epochs.any((e) => e.stage == SleepStageType.deep), false);
       final summary = const SleepStageAnalysisService().summarize(
@@ -196,8 +286,8 @@ void main() {
         sessionEnd: bedsideSession(minutes: 480).endedAt!,
         epochs: result.epochs,
       );
-      expect(summary!.unknownMinutes, 20);
-      expect(summary.sleepOnsetAt, result.epochs[39].startedAt);
+      expect(summary!.unknownMinutes, 0);
+      expect(summary.sleepOnsetAt, result.epochs[19].startedAt);
       expect(summary.finalWakeAt, isNull);
     }
   });
@@ -212,15 +302,21 @@ void main() {
             bedsideSegment(i, periodic: i >= 60, activity: i < 60),
         ],
       );
-      expect(result.epochs.take(79).any((e) => e.isSleep), false);
-      expect(result.epochs[79].stage, SleepStageType.sleeping);
+      // Causal confirmation at 79 after 10 min of periodic breathing; onset is
+      // dated to the middle of that window and never reaches the activity.
+      expect(result.epochs.take(69).any((e) => e.isSleep), false);
+      expect(result.epochs.skip(69).every((e) => e.isSleep), true);
+      expect(
+        result.decisionReasons[result.epochs[69].id],
+        'onset_within_confirmation',
+      );
       expect(result.epochs.any((e) => e.stage == SleepStageType.deep), false);
       final summary = const SleepStageAnalysisService().summarize(
         sessionStart: bedsideStart,
         sessionEnd: bedsideSession().endedAt!,
         epochs: result.epochs,
       )!;
-      expect(summary.sleepOnsetAt, result.epochs[79].startedAt);
+      expect(summary.sleepOnsetAt, result.epochs[69].startedAt);
     },
   );
 
@@ -305,7 +401,12 @@ void main() {
       ],
     );
     expect(result.coverage, greaterThan(0.94));
-    expect(result.epochs.any((e) => e.stage == SleepStageType.awake), false);
+    expect(
+      result.epochs
+          .skipWhile((e) => !e.isSleep)
+          .any((e) => e.stage == SleepStageType.awake),
+      false,
+    );
     expect(result.epochs.last.stage, SleepStageType.sleeping);
     expect(
       result.decisionReasons.values,
@@ -362,9 +463,13 @@ void main() {
         for (var i = 0; i < 120; i++)
           bedsideSegment(i, periodic: i < 70, activity: i >= 90),
       ];
-      final cursor = SleepWakeCursor(sessionId: 'bedside');
+      final cursor = SleepWakeCursor(sessionId: 'bedside', startsAwake: true);
       final online = segments.map((s) => cursor.add(s).epoch.toMap()).toList();
-      final batch = engine.run(session: bedsideSession(), segments: segments);
+      final batch = const SleepWakeEngine().run(
+        session: bedsideSession(),
+        segments: segments,
+        refine: false,
+      );
       expect(batch.epochs.map((e) => e.toMap()).toList(), online);
       expect(batch.epochs.every((e) => e.awakeProbability == null), true);
     },
@@ -383,12 +488,52 @@ void main() {
         result.epochs.fold<int>(0, (sum, e) => sum + e.durationSeconds),
         120,
       );
-      expect(
-        result.epochs.where((e) => e.stage != SleepStageType.unknown),
-        isEmpty,
-      );
+      // Only the known-awake start may be labelled; the overlap is unknown.
+      expect(result.epochs.where((e) => e.isSleep), isEmpty);
+      expect(result.epochs.last.stage, SleepStageType.unknown);
     },
   );
+
+  test('a sub-second early first window is aligned, not discarded', () {
+    final session = bedsideSession(minutes: 60);
+    final late = SleepMonitorSession.fromMap({
+      ...session.toMap(),
+      'started_at': bedsideStart
+          .add(const Duration(milliseconds: 502))
+          .toIso8601String(),
+    });
+    final result = engine.run(
+      session: late,
+      segments: [for (var i = 0; i < 120; i++) bedsideSegment(i)],
+    );
+    expect(result.decisionReasons.values, isNot(contains('missing_capture')));
+    expect(result.epochs.first.stage, SleepStageType.awake);
+  });
+
+  test('short neutral holes inside sleep are bridged, gaps are not', () {
+    SleepMonitorSegment ambiguousAt(int i) => ambiguous(i);
+    final result = engine.run(
+      session: bedsideSession(minutes: 120),
+      segments: [
+        for (var i = 0; i < 100; i++) bedsideSegment(i),
+        for (var i = 100; i < 110; i++) ambiguousAt(i),
+        for (var i = 110; i < 150; i++) bedsideSegment(i),
+        for (var i = 160; i < 240; i++) bedsideSegment(i),
+      ],
+    );
+    expect(result.epochs.skip(100).take(10).every((e) => e.isSleep), true);
+    expect(
+      result.decisionReasons[result.epochs[105].id],
+      'bridged_within_sleep',
+    );
+    // A recording gap is missing evidence and is never bridged.
+    expect(
+      result.epochs.where(
+        (e) => result.decisionReasons[e.id] == 'missing_capture' && e.isSleep,
+      ),
+      isEmpty,
+    );
+  });
 
   test('v3 feature fields survive spool roundtrip', () {
     final original = bedsideSegment(1, periodic: true);

@@ -1,13 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-
-import '../models/traditional_alarm.dart';
-import '../models/traditional_alarm_runtime_state.dart';
-import '../repositories/traditional_alarm_repository.dart';
-import '../repositories/settings_repository.dart';
-import 'notification_service.dart';
-import 'sleep_mission_service.dart';
-import 'sleep_monitor_service.dart';
+import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/models/traditional_alarm.dart';
+import 'package:workout_notes/models/traditional_alarm_runtime_state.dart';
+import 'package:workout_notes/repositories/settings_repository.dart';
+import 'package:workout_notes/repositories/traditional_alarm_repository.dart';
+import 'package:workout_notes/services/notification_service.dart';
+import 'package:workout_notes/services/sleep_mission_service.dart';
+import 'package:workout_notes/services/sleep_monitor_service.dart';
 
 /// Persists alarm definitions in SQLite and mirrors the runnable snapshot to
 /// Android. The native side owns ringing and repeat scheduling while the app is
@@ -19,8 +19,8 @@ class TraditionalAlarmService extends ChangeNotifier {
     'workout_notes/traditional_alarms/methods',
   );
 
-  final TraditionalAlarmRepository _repository = TraditionalAlarmRepository();
-  final SettingsRepository _settings = SettingsRepository();
+  final TraditionalAlarmRepository _repository = DatabaseHelper.instance.traditionalAlarmRepo;
+  final SettingsRepository _settings = DatabaseHelper.instance.settingsRepo;
   List<TraditionalAlarm> _alarms = const [];
   List<TraditionalAlarm> get alarms => List.unmodifiable(_alarms);
 
@@ -226,6 +226,5 @@ class TraditionalAlarmService extends ChangeNotifier {
     }
   }
 
-  bool get _isAndroid =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  bool get _isAndroid => defaultTargetPlatform == TargetPlatform.android;
 }

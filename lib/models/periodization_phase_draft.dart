@@ -1,4 +1,4 @@
-import 'periodization_target.dart';
+import 'package:workout_notes/models/periodization_target.dart';
 
 class PeriodizationPhaseDraft {
   final String name;

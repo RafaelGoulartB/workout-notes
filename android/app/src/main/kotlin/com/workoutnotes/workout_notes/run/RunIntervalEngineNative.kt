@@ -10,8 +10,26 @@ data class RunIntervalSnapshot(
     val remaining: Double = 0.0,
     val currentMetric: RunIntervalMetric = RunIntervalMetric.distance,
     val currentTarget: Int = 0,
+    /** What follows the running phase ("up next" preview); null when the set ends here. */
+    val nextPhase: RunIntervalPhase? = null,
+    val nextMetric: RunIntervalMetric? = null,
+    val nextTarget: Int? = null,
 ) {
     val isActive: Boolean get() = phase == RunIntervalPhase.work || phase == RunIntervalPhase.rest
+
+    /** Wire shape read by `RunIntervalSnapshot.fromMap` in Dart. */
+    fun toMap(): Map<String, Any?> = mapOf(
+        "phase" to phase.name,
+        "workIndex" to workIndex,
+        "totalWorks" to totalWorks,
+        "progress" to progress,
+        "remaining" to remaining,
+        "metric" to currentMetric.name,
+        "target" to currentTarget,
+        "nextPhase" to nextPhase?.name,
+        "nextMetric" to nextMetric?.name,
+        "nextTarget" to nextTarget,
+    )
 }
 
 enum class RunIntervalEventKind { workStarted, restStarted, completed, timeRemainingCue }
@@ -24,7 +42,8 @@ data class RunIntervalEvent(
 )
 
 /**
- * Pure work/rest FSM — Kotlin port of lib/services/run_interval_engine.dart.
+ * Pure work/rest FSM behind the quick "intervals" toggle. Its snapshot reaches
+ * Dart as `interval_snapshot` in the tracking state.
  */
 class RunIntervalEngineNative(
     private var preset: RunIntervalPreset = RunIntervalPreset(),
@@ -64,8 +83,21 @@ class RunIntervalEngineNative(
                 remaining = (target - phaseAccum).coerceIn(0.0, target),
                 currentMetric = metric,
                 currentTarget = target.toInt(),
+                nextPhase = nextPhase(),
+                nextMetric = nextPhase()?.let { if (it == RunIntervalPhase.work) preset.workMetric else preset.restMetric },
+                nextTarget = nextPhase()?.let { if (it == RunIntervalPhase.work) preset.workValue else preset.restValue },
             )
         }
+
+    private fun nextPhase(): RunIntervalPhase? = when (phase) {
+        RunIntervalPhase.work -> when {
+            workIndex >= preset.repeats -> null
+            preset.restValue > 0 -> RunIntervalPhase.rest
+            else -> RunIntervalPhase.work
+        }
+        RunIntervalPhase.rest -> if (workIndex >= preset.repeats) null else RunIntervalPhase.work
+        else -> null
+    }
 
     fun start(): List<RunIntervalEvent> {
         resetAccumulators()
@@ -120,6 +152,12 @@ class RunIntervalEngineNative(
             events.addAll(advancePhase())
         }
         return events
+    }
+
+    /** Ends the current work/rest phase now ("skip step"). */
+    fun skip(): List<RunIntervalEvent> {
+        if (phase != RunIntervalPhase.work && phase != RunIntervalPhase.rest) return emptyList()
+        return advancePhase()
     }
 
     private fun advancePhase(): List<RunIntervalEvent> {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Card showing estimated body composition (lean mass, fat mass, WHR).
 class BodyDerivedStatsCard extends StatelessWidget {
@@ -73,59 +74,51 @@ class BodyDerivedStatsCard extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-              color: theme.colorScheme.outlineVariant.withAlpha(80)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                loc.bodyTrackerEstimatedComposition,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+      child: AppSectionCard(
+        margin: const EdgeInsets.all(4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              loc.bodyTrackerEstimatedComposition,
+              style: theme.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: stats
-                    .map((s) => Expanded(
-                          child: Column(
-                            children: [
-                              Icon(s.icon,
-                                  size: 20, color: s.color.withAlpha(200)),
-                              const SizedBox(height: 4),
-                              Text(
-                                s.value,
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
-                                textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: stats
+                  .map((s) => Expanded(
+                        child: Column(
+                          children: [
+                            Icon(s.icon,
+                                size: 20, color: s.color.withAlpha(200)),
+                            const SizedBox(height: 4),
+                            Text(
+                              s.value,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
                               ),
-                              Text(
-                                s.label,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  fontSize: 9,
-                                  color:
-                                      theme.colorScheme.onSurfaceVariant,
-                                ),
-                                textAlign: TextAlign.center,
+                              textAlign: TextAlign.center,
+                            ),
+                            Text(
+                              s.label,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 9,
+                                color:
+                                    theme.colorScheme.onSurfaceVariant,
                               ),
-                            ],
-                          ),
-                        ))
-                    .toList(),
-              ),
-            ],
-          ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ))
+                  .toList(),
+            ),
+          ],
         ),
       ),
     );

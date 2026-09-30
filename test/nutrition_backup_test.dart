@@ -2,187 +2,22 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:workout_notes/repositories/export_import_repository.dart';
 import 'package:workout_notes/services/export_service.dart';
+
+import 'support/test_db.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Database database;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 1,
-        onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
-        onCreate: (db, version) async {
-          for (final table in [
-            'exercise_categories',
-            'exercises',
-            'workouts',
-            'exercise_entries',
-            'sets',
-            'routines',
-            'routine_days',
-            'routine_exercises',
-            'predefined_sets',
-            'body_measurements',
-            'user_goals',
-            'sleep_entries',
-            'sleep_monitor_sessions',
-            'sleep_monitor_segments',
-            'sleep_stage_epochs',
-            'traditional_alarms',
-          ]) {
-            await db.execute('CREATE TABLE $table (id TEXT PRIMARY KEY)');
-          }
-          await db.execute('''
-            CREATE TABLE foods (
-              id TEXT PRIMARY KEY,
-              source TEXT NOT NULL,
-              external_id TEXT NOT NULL,
-              name TEXT NOT NULL,
-              search_name TEXT NOT NULL,
-              brand TEXT,
-              barcode TEXT,
-              source_url TEXT,
-              fetched_at TEXT NOT NULL,
-              last_used_at TEXT,
-              is_favorite INTEGER NOT NULL DEFAULT 0,
-              UNIQUE(source, external_id)
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE food_variants (
-              id TEXT PRIMARY KEY,
-              food_id TEXT NOT NULL,
-              label TEXT,
-              reference_amount REAL NOT NULL,
-              reference_unit TEXT NOT NULL,
-              calories REAL,
-              protein_g REAL,
-              carbs_g REAL,
-              fat_g REAL,
-              saturated_fat_g REAL, monounsaturated_fat_g REAL,
-              polyunsaturated_fat_g REAL, trans_fat_g REAL,
-              fiber_g REAL,
-              sugars_g REAL,
-              sodium_mg REAL,
-              potassium_mg REAL, calcium_mg REAL, iron_mg REAL, magnesium_mg REAL,
-              zinc_mg REAL, vitamin_a_ug REAL, vitamin_c_mg REAL,
-              vitamin_d_ug REAL, vitamin_b12_ug REAL,
-              extra_nutrients_json TEXT,
-              is_estimated INTEGER NOT NULL DEFAULT 0,
-              FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE CASCADE
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE food_servings (
-              id TEXT PRIMARY KEY,
-              food_variant_id TEXT NOT NULL,
-              label TEXT NOT NULL,
-              quantity REAL NOT NULL DEFAULT 1,
-              unit TEXT NOT NULL,
-              grams_equivalent REAL,
-              ml_equivalent REAL,
-              FOREIGN KEY (food_variant_id) REFERENCES food_variants(id) ON DELETE CASCADE
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE meal_logs (
-              id TEXT PRIMARY KEY,
-              date TEXT NOT NULL,
-              meal_type TEXT NOT NULL,
-              name TEXT,
-              notes TEXT,
-              created_at TEXT NOT NULL,
-              UNIQUE(date, meal_type)
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE meal_log_items (
-              id TEXT PRIMARY KEY,
-              meal_log_id TEXT NOT NULL,
-              food_id TEXT,
-              food_variant_id TEXT,
-              food_name_snapshot TEXT NOT NULL,
-              brand_snapshot TEXT,
-              quantity REAL NOT NULL,
-              unit TEXT NOT NULL,
-              calories REAL,
-              protein_g REAL,
-              carbs_g REAL,
-              fat_g REAL,
-              saturated_fat_g REAL, monounsaturated_fat_g REAL,
-              polyunsaturated_fat_g REAL, trans_fat_g REAL,
-              fiber_g REAL,
-              sugars_g REAL,
-              sodium_mg REAL,
-              potassium_mg REAL, calcium_mg REAL, iron_mg REAL, magnesium_mg REAL,
-              zinc_mg REAL, vitamin_a_ug REAL, vitamin_c_mg REAL,
-              vitamin_d_ug REAL, vitamin_b12_ug REAL,
-              nutrition_snapshot_json TEXT NOT NULL,
-              created_at TEXT NOT NULL,
-              FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE,
-              FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE SET NULL,
-              FOREIGN KEY (food_variant_id) REFERENCES food_variants(id) ON DELETE SET NULL
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE nutrition_goals (
-              id TEXT PRIMARY KEY,
-              calories REAL,
-              protein_g REAL,
-              carbs_g REAL,
-              fat_g REAL,
-              created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL,
-              is_active INTEGER NOT NULL DEFAULT 1
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE saved_meals (
-              id TEXT PRIMARY KEY,
-              name TEXT NOT NULL,
-              meal_type TEXT,
-              portions REAL NOT NULL DEFAULT 1,
-              created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE saved_meal_items (
-              id TEXT PRIMARY KEY,
-              saved_meal_id TEXT NOT NULL,
-              food_id TEXT,
-              food_variant_id TEXT,
-              food_name_snapshot TEXT NOT NULL,
-              brand_snapshot TEXT,
-              quantity REAL NOT NULL,
-              unit TEXT NOT NULL,
-              serving_label TEXT,
-              serving_grams_equivalent REAL,
-              serving_ml_equivalent REAL,
-              order_index INTEGER NOT NULL DEFAULT 0,
-              FOREIGN KEY (saved_meal_id) REFERENCES saved_meals(id) ON DELETE CASCADE,
-              FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE SET NULL,
-              FOREIGN KEY (food_variant_id) REFERENCES food_variants(id) ON DELETE SET NULL
-            )
-          ''');
-          await db.execute(
-            'CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT)',
-          );
-        },
-      ),
-    );
+    database = await openTestDb();
   });
 
   tearDown(() async {
@@ -192,15 +27,42 @@ void main() {
   test(
     'round-trip preserves workout goals and consolidated sleep data',
     () async {
-      const tableIds = <String, String>{
-        'user_goals': 'goal-1',
-        'sleep_entries': 'sleep-1',
-        'sleep_monitor_sessions': 'session-1',
-        'traditional_alarms': 'alarm-1',
+      const now = '2026-07-26T08:00:00.000';
+      final rows = <String, Map<String, Object?>>{
+        'user_goals': {
+          'id': 'goal-1',
+          'title': 'Weekly volume',
+          'scope': 'workouts',
+          'metric': 'workoutCount',
+          'period': 'weekly',
+          'target_value': 3.0,
+          'created_at': now,
+        },
+        'sleep_entries': {
+          'id': 'sleep-1',
+          'date': '2026-07-25',
+          'sleep_minutes': 450,
+          'created_at': now,
+        },
+        'sleep_monitor_sessions': {
+          'id': 'session-1',
+          'status': 'completed',
+          'started_at': now,
+          'utc_offset_start_minutes': -180,
+          'algorithm_version': '1',
+          'created_at': now,
+        },
+        'traditional_alarms': {
+          'id': 'alarm-1',
+          'hour': 7,
+          'minute': 30,
+          'created_at': now,
+          'updated_at': now,
+        },
       };
 
-      for (final entry in tableIds.entries) {
-        await database.insert(entry.key, {'id': entry.value});
+      for (final entry in rows.entries) {
+        await database.insert(entry.key, entry.value);
       }
 
       final repository = ExportImportRepository(
@@ -209,20 +71,19 @@ void main() {
       final backup = await repository.exportAllData();
 
       expect(backup['version'], ExportImportRepository.currentBackupVersion);
-      for (final entry in tableIds.entries) {
-        expect(backup[entry.key], [
-          {'id': entry.value},
+      for (final entry in rows.entries) {
+        expect((backup[entry.key] as List).map((row) => (row as Map)['id']), [
+          entry.value['id'],
         ]);
         await database.delete(entry.key);
       }
 
       final restoredRows = await repository.restoreFromBackup(backup);
 
-      expect(restoredRows, greaterThanOrEqualTo(tableIds.length));
-      for (final entry in tableIds.entries) {
-        expect(await database.query(entry.key), [
-          {'id': entry.value},
-        ]);
+      expect(restoredRows, greaterThanOrEqualTo(rows.length));
+      for (final entry in rows.entries) {
+        final restored = await database.query(entry.key);
+        expect(restored.map((row) => row['id']), [entry.value['id']]);
       }
     },
   );
@@ -353,7 +214,7 @@ void main() {
     final count = await ExportImportRepository(
       databaseProvider: () async => database,
     ).restoreFromBackup(export);
-    expect(count, 5);
+    expect(count, 5 + 7); // + default sleep-mission settings
     final items = await database.query('meal_log_items');
     expect(items.first['food_name_snapshot'], 'Apple');
     expect(items.first['nutrition_snapshot_json'], '{"version":1}');
@@ -378,7 +239,6 @@ void main() {
       'body_measurements': <Map<String, dynamic>>[],
       'sleep_entries': <Map<String, dynamic>>[],
       'sleep_monitor_sessions': <Map<String, dynamic>>[],
-      'sleep_monitor_segments': <Map<String, dynamic>>[],
       // no nutrition tables
       'settings': [
         {'key': 'restored', 'value': 'yes'},
@@ -387,7 +247,7 @@ void main() {
     final count = await ExportImportRepository(
       databaseProvider: () async => database,
     ).restoreFromBackup(backup);
-    expect(count, 1);
+    expect(count, 1 + 7); // + default sleep-mission settings
     final items = await database.query('meal_logs');
     expect(items, isEmpty);
   });
@@ -404,27 +264,18 @@ void main() {
     });
     final backup = <String, dynamic>{
       'version': 5,
+      // Missing the NOT NULL `name`, so the insert aborts the transaction.
       'foods': [
         {
           'id': 'bad',
           'source': 'manual',
           'external_id': 'bad',
-          'name': 'Bad',
           'search_name': 'bad',
           'fetched_at': now,
         },
       ],
-      'food_variants': [
-        {
-          'id': 'bad_v',
-          'food_id': 'different-parent',
-          'reference_amount': 100,
-          'reference_unit': 'g',
-          'is_estimated': 0,
-        },
-      ],
     };
-    expect(
+    await expectLater(
       () => ExportImportRepository(
         databaseProvider: () async => database,
       ).restoreFromBackup(backup),

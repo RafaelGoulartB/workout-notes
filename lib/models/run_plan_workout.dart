@@ -11,7 +11,10 @@ enum RunWorkoutKind {
   hills('hills'),
   progression('progression'),
   recovery('recovery'),
-  race('race');
+  race('race'),
+
+  /// Mid-plan time trial whose result recalibrates the plan's paces.
+  test('test');
 
   final String value;
   const RunWorkoutKind(this.value);
@@ -28,7 +31,8 @@ enum RunWorkoutKind {
       this == RunWorkoutKind.interval ||
       this == RunWorkoutKind.fartlek ||
       this == RunWorkoutKind.hills ||
-      this == RunWorkoutKind.race;
+      this == RunWorkoutKind.race ||
+      this == RunWorkoutKind.test;
 }
 
 /// One planned session inside a [RunPlan] week.
@@ -292,8 +296,6 @@ class RunExpandedStep {
     required this.repTotal,
     required this.sequence,
   });
-
-  bool get isRepeated => repTotal > 1;
 }
 
 const Object _sentinel = Object();

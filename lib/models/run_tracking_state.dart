@@ -1,5 +1,8 @@
-import 'package:workout_notes/models/run_split.dart';
+import 'package:workout_notes/models/run_interval_snapshot.dart';
+import 'package:workout_notes/models/run_lap.dart';
 import 'package:workout_notes/models/run_session_context.dart';
+import 'package:workout_notes/models/run_split.dart';
+import 'package:workout_notes/models/run_step_snapshot.dart';
 
 class RunLatLng {
   final double lat;
@@ -33,15 +36,27 @@ class RunTrackingState {
   final List<RunLatLng> trail;
   final List<RunSplit> splits;
   final RunSplit? currentSplit;
+
+  /// True while the run is recording but standing still: the moving clock and
+  /// distance are frozen and resume by themselves when the runner moves.
+  final bool autoPaused;
+
+  /// Manual laps already marked (oldest first).
+  final List<RunLap> laps;
+
+  /// The lap in progress. Before any manual lap it spans the whole run.
+  final RunLap? currentLap;
   final String? errorCode;
   final String? errorMessage;
 
   /// Durable plan/goal identity mirrored by the native run spool.
   final RunSessionContext? sessionContext;
 
-  /// Native structured-workout progress. Kept as wire data here so this model
-  /// does not depend on the step-engine service layer.
-  final Map<String, dynamic>? nativeStepSnapshot;
+  /// Native structured-workout progress; null when no plan is running.
+  final RunStepSnapshot? stepSnapshot;
+
+  /// Native quick-interval progress; null when no interval set is running.
+  final RunIntervalSnapshot? intervalSnapshot;
 
   const RunTrackingState({
     required this.supported,
@@ -63,7 +78,11 @@ class RunTrackingState {
     required this.errorCode,
     required this.errorMessage,
     this.sessionContext,
-    this.nativeStepSnapshot,
+    this.stepSnapshot,
+    this.intervalSnapshot,
+    this.autoPaused = false,
+    this.laps = const [],
+    this.currentLap,
   });
 
   const RunTrackingState.initial({bool supported = false})
@@ -87,13 +106,17 @@ class RunTrackingState {
         errorCode: null,
         errorMessage: null,
         sessionContext: null,
-        nativeStepSnapshot: null,
       );
 
   bool get isActive =>
       status == starting || status == recording || status == paused;
 
   bool get isRecording => status == recording;
+
+  /// Recording with the clock actually running (not manually or auto paused).
+  bool get isClockRunning => status == recording && !autoPaused;
+
+  bool get isAutoPaused => status == recording && autoPaused;
 
   bool get isPaused => status == paused;
 
@@ -118,8 +141,14 @@ class RunTrackingState {
     if (rawCurrent is Map) {
       current = RunSplit.fromMap(Map<String, dynamic>.from(rawCurrent));
     }
+    final rawLaps = (map['laps'] as List? ?? const [])
+        .whereType<Map>()
+        .map((row) => RunLap.fromMap(Map<String, dynamic>.from(row)))
+        .toList(growable: false);
+    final rawCurrentLap = map['current_lap'];
     final rawContext = map['session_context'];
     final rawStepSnapshot = map['step_snapshot'];
+    final rawIntervalSnapshot = map['interval_snapshot'];
     return RunTrackingState(
       supported: map['supported'] as bool? ?? true,
       locationGranted: map['location_granted'] as bool? ?? false,
@@ -137,13 +166,23 @@ class RunTrackingState {
       trail: trail ?? const [],
       splits: rawSplits,
       currentSplit: current,
+      autoPaused: map['auto_paused'] as bool? ?? false,
+      laps: rawLaps,
+      currentLap: rawCurrentLap is Map
+          ? RunLap.fromMap(Map<String, dynamic>.from(rawCurrentLap))
+          : null,
       errorCode: map['error_code'] as String?,
       errorMessage: map['error_message'] as String?,
       sessionContext: rawContext is Map
           ? RunSessionContext.fromMap(Map<String, dynamic>.from(rawContext))
           : null,
-      nativeStepSnapshot: rawStepSnapshot is Map
-          ? Map<String, dynamic>.from(rawStepSnapshot)
+      stepSnapshot: rawStepSnapshot is Map
+          ? RunStepSnapshot.fromMap(Map<String, dynamic>.from(rawStepSnapshot))
+          : null,
+      intervalSnapshot: rawIntervalSnapshot is Map
+          ? RunIntervalSnapshot.fromMap(
+              Map<String, dynamic>.from(rawIntervalSnapshot),
+            )
           : null,
     );
   }
@@ -165,10 +204,14 @@ class RunTrackingState {
     List<RunLatLng>? trail,
     List<RunSplit>? splits,
     RunSplit? currentSplit,
+    bool? autoPaused,
+    List<RunLap>? laps,
+    RunLap? currentLap,
     String? errorCode,
     String? errorMessage,
     RunSessionContext? sessionContext,
-    Map<String, dynamic>? nativeStepSnapshot,
+    RunStepSnapshot? stepSnapshot,
+    RunIntervalSnapshot? intervalSnapshot,
     bool clearError = false,
   }) {
     return RunTrackingState(
@@ -188,10 +231,14 @@ class RunTrackingState {
       trail: trail ?? this.trail,
       splits: splits ?? this.splits,
       currentSplit: currentSplit ?? this.currentSplit,
+      autoPaused: autoPaused ?? this.autoPaused,
+      laps: laps ?? this.laps,
+      currentLap: currentLap ?? this.currentLap,
       errorCode: clearError ? null : (errorCode ?? this.errorCode),
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       sessionContext: sessionContext ?? this.sessionContext,
-      nativeStepSnapshot: nativeStepSnapshot ?? this.nativeStepSnapshot,
+      stepSnapshot: stepSnapshot ?? this.stepSnapshot,
+      intervalSnapshot: intervalSnapshot ?? this.intervalSnapshot,
     );
   }
 

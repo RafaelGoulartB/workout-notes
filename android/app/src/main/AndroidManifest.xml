@@ -97,6 +97,24 @@
             android:name=".sleep.SleepAlarmReceiver"
             android:exported="false" />
         <receiver
+            android:name=".medication.MedicationReminderReceiver"
+            android:directBootAware="true"
+            android:exported="false" />
+        <service
+            android:name=".medication.MedicationAlarmService"
+            android:directBootAware="true"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+        <activity
+            android:name=".medication.MedicationConfirmActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+        <receiver
             android:name=".sleep.SleepAlarmBootReceiver"
             android:directBootAware="true"
             android:exported="false">

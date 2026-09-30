@@ -1,3 +1,4 @@
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
@@ -24,11 +25,17 @@ class EffectiveNutritionGoal {
   /// Total weeks of [phase].
   final int? totalWeeks;
 
+  /// True on a planned training day, false on a rest day, null when the
+  /// phase does not distinguish them (no template week or no rest-day
+  /// nutrition).
+  final bool? trainingDay;
+
   const EffectiveNutritionGoal({
     this.goal,
     this.phase,
     this.weekNumber,
     this.totalWeeks,
+    this.trainingDay,
   });
 
   bool get fromPlan => phase != null;
@@ -49,8 +56,8 @@ class EffectiveNutritionGoalService {
     DateTime? date,
   }) async {
     final day = date ?? DateTime.now();
-    final nutrition = nutritionRepository ?? NutritionRepository();
-    final periodization = periodizationRepository ?? PeriodizationRepository();
+    final nutrition = nutritionRepository ?? DatabaseHelper.instance.nutritionRepo;
+    final periodization = periodizationRepository ?? DatabaseHelper.instance.periodizationRepo;
     final base = await nutrition.getActiveGoal();
     try {
       final phase = await periodization.getEffectivePhase(day);
@@ -64,19 +71,26 @@ class EffectiveNutritionGoalService {
       if (target == null || target.nutritionJson.isEmpty) {
         return EffectiveNutritionGoal(goal: base);
       }
+      // Rest days only differ when the phase has rest-day nutrition and a
+      // template week saying which weekdays are training days.
+      final trainingDay = target.hasRestDayNutrition
+          ? (await periodization.dayPlanFor(phase, target, day)).trainingDay
+          : null;
+      final values = target.nutritionFor(trainingDay: trainingDay ?? true);
       return EffectiveNutritionGoal(
         goal: NutritionGoal(
           id: 'periodization:${target.id}',
-          calories: target.calories ?? base?.calories,
-          proteinG: target.proteinG ?? base?.proteinG,
-          carbsG: target.carbsG ?? base?.carbsG,
-          fatG: target.fatG ?? base?.fatG,
+          calories: values.calories ?? base?.calories,
+          proteinG: values.proteinG ?? base?.proteinG,
+          carbsG: values.carbsG ?? base?.carbsG,
+          fatG: values.fatG ?? base?.fatG,
           createdAt: target.createdAt,
           updatedAt: DateTime.now(),
         ),
         phase: phase,
         weekNumber: phase.weekAt(day),
         totalWeeks: phase.totalWeeks,
+        trainingDay: trainingDay,
       );
     } catch (_) {
       // Nutrition stays fully usable on databases that have not reached

@@ -9,8 +9,6 @@ void main() {
       durationSeconds: 30 * 60,
       exercises: const [
         WorkoutStatsExerciseInput(
-          exerciseId: 'bench',
-          name: 'Bench Press',
           categoryId: 'chest',
           categoryName: 'Chest',
           categoryColor: Colors.blue,
@@ -46,8 +44,6 @@ void main() {
           ],
         ),
         WorkoutStatsExerciseInput(
-          exerciseId: 'row',
-          name: 'Row',
           categoryId: 'back',
           categoryName: 'Back',
           categoryColor: Colors.green,
@@ -69,9 +65,6 @@ void main() {
     expect(stats.totalSets, 4);
     expect(stats.densityKgPerMinute, closeTo(71.333, 0.01));
     expect(stats.averageRpe, closeTo(8, 0.01));
-    expect(stats.topSet?.exerciseId, 'bench');
-    expect(stats.topSet?.volume, 800);
-    expect(stats.highestVolumeExercise?.exerciseId, 'bench');
     expect(stats.categories, hasLength(2));
     expect(stats.categories.first.categoryId, 'chest');
   });
@@ -82,8 +75,6 @@ void main() {
       durationSeconds: 0,
       exercises: const [
         WorkoutStatsExerciseInput(
-          exerciseId: 'bench',
-          name: 'Bench Press',
           categoryName: 'Chest',
           categoryColor: Colors.blue,
           sets: [

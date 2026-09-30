@@ -1,13 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/run_lap.dart';
 import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
+import 'package:workout_notes/utils/run_split_analytics.dart';
+import 'package:workout_notes/widgets/run/run_theme_colors.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
-/// Per-km splits with relative pace bars (longer = faster).
+/// Per-km splits: a bar per kilometre (longer = faster) coloured by how it
+/// compares with the run average, the delta vs average, the climb of that km
+/// and a badge on the fastest one.
 class RunSplitsList extends StatelessWidget {
   final List<RunSplit> splits;
 
-  const RunSplitsList({super.key, required this.splits});
+  /// Run average pace; when null the mean of the completed splits is used.
+  final double? averagePaceSecPerKm;
+
+  /// Climb per kilometre keyed by split number; the column is hidden when empty.
+  final Map<int, double> elevationGainByKm;
+
+  const RunSplitsList({
+    super.key,
+    required this.splits,
+    this.averagePaceSecPerKm,
+    this.elevationGainByKm = const {},
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -25,173 +42,301 @@ class RunSplitsList extends StatelessWidget {
       );
     }
 
-    double? slowest;
-    double? fastest;
-    for (final s in splits) {
-      final p = s.paceSecPerKm;
-      if (p == null || !p.isFinite || p <= 0) continue;
-      if (slowest == null || p > slowest) slowest = p;
-      if (fastest == null || p < fastest) fastest = p;
-    }
+    final rows = RunSplitAnalytics.build(
+      splits,
+      averagePaceSecPerKm: averagePaceSecPerKm,
+      elevationGainByKm: elevationGainByKm,
+    );
+    final showElevation = elevationGainByKm.isNotEmpty;
+    final header = theme.textTheme.labelSmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+      fontWeight: FontWeight.w600,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 4),
+          padding: const EdgeInsets.only(bottom: 6),
           child: Row(
             children: [
               SizedBox(
-                width: 64,
+                width: _kmWidth,
+                child: Text(loc.runDetailSplitKm, style: header),
+              ),
+              const Spacer(),
+              SizedBox(
+                width: _paceWidth,
                 child: Text(
-                  loc.runDetailSplitKm,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  loc.runDetailSplitPace,
+                  textAlign: TextAlign.end,
+                  style: header,
                 ),
               ),
               SizedBox(
-                width: 56,
+                width: _deltaWidth,
                 child: Text(
-                  loc.runDetailSplitPace,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  loc.runRecordSplitTime,
+                  loc.runSplitsDelta,
                   textAlign: TextAlign.end,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: header,
                 ),
               ),
+              if (showElevation)
+                SizedBox(
+                  width: _climbWidth,
+                  child: Text(
+                    loc.runSplitsClimb,
+                    textAlign: TextAlign.end,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: header,
+                  ),
+                ),
             ],
           ),
         ),
-        for (var i = 0; i < splits.length; i++) ...[
+        for (var i = 0; i < rows.length; i++) ...[
           if (i > 0)
-            Divider(
-              height: 1,
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
-            ),
-          _SplitRow(
-            split: splits[i],
-            fastest: fastest,
-            slowest: slowest,
-          ),
+            Divider(height: 1, color: AppUi.divider(theme.colorScheme)),
+          _SplitRow(row: rows[i], showElevation: showElevation),
         ],
       ],
     );
   }
+
+  static const double _kmWidth = 60;
+  static const double _paceWidth = 48;
+  static const double _deltaWidth = 52;
+  static const double _climbWidth = 46;
 }
 
 class _SplitRow extends StatelessWidget {
-  final RunSplit split;
-  final double? fastest;
-  final double? slowest;
+  final RunSplitRow row;
+  final bool showElevation;
 
-  const _SplitRow({
-    required this.split,
-    required this.fastest,
-    required this.slowest,
-  });
+  const _SplitRow({required this.row, required this.showElevation});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
+    final split = row.split;
     final label = split.isPartial
         ? loc.runDetailSplitPartial(
             RunFormatters.distanceKm(split.distanceMeters),
           )
         : loc.runRecordSplitKm(split.km);
-    final pace = split.paceSecPerKm;
-    final barFraction = _barFraction(pace);
+    final toneColor = switch (row.tone) {
+      RunSplitTone.faster => colors.primary,
+      RunSplitTone.slower => RunThemeColors.warm(colors),
+      _ => colors.onSurfaceVariant,
+    };
+    final delta = row.deltaSecPerKm;
+    final barColor = switch (row.tone) {
+      RunSplitTone.faster => colors.primary,
+      RunSplitTone.slower => RunThemeColors.warm(colors),
+      _ => colors.outline,
+    };
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Row(
         children: [
-          Row(
-            children: [
-              SizedBox(
-                width: 64,
-                child: Text(
-                  label,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight:
-                        split.isPartial ? FontWeight.w600 : FontWeight.w500,
+          SizedBox(
+            width: RunSplitsList._kmWidth,
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: row.isFastest
+                          ? FontWeight.w800
+                          : FontWeight.w500,
+                    ),
                   ),
                 ),
-              ),
-              SizedBox(
-                width: 56,
-                child: Text(
-                  RunFormatters.pace(pace),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  RunFormatters.duration(split.durationSeconds),
-                  textAlign: TextAlign.end,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: SizedBox(
-              height: 8,
-              child: Stack(
-                children: [
-                  Container(
-                    color: theme.colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.7),
-                  ),
-                  FractionallySizedBox(
-                    widthFactor: barFraction,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withValues(
-                          alpha: split.isPartial ? 0.55 : 0.9,
-                        ),
-                        borderRadius: BorderRadius.circular(999),
+                if (row.isFastest)
+                  Semantics(
+                    label: loc.runSplitsFastest,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 2),
+                      child: Icon(
+                        Icons.bolt_rounded,
+                        size: 14,
+                        color: colors.primary,
                       ),
                     ),
                   ),
-                ],
+              ],
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: SizedBox(
+                  height: 10,
+                  child: Stack(
+                    children: [
+                      Container(
+                        color: colors.surfaceContainerHighest.withValues(
+                          alpha: 0.7,
+                        ),
+                      ),
+                      FractionallySizedBox(
+                        widthFactor: row.barFraction,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: barColor.withValues(
+                              alpha: split.isPartial ? 0.5 : 0.9,
+                            ),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
+          SizedBox(
+            width: RunSplitsList._paceWidth,
+            child: Text(
+              RunFormatters.paceShort(split.paceSecPerKm),
+              textAlign: TextAlign.end,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                fontFeatures: AppUi.tabular,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: RunSplitsList._deltaWidth,
+            child: Text(
+              delta == null ? '' : RunFormatters.paceDelta(delta),
+              textAlign: TextAlign.end,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: toneColor,
+                fontWeight: FontWeight.w700,
+                fontFeatures: AppUi.tabular,
+              ),
+            ),
+          ),
+          if (showElevation)
+            SizedBox(
+              width: RunSplitsList._climbWidth,
+              child: Text(
+                row.elevationGainMeters == null
+                    ? '—'
+                    : '+${row.elevationGainMeters!.round()} m',
+                textAlign: TextAlign.end,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.onSurfaceVariant,
+                  fontFeatures: AppUi.tabular,
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
+}
 
-  /// Longer bar = faster pace. Partial / missing pace → short stub.
-  double _barFraction(double? pace) {
-    if (pace == null || !pace.isFinite || pace <= 0) return 0.15;
-    final fast = fastest;
-    final slow = slowest;
-    if (fast == null || slow == null) return 0.7;
-    if ((slow - fast).abs() < 1) return 1.0;
-    final t = ((slow - pace) / (slow - fast)).clamp(0.0, 1.0);
-    return 0.28 + 0.72 * t;
+/// Manual laps marked while recording: distance, time and pace per lap.
+class RunLapsList extends StatelessWidget {
+  final List<RunLap> laps;
+
+  const RunLapsList({super.key, required this.laps});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
+    final fastest = _fastestLap(laps);
+    // Laps may be stored 0- or 1-based; always show "Lap 1" first.
+    final labelOffset = laps.any((lap) => lap.index == 0) ? 1 : 0;
+    return AppDividedList(
+      children: [
+        for (final lap in laps)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 9),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          loc.runDetailLapLabel('${lap.index + labelOffset}'),
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (lap == fastest)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4),
+                          child: Icon(
+                            Icons.bolt_rounded,
+                            size: 14,
+                            color: colors.primary,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Text(
+                  RunFormatters.distanceWithUnit(lap.distanceMeters),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    fontFeatures: AppUi.tabular,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  RunFormatters.duration(lap.durationSeconds),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    fontFeatures: AppUi.tabular,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 44,
+                  child: Text(
+                    RunFormatters.paceShort(lap.paceSecPerKm),
+                    textAlign: TextAlign.end,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: AppUi.tabular,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  static RunLap? _fastestLap(List<RunLap> laps) {
+    if (laps.length < 2) return null;
+    RunLap? best;
+    for (final lap in laps) {
+      final pace = lap.paceSecPerKm;
+      if (pace == null || !pace.isFinite || pace <= 0) continue;
+      if (best == null || pace < best.paceSecPerKm!) best = lap;
+    }
+    return best;
   }
 }

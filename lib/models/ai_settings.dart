@@ -1,4 +1,4 @@
-import 'ai_provider.dart';
+import 'package:workout_notes/models/ai_provider.dart';
 
 /// Persisted AI configuration: providers, active id, system prompt, context mode.
 class AiSettings {

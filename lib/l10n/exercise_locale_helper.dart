@@ -1,5 +1,5 @@
-import 'app_localizations.dart';
-import 'l10n_exercises.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/l10n_exercises.dart';
 
 /// Helper methods for resolving localized exercise and category names.
 ///

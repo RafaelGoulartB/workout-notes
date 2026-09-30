@@ -2,16 +2,21 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/dev_tools/run_debug_backend.dart';
+import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_activity.dart';
+import 'package:workout_notes/models/run_lap.dart';
 import 'package:workout_notes/models/run_permission_state.dart';
 import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/models/run_session_context.dart';
+import 'package:workout_notes/models/run_step_snapshot.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
-import 'package:workout_notes/services/run_debug_simulator.dart';
-import 'package:workout_notes/services/run_workout_step_engine.dart';
+import 'package:workout_notes/services/run_native_tracking_backend.dart';
+import 'package:workout_notes/services/run_tracking_backend.dart';
 import 'package:workout_notes/utils/run_spool_recovery.dart';
 
 class RunGpsFix {
@@ -31,38 +36,39 @@ class RunGpsFix {
   bool get isRegular => accuracyMeters != null && accuracyMeters! <= 35;
 }
 
-/// Flutter facade for the Android foreground GPS run tracker.
+/// Flutter facade for the run tracker.
+///
+/// The tracker itself is a [RunTrackingBackend]: the Android foreground GPS
+/// service in production ([NativeRunTrackingBackend]), or in [kDebugMode] a
+/// simulated GPS path ([RunDebugBackend], see [startDebugSimulation]) so the
+/// emulator can exercise distance, pace, splits, and save without real motion.
 ///
 /// The EventChannel is a live UI signal. Durable activities are imported from
 /// the native spool through the MethodChannel after stop / app relaunch.
-///
-/// In [kDebugMode] only, [startDebugSimulation] drives a fake GPS path so the
-/// emulator can exercise distance, pace, splits, and save without real motion.
 class RunTrackingService extends ChangeNotifier {
   static final RunTrackingService _instance = RunTrackingService._();
   static RunTrackingService get instance => _instance;
 
-  RunTrackingService._();
+  RunTrackingService._() {
+    _native = _own(NativeRunTrackingBackend.new);
+    _backend = _native;
+  }
 
-  static const methods = MethodChannel('workout_notes/run_tracking/methods');
-  static const events = EventChannel('workout_notes/run_tracking/events');
+  static const methods = NativeRunTrackingBackend.methods;
 
-  final RunRepository _repository = RunRepository();
-  final RunPlanRepository _planRepository = RunPlanRepository();
+  final RunRepository _repository = DatabaseHelper.instance.runRepo;
+  final RunPlanRepository _planRepository = DatabaseHelper.instance.runPlanRepo;
   RunTrackingState _state = RunTrackingState.initial(
-    supported: !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
+    supported: defaultTargetPlatform == TargetPlatform.android,
   );
-  StreamSubscription<dynamic>? _eventSubscription;
-  bool _initialized = false;
+  late final NativeRunTrackingBackend _native;
+  late RunTrackingBackend _backend;
+  Future<void>? _initFuture;
+  bool _routeMaintenanceStarted = false;
   bool _recovering = false;
   int _recoveredCount = 0;
-  final List<RunLatLng> _trail = [];
   final Map<String, Map<String, dynamic>> _memoryReviewSpools = {};
 
-  RunDebugSimulator? _debugSim;
-  Timer? _debugTimer;
-  bool _debugPaused = false;
-  bool _nativeDebugSim = false;
   bool _notificationsGranted = false;
   bool _notificationsPermissionRequired = false;
   RunSessionContext? _sessionContext;
@@ -71,7 +77,7 @@ class RunTrackingService extends ChangeNotifier {
   bool get isSupported => _state.supported;
   bool get isActive => _state.isActive;
   int get recoveredCount => _recoveredCount;
-  bool get isDebugSimulating => _debugSim != null;
+  bool get isDebugSimulating => _backend.isSimulated;
   bool get canDebugSimulate => kDebugMode;
   bool get notificationsGranted => _notificationsGranted;
   bool get notificationsPermissionRequired => _notificationsPermissionRequired;
@@ -81,68 +87,68 @@ class RunTrackingService extends ChangeNotifier {
     notificationsPermissionRequired: _notificationsPermissionRequired,
   );
 
-  bool get _isAndroid =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  bool get _isAndroid => defaultTargetPlatform == TargetPlatform.android;
 
-  Future<void> initialize() async {
+  /// Subscribes to the native events, reads capabilities/state and recovers
+  /// what a killed process left behind. Concurrent and later callers share the
+  /// same run (home, run screens and startup all call this); a failed run can
+  /// be retried by calling it again. Use [refresh] for a light re-read.
+  Future<void> initialize() {
+    final running = _initFuture;
+    if (running != null) return running;
+    final future = _initialize();
+    _initFuture = future;
+    future.catchError((Object _) {
+      if (identical(_initFuture, future)) _initFuture = null;
+    });
+    return future;
+  }
+
+  Future<void> _initialize() async {
     if (!_isAndroid) {
       if (kDebugMode) {
         _state = _state.copyWith(supported: true, locationGranted: true);
       }
       _notificationsGranted = true;
-      _initialized = true;
       notifyListeners();
-      await _maintainRouteStorage();
+      _scheduleRouteMaintenance();
       return;
     }
-    if (!_initialized) {
-      _initialized = true;
-      _eventSubscription = events.receiveBroadcastStream().listen(
-        _onEvent,
-        onError: (Object error, StackTrace stack) {
-          if (_debugSim != null) return;
-          _state = _state.copyWith(
-            errorCode: 'event_channel',
-            errorMessage: error.toString(),
-          );
-          notifyListeners();
-        },
-      );
-    }
-    await getCapabilities();
-    await getState();
-    await _recoverActiveNativeSession();
+    _native.listen();
+    await refresh();
+    await _native.recoverActive();
     _sessionContext = _state.sessionContext;
     await recoverPendingSessions();
-    await _maintainRouteStorage();
+    _scheduleRouteMaintenance();
+  }
+
+  /// Forgets the shared initialisation so the next [initialize] runs again
+  /// (tests share the singleton across cases).
+  @visibleForTesting
+  void resetInitializationForTest() {
+    _initFuture = null;
+    _routeMaintenanceStarted = false;
+  }
+
+  /// Light re-read of the native capabilities and state (no recovery).
+  Future<void> refresh() async {
+    await getCapabilities();
+    await getState();
+  }
+
+  /// Route storage maintenance runs at most once per process, in the
+  /// background, and never while a run is being recorded.
+  void _scheduleRouteMaintenance() {
+    if (_routeMaintenanceStarted || _state.isActive) return;
+    _routeMaintenanceStarted = true;
+    unawaited(_maintainRouteStorage());
   }
 
   Future<void> _maintainRouteStorage() async {
     try {
-      await _repository.migrateLegacyRoutes(limit: 5);
-      await _repository.optimizeOldRoutes(limit: 5);
-      await _repository.reclaimIncrementalVacuumPages();
+      await _repository.runRouteMaintenance();
     } catch (_) {
       // Storage maintenance is opportunistic and must never block tracking.
-    }
-  }
-
-  Future<void> _recoverActiveNativeSession() async {
-    if (!_isAndroid || _state.isActive) return;
-    try {
-      final requested =
-          await methods.invokeMethod<bool>('recoverActive') ?? false;
-      if (!requested) return;
-      await _awaitStatus({
-        RunTrackingState.recording,
-        RunTrackingState.paused,
-        RunTrackingState.completed,
-        RunTrackingState.discarded,
-      }, timeout: const Duration(seconds: 8));
-    } on MissingPluginException {
-      // Older debug builds and tests.
-    } catch (error) {
-      _setError('active_recovery_error', error.toString());
     }
   }
 
@@ -184,22 +190,7 @@ class RunTrackingService extends ChangeNotifier {
     }
   }
 
-  Future<RunTrackingState> getState() async {
-    if (_debugSim != null && !_nativeDebugSim) return _state;
-    if (!_isAndroid) return _state;
-    try {
-      final result = await methods.invokeMapMethod<String, dynamic>('getState');
-      if (result != null) {
-        _applyNativeState(result);
-      }
-    } on MissingPluginException {
-      _state = _state.copyWith(supported: kDebugMode);
-      notifyListeners();
-    } catch (error) {
-      _setError('state_error', error.toString());
-    }
-    return _state;
-  }
+  Future<RunTrackingState> getState() => _native.refresh();
 
   Future<bool> requestLocationPermission() async {
     if (kDebugMode && !_isAndroid) {
@@ -341,219 +332,60 @@ class RunTrackingService extends ChangeNotifier {
   }) async {
     if (!kDebugMode) return false;
     if (_state.isActive) return true;
-    _stopDebugTimer();
-    _trail.clear();
-    _debugPaused = false;
-    _nativeDebugSim = false;
-    _debugSim = RunDebugSimulator.create(
-      startLat: startLat,
-      startLng: startLng,
+    _backend.dispose();
+    _backend = _own(
+      (sink) => RunDebugBackend(sink, startLat: startLat, startLng: startLng),
     );
-    _publishDebugState();
-    _debugTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (_debugPaused || _debugSim == null) return;
-      _debugSim!.tick();
-      _publishDebugState();
-    });
-    return true;
+    return _backend.start();
   }
 
   Future<bool> start() async {
-    if (_debugSim != null) return true;
+    if (_backend.isSimulated) return true;
     if (!_isAndroid) {
       if (kDebugMode) return startDebugSimulation();
       return false;
     }
-    if (_state.isActive) return true;
-    if (!_state.locationGranted) {
-      _setError('location_denied', 'Precise location permission is required');
-      return false;
-    }
-    try {
-      _trail.clear();
-      final result = await methods.invokeMapMethod<String, dynamic>('start');
-      if (result != null) {
-        _applyNativeState(result);
-      }
-      final ready = await _awaitStatus({
-        RunTrackingState.recording,
-        RunTrackingState.paused,
-      }, timeout: const Duration(seconds: 8));
-      if (!ready) {
-        if (_state.errorCode == null) {
-          _setError('start_timeout', 'Run service did not start in time');
-        }
-        return _state.isActive;
-      }
-      return true;
-    } on PlatformException catch (error) {
-      _setError(error.code, error.message ?? error.toString());
-      return false;
-    } catch (error) {
-      _setError('start_error', error.toString());
-      return false;
-    }
+    return _backend.start();
   }
 
-  Future<void> pause() async {
-    if (_debugSim != null) {
-      if (_nativeDebugSim && _isAndroid) {
-        try {
-          final result = await methods.invokeMapMethod<String, dynamic>(
-            'pause',
-          );
-          if (result != null) _applyNativeState(result);
-        } catch (_) {}
-        return;
-      }
-      if (!_state.isRecording) return;
-      _debugPaused = true;
-      _state = _debugSim!.toPausedState(
-        locationGranted: _state.locationGranted,
-      );
-      notifyListeners();
-      return;
-    }
-    if (!_isAndroid || !_state.isRecording) return;
-    try {
-      final result = await methods.invokeMapMethod<String, dynamic>('pause');
-      if (result != null) _applyNativeState(result);
-    } catch (error) {
-      _setError('pause_error', error.toString());
-    }
-  }
+  Future<void> pause() => _backend.pause();
 
-  Future<void> resume() async {
-    if (_debugSim != null) {
-      if (_nativeDebugSim && _isAndroid) {
-        try {
-          final result = await methods.invokeMapMethod<String, dynamic>(
-            'resume',
-          );
-          if (result != null) _applyNativeState(result);
-        } catch (_) {}
-        return;
-      }
-      if (!_state.isPaused) return;
-      _debugPaused = false;
-      _publishDebugState();
-      return;
-    }
-    if (!_isAndroid || !_state.isPaused) return;
-    try {
-      final result = await methods.invokeMapMethod<String, dynamic>('resume');
-      if (result != null) _applyNativeState(result);
-    } catch (error) {
-      _setError('resume_error', error.toString());
-    }
-  }
+  /// Marks a manual lap. Returns the lap just closed, or null when it was
+  /// ignored (accidental double tap, nothing recording).
+  Future<RunLap?> lap() => _backend.lap();
+
+  Future<void> resume() => _backend.resume();
 
   /// Stops tracking but keeps the completed spool outside SQLite until the
   /// athlete accepts the post-run review.
   Future<RunReviewDraft?> stopForReview({
     List<RunStepResult> stepResults = const [],
   }) async {
-    if (_debugSim != null && !_nativeDebugSim) {
-      final sim = _debugSim!;
-      _stopDebugTimer();
-      _debugSim = null;
-      _debugPaused = false;
-      final payload = sim.toSpoolPayload();
-      final activity = Map<String, dynamic>.from(
-        payload['activity'] as Map? ?? const {},
-      );
-      _writeContextToActivity(activity, _sessionContext);
-      activity['status'] = 'pending_review';
-      activity['splits'] = [
-        for (final split in _state.splits)
-          {
-            'km': split.km,
-            'distance_meters': split.distanceMeters,
-            'duration_seconds': split.durationSeconds,
-            'pace_sec_per_km': split.paceSecPerKm,
-            'is_partial': split.isPartial,
-          },
-      ];
-      activity['voice_step_results'] = _stepResultsJson(stepResults);
-      payload['activity'] = activity;
-      final typedPayload = Map<String, dynamic>.from(payload);
-      final preview = await _repository.previewNativeSpoolUsingLatestWeight(
-        typedPayload,
-      );
-      _memoryReviewSpools[preview.id] = typedPayload;
-      _trail.clear();
-      _sessionContext = null;
-      _state = RunTrackingState.initial(
-        supported: true,
-      ).copyWith(locationGranted: true);
-      notifyListeners();
-      return RunReviewDraft.fromSpool(activity: preview, spool: typedPayload);
-    }
-    if (_nativeDebugSim) {
-      _stopDebugTimer();
-      _debugSim = null;
-      _debugPaused = false;
-      _nativeDebugSim = false;
-      // Fall through to native stop path below.
-    }
-
-    if (!_isAndroid) return null;
-    final activityId = _state.activityId;
-    try {
-      final result = await methods.invokeMapMethod<String, dynamic>('stop');
-      if (result != null) _applyNativeState(result);
-    } catch (error) {
-      _setError('stop_error', error.toString());
-    }
-
-    await _awaitStatus({
-      RunTrackingState.completed,
-      RunTrackingState.idle,
-      RunTrackingState.discarded,
-    }, timeout: const Duration(seconds: 5));
-
-    final resolvedId = activityId ?? _state.activityId;
+    final backend = _backend;
+    final payload = await backend.stopForReview();
     RunReviewDraft? draft;
-    if (resolvedId != null) {
+    if (payload != null) {
       try {
-        final raw = await methods.invokeMapMethod<String, dynamic>(
-          'markPendingReview',
-          resolvedId,
+        final activity = Map<String, dynamic>.from(
+          payload['activity'] as Map? ?? const {},
         );
-        if (raw != null) {
-          final payload = Map<String, dynamic>.from(raw);
-          final activity = Map<String, dynamic>.from(
-            payload['activity'] as Map? ?? const {},
-          );
-          _writeContextToActivity(activity, _sessionContext);
-          if (stepResults.isNotEmpty) {
-            activity['voice_step_results'] = _stepResultsJson(stepResults);
-          }
-          payload['activity'] = activity;
-          final preview = await _repository.previewNativeSpoolUsingLatestWeight(
-            payload,
-          );
-          draft = RunReviewDraft.fromSpool(activity: preview, spool: payload);
+        _writeContextToActivity(activity, _sessionContext);
+        if (stepResults.isNotEmpty) {
+          activity['voice_step_results'] = _stepResultsJson(stepResults);
         }
+        payload['activity'] = activity;
+        final preview = await _repository.previewNativeSpoolUsingLatestWeight(
+          payload,
+        );
+        // A simulated run has no native spool to reopen the review from.
+        if (backend.isSimulated) _memoryReviewSpools[preview.id] = payload;
+        draft = RunReviewDraft.fromSpool(activity: preview, spool: payload);
       } catch (error) {
         _setError('review_error', error.toString());
       }
     }
-
-    _trail.clear();
-    _sessionContext = null;
-    _state = RunTrackingState.initial(
-      supported: true,
-    ).copyWith(locationGranted: _state.locationGranted);
-    notifyListeners();
+    _resetAfterRun();
     return draft;
-  }
-
-  /// Backward-compatible immediate save for non-UI callers.
-  Future<RunActivity?> stop() async {
-    final draft = await stopForReview();
-    if (draft == null) return null;
-    return saveReviewedRun(draft: draft, completePlannedWorkout: true);
   }
 
   Future<List<RunReviewDraft>> listPendingReviews() async {
@@ -620,6 +452,11 @@ class RunTrackingService extends ChangeNotifier {
         activity['distance_meters'] = distanceMeters.clamp(0, 1000000);
         // Recalculate the estimate from the reviewed metrics.
         activity.remove('calories');
+        // Treadmill: the pace only exists once the console distance is typed.
+        if (CardioActivityType.fromDatabase(activity['activity_type']) ==
+            CardioActivityType.treadmill) {
+          activity.remove('avg_pace_sec_per_km');
+        }
       }
       payload['activity'] = activity;
 
@@ -682,50 +519,25 @@ class RunTrackingService extends ChangeNotifier {
   ];
 
   Future<void> discard() async {
-    if (_debugSim != null && !_nativeDebugSim) {
-      _stopDebugTimer();
-      _debugSim = null;
-      _debugPaused = false;
-      _trail.clear();
-      _sessionContext = null;
-      _state = RunTrackingState.initial(
-        supported: true,
-      ).copyWith(locationGranted: true);
-      notifyListeners();
-      return;
-    }
-    if (_nativeDebugSim) {
-      _stopDebugTimer();
-      _debugSim = null;
-      _debugPaused = false;
-      _nativeDebugSim = false;
-      // Fall through to native discard path.
-    }
+    await _backend.discard();
+    _resetAfterRun();
+  }
 
-    if (!_isAndroid) return;
-    final activityId = _state.activityId;
-    try {
-      await methods.invokeMethod<dynamic>('discard', activityId);
-    } catch (error) {
-      _setError('discard_error', error.toString());
+  /// Back to an idle state (and the native backend) once a run ended.
+  void _resetAfterRun() {
+    if (_backend.isSimulated) {
+      _backend.dispose();
+      _backend = _native;
     }
-    if (activityId != null) {
-      try {
-        await methods.invokeMethod<dynamic>('deleteSpool', activityId);
-      } catch (_) {}
-    }
-    _trail.clear();
     _sessionContext = null;
-    _state = RunTrackingState.initial(
+    _state = const RunTrackingState.initial(
       supported: true,
     ).copyWith(locationGranted: _state.locationGranted);
     notifyListeners();
   }
 
   Future<int> recoverPendingSessions() async {
-    if (_isAndroid == false ||
-        _recovering ||
-        (_debugSim != null && !_nativeDebugSim)) {
+    if (_isAndroid == false || _recovering || _backend.isSimulated) {
       return _recoveredCount;
     }
     _recovering = true;
@@ -801,7 +613,7 @@ class RunTrackingService extends ChangeNotifier {
       final activityMap = Map<String, dynamic>.from(
         raw['activity'] as Map? ?? const {},
       );
-      var status = activityMap['status'] as String? ?? 'completed';
+      final status = activityMap['status'] as String? ?? 'completed';
       if (status == 'discarded') {
         await methods.invokeMethod<dynamic>('deleteSpool', id);
         return null;
@@ -819,7 +631,7 @@ class RunTrackingService extends ChangeNotifier {
               status == 'stopping')) {
         final points = (raw['points'] as List? ?? const [])
             .whereType<Map>()
-            .map((row) => Map<String, dynamic>.from(row))
+            .map(Map<String, dynamic>.from)
             .toList();
         RunSpoolRecovery.finalizeInterruptedActivity(
           activityMap,
@@ -922,62 +734,17 @@ class RunTrackingService extends ChangeNotifier {
     }
   }
 
-  /// Polls native state until [statuses] match or [timeout] elapses.
-  Future<bool> _awaitStatus(
-    Set<String> statuses, {
-    Duration timeout = const Duration(seconds: 5),
-    Duration interval = const Duration(milliseconds: 150),
-  }) async {
-    final deadline = DateTime.now().add(timeout);
-    while (DateTime.now().isBefore(deadline)) {
-      if (statuses.contains(_state.status)) return true;
-      if (_state.errorCode == 'location_denied') return false;
-      await Future<void>.delayed(interval);
-      await getState();
-    }
-    return statuses.contains(_state.status);
+  /// Builds a backend wired to this service through its own [_BackendSink].
+  T _own<T extends RunTrackingBackend>(T Function(RunTrackingSink) create) {
+    final sink = _BackendSink(this);
+    final backend = create(sink);
+    sink._owner = backend;
+    return backend;
   }
 
-  void _onEvent(dynamic event) {
-    if (_debugSim != null && !_nativeDebugSim) return;
-    if (event is! Map) return;
-    _applyNativeState(Map<String, dynamic>.from(event));
-  }
-
-  void _applyNativeState(Map<String, dynamic> map) {
-    final lat = (map['lat'] as num?)?.toDouble();
-    final lng = (map['lng'] as num?)?.toDouble();
-    if (lat != null && lng != null) {
-      final last = _trail.isEmpty ? null : _trail.last;
-      if (last == null || last.lat != lat || last.lng != lng) {
-        _trail.add(RunLatLng(lat, lng));
-        if (_trail.length > 5000) {
-          _trail.removeRange(0, _trail.length - 4000);
-        }
-      }
-    }
-    _state = RunTrackingState.fromMap(map, trail: List.unmodifiable(_trail));
+  void _publish(RunTrackingState state) {
+    _state = state;
     notifyListeners();
-  }
-
-  void _publishDebugState() {
-    final sim = _debugSim;
-    if (sim == null) return;
-    _trail
-      ..clear()
-      ..addAll(sim.trail);
-    _state = _debugPaused
-        ? sim.toPausedState(locationGranted: true)
-        : sim.toState(locationGranted: true);
-    if (_sessionContext != null) {
-      _state = _state.copyWith(sessionContext: _sessionContext);
-    }
-    notifyListeners();
-  }
-
-  void _stopDebugTimer() {
-    _debugTimer?.cancel();
-    _debugTimer = null;
   }
 
   void _setError(String code, String message) {
@@ -987,8 +754,35 @@ class RunTrackingService extends ChangeNotifier {
 
   @override
   void dispose() {
-    _stopDebugTimer();
-    _eventSubscription?.cancel();
+    _backend.dispose();
+    _native.dispose();
     super.dispose();
+  }
+}
+
+/// Lets a backend publish into the service, but only while it is the active
+/// one — a late native event must not overwrite a simulated run's state.
+class _BackendSink implements RunTrackingSink {
+  _BackendSink(this._service);
+
+  final RunTrackingService _service;
+  late final RunTrackingBackend _owner;
+
+  @override
+  RunTrackingState get state => _service._state;
+
+  @override
+  RunSessionContext? get sessionContext => _service._sessionContext;
+
+  @override
+  void publish(RunTrackingState state) {
+    if (!identical(_service._backend, _owner)) return;
+    _service._publish(state);
+  }
+
+  @override
+  void reportError(String code, String message) {
+    if (!identical(_service._backend, _owner)) return;
+    _service._setError(code, message);
   }
 }

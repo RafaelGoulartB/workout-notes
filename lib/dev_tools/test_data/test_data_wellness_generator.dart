@@ -1,6 +1,7 @@
 import 'dart:convert';
 
-import 'test_data_context.dart';
+import 'package:workout_notes/dev_tools/test_data/test_data_context.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 class WellnessGenerationResult {
   final int sleepNights;
@@ -44,7 +45,7 @@ class TestDataWellnessGenerator {
     for (var day = 0; day <= totalDays; day++) {
       if (context.random.nextDouble() < 0.06) continue;
       final wakeDate = context.start.add(Duration(days: day));
-      final date = context.date(wakeDate);
+      final date = dateKey(wakeDate);
       final existing = await context.database.query(
         'sleep_entries',
         columns: const ['id'],
@@ -178,66 +179,10 @@ class TestDataWellnessGenerator {
       'end_reason': 'alarm',
       'created_at': endedAt.toIso8601String(),
     });
-
-    final epochCount = (timeInBed / 30).ceil();
-    for (var epoch = 0; epoch < epochCount; epoch++) {
-      final progress = epoch / epochCount;
-      final stage = epoch == 0 || epoch == epochCount - 1
-          ? 'awake'
-          : progress < 0.58 && epoch % 4 != 0
-          ? 'deep'
-          : 'sleeping';
-      await context.database.insert('sleep_stage_epochs', {
-        'id': context.id('sleep_epoch', '$sequence:$epoch'),
-        'session_id': sessionId,
-        'started_at': startedAt
-            .add(Duration(minutes: epoch * 30))
-            .toIso8601String(),
-        'duration_seconds': epoch == epochCount - 1
-            ? (timeInBed - epoch * 30) * 60
-            : 1800,
-        'stage': stage,
-        'confidence': double.parse(
-          context.jitter(0.84, 0.1).clamp(0.5, 0.99).toStringAsFixed(2),
-        ),
-        'awake_probability': stage == 'awake' ? 0.82 : 0.08,
-        'sleeping_probability': stage == 'sleeping' ? 0.82 : 0.14,
-        'deep_probability': stage == 'deep' ? 0.78 : 0.06,
-        'algorithm_version': 'dev-stage-v1',
-        'source': 'acoustic_model',
-      });
-    }
-
-    // A small representative sample is enough to exercise diagnostics without
-    // creating thousands of sensor rows per click.
-    for (var segment = 0; segment < 8; segment++) {
-      final noisy = segment == 2 || segment == 6;
-      await context.database.insert('sleep_monitor_segments', {
-        'id': context.id('sleep_segment', '$sequence:$segment'),
-        'session_id': sessionId,
-        'started_at': startedAt
-            .add(Duration(minutes: segment * timeInBed ~/ 8))
-            .toIso8601String(),
-        'duration_seconds': 30,
-        'audio_rms_dbfs': noisy ? -31.0 : -52.0,
-        'audio_peak_dbfs': noisy ? -16.0 : -39.0,
-        'noise_score': noisy ? 0.76 : 0.16,
-        'classification': noisy ? 'noisy' : 'quiet',
-        'valid_fraction': 0.98,
-        'noise_burst_count': noisy ? 2 : 0,
-        'spectral_flatness': noisy ? 0.58 : 0.24,
-        'spectral_centroid_hz': noisy ? 1380.0 : 420.0,
-        'breathing_regularity': noisy ? 0.55 : 0.88,
-        'breathing_rate_hz': 0.24,
-        'motion_active_seconds': noisy ? 4.5 : 0.6,
-        'motion_mean_deviation_g': noisy ? 0.09 : 0.015,
-        'motion_max_deviation_g': noisy ? 0.32 : 0.06,
-      });
-    }
   }
 
   Future<(int, int, int)> _nutrition() async {
-    final foods = _foods;
+    const foods = _foods;
     for (var index = 0; index < foods.length; index++) {
       final food = foods[index];
       final foodId = context.id('food', index);
@@ -287,7 +232,7 @@ class TestDataWellnessGenerator {
         if (meal.type == 'snacks' && context.random.nextDouble() < 0.28) {
           continue;
         }
-        final dateString = context.date(date);
+        final dateString = dateKey(date);
         final occupied = await context.database.query(
           'meal_logs',
           columns: const ['id'],

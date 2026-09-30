@@ -21,8 +21,22 @@ internal class SleepAudioFeatures(val sampleRate: Int) {
     private var levelCount = 0
     private var levelMean = 0.0
     private var levelM2 = 0.0
+    // Read from the platform thread by the live waveform; never persisted.
+    @Volatile private var liveDbfs = Double.NaN
+    @Volatile private var liveBaselineDbfs = baseline.value
 
     internal val processedFrames get() = spectral.processedFrames
+
+    /** Level of the latest analysis block and the room baseline, for the
+     * monitor screen's waveform only. Null before the first block. */
+    fun liveLevel(): Map<String, Any?>? {
+        val level = liveDbfs
+        if (level.isNaN()) return null
+        return mapOf(
+            "level_dbfs" to level,
+            "baseline_dbfs" to liveBaselineDbfs,
+        )
+    }
 
     fun add(buffer: ShortArray, length: Int) {
         var offset = 0
@@ -52,6 +66,8 @@ internal class SleepAudioFeatures(val sampleRate: Int) {
         levelMean += delta / levelCount
         levelM2 += delta * (db - levelMean)
         baseline.observe(db)
+        liveBaselineDbfs = baseline.value
+        liveDbfs = db
         if (baseline.isCalibrated && db > baseline.value + AudioSignalProcessor.NOISE_DELTA_DB) {
             noisySeconds += blockSize / sampleRate.toDouble()
         }

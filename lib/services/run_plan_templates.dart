@@ -1,183 +1,93 @@
 import 'package:workout_notes/models/run_plan.dart';
+import 'package:workout_notes/models/run_plan_template.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/services/run_plan_composer.dart';
 
-enum RunPlanTemplateCategory {
-  gettingStarted,
-  fiveK,
-  tenK,
-  half,
-  marathon,
-  conditioning,
-}
-
-enum RunPlanTemplateLevel { beginner, intermediate, advanced }
-
-enum RunPlanTemplateStyle { continuous, performance, runWalk }
-
-class RunPlanTemplateStep {
-  final RunStepRole role;
-  final RunIntervalMetric metric;
-  final int value;
-  final int? repeatGroup;
-  final int repeatCount;
-  final double? targetPaceMinSecPerKm;
-  final double? targetPaceMaxSecPerKm;
-  const RunPlanTemplateStep({
-    required this.role,
-    this.metric = RunIntervalMetric.distance,
-    required this.value,
-    this.repeatGroup,
-    this.repeatCount = 1,
-    this.targetPaceMinSecPerKm,
-    this.targetPaceMaxSecPerKm,
-  });
-}
-
-class RunPlanTemplateWorkout {
-  final String name;
-  final RunWorkoutKind kind;
-  final int dayOfWeek;
-  final String? notes;
-  final String? effortZone;
-  final double? targetDistanceMeters;
-  final int? targetDurationSeconds;
-  final double? targetPaceSecPerKm;
-  final List<RunPlanTemplateStep> steps;
-  const RunPlanTemplateWorkout({
-    required this.name,
-    required this.kind,
-    required this.dayOfWeek,
-    this.notes,
-    this.effortZone,
-    this.targetDistanceMeters,
-    this.targetDurationSeconds,
-    this.targetPaceSecPerKm,
-    this.steps = const [],
-  });
-}
-
-/// A complete progressive template. Every entry in [schedule] is one week.
-///
-/// Blueprint fields ([continuousKm], [performanceLongKm], …) feed
-/// [RunPlanComposer] when the user customises days / intensity / paces.
-class RunPlanTemplate {
-  final String key;
-  final RunPlanGoalKind goalKind;
-  final RunPlanTemplateCategory category;
-  final RunPlanTemplateLevel level;
-  final RunPlanTemplateStyle style;
-  final String titlePt,
-      titleEn,
-      descriptionPt,
-      descriptionEn,
-      prerequisitePt,
-      prerequisiteEn;
-  final List<List<RunPlanTemplateWorkout>> schedule;
-
-  /// Weekly volume (km) the prerequisite text assumes the athlete already
-  /// runs. When the wizard has no measured baseline the composer anchors
-  /// week 1 here instead of starting at the template's full ladder.
-  final double? prerequisiteWeeklyKm;
-
-  /// Continuous / base ladders: each inner list is one week of km (last = long).
-  final List<List<double>>? continuousKm;
-  final bool raceFinish;
-
-  /// Performance ladders.
-  final List<double>? performanceLongKm;
-  final double? performanceEasyKm;
-  final int? performanceIntervalMeters;
-  final int? performanceBaseReps;
-
-  /// Run/walk ladders (seconds / reps per week).
-  final List<int>? runWalkWork;
-  final List<int>? runWalkRest;
-  final List<int>? runWalkReps;
-
-  const RunPlanTemplate({
-    required this.key,
-    required this.goalKind,
-    required this.category,
-    required this.level,
-    required this.style,
-    required this.titlePt,
-    required this.titleEn,
-    required this.descriptionPt,
-    required this.descriptionEn,
-    required this.prerequisitePt,
-    required this.prerequisiteEn,
-    required this.schedule,
-    this.prerequisiteWeeklyKm,
-    this.continuousKm,
-    this.raceFinish = false,
-    this.performanceLongKm,
-    this.performanceEasyKm,
-    this.performanceIntervalMeters,
-    this.performanceBaseReps,
-    this.runWalkWork,
-    this.runWalkRest,
-    this.runWalkReps,
-    this.allowedWeeks = const [],
-  });
-  List<RunPlanTemplateWorkout> get week => schedule.first;
-  int get sessionsPerWeek =>
-      schedule.fold(0, (max, value) => value.length > max ? value.length : max);
-  String title(bool pt) => pt ? titlePt : titleEn;
-  String description(bool pt) => pt ? descriptionPt : descriptionEn;
-  String prerequisite(bool pt) => pt ? prerequisitePt : prerequisiteEn;
-
-  /// When non-empty, the customize wizard lets the athlete pick plan length
-  /// and the composer expands the blueprint into that many varied weeks.
-  final List<int> allowedWeeks;
-
-  bool get selectableWeeks => allowedWeeks.isNotEmpty;
-
-  /// Flat-volume “keep what you have” plans — no race build or taper.
-  bool get maintainFitness => key == 'keep_fit';
-
-  /// Default length when the wizard has not picked yet (also used by tests /
-  /// catalog when [RunPlanBuildConfig.weeks] is omitted).
-  int get defaultSelectableWeeks {
-    if (!selectableWeeks) return schedule.length;
-    if (allowedWeeks.contains(8)) return 8;
-    return allowedWeeks[allowedWeeks.length ~/ 2];
-  }
-
-  /// Display / catalog week count. Selectable plans report their default
-  /// length; the composed schedule may differ once the athlete picks.
-  int get weeks =>
-      selectableWeeks ? defaultSelectableWeeks : schedule.length;
-
-  /// Suggested days/week choices for the customize wizard.
-  ///
-  /// Beginner and return progressions cap at four days: bone and tendon
-  /// adaptation lags the cardiovascular system, so these runners gain little
-  /// from a fifth impact day and take on avoidable injury risk.
-  List<int> get allowedSessionsPerWeek {
-    if (style == RunPlanTemplateStyle.runWalk ||
-        key == 'return' ||
-        key == 'return_injury' ||
-        key == 'walk_jog' ||
-        key == 'first_5k' ||
-        key == 'habit_3x') {
-      return const [3, 4];
-    }
-    return const [3, 4, 5];
-  }
-
-  /// Easy aerobic blocks that should not prescribe structured quality.
-  bool get aerobicOnly =>
-      key == 'base' || key == 'habit_3x' || key == 'trail_intro';
-
-  /// Return-to-running (or post-injury) progressions that stay gentler longer.
-  bool get returnStyle => key == 'return' || key == 'return_injury';
-}
-
 abstract final class RunPlanTemplates {
+  /// The plan the finder suggests. Always a plan whose prerequisite the
+  /// answer already meets: someone who cannot run 30 minutes is never sent to
+  /// a 5K plan, and "faster" only exists once the distance is covered.
+  static RunPlanTemplate recommend(
+    RunPlanExperience experience,
+    RunPlanAim aim,
+  ) => switch (experience) {
+    RunPlanExperience.none => walkJog,
+    RunPlanExperience.fewMinutes => runWalk,
+    RunPlanExperience.thirtyMinutes => switch (aim) {
+      RunPlanAim.habit => habit,
+      _ => firstFiveK,
+    },
+    RunPlanExperience.fiveK => switch (aim) {
+      RunPlanAim.habit => base,
+      RunPlanAim.further => firstTenK,
+      RunPlanAim.faster => fiveK,
+    },
+    RunPlanExperience.tenK => switch (aim) {
+      RunPlanAim.habit => keepFit,
+      RunPlanAim.further => toHalf,
+      RunPlanAim.faster => tenK,
+    },
+    RunPlanExperience.half => switch (aim) {
+      RunPlanAim.habit => keepFit,
+      RunPlanAim.further => marathon,
+      RunPlanAim.faster => halfPerformance,
+    },
+  };
+
+  /// What to do once a plan built from [templateKey] is finished — the
+  /// natural next step first. Falls back on [goal] for blank and older
+  /// plans. Never suggests the same plan again (that is what "restart" is
+  /// for) and never jumps more than one level.
+  static List<RunPlanTemplate> nextSteps(
+    String? templateKey,
+    RunPlanGoalKind goal,
+  ) {
+    final keys = switch (templateKey) {
+      'walk_jog' => const ['run_walk'],
+      'run_walk' => const ['first_5k', 'habit_3x'],
+      'return' || 'return_injury' => const ['first_5k', 'base'],
+      'first_5k' => const ['5k', 'first_10k'],
+      '5k' => const ['first_10k', '5k_advanced'],
+      '5k_advanced' => const ['10k', '10k_advanced'],
+      'first_10k' => const ['10k', 'to_half'],
+      '10k' => const ['to_half', '10k_advanced'],
+      '10k_advanced' => const ['half_pb', 'first_half'],
+      'to_half' || 'first_half' => const ['half_pb', 'keep_fit'],
+      'half_pb' => const ['first_marathon', 'keep_fit'],
+      'first_marathon' || 'marathon_pb' => const ['keep_fit', 'marathon_pb'],
+      'base' || 'habit_3x' => const ['first_5k', 'first_10k'],
+      'trail_intro' ||
+      'threshold_block' ||
+      'hills' ||
+      'race_sharpen' => const ['keep_fit', '10k'],
+      _ => switch (goal) {
+        RunPlanGoalKind.fiveK => const ['5k', 'first_10k'],
+        RunPlanGoalKind.tenK => const ['10k', 'to_half'],
+        RunPlanGoalKind.half => const ['half_pb', 'keep_fit'],
+        RunPlanGoalKind.marathon => const ['keep_fit'],
+        _ => const ['first_5k', 'keep_fit'],
+      },
+    };
+    return [
+      for (final key in keys)
+        if (key != templateKey) ?byKey(key),
+    ];
+  }
+
+  /// A shorter goal to offer when this template's race is out of reach.
+  static RunPlanTemplate? shorterGoal(RunPlanTemplate template) =>
+      switch (template.goalKind) {
+        RunPlanGoalKind.marathon => half,
+        RunPlanGoalKind.half => firstTenK,
+        RunPlanGoalKind.tenK => firstFiveK,
+        RunPlanGoalKind.fiveK =>
+          template.key == 'first_5k' ? runWalk : firstFiveK,
+        _ => null,
+      };
+
   static final returnToRunning = _continuous(
     key: 'return',
     goal: RunPlanGoalKind.base,
@@ -741,6 +651,10 @@ abstract final class RunPlanTemplates {
       goalKind: template.goalKind,
       raceDate: config?.raceDate ?? raceDate,
       weeks: schedule.length,
+      // Remembered so the plan can be re-planned after missed weeks or a
+      // fitness test without asking the athlete everything again.
+      templateKey: template.key,
+      config: config?.toJson(),
     );
     for (var week = 0; week < schedule.length; week++) {
       for (final session in schedule[week]) {

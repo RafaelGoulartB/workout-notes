@@ -8,15 +8,13 @@ import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_post_run_review_screen.dart';
+import 'support/test_db.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Database database;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(
@@ -98,7 +96,7 @@ void main() {
     });
 
     expect(find.text('Revisar corrida'), findsOneWidget);
-    expect(find.text('5.00 km'), findsWidgets);
+    expect(find.text('5.00'), findsWidgets);
     await tester.scrollUntilVisible(
       find.text('ESFORÇO PERCEBIDO'),
       250,
@@ -127,6 +125,11 @@ void main() {
     expect(find.byIcon(Icons.star_rounded), findsNWidgets(3));
     expect(find.byIcon(Icons.star_outline_rounded), findsNWidgets(2));
 
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('run-review-rpe-1')),
+      -250,
+      scrollable: find.byType(Scrollable).first,
+    );
     final firstRpe = tester.getCenter(
       find.byKey(const ValueKey('run-review-rpe-1')),
     );

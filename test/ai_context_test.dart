@@ -66,6 +66,12 @@ void main() {
   });
 
   test('totals reflect completed workout content', () async {
+    await db.insert('exercise_categories', {
+      'id': 'chest',
+      'name': 'Chest',
+      'color': 0xFF2196F3,
+      'order_index': 0,
+    });
     await db.insert('exercises', {
       'id': 'e1',
       'name': 'A',

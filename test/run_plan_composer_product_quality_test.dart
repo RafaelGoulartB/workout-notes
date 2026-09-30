@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:workout_notes/models/run_plan_template.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
@@ -71,8 +72,13 @@ void main() {
                   scenarios++;
 
                   expect(schedule, hasLength(template.weeks));
+                  // Race week trades some training days for rest.
                   expect(
-                    schedule.every((week) => week.length == sessions),
+                    schedule.every(
+                      (week) => week.any((s) => s.kind == RunWorkoutKind.race)
+                          ? week.length <= sessions
+                          : week.length == sessions,
+                    ),
                     isTrue,
                     reason: '${template.key}/$sessions',
                   );

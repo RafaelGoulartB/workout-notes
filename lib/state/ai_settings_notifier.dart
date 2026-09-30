@@ -4,9 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../models/ai_provider.dart';
-import '../models/ai_settings.dart';
-import '../services/ai_service.dart';
+import 'package:workout_notes/models/ai_provider.dart';
+import 'package:workout_notes/models/ai_settings.dart';
+import 'package:workout_notes/services/ai_service.dart';
 
 const _kPrefsProviders = 'ai_providers_v1';
 const _kPrefsActiveId = 'ai_active_provider_id_v1';
@@ -17,6 +17,10 @@ const _kPrefsShowMessageTimestamps = 'ai_show_message_timestamps_v1';
 const _kPrefsAutoExpandToolDetails = 'ai_auto_expand_tool_details_v1';
 const _kTokenPrefix = 'ai_token:';
 const _kLegacyTokenKey = 'ai_token';
+
+/// Set once the pre-multi-provider token key has been looked at, so later
+/// launches skip the (slow) secure-storage read.
+const _kPrefsLegacyTokenMigrated = 'ai_legacy_token_migrated_v1';
 
 const String kDefaultAiCoachSystemPrompt = r'''# Identidade e missão
 
@@ -122,10 +126,15 @@ class AiSettingsNotifier extends ChangeNotifier {
     FlutterSecureStorage? secure,
     AiService? service,
   }) : secure = secure ?? const FlutterSecureStorage(),
-       service = service ?? AiService(),
+       service = service ?? AiService.shared,
        _settings = _loadInitial();
 
   AiSettings get settings => _settings;
+
+  /// The app language the user picked in Settings (`pt` or `en`); the same
+  /// preference that drives the UI locale.
+  String get appLanguageCode =>
+      prefs.getString('app_locale') == 'pt' ? 'pt' : 'en';
   bool get isLoaded => _loaded;
   bool get isConfigured => _settings.isConfigured;
   AiProvider? get activeProvider => _settings.activeProvider;
@@ -137,7 +146,7 @@ class AiSettingsNotifier extends ChangeNotifier {
       '$systemPrompt\n\n${_settings.responseStyle.systemInstruction}';
 
   static AiSettings _loadInitial() {
-    return AiSettings(
+    return const AiSettings(
       systemPrompt: kDefaultAiCoachSystemPrompt,
       contextMode: AiContextMode.standard,
     );
@@ -155,7 +164,9 @@ class AiSettingsNotifier extends ChangeNotifier {
             providers.add(AiProvider.fromMap(raw.cast<String, dynamic>()));
           }
         }
-      } catch (_) {}
+      } catch (error) {
+        debugPrint('Reading the saved AI providers failed: $error');
+      }
     }
 
     final activeId = prefs.getString(_kPrefsActiveId);
@@ -199,8 +210,10 @@ class AiSettingsNotifier extends ChangeNotifier {
       autoExpandToolDetails: autoExpandToolDetails,
     );
 
-    // Migrate legacy single token.
-    if (providers.isNotEmpty) {
+    // Migrate the legacy single token once. The flag keeps every later launch
+    // from touching secure storage just to find nothing.
+    if (providers.isNotEmpty &&
+        !(prefs.getBool(_kPrefsLegacyTokenMigrated) ?? false)) {
       try {
         final legacyToken = await secure.read(key: _kLegacyTokenKey);
         if (legacyToken != null && legacyToken.isNotEmpty) {
@@ -213,7 +226,10 @@ class AiSettingsNotifier extends ChangeNotifier {
           }
           await secure.delete(key: _kLegacyTokenKey);
         }
-      } catch (_) {}
+        await prefs.setBool(_kPrefsLegacyTokenMigrated, true);
+      } catch (error) {
+        debugPrint('Migrating the legacy AI token failed: ${error.runtimeType}');
+      }
     }
 
     _loaded = true;
@@ -274,7 +290,9 @@ class AiSettingsNotifier extends ChangeNotifier {
     await _persistProviders();
     try {
       await secure.delete(key: '$_kTokenPrefix$id');
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Deleting the AI provider token failed: ${error.runtimeType}');
+    }
     notifyListeners();
   }
 
@@ -341,7 +359,9 @@ class AiSettingsNotifier extends ChangeNotifier {
       } else {
         await secure.write(key: '$_kTokenPrefix$providerId', value: token);
       }
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Saving the AI provider token failed: ${error.runtimeType}');
+    }
   }
 
   Future<List<String>> fetchModels(String providerId) async {

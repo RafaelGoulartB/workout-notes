@@ -4,11 +4,14 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/goal.dart';
 import 'package:workout_notes/repositories/goal_repository.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
-import 'package:workout_notes/screens/workout/goal_detail_screen.dart';
+import 'package:workout_notes/screens/goals/goal_detail_screen.dart';
+import 'package:workout_notes/utils/load_generation.dart';
 import 'package:workout_notes/widgets/goals/goal_card.dart';
 import 'package:workout_notes/widgets/goals/goal_form_sheet.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
-/// Renders goals as a vertical list with an add action.
+/// Goals card: one divided row per goal and an add row at the end.
 class GoalsSection extends StatefulWidget {
   final DatabaseHelper db;
   final SettingsRepository settingsRepo;
@@ -21,12 +24,16 @@ class GoalsSection extends StatefulWidget {
   /// screen can show a summary next to its section header.
   final void Function(int achieved, int total)? onSummaryChanged;
 
+  /// Wraps the list in its own card; turn off when the host already is one.
+  final bool framed;
+
   const GoalsSection({
     super.key,
     required this.db,
     required this.settingsRepo,
     this.allowedScopes = const [GoalScope.anaerobic, GoalScope.aerobic],
     this.onSummaryChanged,
+    this.framed = true,
   });
 
   @override
@@ -34,16 +41,28 @@ class GoalsSection extends StatefulWidget {
 }
 
 class _GoalsSectionState extends State<GoalsSection> {
-  final GoalRepository _goalRepo = GoalRepository();
+  final GoalRepository _goalRepo = DatabaseHelper.instance.goalRepo;
   List<Goal> _goals = [];
   final Map<String, GoalProgress> _progressByGoal = {};
+  final _generation = LoadGeneration();
+
+  // A goal whose progress could not be read has no entry here and shows as
+  // unavailable, never as zero progress.
   bool _isLoading = true;
+  bool _hasLoaded = false;
+  bool _loadFailed = false;
   bool _isKm = true;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _generation.invalidate();
+    super.dispose();
   }
 
   @override
@@ -64,36 +83,48 @@ class _GoalsSectionState extends State<GoalsSection> {
   }
 
   Future<void> _load() async {
-    setState(() => _isLoading = true);
+    final token = _generation.begin();
+    if (!_hasLoaded) setState(() => _isLoading = true);
     try {
-      _isKm = await widget.settingsRepo.getIsDistanceKm();
+      final isKm = await widget.settingsRepo.getIsDistanceKm();
       final goals = (await _goalRepo.getAll())
           .where((g) => widget.allowedScopes.contains(g.scope))
           .toList();
-      final progressEntries = await Future.wait(
-        goals.map((g) async {
-          try {
-            final p = await _goalRepo.getProgress(g);
-            return MapEntry(g.id, p);
-          } catch (_) {
-            return MapEntry(g.id, GoalProgress.empty(DateTime.now()));
-          }
-        }),
-      );
-      if (!mounted) return;
+      // A goal whose progress can't be read shows as unavailable, not 0%.
+      Map<String, GoalProgress> progressByGoal;
+      try {
+        progressByGoal = await _goalRepo.getProgressForGoals(goals);
+      } catch (_) {
+        progressByGoal = const {};
+      }
+      final progressEntries = [
+        for (final g in goals)
+          MapEntry<String, GoalProgress?>(g.id, progressByGoal[g.id]),
+      ];
+      if (!mounted || !_generation.isCurrent(token)) return;
       setState(() {
+        _isKm = isKm;
         _goals = goals;
         _progressByGoal
           ..clear()
-          ..addEntries(progressEntries);
+          ..addEntries([
+            for (final e in progressEntries)
+              if (e.value != null) MapEntry(e.key, e.value!),
+          ]);
+        _hasLoaded = true;
+        _loadFailed = false;
         _isLoading = false;
       });
       widget.onSummaryChanged?.call(
-        progressEntries.where((e) => e.value.isComplete).length,
+        progressEntries.where((e) => e.value?.isComplete ?? false).length,
         goals.length,
       );
     } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
+      if (!mounted || !_generation.isCurrent(token)) return;
+      setState(() {
+        _loadFailed = true;
+        _isLoading = false;
+      });
     }
   }
 
@@ -115,7 +146,9 @@ class _GoalsSectionState extends State<GoalsSection> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AppLocalizations.of(context)!.commonError(e.toString())),
+          content: Text(
+            AppLocalizations.of(context)!.commonError(e.toString()),
+          ),
         ),
       );
     }
@@ -140,7 +173,9 @@ class _GoalsSectionState extends State<GoalsSection> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AppLocalizations.of(context)!.commonError(e.toString())),
+          content: Text(
+            AppLocalizations.of(context)!.commonError(e.toString()),
+          ),
         ),
       );
     }
@@ -153,30 +188,19 @@ class _GoalsSectionState extends State<GoalsSection> {
 
   Future<void> _deleteGoal(Goal goal) async {
     final loc = AppLocalizations.of(context)!;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.goalDeleteConfirm),
-        content: Text(loc.goalDeleteMessage),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton.tonal(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(foregroundColor: Colors.red),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: loc.goalDeleteConfirm,
+      message: loc.goalDeleteMessage,
+      confirmLabel: loc.commonDelete,
+      destructive: true,
     );
     if (confirm != true) return;
     await _goalRepo.delete(goal.id);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(loc.goalDeleted)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(loc.goalDeleted)));
     await _load();
   }
 
@@ -208,90 +232,154 @@ class _GoalsSectionState extends State<GoalsSection> {
       );
     }
 
-    if (_goals.isEmpty) {
-      return _buildEmpty(theme, loc);
+    // Nothing was ever read: say so, rather than showing "no goals yet".
+    if (_loadFailed && !_hasLoaded) {
+      return LoadErrorBanner(onRetry: _load, message: loc.commonLoadError);
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i < _goals.length; i++) ...[
-          if (i > 0) const SizedBox(height: 8),
-          GoalCard(
-            goal: _goals[i],
-            progress: _progressByGoal[_goals[i].id] ??
-                GoalProgress.empty(DateTime.now()),
-            isKm: _isKm,
-            onTap: () => _openDetail(_goals[i]),
-            onEdit: () => _editGoal(_goals[i]),
-            onTogglePause: () => _togglePause(_goals[i]),
-            onDelete: () => _deleteGoal(_goals[i]),
-          ),
-        ],
-        const SizedBox(height: 4),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: _addGoal,
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              minimumSize: const Size(0, 36),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    final colors = theme.colorScheme;
+    final addRow = InkWell(
+      onTap: _addGoal,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 44,
+              child: Icon(Icons.add_rounded, size: 22, color: colors.primary),
             ),
-            icon: const Icon(Icons.add, size: 18),
-            label: Text(loc.goalGridAdd),
-          ),
+            const SizedBox(width: 12),
+            Text(
+              loc.goalGridAdd,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: colors.primary,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
+    );
+
+    final list = _goals.isEmpty
+        ? _buildEmpty(theme, loc)
+        : AppDividedList(
+            children: [
+              for (final goal in _goals)
+                if (_progressByGoal[goal.id] case final progress?)
+                  GoalCard(
+                    goal: goal,
+                    progress: progress,
+                    isKm: _isKm,
+                    onTap: () => _openDetail(goal),
+                    onEdit: () => _editGoal(goal),
+                    onTogglePause: () => _togglePause(goal),
+                    onDelete: () => _deleteGoal(goal),
+                  )
+                else
+                  _GoalUnavailableRow(goal: goal, onRetry: _load),
+              addRow,
+            ],
+          );
+
+    final body = _loadFailed
+        ? Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [LoadErrorBanner(onRetry: _load), list],
+          )
+        : list;
+    if (!widget.framed) return body;
+    return AppSectionCard(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      child: body,
     );
   }
 
   Widget _buildEmpty(ThemeData theme, AppLocalizations loc) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withAlpha(80),
+    final colors = theme.colorScheme;
+    return InkWell(
+      onTap: _addGoal,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+        child: Row(
+          children: [
+            const AppIconBadge(Icons.flag_outlined, size: 44, iconSize: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    loc.goalEmpty,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    loc.goalEmptyRowSubtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              onPressed: _addGoal,
+              tooltip: loc.goalGridAdd,
+              icon: const Icon(Icons.add_rounded),
+            ),
+          ],
         ),
       ),
-      child: Column(
+    );
+  }
+}
+
+/// A goal whose progress could not be read: its name and a retry, instead of
+/// a ring stuck at 0 %.
+class _GoalUnavailableRow extends StatelessWidget {
+  final Goal goal;
+  final VoidCallback onRetry;
+
+  const _GoalUnavailableRow({required this.goal, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+      child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withAlpha(28),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.flag_outlined,
-              size: 28,
-              color: theme.colorScheme.primary,
+          const AppIconBadge(Icons.error_outline_rounded, size: 44, iconSize: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (goal.title.isNotEmpty)
+                  Text(
+                    goal.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                Text(
+                  loc.commonLoadError,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            loc.goalEmpty,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            loc.goalEmptySubtitle,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 14),
-          FilledButton.tonalIcon(
-            onPressed: _addGoal,
-            icon: const Icon(Icons.add, size: 18),
-            label: Text(loc.goalGridAdd),
-          ),
+          TextButton(onPressed: onRetry, child: Text(loc.commonRetry)),
         ],
       ),
     );

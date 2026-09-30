@@ -58,7 +58,7 @@ void main() {
 
     expect(state.sessionContext?.planWorkoutId, 'planned-1');
     expect(state.sessionContext?.scheduledRunId, 'scheduled-1');
-    expect(state.nativeStepSnapshot?['stepIndex'], 3);
-    expect(state.nativeStepSnapshot?['remaining'], 45.0);
+    expect(state.stepSnapshot?.stepIndex, 3);
+    expect(state.stepSnapshot?.remaining, 45.0);
   });
 }

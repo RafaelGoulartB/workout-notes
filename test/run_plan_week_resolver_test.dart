@@ -116,15 +116,5 @@ void main() {
       );
       expect(resolver.leftoverPlanWeeks(phaseWeeks: 12, planWeeks: 4), 0);
     });
-
-    test('repeatsWithin counts how often a short plan restarts', () {
-      expect(resolver.repeatsWithin(phaseWeeks: 12, planWeeks: 4), 2);
-      expect(resolver.repeatsWithin(phaseWeeks: 12, planWeeks: 12), 0);
-      expect(resolver.repeatsWithin(phaseWeeks: 4, planWeeks: 12), 0);
-      expect(
-        resolver.repeatsWithin(phaseWeeks: 12, planWeeks: 12, startWeek: 6),
-        1,
-      );
-    });
   });
 }

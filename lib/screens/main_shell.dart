@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/main.dart';
-import 'package:workout_notes/screens/workout/sleep_tracker_screen.dart';
+import 'package:workout_notes/screens/nutrition/nutrition_home_screen.dart';
+import 'package:workout_notes/screens/planning/periodization_home_screen.dart';
+import 'package:workout_notes/screens/sleep/sleep_tracker_screen.dart';
 import 'package:workout_notes/screens/workout/workout_home_screen.dart';
-import 'package:workout_notes/screens/workout/nutrition_home_screen.dart';
-import 'package:workout_notes/screens/workout/periodization_home_screen.dart';
 
 /// Primary application navigation. Each tab keeps its own navigation state
 /// while the user switches between workout, sleep, nutrition and progress
@@ -20,9 +19,8 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
-  final ValueNotifier<int> _selectedTab = ValueNotifier<int>(0);
   late final Map<int, Widget> _builtTabs = <int, Widget>{
-    0: WorkoutHomeScreen(selectedTab: _selectedTab),
+    0: const WorkoutHomeScreen(),
   };
 
   @override
@@ -34,24 +32,20 @@ class _MainShellState extends State<MainShell> {
   @override
   void dispose() {
     WorkoutNotesApp.sections.removeListener(_onSectionsChanged);
-    _selectedTab.dispose();
     super.dispose();
   }
 
   void _onSectionsChanged() {
     if (!mounted) return;
-    var resetToWorkout = false;
     setState(() {
       if (!WorkoutNotesApp.sections.planEnabled && _selectedIndex == 3) {
         _selectedIndex = 0;
-        resetToWorkout = true;
       }
     });
-    if (resetToWorkout) _selectedTab.value = 0;
   }
 
   Widget _createTab(int index) => switch (index) {
-        0 => WorkoutHomeScreen(selectedTab: _selectedTab),
+        0 => const WorkoutHomeScreen(),
         1 => const SleepTrackerScreen(),
         2 => const NutritionHomeScreen(),
         3 => const PeriodizationHomeScreen(),
@@ -63,7 +57,6 @@ class _MainShellState extends State<MainShell> {
       _selectedIndex = index;
       _builtTabs.putIfAbsent(index, () => _createTab(index));
     });
-    _selectedTab.value = index;
   }
 
   @override
@@ -73,9 +66,15 @@ class _MainShellState extends State<MainShell> {
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
+        // A hidden tab keeps its state, but its tickers (pulsing dots, clocks)
+        // are muted so it does not keep drawing frames in the background.
+        // Services and timers that track a session are not affected.
         children: List<Widget>.generate(
           planEnabled ? 4 : 3,
-          (index) => _builtTabs[index] ?? const SizedBox.shrink(),
+          (index) => TickerMode(
+            enabled: index == _selectedIndex,
+            child: _builtTabs[index] ?? const SizedBox.shrink(),
+          ),
         ),
       ),
       bottomNavigationBar: NavigationBar(

@@ -84,7 +84,7 @@ mixin _ActiveWorkoutRoutineActions
 
   Future<Set<String>> _plannedRoutineIdsForToday() async {
     try {
-      final repository = PeriodizationRepository();
+      final repository = DatabaseHelper.instance.periodizationRepo;
       final phase = await repository.getEffectivePhase(DateTime.now());
       if (phase == null) return const {};
       final target = await repository.getEffectiveTarget(phase.id);
@@ -406,10 +406,10 @@ mixin _ActiveWorkoutRoutineActions
     );
   }
 
-  void _updateRestTimeAndClose(ExerciseWithSets exercise, int seconds) async {
+  Future<void> _updateRestTimeAndClose(ExerciseWithSets exercise, int seconds) async {
     await _workoutRepo.updateExerciseEntryRestTime(exercise.entryId, seconds);
     await _loadExercises();
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   Future<void> _pickExercise() async {
@@ -455,32 +455,20 @@ mixin _ActiveWorkoutRoutineActions
   }
 
   Future<void> _deleteWorkout() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(AppLocalizations.of(context)!.commonConfirmDelete),
-        content: Text(AppLocalizations.of(context)!.commonActionCannotBeUndone),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(AppLocalizations.of(context)!.commonCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              AppLocalizations.of(context)!.commonDelete,
-              style: TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: AppLocalizations.of(context)!.commonConfirmDelete,
+      message: AppLocalizations.of(context)!.commonActionCannotBeUndone,
+      confirmLabel: AppLocalizations.of(context)!.commonDelete,
+      cancelLabel: AppLocalizations.of(context)!.commonCancel,
+      destructive: true,
     );
 
     if (confirm == true && _workoutId != null) {
       // Stop any running timers
       _elapsedTimer?.cancel();
       _timerService.stop();
-      NotificationService.instance.cancelWorkoutTimer();
+      unawaited(NotificationService.instance.cancelWorkoutTimer());
 
       await _workoutRepo.deleteWorkout(_workoutId!);
 

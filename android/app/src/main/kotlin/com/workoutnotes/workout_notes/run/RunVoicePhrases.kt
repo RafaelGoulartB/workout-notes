@@ -2,7 +2,7 @@ package com.workoutnotes.workout_notes.run
 
 import kotlin.math.roundToInt
 
-/** Native mirror of the Dart voice phrases used while the screen is off. */
+/** Spoken run phrases, localized independently from the app UI. */
 class RunVoicePhrases(private val language: RunVoiceLanguage) {
 
     private val pt: Boolean get() = language == RunVoiceLanguage.pt
@@ -105,6 +105,16 @@ class RunVoicePhrases(private val language: RunVoiceLanguage) {
 
     fun paused(): String = if (pt) "Corrida pausada." else "Paused."
     fun resumed(): String = if (pt) "Corrida retomada." else "Resumed."
+    fun autoPaused(): String = if (pt) "Pausa automática." else "Auto paused."
+    fun autoResumed(): String = if (pt) "Retomando." else "Resuming."
+
+    fun lapSummary(index: Int, distanceMeters: Int, durationSeconds: Int, paceSecPerKm: Double?): String {
+        val head = if (pt) "Volta $index." else "Lap $index."
+        val distance = if (distanceMeters >= 1) " ${distanceSpeech(distanceMeters)}." else ""
+        val time = " ${durationSpeech(durationSeconds)}."
+        val pace = if (validPace(paceSecPerKm)) " Pace ${paceSpeech(paceSecPerKm!!)}." else ""
+        return "$head$distance$time$pace"
+    }
     fun testAnnouncement(): String = if (pt) {
         "Áudio do treinador pronto. Pace de 5 minutos e 30 segundos por quilômetro."
     } else {

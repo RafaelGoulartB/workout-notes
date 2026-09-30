@@ -31,7 +31,6 @@ void main() {
         comment: 'Acordei cansado',
       );
       await _insertSession(database, entryId: 'night-1');
-      await _insertEpochs(database);
 
       final result = await registry.executeRead(
         toolName: 'get_sleep_night_detail',
@@ -58,11 +57,7 @@ void main() {
       expect(stages['available'], isTrue);
       expect(stages['deepSleepMinutes'], 95);
       expect(stages['awakeningCount'], 3);
-      final epochs = stages['epochSummary'] as Map;
-      expect(epochs['epochCount'], 4);
-      expect(epochs['knownEpochCount'], 3);
-      expect(epochs['coveragePct'], 75.0);
-      expect(epochs['deepSleepMinutes'], 0.5);
+      expect(stages, isNot(contains('epochSummary')));
       final monitoring = data['monitoring'] as Map;
       expect(monitoring['signalQualityScore'], 0.86);
       expect((monitoring['noise'] as Map)['eventCount'], 7);
@@ -232,21 +227,3 @@ Future<void> _insertSession(Database database, {required String entryId}) =>
       'created_at': '2026-08-12T07:00:00.000',
     });
 
-Future<void> _insertEpochs(Database database) async {
-  const stages = ['awake', 'sleeping', 'deep', 'unknown'];
-  for (var index = 0; index < stages.length; index++) {
-    await database.insert('sleep_stage_epochs', {
-      'id': 'epoch-$index',
-      'session_id': 'session-night-1',
-      'started_at': '2026-08-11T23:${index.toString().padLeft(2, '0')}:00.000',
-      'duration_seconds': 30,
-      'stage': stages[index],
-      'confidence': 0.8,
-      'awake_probability': stages[index] == 'awake' ? 0.8 : 0.1,
-      'sleeping_probability': stages[index] == 'sleeping' ? 0.8 : 0.1,
-      'deep_probability': stages[index] == 'deep' ? 0.8 : 0.1,
-      'algorithm_version': 'sleep-stage-v2',
-      'source': 'acoustic_model',
-    });
-  }
-}

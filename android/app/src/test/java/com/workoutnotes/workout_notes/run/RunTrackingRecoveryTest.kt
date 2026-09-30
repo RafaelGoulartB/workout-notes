@@ -46,4 +46,53 @@ class RunTrackingRecoveryTest {
         assertEquals(280, restored.lastSplitMovingSeconds)
         assertEquals(2_000.0, restored.nextSplitAtMeters, 0.001)
     }
+
+    @Test
+    fun restoresAutoPausedTimeAndOpenAutoPause() {
+        val restored = RunTrackingRecovery.restore(
+            session = mapOf(
+                "status" to "recording",
+                "duration_seconds" to 900,
+                "moving_time_seconds" to 800,
+                "total_paused_millis" to 40_000L,
+                "total_auto_paused_millis" to 60_000L,
+                "auto_paused_at_millis" to 1_700_000_000_000L,
+            ),
+            completedSplits = emptyList(),
+            nowMillis = 1_700_000_010_000L,
+        )
+        assertEquals(40_000L, restored.totalPausedMillis)
+        assertEquals(60_000L, restored.totalAutoPausedMillis)
+        assertEquals(1_700_000_000_000L, restored.autoPausedAtMillis)
+    }
+
+    @Test
+    fun manualPauseWinsOverStaleAutoPause() {
+        val restored = RunTrackingRecovery.restore(
+            session = mapOf(
+                "status" to "paused",
+                "duration_seconds" to 900,
+                "moving_time_seconds" to 800,
+                "auto_paused_at_millis" to 1_700_000_000_000L,
+            ),
+            completedSplits = emptyList(),
+            nowMillis = 1_700_000_010_000L,
+        )
+        assertEquals(0L, restored.autoPausedAtMillis)
+    }
+
+    @Test
+    fun legacyDerivationExcludesAutoPausedShare() {
+        val restored = RunTrackingRecovery.restore(
+            session = mapOf(
+                "status" to "recording",
+                "duration_seconds" to 1000,
+                "moving_time_seconds" to 850,
+                "total_auto_paused_millis" to 100_000L,
+            ),
+            completedSplits = emptyList(),
+            nowMillis = 1L,
+        )
+        assertEquals(50_000L, restored.totalPausedMillis)
+    }
 }

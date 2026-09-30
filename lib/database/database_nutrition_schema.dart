@@ -173,8 +173,6 @@ abstract final class DatabaseNutritionSchema {
     ''');
 
     for (final statement in <String>[
-      'CREATE INDEX IF NOT EXISTS idx_foods_search_name ON foods(search_name)',
-      'CREATE INDEX IF NOT EXISTS idx_foods_brand ON foods(brand)',
       'CREATE INDEX IF NOT EXISTS idx_foods_barcode ON foods(barcode)',
       'CREATE INDEX IF NOT EXISTS idx_food_variants_food ON food_variants(food_id)',
       'CREATE INDEX IF NOT EXISTS idx_food_servings_variant ON food_servings(food_variant_id)',
@@ -184,9 +182,7 @@ abstract final class DatabaseNutritionSchema {
       'CREATE INDEX IF NOT EXISTS idx_nutrition_goals_active ON nutrition_goals(is_active)',
       'CREATE INDEX IF NOT EXISTS idx_saved_meal_items_meal ON saved_meal_items(saved_meal_id, order_index ASC)',
     ]) {
-      try {
-        await db.execute(statement);
-      } catch (_) {}
+      await db.execute(statement);
     }
   }
 }

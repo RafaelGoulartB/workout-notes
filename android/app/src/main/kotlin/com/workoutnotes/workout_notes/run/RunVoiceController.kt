@@ -15,12 +15,14 @@ private data class RunVoicePacePoint(
 )
 
 /**
- * Native voice coach — mirrors Dart RunVoiceCoach logic but runs inside
+ * The run voice coach. It is the only voice engine: it runs inside
  * RunTrackingService so announcements survive screen-off / Flutter engine death.
  */
-class RunVoiceController(private val context: Context) {
+class RunVoiceController(
+    private val context: Context,
+    private val tts: RunSpeechOutput = RunTtsService(context),
+) {
 
-    private val tts = RunTtsService(context)
     private var phrases = RunVoicePhrases(RunVoiceLanguage.en)
     private val intervalEngine = RunIntervalEngineNative()
 
@@ -30,7 +32,6 @@ class RunVoiceController(private val context: Context) {
     private var settings: RunVoiceSettings = RunVoiceSettings.defaults()
     private var goal: RunSessionGoal = RunSessionGoal.disabled()
     private var intervalsOn: Boolean = false
-    private var bypassHeadphonesGate: Boolean = false
     private var active: Boolean = false
     private var goalCompleted: Boolean = false
 
@@ -46,6 +47,7 @@ class RunVoiceController(private val context: Context) {
     private var paceDeviationDirection: Int = 0
     private var paceCorrectionSpoken: Boolean = false
     private var wasPaused: Boolean? = null
+    private var wasAutoPaused: Boolean? = null
 
     // Persisted settings cache
     @Volatile private var settingsLoaded = false
@@ -98,22 +100,6 @@ class RunVoiceController(private val context: Context) {
         return defaults
     }
 
-    fun configure(
-        settings: RunVoiceSettings,
-        goal: RunSessionGoal,
-        intervalsOn: Boolean,
-        bypassHeadphonesGate: Boolean = false,
-        planSteps: List<RunWorkoutStepNative> = emptyList(),
-    ) {
-        this.settings = settings
-        refreshVoiceLanguage()
-        this.goal = goal
-        this.intervalsOn = intervalsOn
-        this.bypassHeadphonesGate = bypassHeadphonesGate
-        intervalEngine.configure(settings.interval)
-        setPlanSteps(planSteps)
-    }
-
     /** Loads a structured session. Empty clears it and falls back to presets. */
     fun setPlanSteps(steps: List<RunWorkoutStepNative>) {
         planSteps = steps
@@ -131,6 +117,12 @@ class RunVoiceController(private val context: Context) {
     fun engineSnapshotJson(): String? =
         if (stepEngine.hasPlan) stepEngine.stateJson() else null
 
+    /** Live quick-interval progress, or null while no interval set is running. */
+    fun intervalSnapshotMap(): Map<String, Any?>? =
+        if (intervalsOn && !stepEngine.hasPlan && intervalEngine.snapshot.phase != RunIntervalPhase.idle) {
+            intervalEngine.snapshot.toMap()
+        } else null
+
     /** Live structured-workout progress for a reattached Flutter screen. */
     fun stepSnapshotMap(): Map<String, Any?>? =
         if (stepEngine.hasPlan) stepEngine.snapshotMap() else null
@@ -140,6 +132,9 @@ class RunVoiceController(private val context: Context) {
 
     val hasPlan: Boolean get() = stepEngine.hasPlan
     val intervalsEnabled: Boolean get() = intervalsOn
+
+    /** Auto-pause is a user setting, but structured sessions own their clock. */
+    val autoPauseEnabled: Boolean get() = settings.autoPause
 
     fun goalJson(): String = goal.toJson().toString()
 
@@ -154,7 +149,6 @@ class RunVoiceController(private val context: Context) {
         settingsMap: Map<String, Any?>?,
         goalMap: Map<String, Any?>?,
         intervalsOn: Boolean?,
-        bypassGate: Boolean?,
         plan: Any? = null,
     ) {
         if (plan != null) setPlanSteps(RunWorkoutStepNative.listFromAny(plan))
@@ -168,7 +162,6 @@ class RunVoiceController(private val context: Context) {
             this.goal = RunSessionGoal.fromMap(goalMap)
         }
         if (intervalsOn != null) this.intervalsOn = intervalsOn
-        if (bypassGate != null) this.bypassHeadphonesGate = bypassGate
         Log.i("RunVoice", "sync intervalsOn=$intervalsOn goal=${goal.enabled} enabled=${settings.enabled}")
     }
 
@@ -176,7 +169,6 @@ class RunVoiceController(private val context: Context) {
         settingsMap: Map<String, Any?>?,
         goalMap: Map<String, Any?>?,
         intervalsOn: Boolean?,
-        bypassGate: Boolean?,
         plan: Any? = null,
     ) {
         // If flutter didn't push settings, load from storage
@@ -191,7 +183,6 @@ class RunVoiceController(private val context: Context) {
         if (goalMap != null) goal = RunSessionGoal.fromMap(goalMap)
         // If caller didn't specify intervalsOn, respect default
         this.intervalsOn = intervalsOn ?: settings.intervalsEnabledByDefault
-        this.bypassHeadphonesGate = bypassGate ?: false
         active = true
         goalCompleted = false
         lastAnnouncedKm = 0
@@ -205,6 +196,7 @@ class RunVoiceController(private val context: Context) {
         paceDeviationDirection = 0
         paceCorrectionSpoken = false
         wasPaused = null
+        wasAutoPaused = null
         intervalEngine.reset()
         if (plan != null) setPlanSteps(RunWorkoutStepNative.listFromAny(plan))
         stepEngine.reset()
@@ -229,6 +221,46 @@ class RunVoiceController(private val context: Context) {
     fun shutdown() {
         end()
         tts.shutdown()
+    }
+
+    /**
+     * Moves the structured session (or the quick interval set) to its next
+     * step and speaks it. Returns false when there is nothing to skip.
+     */
+    fun skipStep(): Boolean {
+        if (!active) return false
+        val spoken = mutableListOf<String>()
+        if (stepEngine.hasPlan) {
+            if (stepEngine.snapshot.phase != RunStepEnginePhase.running) return false
+            for (event in stepEngine.skip()) phraseForStep(event)?.let { spoken.add(it) }
+        } else if (intervalsOn) {
+            val phase = intervalEngine.snapshot.phase
+            if (phase != RunIntervalPhase.work && phase != RunIntervalPhase.rest) return false
+            for (event in intervalEngine.skip()) {
+                if (settings.announceIntervals) phraseForInterval(event)?.let { spoken.add(it) }
+            }
+        } else {
+            return false
+        }
+        spoken.firstOrNull()?.let { speakIfAllowed(it) }
+        return true
+    }
+
+    /** Spoken summary of a manual lap that was just marked. */
+    fun announceLap(lap: Map<String, Any?>) {
+        if (!active || !settings.enabled || !settings.announceLaps) return
+        val index = (lap["lap_index"] as? Number)?.toInt() ?: return
+        val distance = (lap["distance_meters"] as? Number)?.toDouble() ?: 0.0
+        val duration = (lap["duration_seconds"] as? Number)?.toInt() ?: 0
+        val pace = (lap["pace_sec_per_km"] as? Number)?.toDouble()
+        speakIfAllowed(phrases.lapSummary(index, distance.toInt(), duration, pace))
+    }
+
+    /** Short acknowledgement after a free run was stopped (planned sessions announce their own end). */
+    fun speakWorkoutComplete() {
+        if (!settings.enabled) return
+        tts.ensureReady(effectiveLanguage())
+        speakIfAllowed(phrases.workoutComplete())
     }
 
     fun speakTest() {
@@ -272,11 +304,20 @@ class RunVoiceController(private val context: Context) {
         splitsCount: Int,
         currentSplitPace: Double?,
         splits: List<Map<String, Any?>>,
+        autoPaused: Boolean = false,
     ) {
         if (!active) return
         if (!settings.enabled) return
 
         val phrases = mutableListOf<String>()
+
+        if (isRecording || isPaused || autoPaused) {
+            val previousAuto = wasAutoPaused
+            wasAutoPaused = autoPaused
+            if (previousAuto != null && previousAuto != autoPaused && settings.announceAutoPause) {
+                phrases.add(if (autoPaused) this.phrases.autoPaused() else this.phrases.autoResumed())
+            }
+        }
 
         if (isRecording || isPaused) {
             val previousPaused = wasPaused
@@ -396,8 +437,13 @@ class RunVoiceController(private val context: Context) {
             }
         }
 
-        if (!stepEngine.hasPlan && settings.announcePaceWarning && settings.targetPaceSecPerKm != null && isRecording) {
-            stablePacePhrase(distanceMeters, movingTimeSeconds)?.let { out.add(it) }
+        // A pace goal set for this run wins over the global target and turns the
+        // warnings on for the session.
+        val sessionPace = goal.paceTargetSecPerKm
+        val paceTarget = sessionPace ?: settings.targetPaceSecPerKm?.takeIf { settings.announcePaceWarning }
+        val paceTolerance = if (sessionPace != null) goal.paceTolerancePercent else settings.paceTolerancePercent
+        if (!stepEngine.hasPlan && paceTarget != null && isRecording) {
+            stablePacePhrase(distanceMeters, movingTimeSeconds, paceTarget, paceTolerance)?.let { out.add(it) }
         }
 
         return out
@@ -416,7 +462,12 @@ class RunVoiceController(private val context: Context) {
         return phrases.goalRemaining(goal.metric, remaining)
     }
 
-    private fun stablePacePhrase(distanceMeters: Double, movingTimeSeconds: Int): String? {
+    private fun stablePacePhrase(
+        distanceMeters: Double,
+        movingTimeSeconds: Int,
+        target: Int,
+        tolerancePercent: Int,
+    ): String? {
         val now = System.currentTimeMillis()
         paceSamples.addLast(RunVoicePacePoint(now, distanceMeters, movingTimeSeconds))
         while (paceSamples.isNotEmpty() && now - paceSamples.first().atMillis > 25_000) paceSamples.removeFirst()
@@ -426,8 +477,7 @@ class RunVoiceController(private val context: Context) {
         val distance = distanceMeters - first.distanceMeters
         if (elapsed < 12 || distance < 40) return null
         val pace = elapsed / (distance / 1000.0)
-        val target = settings.targetPaceSecPerKm ?: return null
-        val tolerance = settings.paceTolerancePercent / 100.0
+        val tolerance = tolerancePercent / 100.0
         val direction = if (pace < target * (1 - tolerance)) -1 else if (pace > target * (1 + tolerance)) 1 else 0
         if (direction == 0) {
             paceDeviationSince = 0L
@@ -526,7 +576,7 @@ class RunVoiceController(private val context: Context) {
             Log.d("RunVoice", "skipped in call")
             return false
         }
-        if (settings.headphonesOnly && !bypassHeadphonesGate && !isHeadsetConnected()) {
+        if (settings.headphonesOnly && !isHeadsetConnected()) {
             Log.d("RunVoice", "skipped no headset")
             return false
         }
@@ -548,31 +598,26 @@ class RunVoiceController(private val context: Context) {
     private fun isHeadsetConnected(): Boolean {
         return try {
             val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val devices = am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-                for (device in devices) {
-                    when (device.type) {
-                        AudioDeviceInfo.TYPE_WIRED_HEADSET,
-                        AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
-                        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-                        AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
-                        AudioDeviceInfo.TYPE_USB_HEADSET,
-                        AudioDeviceInfo.TYPE_HEARING_AID,
-                        -> return true
-                        else -> {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                if (device.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
-                                    device.type == AudioDeviceInfo.TYPE_BLE_SPEAKER
-                                ) return true
-                            }
+            val devices = am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            for (device in devices) {
+                when (device.type) {
+                    AudioDeviceInfo.TYPE_WIRED_HEADSET,
+                    AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+                    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+                    AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+                    AudioDeviceInfo.TYPE_USB_HEADSET,
+                    AudioDeviceInfo.TYPE_HEARING_AID,
+                    -> return true
+                    else -> {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            if (device.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+                                device.type == AudioDeviceInfo.TYPE_BLE_SPEAKER
+                            ) return true
                         }
                     }
                 }
-                false
-            } else {
-                @Suppress("DEPRECATION")
-                am.isWiredHeadsetOn || am.isBluetoothA2dpOn || am.isBluetoothScoOn
             }
+            false
         } catch (_: Throwable) { false }
     }
 }

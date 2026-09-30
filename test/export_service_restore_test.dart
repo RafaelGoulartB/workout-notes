@@ -3,20 +3,19 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:workout_notes/repositories/export_import_repository.dart';
 import 'package:workout_notes/services/export_service.dart';
+
+import 'support/test_db.dart';
 
 void main() {
   late Database database;
   late Directory backupsDirectory;
   late ExportService service;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({
@@ -27,43 +26,7 @@ void main() {
     backupsDirectory = await Directory.systemTemp.createTemp(
       'workout_notes_export_test_',
     );
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 1,
-        onCreate: (db, version) async {
-          for (final table in [
-            'exercise_categories',
-            'exercises',
-            'workouts',
-            'exercise_entries',
-            'sets',
-            'routines',
-            'routine_days',
-            'routine_exercises',
-            'predefined_sets',
-            'body_measurements',
-            'sleep_entries',
-            'sleep_monitor_segments',
-            'foods',
-            'food_variants',
-            'food_servings',
-            'meal_logs',
-            'meal_log_items',
-            'nutrition_goals',
-          ]) {
-            await db.execute('CREATE TABLE $table (id TEXT PRIMARY KEY)');
-          }
-          await db.execute(
-            'CREATE TABLE sleep_monitor_sessions '
-            '(id TEXT PRIMARY KEY, alarm_at TEXT)',
-          );
-          await db.execute(
-            'CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT)',
-          );
-        },
-      ),
-    );
+    database = await openTestDb();
     await database.insert('app_settings', {
       'key': 'current',
       'value': 'unchanged',
@@ -91,10 +54,11 @@ void main() {
   test('restores a valid backup from bytes', () async {
     final count = await service.restoreFromBytes(_bytes(_validBackup()));
 
-    expect(count, 1);
-    expect(await database.query('app_settings'), [
-      {'key': 'restored', 'value': 'yes'},
-    ]);
+    expect(count, 1 + _sleepDefaultSettingCount);
+    expect(await _settings(database), {
+      'restored': 'yes',
+      ..._sleepDefaultSettings,
+    });
   });
 
   test(
@@ -311,27 +275,25 @@ void main() {
 
     final count = await service.restoreFromBytes(_bytes(backup));
 
-    expect(count, 1);
+    expect(count, 1 + _sleepDefaultSettingCount);
     expect(await database.query('sleep_entries'), isEmpty);
   });
 
   test('accepts a version 3 backup without monitoring records', () async {
     final backup = _validBackup()
       ..['version'] = 3
-      ..remove('sleep_monitor_sessions')
-      ..remove('sleep_monitor_segments');
+      ..remove('sleep_monitor_sessions');
 
     final count = await service.restoreFromBytes(_bytes(backup));
 
-    expect(count, 1);
+    expect(count, 1 + _sleepDefaultSettingCount);
     expect(await database.query('sleep_monitor_sessions'), isEmpty);
-    expect(await database.query('sleep_monitor_segments'), isEmpty);
   });
 
   test('restores the alarm time from a version 5 backup', () async {
     final backup = _validBackup();
     backup['sleep_monitor_sessions'] = [
-      {'id': 'night-1', 'alarm_at': '2026-08-01T10:00:00.000Z'},
+      _session('night-1', alarmAt: '2026-08-01T10:00:00.000Z'),
     ];
     (backup['record_counts']
             as Map<String, dynamic>)['sleep_monitor_sessions'] =
@@ -339,24 +301,93 @@ void main() {
 
     await service.restoreFromBytes(_bytes(backup));
 
-    expect(await database.query('sleep_monitor_sessions'), [
-      {'id': 'night-1', 'alarm_at': '2026-08-01T10:00:00.000Z'},
-    ]);
+    expect(
+      await database.query(
+        'sleep_monitor_sessions',
+        columns: ['id', 'alarm_at', 'monitor_mode'],
+      ),
+      [
+        {
+          'id': 'night-1',
+          'alarm_at': '2026-08-01T10:00:00.000Z',
+          'monitor_mode': 'alarm_without_mission',
+        },
+      ],
+    );
   });
+
+  test('accepts a version 16 backup without plan adaptations', () async {
+    final backup = _validBackup()..['version'] = 16;
+    backup.remove('run_plan_adaptations');
+    (backup['record_counts'] as Map<String, dynamic>).remove(
+      'run_plan_adaptations',
+    );
+
+    final count = await service.restoreFromBytes(_bytes(backup));
+
+    expect(count, 1 + _sleepDefaultSettingCount);
+    expect((await _settings(database))['restored'], 'yes');
+  });
+
+  test(
+    'rejects a current backup without plan adaptations without changing data',
+    () async {
+      final backup = _validBackup()..remove('run_plan_adaptations');
+
+      await expectInvalidAndUnchanged(
+        () => service.restoreFromBytes(_bytes(backup)),
+      );
+    },
+  );
 
   test('accepts a version 4 session without alarm time', () async {
     final backup = _validBackup()..['version'] = 4;
-    backup['sleep_monitor_sessions'] = [
-      {'id': 'night-legacy'},
-    ];
+    backup['sleep_monitor_sessions'] = [_session('night-legacy')];
 
     await service.restoreFromBytes(_bytes(backup));
 
-    expect(await database.query('sleep_monitor_sessions'), [
-      {'id': 'night-legacy', 'alarm_at': null},
-    ]);
+    expect(
+      await database.query(
+        'sleep_monitor_sessions',
+        columns: ['id', 'alarm_at', 'monitor_mode'],
+      ),
+      [
+        {
+          'id': 'night-legacy',
+          'alarm_at': null,
+          'monitor_mode': 'monitoring_only',
+        },
+      ],
+    );
   });
 }
+
+/// Default sleep-mission settings a restore adds when the backup has none.
+const _sleepDefaultSettings = <String, String>{
+  'sleep_mission_enabled': 'false',
+  'sleep_mission_type': 'barcode',
+  'sleep_mission_barcode_hash': '',
+  'sleep_mission_barcode_salt': '',
+  'sleep_mission_barcode_format': '',
+  'sleep_mission_registered_at': '',
+  'sleep_monitor_default_mode': 'alarm_without_mission',
+};
+final _sleepDefaultSettingCount = _sleepDefaultSettings.length;
+
+Future<Map<String, Object?>> _settings(Database database) async => {
+  for (final row in await database.query('app_settings'))
+    row['key'] as String: row['value'],
+};
+
+Map<String, Object?> _session(String id, {String? alarmAt}) => {
+  'id': id,
+  'status': 'completed',
+  'started_at': '2026-08-01T00:00:00.000Z',
+  'utc_offset_start_minutes': 0,
+  'algorithm_version': 'test',
+  'created_at': '2026-08-01T00:00:00.000Z',
+  'alarm_at': alarmAt,
+};
 
 Uint8List _bytes(Object data) =>
     Uint8List.fromList(utf8.encode(jsonEncode(data)));

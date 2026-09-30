@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/body_tracker_utils.dart';
-import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
+import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 
 /// Compact body-weight summary shown at the top of the Tracking tab.
 class BodyMeasurementsTeaserCard extends StatelessWidget {
@@ -10,6 +10,10 @@ class BodyMeasurementsTeaserCard extends StatelessWidget {
   final String? unit;
   final double? delta;
   final String? date;
+
+  /// Direction the current phase wants the weight to move (1 = gain,
+  /// −1 = lose). Defaults to losing being good when no phase says.
+  final int? goodDirection;
   final VoidCallback onOpen;
 
   const BodyMeasurementsTeaserCard({
@@ -18,6 +22,7 @@ class BodyMeasurementsTeaserCard extends StatelessWidget {
     this.unit,
     this.delta,
     this.date,
+    this.goodDirection,
     required this.onOpen,
   });
 
@@ -29,8 +34,9 @@ class BodyMeasurementsTeaserCard extends StatelessWidget {
     final displayUnit = (unit == null || unit!.isEmpty) ? 'kg' : unit!;
 
     final deltaValue = delta;
-    final isGood = deltaValue != null && deltaValue < 0;
-    final isBad = deltaValue != null && deltaValue > 0;
+    final good = goodDirection ?? -1;
+    final isGood = deltaValue != null && deltaValue.sign == good;
+    final isBad = deltaValue != null && deltaValue.sign == -good;
     final deltaColor = deltaValue == null || deltaValue == 0
         ? theme.colorScheme.onSurfaceVariant
         : (isGood
@@ -39,7 +45,7 @@ class BodyMeasurementsTeaserCard extends StatelessWidget {
               ? Colors.red
               : theme.colorScheme.onSurfaceVariant);
 
-    return PeriodizationSurface(
+    return PlanningCard(
       onTap: onOpen,
       padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
       child: Row(
@@ -110,7 +116,9 @@ class BodyMeasurementsTeaserCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant.withAlpha(170),
+                        color: theme.colorScheme.onSurfaceVariant.withAlpha(
+                          170,
+                        ),
                         fontSize: 11,
                       ),
                     ),

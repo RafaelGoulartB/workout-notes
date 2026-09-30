@@ -3,18 +3,25 @@ import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/widgets/sleep/sleep_schedule_chart.dart';
+import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
+/// Weekly sleep per night: recorded duration next to actual or estimated
+/// sleep, against a dashed goal line.
 class SleepDurationChart extends StatelessWidget {
   final List<SleepEntry> entries;
   final List<DateTime> days;
+  final int goalMinutes;
 
   const SleepDurationChart({
     super.key,
     required this.entries,
     required this.days,
+    required this.goalMinutes,
   });
 
   @override
@@ -22,13 +29,12 @@ class SleepDurationChart extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
-    final byDate = {
-      for (final entry in entries) _dateString(entry.date): entry,
-    };
+    final byDate = {for (final entry in entries) dateKey(entry.date): entry};
+    final goalHours = goalMinutes / 60;
     final groups = <BarChartGroupData>[];
-    var maxHours = 0.0;
+    var maxHours = goalHours;
     for (var index = 0; index < days.length; index++) {
-      final entry = byDate[_dateString(days[index])];
+      final entry = byDate[dateKey(days[index])];
       final recorded = entry == null ? null : entry.sleepMinutes / 60;
       final actualMinutes =
           entry?.actualSleepMinutes ?? entry?.estimatedSleepMinutes;
@@ -46,142 +52,120 @@ class SleepDurationChart extends StatelessWidget {
       );
     }
 
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 12, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.bar_chart_rounded, color: colors.primary, size: 21),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        loc.sleepDurationChart,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          label: loc.sleepDurationChartSemantics,
+          child: SizedBox(
+            height: 190,
+            child: BarChart(
+              BarChartData(
+                minY: 0,
+                maxY: (maxHours + 1).ceilToDouble(),
+                alignment: BarChartAlignment.spaceAround,
+                barGroups: groups,
+                extraLinesData: ExtraLinesData(
+                  horizontalLines: [
+                    HorizontalLine(
+                      y: goalHours,
+                      color: colors.onSurfaceVariant.withAlpha(150),
+                      strokeWidth: 1.5,
+                      dashArray: [5, 4],
+                    ),
+                  ],
+                ),
+                barTouchData: BarTouchData(
+                  touchTooltipData: BarTouchTooltipData(
+                    fitInsideHorizontally: true,
+                    fitInsideVertically: true,
+                    getTooltipColor: (_) => colors.inverseSurface,
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      final index = group.x;
+                      if (index < 0 || index >= days.length) return null;
+                      final label = rodIndex == 0
+                          ? loc.sleepChartRecorded
+                          : loc.sleepChartActualOrEstimated;
+                      return BarTooltipItem(
+                        '${DateFormat.MMMEd(Intl.defaultLocale).format(days[index])}\n'
+                        '$label: ${SleepUi.duration(loc, (rod.toY * 60).round())}',
+                        TextStyle(
+                          color: colors.onInverseSurface,
+                          fontWeight: FontWeight.w600,
+                          height: 1.35,
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        loc.sleepDurationChartSubtitle,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+                        textAlign: TextAlign.left,
+                      );
+                    },
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 16,
-              runSpacing: 6,
-              children: [
-                _LegendItem(
-                  color: colors.primary,
-                  label: loc.sleepChartRecorded,
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: 2,
+                  getDrawingHorizontalLine: (_) => FlLine(
+                    color: colors.outlineVariant.withAlpha(70),
+                    strokeWidth: 1,
+                  ),
                 ),
-                _LegendItem(
-                  color: colors.tertiary,
-                  label: loc.sleepChartActualOrEstimated,
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Semantics(
-              label: loc.sleepDurationChartSemantics,
-              child: SizedBox(
-                height: 190,
-                child: BarChart(
-                  BarChartData(
-                    minY: 0,
-                    maxY: math.max(8, maxHours.ceilToDouble() + 1),
-                    alignment: BarChartAlignment.spaceAround,
-                    barGroups: groups,
-                    barTouchData: BarTouchData(
-                      touchTooltipData: BarTouchTooltipData(
-                        getTooltipColor: (_) => colors.inverseSurface,
-                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                          return BarTooltipItem(
-                            _formatDuration(rod.toY),
-                            TextStyle(
-                              color: colors.onInverseSurface,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    gridData: FlGridData(
-                      show: true,
-                      drawVerticalLine: false,
-                      horizontalInterval: 2,
-                      getDrawingHorizontalLine: (_) => FlLine(
-                        color: colors.outlineVariant.withAlpha(110),
-                        strokeWidth: 1,
-                      ),
-                    ),
-                    borderData: FlBorderData(show: false),
-                    titlesData: FlTitlesData(
-                      topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 31,
-                          interval: 2,
-                          getTitlesWidget: (value, meta) => Text(
-                            '${value.toInt()}h',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: colors.onSurfaceVariant,
-                            ),
+                borderData: FlBorderData(show: false),
+                titlesData: FlTitlesData(
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 30,
+                      interval: 2,
+                      getTitlesWidget: (value, meta) {
+                        if (value == meta.max) return const SizedBox.shrink();
+                        return Text(
+                          '${value.toInt()}h',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                            fontFeatures: AppUi.tabular,
                           ),
-                        ),
-                      ),
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 28,
-                          getTitlesWidget: (value, meta) {
-                            final index = value.toInt();
-                            if (index < 0 || index >= days.length) {
-                              return const SizedBox();
-                            }
-                            return SideTitleWidget(
-                              meta: meta,
-                              child: Text(
-                                DateFormat(
-                                  'E',
-                                  Intl.defaultLocale,
-                                ).format(days[index]).substring(0, 1),
-                                style: theme.textTheme.labelMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+                        );
+                      },
+                    ),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 34,
+                      getTitlesWidget: (value, meta) =>
+                          SleepDayLabel(meta: meta, days: days, value: value),
                     ),
                   ),
                 ),
               ),
             ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 16,
+          runSpacing: 6,
+          alignment: WrapAlignment.center,
+          children: [
+            AppLegendItem(color: colors.primary, label: loc.sleepChartRecorded),
+            AppLegendItem(
+              color: colors.tertiary,
+              label: loc.sleepChartActualOrEstimated,
+            ),
+            AppLegendItem(
+              color: colors.onSurfaceVariant,
+              dashed: true,
+              label:
+                  '${loc.sleepGoalTarget} ${SleepUi.duration(loc, goalMinutes)}',
+            ),
           ],
         ),
-      ),
+      ],
     );
   }
 
@@ -191,38 +175,4 @@ class SleepDurationChart extends StatelessWidget {
     color: color,
     borderRadius: BorderRadius.circular(4),
   );
-
-  static String _formatDuration(double hours) {
-    final minutes = (hours * 60).round();
-    return '${minutes ~/ 60}h ${minutes % 60}min';
-  }
-
-  static String _dateString(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
-}
-
-class _LegendItem extends StatelessWidget {
-  final Color color;
-  final String label;
-
-  const _LegendItem({required this.color, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 9,
-          height: 9,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 6),
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
-      ],
-    );
-  }
 }

@@ -9,7 +9,7 @@ import 'package:workout_notes/models/nutrition/food_serving.dart';
 import 'package:workout_notes/models/nutrition/food_variant.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 
-import 'nutrition_gateway.dart';
+import 'package:workout_notes/services/nutrition_gateway.dart';
 
 /// Gateway for the Open Food Facts collaborative database.
 ///
@@ -25,14 +25,18 @@ import 'nutrition_gateway.dart';
 ///   GET /api/v2/product/{code}.json                 (barcode lookup)
 class OpenFoodFactsGateway implements NutritionGateway {
   static const String defaultBaseUrl = 'https://world.openfoodfacts.org';
-  static const String sourceName = FoodSource.openFoodFacts;
 
   /// Fields requested from OFF so the payload stays small.
   static const String _fields =
       'code,product_name_pt_br,product_name_en,product_name,brands,'
       'nutriments,url,image_front_small_url,serving_quantity_g,serving_size';
 
+  /// The app-wide gateway shared by the nutrition screens. It lives for the
+  /// process and is never closed; screens must not call [close] on it.
+  static final OpenFoodFactsGateway instance = OpenFoodFactsGateway();
+
   final http.Client _client;
+  final bool _ownsClient;
   final Duration timeout;
   final String _baseUrl;
   final String language;
@@ -47,10 +51,17 @@ class OpenFoodFactsGateway implements NutritionGateway {
     this.country = 'br',
     this.userAgent = 'workout-notes/1.0',
   }) : _client = client ?? http.Client(),
+       _ownsClient = client == null,
        _baseUrl = (baseUrl ?? defaultBaseUrl).trim();
 
   @override
   String? get baseUrl => _baseUrl;
+
+  /// Releases the HTTP client only if this gateway created it; an injected
+  /// client stays with its owner. Never call this on [instance].
+  void close() {
+    if (_ownsClient) _client.close();
+  }
 
   @override
   Future<NutritionGatewayResult<List<FoodSearchResult>>> search(

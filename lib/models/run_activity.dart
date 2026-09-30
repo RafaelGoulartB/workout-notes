@@ -34,6 +34,23 @@ class RunActivity {
   /// 1 once GPS effort metrics have been computed (even if all null).
   final bool effortsComputed;
 
+  /// Route elevation summary (v51). Null for indoor sessions or routes
+  /// without usable altitude.
+  final double? elevationGainMeters;
+  final double? elevationLossMeters;
+  final double? minimumAltitudeMeters;
+  final double? maximumAltitudeMeters;
+
+  /// Mean horizontal GPS accuracy and route quality label (v51).
+  final double? gpsAccuracyMeanMeters;
+  final String? routeQuality;
+
+  /// Running-plan session this activity completed, if any.
+  final String? planWorkoutId;
+
+  /// Shoe / gear used for this activity (`run_gear.id`, v53).
+  final String? gearId;
+
   const RunActivity({
     required this.id,
     this.activityType = CardioActivityType.running,
@@ -61,11 +78,27 @@ class RunActivity {
     this.bestEffortHalfSec,
     this.bestEffortMarathonSec,
     this.effortsComputed = false,
+    this.elevationGainMeters,
+    this.elevationLossMeters,
+    this.minimumAltitudeMeters,
+    this.maximumAltitudeMeters,
+    this.gpsAccuracyMeanMeters,
+    this.routeQuality,
+    this.planWorkoutId,
+    this.gearId,
   });
 
   bool get isCompleted => status == 'completed';
 
+  /// Outdoor GPS run: the only type with routes, splits and best efforts.
   bool get isRun => activityType == CardioActivityType.running;
+
+  /// Outdoor or treadmill run: counts toward running volume and plans.
+  bool get isRunning => activityType.isRunning;
+
+  bool get isIndoor => activityType.isIndoor;
+
+  bool get isTreadmill => activityType == CardioActivityType.treadmill;
 
   bool get isStationaryBike =>
       activityType == CardioActivityType.stationaryBike;
@@ -79,9 +112,9 @@ class RunActivity {
     return RunActivity(
       id: map['id'] as String,
       activityType: CardioActivityType.fromDatabase(map['activity_type']),
-      startedAt: DateTime.parse(map['started_at'] as String),
+      startedAt: DateTime.parse(map['started_at'] as String).toLocal(),
       endedAt: map['ended_at'] != null
-          ? DateTime.parse(map['ended_at'] as String)
+          ? DateTime.parse(map['ended_at'] as String).toLocal()
           : null,
       durationSeconds: (map['duration_seconds'] as num?)?.toInt() ?? 0,
       movingTimeSeconds: (map['moving_time_seconds'] as num?)?.toInt() ?? 0,
@@ -95,8 +128,8 @@ class RunActivity {
       feelingRating: (map['feeling_rating'] as num?)?.toInt(),
       status: map['status'] as String? ?? 'completed',
       polylineSummary: map['polyline_summary'] as String?,
-      createdAt: DateTime.parse(map['created_at'] as String),
-      updatedAt: DateTime.parse(map['updated_at'] as String),
+      createdAt: DateTime.parse(map['created_at'] as String).toLocal(),
+      updatedAt: DateTime.parse(map['updated_at'] as String).toLocal(),
       bestSplitPaceSecPerKm: (map['best_split_pace_sec_per_km'] as num?)
           ?.toDouble(),
       bestEffort1kSec: (map['best_effort_1k_sec'] as num?)?.toInt(),
@@ -106,14 +139,29 @@ class RunActivity {
       bestEffortHalfSec: (map['best_effort_half_sec'] as num?)?.toInt(),
       bestEffortMarathonSec: (map['best_effort_marathon_sec'] as num?)?.toInt(),
       effortsComputed: (map['efforts_computed'] as num?)?.toInt() == 1,
+      elevationGainMeters: (map['elevation_gain_meters'] as num?)?.toDouble(),
+      elevationLossMeters: (map['elevation_loss_meters'] as num?)?.toDouble(),
+      minimumAltitudeMeters: (map['minimum_altitude_meters'] as num?)
+          ?.toDouble(),
+      maximumAltitudeMeters: (map['maximum_altitude_meters'] as num?)
+          ?.toDouble(),
+      gpsAccuracyMeanMeters: (map['gps_accuracy_mean_meters'] as num?)
+          ?.toDouble(),
+      routeQuality: map['route_quality'] as String?,
+      planWorkoutId: map['plan_workout_id'] as String?,
+      gearId: map['gear_id'] as String?,
     );
   }
 
+  /// Timestamps are persisted as local wall-clock ISO strings without an
+  /// offset (like every other date in the app), so `yyyy-MM-dd` prefixes and
+  /// range predicates attribute a run to the day the user ran it. Native
+  /// spools carry UTC instants; they are converted here.
   Map<String, dynamic> toMap() => {
     'id': id,
     'activity_type': activityType.databaseValue,
-    'started_at': startedAt.toIso8601String(),
-    'ended_at': endedAt?.toIso8601String(),
+    'started_at': startedAt.toLocal().toIso8601String(),
+    'ended_at': endedAt?.toLocal().toIso8601String(),
     'duration_seconds': durationSeconds,
     'moving_time_seconds': movingTimeSeconds,
     'distance_meters': distanceMeters,
@@ -126,8 +174,8 @@ class RunActivity {
     'feeling_rating': feelingRating,
     'status': status,
     'polyline_summary': polylineSummary,
-    'created_at': createdAt.toIso8601String(),
-    'updated_at': updatedAt.toIso8601String(),
+    'created_at': createdAt.toLocal().toIso8601String(),
+    'updated_at': updatedAt.toLocal().toIso8601String(),
     'best_split_pace_sec_per_km': bestSplitPaceSecPerKm,
     'best_effort_1k_sec': bestEffort1kSec,
     'best_effort_3k_sec': bestEffort3kSec,
@@ -136,6 +184,18 @@ class RunActivity {
     'best_effort_half_sec': bestEffortHalfSec,
     'best_effort_marathon_sec': bestEffortMarathonSec,
     'efforts_computed': effortsComputed ? 1 : 0,
+    // Optional columns written by later steps of the import; only emitted when
+    // known so an insert never clobbers them with null.
+    if (elevationGainMeters != null)
+      'elevation_gain_meters': elevationGainMeters,
+    if (elevationLossMeters != null)
+      'elevation_loss_meters': elevationLossMeters,
+    if (minimumAltitudeMeters != null)
+      'minimum_altitude_meters': minimumAltitudeMeters,
+    if (maximumAltitudeMeters != null)
+      'maximum_altitude_meters': maximumAltitudeMeters,
+    if (planWorkoutId != null) 'plan_workout_id': planWorkoutId,
+    if (gearId != null) 'gear_id': gearId,
   };
 
   RunActivity copyWith({
@@ -152,6 +212,8 @@ class RunActivity {
     int? bestEffortHalfSec,
     int? bestEffortMarathonSec,
     bool? effortsComputed,
+    String? gearId,
+    bool clearGear = false,
   }) {
     return RunActivity(
       id: id,
@@ -182,6 +244,48 @@ class RunActivity {
       bestEffortMarathonSec:
           bestEffortMarathonSec ?? this.bestEffortMarathonSec,
       effortsComputed: effortsComputed ?? this.effortsComputed,
+      elevationGainMeters: elevationGainMeters,
+      elevationLossMeters: elevationLossMeters,
+      minimumAltitudeMeters: minimumAltitudeMeters,
+      maximumAltitudeMeters: maximumAltitudeMeters,
+      gpsAccuracyMeanMeters: gpsAccuracyMeanMeters,
+      routeQuality: routeQuality,
+      planWorkoutId: planWorkoutId,
+      gearId: clearGear ? null : (gearId ?? this.gearId),
+    );
+  }
+}
+
+/// The few columns of a completed cardio session that calendars and weekly
+/// totals need — no route, notes or best efforts.
+class CardioStamp {
+  final DateTime startedAt;
+  final CardioActivityType activityType;
+  final int durationSeconds;
+  final int movingTimeSeconds;
+  final double distanceMeters;
+
+  const CardioStamp({
+    required this.startedAt,
+    required this.activityType,
+    required this.durationSeconds,
+    required this.movingTimeSeconds,
+    required this.distanceMeters,
+  });
+
+  /// Outdoor or treadmill run.
+  bool get isRunning => activityType.isRunning;
+
+  /// Sub-minute sessions are aborted starts, not sessions.
+  bool get countsAsSession => durationSeconds >= 60 || distanceMeters >= 100;
+
+  factory CardioStamp.fromMap(Map<String, dynamic> map) {
+    return CardioStamp(
+      startedAt: DateTime.parse(map['started_at'] as String).toLocal(),
+      activityType: CardioActivityType.fromDatabase(map['activity_type']),
+      durationSeconds: (map['duration_seconds'] as num?)?.toInt() ?? 0,
+      movingTimeSeconds: (map['moving_time_seconds'] as num?)?.toInt() ?? 0,
+      distanceMeters: (map['distance_meters'] as num?)?.toDouble() ?? 0,
     );
   }
 }

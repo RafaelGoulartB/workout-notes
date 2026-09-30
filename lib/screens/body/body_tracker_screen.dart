@@ -1,0 +1,803 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/body_measurement_types.dart';
+import 'package:workout_notes/screens/body/body_stats_screen.dart';
+import 'package:workout_notes/screens/body/body_tracker_dialogs.dart';
+import 'package:workout_notes/utils/body_tracker_utils.dart';
+import 'package:workout_notes/widgets/body_tracker/bilateral_summary_card.dart';
+import 'package:workout_notes/widgets/body_tracker/body_tracker_badges.dart';
+import 'package:workout_notes/widgets/body_tracker/body_tracker_type_selector.dart';
+import 'package:workout_notes/widgets/body_tracker/chart_cards.dart';
+import 'package:workout_notes/widgets/body_tracker/derived_stats_card.dart';
+import 'package:workout_notes/widgets/body_tracker/measurement_card.dart';
+import 'package:workout_notes/widgets/body_tracker/quick_stats.dart';
+import 'package:workout_notes/widgets/body_tracker/summary_card.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
+
+class BodyTrackerScreen extends StatefulWidget {
+  const BodyTrackerScreen({super.key});
+
+  @override
+  State<BodyTrackerScreen> createState() => _BodyTrackerScreenState();
+}
+
+class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
+  final _bodyRepo = DatabaseHelper.instance.bodyMeasurementRepo;
+  final _settingsRepo = DatabaseHelper.instance.settingsRepo;
+
+  // ── State ──────────────────────────────────────────────────────────
+  String _selectedType = 'weight';
+  List<Map<String, dynamic>> _measurements = [];
+  List<Map<String, dynamic>> _allMeasurements = [];
+  Map<String, Map<String, dynamic>?> _latestByType = {};
+  bool _isLoading = true;
+  bool _fabOpen = false;
+
+  // ── Bilateral state ───────────────────────────────────────────────
+  String? _selectedSide; // 'left', 'right', or null for 'all'
+  List<Map<String, dynamic>> _leftMeasurements = [];
+  List<Map<String, dynamic>> _rightMeasurements = [];
+
+  // ── History pagination ────────────────────────────────────────────
+  int _historyDisplayCount = 5;
+
+  // ── Enabled types ─────────────────────────────────────────────────
+  Set<String> _enabledTypeIds = {};
+
+  /// Returns only the types the user chose to track.
+  List<MeasureType> get _activeTypes =>
+      _allTypes.where((t) => _enabledTypeIds.contains(t.id)).toList();
+
+  // ── Measurement type definitions ───────────────────────────────────
+  static const _allTypes = kBodyMeasureTypes;
+
+  MeasureType get _currentType {
+    if (_activeTypes.isEmpty) return _allTypes.first;
+    return _activeTypes.firstWhere(
+      (t) => t.id == _selectedType,
+      orElse: () => _activeTypes.first,
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEnabledTypes().then((_) => _load());
+  }
+
+  Future<void> _loadEnabledTypes() async {
+    final raw = await _settingsRepo.getSetting('body_tracker_enabled_types');
+    if (raw != null) {
+      try {
+        final list = raw.split(',');
+        _enabledTypeIds = list.toSet();
+      } catch (_) {
+        _enabledTypeIds = {};
+      }
+    } else {
+      _enabledTypeIds = {};
+    }
+    // Ensure every type exists in the set (handles newly added types)
+    for (final t in _allTypes) {
+      _enabledTypeIds.add(t.id);
+    }
+  }
+
+  Future<void> _saveEnabledTypes() async {
+    await _settingsRepo.setSetting(
+      'body_tracker_enabled_types',
+      _enabledTypeIds.join(','),
+    );
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _isLoading = true;
+      _historyDisplayCount = 5;
+    });
+    try {
+      final all = await _bodyRepo.getBodyMeasurements(limit: 500);
+      final summary = await _bodyRepo.getBodyMeasurementsSummary();
+      final latestMap = <String, Map<String, dynamic>?>{};
+      for (final t in _allTypes) {
+        try {
+          latestMap[t.id] = summary.firstWhere((s) => s['type'] == t.id);
+        } catch (_) {
+          latestMap[t.id] = null;
+        }
+      }
+      // Ensure selected type is still enabled
+      final activeIds = _activeTypes.map((t) => t.id).toList();
+      if (!activeIds.contains(_selectedType)) {
+        _selectedType = activeIds.isNotEmpty ? activeIds.first : 'weight';
+      }
+      final filtered = all.where((m) => m['type'] == _selectedType).toList();
+      if (!mounted) return;
+      setState(() {
+        _allMeasurements = all;
+        _latestByType = latestMap;
+        _measurements = filtered;
+        _updateBilateralData(filtered);
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _updateBilateralData(List<Map<String, dynamic>> filtered) {
+    if (_currentType.isBilateral) {
+      _leftMeasurements = filtered.where((m) => m['side'] == 'left').toList();
+      _rightMeasurements = filtered.where((m) => m['side'] == 'right').toList();
+      _selectedSide ??= 'all';
+    } else {
+      _leftMeasurements = [];
+      _rightMeasurements = [];
+      _selectedSide = null;
+    }
+  }
+
+  Future<void> _switchType(String typeId) async {
+    setState(() {
+      _selectedType = typeId;
+      _selectedSide = null;
+      _historyDisplayCount = 5;
+      _measurements = _allMeasurements
+          .where((m) => m['type'] == typeId)
+          .toList();
+      _updateBilateralData(_measurements);
+    });
+  }
+
+  void _switchSide(String? side) {
+    setState(() {
+      _selectedSide = side;
+      _historyDisplayCount = 5;
+    });
+  }
+
+  void _loadMoreHistory() {
+    setState(() => _historyDisplayCount += 5);
+  }
+
+  void _openStats() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            BodyStatsScreen(initialTypeId: _selectedType, types: _activeTypes),
+      ),
+    );
+  }
+
+  void _onCustomizeTypes(List<MeasureType> enabled) {
+    final newIds = enabled.map((t) => t.id).toSet();
+    if (newIds.isEmpty) return;
+    _enabledTypeIds = newIds;
+    _saveEnabledTypes();
+    // Ensure current selection is still valid
+    final activeIds = _activeTypes.map((t) => t.id).toList();
+    if (!activeIds.contains(_selectedType)) {
+      _selectedType = activeIds.first;
+    }
+    _load();
+  }
+
+  // ── Derived stats (unilateral) ─────────────────────────────────────
+  double? get _currentValue {
+    final latest = _latestByType[_selectedType];
+    if (latest == null) return null;
+    return (latest['value'] as num?)?.toDouble();
+  }
+
+  double? get _previousValue {
+    if (_measurements.length < 2) return null;
+    return (_measurements[1]['value'] as num?)?.toDouble();
+  }
+
+  double? get _delta {
+    if (_currentValue == null || _previousValue == null) return null;
+    return _currentValue! - _previousValue!;
+  }
+
+  double? get _minValue {
+    if (_measurements.isEmpty) return null;
+    return _measurements
+        .map((m) => (m['value'] as num).toDouble())
+        .reduce((a, b) => a < b ? a : b);
+  }
+
+  double? get _maxValue {
+    if (_measurements.isEmpty) return null;
+    return _measurements
+        .map((m) => (m['value'] as num).toDouble())
+        .reduce((a, b) => a > b ? a : b);
+  }
+
+  double? get _avgValue {
+    if (_measurements.isEmpty) return null;
+    return _measurements
+            .map((m) => (m['value'] as num).toDouble())
+            .reduce((a, b) => a + b) /
+        _measurements.length;
+  }
+
+  bool get _isDecreasingGood => isDecreasingGoodFor(_selectedType);
+
+  // ── Derived stats (bilateral) ──────────────────────────────────────
+  double? get _leftCurrentValue {
+    if (_leftMeasurements.isEmpty) return null;
+    return (_leftMeasurements.first['value'] as num?)?.toDouble();
+  }
+
+  double? get _rightCurrentValue {
+    if (_rightMeasurements.isEmpty) return null;
+    return (_rightMeasurements.first['value'] as num?)?.toDouble();
+  }
+
+  double? get _leftDelta {
+    if (_leftMeasurements.length < 2) return null;
+    final current = (_leftMeasurements[0]['value'] as num).toDouble();
+    final previous = (_leftMeasurements[1]['value'] as num).toDouble();
+    return current - previous;
+  }
+
+  double? get _rightDelta {
+    if (_rightMeasurements.length < 2) return null;
+    final current = (_rightMeasurements[0]['value'] as num).toDouble();
+    final previous = (_rightMeasurements[1]['value'] as num).toDouble();
+    return current - previous;
+  }
+
+  List<Map<String, dynamic>> get _bilateralFilteredMeasurements {
+    if (_selectedSide == 'left') return _leftMeasurements;
+    if (_selectedSide == 'right') return _rightMeasurements;
+    return _measurements; // 'all'
+  }
+
+  double? get _bilateralMinValue {
+    final list = _bilateralFilteredMeasurements;
+    if (list.isEmpty) return null;
+    return list
+        .map((m) => (m['value'] as num).toDouble())
+        .reduce((a, b) => a < b ? a : b);
+  }
+
+  double? get _bilateralMaxValue {
+    final list = _bilateralFilteredMeasurements;
+    if (list.isEmpty) return null;
+    return list
+        .map((m) => (m['value'] as num).toDouble())
+        .reduce((a, b) => a > b ? a : b);
+  }
+
+  double? get _bilateralAvgValue {
+    final list = _bilateralFilteredMeasurements;
+    if (list.isEmpty) return null;
+    return list
+            .map((m) => (m['value'] as num).toDouble())
+            .reduce((a, b) => a + b) /
+        list.length;
+  }
+
+  // ── Speed Dial FAB ─────────────────────────────────────────────────
+  Widget _buildSpeedDial(ThemeData theme, AppLocalizations loc) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        AnimatedScale(
+          scale: _fabOpen ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutBack,
+          child: AnimatedOpacity(
+            opacity: _fabOpen ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 150),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                SpeedDialOption(
+                  label: loc.bodyTrackerAddTitle(
+                    typeName(_selectedType, context),
+                  ),
+                  icon: Icons.add_circle_outline,
+                  color: _currentType.color,
+                  onTap: () {
+                    setState(() => _fabOpen = false);
+                    showAddMeasurementSheet(
+                      context,
+                      repo: _bodyRepo,
+                      currentType: _currentType,
+                      typeId: _selectedType,
+                      onSaved: _load,
+                    );
+                  },
+                ),
+                const SizedBox(height: 10),
+                SpeedDialOption(
+                  label: loc.bodyTrackerQuickMeasure,
+                  icon: Icons.bolt,
+                  color: Colors.amber,
+                  onTap: () {
+                    setState(() => _fabOpen = false);
+                    showQuickMeasureSheet(
+                      context,
+                      repo: _bodyRepo,
+                      types: _activeTypes,
+                      latestByType: _latestByType,
+                      onSaved: _load,
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        FloatingActionButton(
+          onPressed: () => setState(() => _fabOpen = !_fabOpen),
+          child: AnimatedRotation(
+            turns: _fabOpen ? 0.125 : 0.0,
+            duration: const Duration(milliseconds: 200),
+            child: const Icon(Icons.add),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Build ──────────────────────────────────────────────────────────
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(loc.bodyTrackerTitle),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.insights_outlined),
+            tooltip: loc.bodyStatsTooltip,
+            onPressed: _openStats,
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  displacement: 40,
+                  child: _allMeasurements.isEmpty
+                      ? _buildEmptyState(theme, loc)
+                      : _buildContent(theme, loc),
+                ),
+          if (_fabOpen)
+            GestureDetector(
+              onTap: () => setState(() => _fabOpen = false),
+              behavior: HitTestBehavior.opaque,
+              child: Container(color: Colors.black26),
+            ),
+        ],
+      ),
+      floatingActionButton: _isLoading ? null : _buildSpeedDial(theme, loc),
+    );
+  }
+
+  Widget _buildEmptyState(ThemeData theme, AppLocalizations loc) {
+    // Wrapped in scrollable so RefreshIndicator works on empty state
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.6,
+        child: AppEmptyState(
+          icon: Icons.accessibility_new,
+          title: loc.bodyTrackerEmptyTitle,
+          subtitle: loc.bodyTrackerEmptySubtitle,
+          actionLabel: loc.bodyTrackerQuickMeasure,
+          onAction: () {
+            showQuickMeasureSheet(
+              context,
+              repo: _bodyRepo,
+              types: _activeTypes,
+              latestByType: _latestByType,
+              onSaved: _load,
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(ThemeData theme, AppLocalizations loc) {
+    final isBilateral = _currentType.isBilateral;
+
+    // Determine which data to use for history (chart uses all data)
+    final historyList = isBilateral
+        ? _bilateralFilteredMeasurements
+        : _measurements;
+
+    return Column(
+      children: [
+        BodyTypeSelector(
+          types: _activeTypes,
+          selectedType: _selectedType,
+          onSelected: _switchType,
+          latestByType: _latestByType,
+          allTypes: _allTypes,
+          onCustomize: _onCustomizeTypes,
+        ),
+        const SizedBox(height: 12),
+
+        // Summary card — bilateral or unilateral
+        if (isBilateral)
+          BodyBilateralSummaryCard(
+            type: _currentType,
+            leftValue: _leftCurrentValue,
+            rightValue: _rightCurrentValue,
+            leftDelta: _leftDelta,
+            rightDelta: _rightDelta,
+            isDecreasingGood: _isDecreasingGood,
+            leftMeasurements: _leftMeasurements,
+            rightMeasurements: _rightMeasurements,
+          )
+        else
+          BodySummaryCard(
+            type: _currentType,
+            value: _currentValue,
+            delta: _delta,
+            isDecreasingGood: _isDecreasingGood,
+            measurements: _measurements,
+            latestMeasurement: _latestByType[_selectedType],
+          ),
+
+        // Quick stats (only for unilateral)
+        if (!isBilateral && _measurements.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          BodyQuickStats(
+            minValue: _minValue,
+            maxValue: _maxValue,
+            avgValue: _avgValue,
+            totalCount: _measurements.length,
+            typeColor: _currentType.color,
+          ),
+        ],
+
+        Expanded(
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              // ── Chart ──────────────────────────────────────────────
+              if (_measurements.length >= 2) ...[
+                const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                SliverToBoxAdapter(
+                  child: isBilateral
+                      ? BodyBilateralChartCard(
+                          leftMeasurements: _leftMeasurements,
+                          rightMeasurements: _rightMeasurements,
+                          type: _currentType,
+                        )
+                      : BodyChartCard(
+                          measurements: _measurements,
+                          type: _currentType,
+                        ),
+                ),
+              ],
+
+              // ── Quick stats for bilateral ──────────────────────────
+              if (isBilateral && historyList.isNotEmpty) ...[
+                const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                SliverToBoxAdapter(
+                  child: BodyQuickStats(
+                    minValue: _bilateralMinValue,
+                    maxValue: _bilateralMaxValue,
+                    avgValue: _bilateralAvgValue,
+                    totalCount: historyList.length,
+                    typeColor: _currentType.color,
+                  ),
+                ),
+              ],
+
+              // ── Body composition (weight only) ─────────────────────
+              if (!isBilateral &&
+                  _measurements.isNotEmpty &&
+                  _selectedType == 'weight' &&
+                  _currentValue != null) ...[
+                const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                SliverToBoxAdapter(
+                  child: BodyDerivedStatsCard(
+                    weight: _currentValue!,
+                    latestByType: _latestByType,
+                  ),
+                ),
+              ],
+
+              // ── Side tabs (bilateral only) ─────────────────────────
+              if (isBilateral && _measurements.isNotEmpty) ...[
+                const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                SliverToBoxAdapter(child: _buildSideTabs(theme, loc)),
+              ],
+
+              // ── History header ─────────────────────────────────────
+              if (historyList.isNotEmpty) ...[
+                const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.history,
+                          size: 16,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            isBilateral
+                                ? '${loc.bodyTrackerHistory} · ${historyList.length} ${loc.bodyTrackerEntries}'
+                                : '${loc.bodyTrackerHistory} · ${_measurements.length} ${loc.bodyTrackerEntries}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 8)),
+              ],
+
+              // ── History list (paginated) ──────────────────────────
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (ctx, i) => _buildMeasurementCard(theme, loc, i, historyList),
+                  childCount: historyList.length > _historyDisplayCount
+                      ? _historyDisplayCount
+                      : historyList.length,
+                ),
+              ),
+
+              // ── Load more button ───────────────────────────────────
+              if (historyList.length > _historyDisplayCount) ...[
+                const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                SliverToBoxAdapter(
+                  child: _buildLoadMoreButton(theme, loc, historyList),
+                ),
+              ],
+
+              const SliverToBoxAdapter(child: SizedBox(height: 80)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Minimalistic "+ Load more" button for paginated history.
+  Widget _buildLoadMoreButton(
+    ThemeData theme,
+    AppLocalizations loc,
+    List<Map<String, dynamic>> list,
+  ) {
+    final remaining = list.length - _historyDisplayCount;
+    final remainingText = remaining > 5
+        ? loc.bodyTrackerLoadMore(remaining)
+        : loc.bodyTrackerLoadMoreCount(remaining);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: InkWell(
+        onTap: _loadMoreHistory,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          width: double.infinity,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.add, size: 16, color: theme.colorScheme.primary),
+              const SizedBox(width: 6),
+              Text(
+                remainingText,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSideTabs(ThemeData theme, AppLocalizations loc) {
+    final tabs = <Widget>[
+      _SideTab(
+        label: loc.commonAll,
+        icon: Icons.sync_alt,
+        isSelected: _selectedSide == 'all' || _selectedSide == null,
+        color: theme.colorScheme.primary,
+        count: _measurements.length,
+        theme: theme,
+        onTap: () => _switchSide('all'),
+      ),
+      _SideTab(
+        label: loc.bodyTrackerLeftAbbr,
+        icon: Icons.arrow_back,
+        isSelected: _selectedSide == 'left',
+        color: Colors.blue,
+        count: _leftMeasurements.length,
+        theme: theme,
+        onTap: () => _switchSide('left'),
+      ),
+      _SideTab(
+        label: loc.bodyTrackerRightAbbr,
+        icon: Icons.arrow_forward,
+        isSelected: _selectedSide == 'right',
+        color: Colors.red,
+        count: _rightMeasurements.length,
+        theme: theme,
+        onTap: () => _switchSide('right'),
+      ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(children: tabs.map((t) => Expanded(child: t)).toList()),
+    );
+  }
+
+  Widget _buildMeasurementCard(
+    ThemeData theme,
+    AppLocalizations loc,
+    int index,
+    List<Map<String, dynamic>> list,
+  ) {
+    final m = list[index];
+    final value = (m['value'] as num).toDouble();
+    final isBilateral = _currentType.isBilateral;
+    final side = m['side'] as String?;
+
+    // Delta: compare only with the previous entry of the SAME side
+    // (prevents comparing left vs right when viewing "All")
+    double? delta;
+    for (int j = index + 1; j < list.length; j++) {
+      final prev = list[j];
+      if (!isBilateral || prev['side'] == side) {
+        final prevVal = (prev['value'] as num).toDouble();
+        delta = value - prevVal;
+        break;
+      }
+    }
+
+    return BodyMeasurementCard(
+      measurement: m,
+      type: _currentType,
+      delta: delta,
+      isDecreasingGood: _isDecreasingGood,
+      onTap: () {
+        showMeasurementDetailSheet(
+          context,
+          measurement: m,
+          type: _currentType,
+          typeId: _selectedType,
+          delta: delta,
+          repo: _bodyRepo,
+          onDeleted: _load,
+        );
+      },
+      onLongPress: () async {
+        final confirm = await showConfirmDialog(
+          context,
+          title: loc.bodyTrackerDeleteConfirm,
+          confirmLabel: loc.commonDelete,
+          destructive: true,
+        );
+        if (confirm == true) {
+          await _bodyRepo.deleteBodyMeasurement(m['id'] as String);
+          unawaited(_load());
+        }
+      },
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SIDE TAB (inline filter button for bilateral measurements)
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Compact filter button used in the side selector for bilateral types.
+class _SideTab extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final Color color;
+  final int count;
+  final ThemeData theme;
+  final VoidCallback onTap;
+
+  const _SideTab({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.color,
+    required this.count,
+    required this.theme,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected
+                  ? color.withAlpha(120)
+                  : theme.colorScheme.outlineVariant.withAlpha(50),
+            ),
+            color: isSelected ? color.withAlpha(18) : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? color : theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 13,
+                  color: isSelected
+                      ? color
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? color.withAlpha(30)
+                      : theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: isSelected
+                        ? color
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

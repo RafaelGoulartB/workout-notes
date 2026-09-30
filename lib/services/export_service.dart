@@ -1,18 +1,21 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:file_picker/file_picker.dart';
-import 'package:csv/csv.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../l10n/app_localizations.dart';
-import '../l10n/l10n_exercises.dart';
-import '../repositories/workout_repository.dart';
-import '../repositories/export_import_repository.dart';
-import '../repositories/nutrition_repository.dart';
-import 'backup_media_service.dart';
+import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/l10n_exercises.dart';
+import 'package:workout_notes/repositories/export_import_repository.dart';
+import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/services/backup_exception.dart';
+import 'package:workout_notes/services/backup_media_service.dart';
+import 'package:workout_notes/utils/csv_writer.dart';
 
 typedef SaveFileCallback =
     Future<String?> Function({
@@ -47,7 +50,7 @@ class BackupFileInfo {
 }
 
 class ExportService {
-  final _workoutRepo = WorkoutRepository();
+  final _workoutRepo = DatabaseHelper.instance.workoutRepo;
   final ExportImportRepository _exportRepo;
   final SaveFileCallback _saveFile;
   final ShareFileCallback _shareFile;
@@ -62,7 +65,7 @@ class ExportService {
     BackupMediaService? backupMedia,
     Future<SharedPreferences> Function()? preferencesProvider,
     this.backupsDirectoryProvider,
-  }) : _exportRepo = exportRepo ?? ExportImportRepository(),
+  }) : _exportRepo = exportRepo ?? DatabaseHelper.instance.exportImportRepo,
        _saveFile = saveFile ?? _saveFileWithPicker,
        _shareFile = shareFile ?? _shareFileWithSheet,
        _backupMedia = backupMedia ?? BackupMediaService(),
@@ -110,7 +113,9 @@ class ExportService {
         if (!await dir.exists()) await dir.create(recursive: true);
         return dir;
       }
-    } catch (_) {}
+    } catch (_) {
+      // Public Downloads is unavailable: fall back to app documents.
+    }
 
     // Fallback: app's documents
     final appDir = await getApplicationDocumentsDirectory();
@@ -120,11 +125,11 @@ class ExportService {
   }
 
   /// Human-readable path description to show the user.
-  Future<String> getBackupsPathDescription() async {
+  Future<String> getBackupsPathDescription(AppLocalizations loc) async {
     try {
       return (await getBackupsDirectory()).path;
     } catch (_) {
-      return '(indisponível)';
+      return loc.settingsBackupPathUnavailable;
     }
   }
 
@@ -157,25 +162,66 @@ class ExportService {
   // JSON Backup – Export
   // ===================================================================
 
-  /// Generates the current backup format as UTF-8 JSON bytes.
-  Future<Uint8List> exportBackupBytes() async {
+  /// Serializes the current backup format as compact UTF-8 JSON, handing the
+  /// output to [write] in chunks.
+  ///
+  /// The database and preferences are encoded in one background pass; each
+  /// photo is then read, encoded and written on its own, so only one encoded
+  /// image exists at a time. The result is a single JSON object with the same
+  /// structure as older backups (`media_files` simply comes last).
+  Future<void> _writeBackup(
+    Future<void> Function(List<int> chunk) write,
+  ) async {
     final data = await _exportRepo.exportAllData();
     final preferences = await _exportPortablePreferences();
     data['preferences'] = preferences;
     data['preference_count'] = preferences.length;
-    await _backupMedia.addPortableMedia(data);
-    final json = const JsonEncoder.withIndent('  ').convert(data);
-    return Uint8List.fromList(utf8.encode(json));
+    final media = await _backupMedia.collectPortableMedia(data);
+    // Everything except the photos, without the closing brace.
+    await write(await compute(_encodeBackupHead, data));
+    await write(utf8.encode(',"media_files":['));
+    for (var i = 0; i < media.length; i++) {
+      if (i > 0) await write(const [0x2C]); // ,
+      await write(await _backupMedia.encodeMediaEntry(media[i]));
+    }
+    await write(utf8.encode(']}'));
+  }
+
+  /// Generates the current backup format as UTF-8 JSON bytes.
+  Future<Uint8List> exportBackupBytes() async {
+    final out = BytesBuilder(copy: false);
+    await _writeBackup((chunk) async => out.add(chunk));
+    return out.takeBytes();
   }
 
   /// Exports all data to JSON and returns the file path.
+  ///
+  /// The backup is streamed to a temporary file that is renamed on success, so
+  /// a failed export never leaves a truncated `.json` behind.
   Future<String> exportToJson() async {
-    final bytes = await exportBackupBytes();
     final dir = await getBackupsDirectory();
     final dateStr = DateFormat('yyyy-MM-dd_HHmmss').format(DateTime.now());
-    final file = File('${dir.path}/workout_notes_backup_$dateStr.json');
-    await file.writeAsBytes(bytes);
-    return file.path;
+    final path = '${dir.path}/workout_notes_backup_$dateStr.json';
+    final partial = File('$path.part');
+    final sink = partial.openWrite();
+    try {
+      await _writeBackup((chunk) {
+        sink.add(chunk);
+        // Wait for the disk so queued chunks never pile up in memory.
+        return sink.flush();
+      });
+      await sink.close();
+      await partial.rename(path);
+    } catch (_) {
+      try {
+        await sink.close();
+      } catch (_) {}
+      try {
+        if (await partial.exists()) await partial.delete();
+      } catch (_) {}
+      rethrow;
+    }
+    return path;
   }
 
   /// Saves backup and opens share sheet. The file is also kept
@@ -226,43 +272,50 @@ class ExportService {
 
   /// Restores all data from a JSON backup file.
   Future<int> restoreFromFile(String filePath) async {
-    final file = File(filePath);
-    if (!await file.exists()) {
-      throw Exception('Arquivo não encontrado: $filePath');
+    if (!await File(filePath).exists()) {
+      throw BackupFormatException(
+        BackupErrorCode.fileNotFound,
+        'Backup file not found: $filePath',
+        args: [filePath],
+      );
     }
-    final content = await file.readAsString();
-    return _restoreFromJsonString(content);
+    // The file is streamed and parsed in the background isolate, so neither
+    // its bytes nor its text ever exist on the UI isolate.
+    return _restoreDecoded(await compute(_decodeBackupFile, filePath));
   }
 
   /// Restores all data from a raw JSON string (pasted by the user).
   Future<int> restoreFromJsonString(String jsonString) async {
-    return _restoreFromJsonString(jsonString);
+    return _restoreDecoded(await compute(_decodeBackupString, jsonString));
   }
 
   /// Restores all data from the bytes returned by a file picker.
   Future<int> restoreFromBytes(Uint8List bytes) async {
-    return _restoreFromJsonString(utf8.decode(bytes, allowMalformed: false));
+    return _restoreDecoded(await compute(_decodeBackupBytes, bytes));
   }
 
-  Future<int> _restoreFromJsonString(String content) async {
-    final data = jsonDecode(content);
+  Future<int> _restoreDecoded(Object? data) async {
     if (data is! Map<String, dynamic>) {
-      throw const FormatException(
-        'Formato inválido: esperado um objeto JSON com os dados do backup.',
+      throw const BackupFormatException(
+        BackupErrorCode.invalidFormat,
+        'Invalid format: expected a JSON object with the backup data.',
       );
     }
     if (!data.containsKey('version')) {
-      throw const FormatException(
-        'Arquivo de backup inválido: campo version ausente.',
+      throw const BackupFormatException(
+        BackupErrorCode.missingVersion,
+        'Invalid backup file: version field is missing.',
       );
     }
     final version = data['version'];
     if (version is! int ||
         version < ExportImportRepository.minimumSupportedBackupVersion ||
         version > ExportImportRepository.currentBackupVersion) {
-      throw FormatException(
-        'Versão de backup incompatível: $version. '
-        'Versão esperada: ${ExportImportRepository.currentBackupVersion}.',
+      throw BackupFormatException(
+        BackupErrorCode.incompatibleVersion,
+        'Incompatible backup version: $version. '
+        'Expected version: ${ExportImportRepository.currentBackupVersion}.',
+        args: [version ?? 'null', ExportImportRepository.currentBackupVersion],
       );
     }
     ExportImportRepository.validateBackup(data);
@@ -285,7 +338,9 @@ class ExportService {
       if (preferencesChanged) {
         try {
           await _replacePortablePreferences(previousPreferences);
-        } catch (_) {}
+        } catch (_) {
+          // Best-effort rollback; the original restore error is rethrown.
+        }
       }
       await _backupMedia.discardRestore(restoreDirectory);
       rethrow;
@@ -378,91 +433,11 @@ class ExportService {
     }
   }
 
-  /// Deletes a backup file.
-  Future<void> deleteBackupFile(String path) async {
-    try {
-      final f = File(path);
-      if (await f.exists()) await f.delete();
-    } catch (_) {}
-  }
-
-  // ===================================================================
-  // CSV Export
-  // ===================================================================
-
-  Future<String> exportToCsv({
-    String? exerciseId,
-    String? exerciseName,
-    DateTime? startDate,
-    DateTime? endDate,
-  }) async {
-    final rows = await _exportRepo.exportWorkoutsCsvData(
-      exerciseId: exerciseId,
-      startDate: startDate,
-      endDate: endDate,
-    );
-    final csvRows = <List<String>>[
-      [
-        'Data',
-        'Exercício',
-        'Categoria',
-        'Peso',
-        'Repetições',
-        'Distância',
-        'Tempo (s)',
-        'Aquecimento',
-        'RPE',
-        'Nota',
-        'Observação do Treino',
-      ],
-    ];
-    for (final row in rows) {
-      csvRows.add([
-        (row['date'] as String?) ?? '',
-        (row['exercise'] as String?) ?? '',
-        (row['category'] as String?) ?? '',
-        (row['weight'] as num?)?.toStringAsFixed(1) ?? '',
-        (row['reps'] as int?)?.toString() ?? '',
-        (row['distance'] as num?)?.toStringAsFixed(2) ?? '',
-        (row['time_seconds'] as int?)?.toString() ?? '',
-        (row['is_warmup'] as int?) == 1 ? 'Sim' : 'Não',
-        (row['rpe'] as num?)?.toStringAsFixed(1) ?? '',
-        (row['set_comment'] as String?) ?? '',
-        (row['workout_comment'] as String?) ?? '',
-      ]);
-    }
-    final csvData = csv.encode(csvRows);
-    final dir = await getTemporaryDirectory();
-    final file = File(
-      '${dir.path}/workout_notes_export_${DateTime.now().millisecondsSinceEpoch}.csv',
-    );
-    await file.writeAsString(csvData);
-    return file.path;
-  }
-
-  Future<void> shareCsvExport({
-    String? exerciseId,
-    String? exerciseName,
-    DateTime? startDate,
-    DateTime? endDate,
-  }) async {
-    final path = await exportToCsv(
-      exerciseId: exerciseId,
-      exerciseName: exerciseName,
-      startDate: startDate,
-      endDate: endDate,
-    );
-    final file = XFile(path, mimeType: 'text/csv');
-    await SharePlus.instance.share(
-      ShareParams(files: [file], text: 'Workout Notes - Export'),
-    );
-  }
-
   // ===================================================================
   // Nutrition CSV export
   // ===================================================================
 
-  final NutritionRepository _nutritionRepo = NutritionRepository();
+  final NutritionRepository _nutritionRepo = DatabaseHelper.instance.nutritionRepo;
 
   /// Writes the meal log history to a CSV file in the temp directory
   /// and returns the path.
@@ -542,7 +517,7 @@ class ExportService {
             : loc.exportNutritionFlagComplete,
       ]);
     }
-    final csvData = csv.encode(csvRows);
+    final csvData = encodeCsv(csvRows);
     final dir = await getTemporaryDirectory();
     final path =
         '${dir.path}/workout_notes_nutrition_${DateTime.now().millisecondsSinceEpoch}.csv';
@@ -641,3 +616,28 @@ class ExportService {
     return (ex['exercise_name'] as String?) ?? '';
   }
 }
+
+/// Runs in a background isolate: compact JSON for everything but the photos,
+/// minus the closing brace so the caller can append `media_files`.
+Uint8List _encodeBackupHead(Map<String, dynamic> data) {
+  final bytes = utf8.encode(jsonEncode(data));
+  // `data` always carries `version`, so the object is never empty.
+  return Uint8List.sublistView(bytes, 0, bytes.length - 1);
+}
+
+/// Streams the file through the UTF-8 and JSON decoders so the raw bytes and
+/// the full text are never materialized next to the decoded tree.
+Future<Object?> _decodeBackupFile(String path) async {
+  final decoded = await json.decoder
+      .bind(utf8.decoder.bind(File(path).openRead()))
+      .toList();
+  if (decoded.isEmpty) {
+    throw const FormatException('Unexpected end of input');
+  }
+  return decoded.first;
+}
+
+Object? _decodeBackupString(String content) => jsonDecode(content);
+
+Object? _decodeBackupBytes(Uint8List bytes) =>
+    jsonDecode(utf8.decode(bytes, allowMalformed: false));

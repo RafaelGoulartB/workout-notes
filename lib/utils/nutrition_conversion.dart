@@ -33,13 +33,13 @@ class NutritionConversion {
   /// cannot be converted.
   double resolveMultiplier() {
     if (quantity <= 0) {
-      throw NutritionConversionException('quantity_must_be_positive');
+      throw const NutritionConversionException('quantity_must_be_positive');
     }
     if (referenceAmount <= 0) {
-      throw NutritionConversionException('reference_amount_must_be_positive');
+      throw const NutritionConversionException('reference_amount_must_be_positive');
     }
     if (_isInvalidNumber(quantity) || _isInvalidNumber(referenceAmount)) {
-      throw NutritionConversionException('invalid_numeric_value');
+      throw const NutritionConversionException('invalid_numeric_value');
     }
 
     final normalizedUnit = normalizeUnit(unit);
@@ -64,7 +64,7 @@ class NutritionConversion {
     if (normalizedUnit == 'serving' || normalizedUnit == 'unit') {
       final serving = this.serving;
       if (serving == null) {
-        throw NutritionConversionException('serving_equivalence_missing');
+        throw const NutritionConversionException('serving_equivalence_missing');
       }
       if (normalizedRef == 'g') {
         if (serving.hasGramConversion) {
@@ -76,7 +76,7 @@ class NutritionConversion {
           final grams = quantity * inferred;
           return grams / referenceAmount;
         }
-        throw NutritionConversionException('grams_equivalence_missing');
+        throw const NutritionConversionException('grams_equivalence_missing');
       }
       if (normalizedRef == 'ml') {
         if (serving.hasMlConversion) {
@@ -88,12 +88,12 @@ class NutritionConversion {
           final ml = quantity * inferred;
           return ml / referenceAmount;
         }
-        throw NutritionConversionException('ml_equivalence_missing');
+        throw const NutritionConversionException('ml_equivalence_missing');
       }
-      throw NutritionConversionException('unsupported_reference_unit');
+      throw const NutritionConversionException('unsupported_reference_unit');
     }
 
-    throw NutritionConversionException('unsupported_unit_combination');
+    throw const NutritionConversionException('unsupported_unit_combination');
   }
 
   /// Best-effort fallback: when a serving has no explicit
@@ -140,7 +140,7 @@ class NutritionConversion {
   NutritionValues apply(NutritionValues reference) {
     final multiplier = resolveMultiplier();
     if (_isInvalidNumber(multiplier)) {
-      throw NutritionConversionException('invalid_multiplier');
+      throw const NutritionConversionException('invalid_multiplier');
     }
     return NutritionValues(
       calories: _scale(reference.calories, multiplier),
@@ -169,11 +169,11 @@ class NutritionConversion {
   static double? _scale(double? value, double multiplier) {
     if (value == null) return null;
     if (value < 0) {
-      throw NutritionConversionException('negative_nutrient');
+      throw const NutritionConversionException('negative_nutrient');
     }
     final result = value * multiplier;
     if (_isInvalidNumber(result) || result < 0) {
-      throw NutritionConversionException('invalid_scaled_value');
+      throw const NutritionConversionException('invalid_scaled_value');
     }
     return result;
   }

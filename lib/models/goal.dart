@@ -8,8 +8,6 @@ enum GoalScope {
 
   static GoalScope fromString(String value) =>
       values.firstWhere((e) => e.value == value, orElse: () => GoalScope.anaerobic);
-
-  bool get isCardio => this == GoalScope.aerobic;
 }
 
 /// What kind of metric the goal tracks.

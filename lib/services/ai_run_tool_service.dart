@@ -1,3 +1,5 @@
+// Read-only queries built for the AI Coach may run SQL directly (a documented
+// exception to the repository-only rule); writes never happen in this file.
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_achievement.dart';
@@ -7,7 +9,9 @@ import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/run_achievement_engine.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
 
 /// Read-only, AI-facing access to recorded cardio activities and running plans.
@@ -28,8 +32,8 @@ class AiRunToolService {
     RunPlanRepository? plans,
     DateTime Function()? now,
   }) : db = db ?? DatabaseHelper.instance,
-       activities = activities ?? RunRepository(),
-       plans = plans ?? RunPlanRepository(),
+       activities = activities ?? DatabaseHelper.instance.runRepo,
+       plans = plans ?? DatabaseHelper.instance.runPlanRepo,
        _now = now ?? DateTime.now;
 
   Future<Map<String, dynamic>> listActivities({
@@ -49,12 +53,12 @@ class AiRunToolService {
     }
     if (startDate != null) {
       where.add('started_at >= ?');
-      args.add('${_date(DateTime.parse(startDate))}T00:00:00');
+      args.add('${dateKey(DateTime.parse(startDate))}T00:00:00');
     }
     if (endDate != null) {
       where.add('started_at < ?');
       args.add(
-        '${_date(DateTime.parse(endDate).add(const Duration(days: 1)))}T00:00:00',
+        '${dateKey(DateTime.parse(endDate).add(const Duration(days: 1)))}T00:00:00',
       );
     }
     final whereSql = where.join(' AND ');
@@ -171,7 +175,7 @@ class AiRunToolService {
           ? null
           : {
               'id': scheduled.id,
-              'date': _date(scheduled.date),
+              'date': dateKey(scheduled.date),
               'status': scheduled.status.value,
               'notes': scheduled.notes,
             },
@@ -196,18 +200,10 @@ class AiRunToolService {
 
   Future<Map<String, dynamic>> cardioSummary({int weeks = 4}) async {
     final end = _now();
-    final start = DateTime(
-      end.year,
-      end.month,
-      end.day,
-    ).subtract(Duration(days: weeks * 7 - 1));
+    final start = addDays(end, -(weeks * 7 - 1));
     final all = await _completedActivities();
     final recent = all.where((activity) {
-      final day = DateTime(
-        activity.startedAt.year,
-        activity.startedAt.month,
-        activity.startedAt.day,
-      );
+      final day = dayOf(activity.startedAt);
       return !day.isBefore(start) && !day.isAfter(end);
     }).toList();
     final byType = <String, List<RunActivity>>{};
@@ -218,8 +214,8 @@ class AiRunToolService {
     }
     return {
       'weeksBack': weeks,
-      'startDate': _date(start),
-      'endDate': _date(end),
+      'startDate': dateKey(start),
+      'endDate': dateKey(end),
       'recordedActivities': recent.length,
       'byActivityType': [
         for (final entry in byType.entries) _aggregate(entry.key, entry.value),
@@ -250,7 +246,7 @@ class AiRunToolService {
       'period': period,
       'periodStart': stats.periodStart == null
           ? null
-          : _date(stats.periodStart!),
+          : dateKey(stats.periodStart!),
       'runCount': stats.runCount,
       'totalDistanceMeters': stats.totalDistanceMeters,
       'totalMovingTimeSeconds': stats.totalMovingTimeSeconds,
@@ -280,7 +276,7 @@ class AiRunToolService {
       'weeklyTrend': [
         for (final week in stats.weeklyBuckets)
           {
-            'weekStart': _date(week.weekStart),
+            'weekStart': dateKey(week.weekStart),
             'runs': week.runCount,
             'distanceMeters': week.distanceMeters,
             'movingTimeSeconds': week.movingTimeSeconds,
@@ -289,7 +285,7 @@ class AiRunToolService {
       'paceTrend': [
         for (final point in stats.paceTrend)
           {
-            'date': _date(point.date),
+            'date': dateKey(point.date),
             'paceSecPerKm': point.paceSecPerKm,
             'distanceMeters': point.distanceMeters,
           },
@@ -312,7 +308,7 @@ class AiRunToolService {
                 {
                   'place': placement.tier.place,
                   'activityId': placement.activity.id,
-                  'date': _date(placement.activity.startedAt),
+                  'date': dateKey(placement.activity.startedAt),
                   'value': placement.value,
                   'formattedValue': RunAchievementEngine.formatValue(
                     placement.kind,
@@ -406,7 +402,7 @@ class AiRunToolService {
     final today = _now();
     final start =
         DateTime.tryParse(startDate ?? '') ??
-        DateTime(today.year, today.month, today.day);
+        dayOf(today);
     final end =
         DateTime.tryParse(endDate ?? '') ?? start.add(const Duration(days: 27));
     final scheduled = await plans.getScheduledRuns(start, end);
@@ -423,13 +419,13 @@ class AiRunToolService {
       }
     }
     return {
-      'startDate': _date(start),
-      'endDate': _date(end),
+      'startDate': dateKey(start),
+      'endDate': dateKey(end),
       'scheduledRuns': [
         for (final run in scheduled)
           {
             'id': run.id,
-            'date': _date(run.date),
+            'date': dateKey(run.date),
             'status': run.status.value,
             'runPlanId': run.runPlanId,
             'runPlanName': planCache[run.runPlanId]?.name,
@@ -487,7 +483,7 @@ class AiRunToolService {
       'movingTimeSeconds': moving,
       'calories': calories,
       'averagePaceSecPerKm': type == 'running' && distance > 0 && moving > 0
-          ? moving / (distance / 1000)
+          ? RunFormatters.paceSecondsPerKm(distance, moving)
           : null,
       'averageSpeedKmh': distance > 0 && moving > 0
           ? (distance / 1000) / (moving / 3600)
@@ -534,11 +530,15 @@ class AiRunToolService {
     'weeks': plan.weeks,
     'status': plan.status.value,
     'isActivated': plan.isActivated,
-    'activatedAt': plan.activatedAt == null ? null : _date(plan.activatedAt!),
+    'activatedAt': plan.activatedAt == null
+        ? null
+        : dateKey(plan.activatedAt!),
     'currentWeek': plan.activeWeekIndexOn(_now()) == null
         ? null
         : plan.activeWeekIndexOn(_now())! + 1,
-    'raceDate': plan.raceDate == null ? null : _date(plan.raceDate!),
+    'raceDate': plan.raceDate == null
+        ? null
+        : dateKey(plan.raceDate!),
     'completionCount': plan.completionCount,
     'progress': {
       'totalSessions': progress.totalSessions,
@@ -577,10 +577,4 @@ class AiRunToolService {
         },
     ],
   };
-
-  static String _date(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
 }

@@ -1,9 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:workout_notes/database/database_helper.dart';
-import 'package:workout_notes/database/database_periodization_schema.dart';
-import 'package:workout_notes/database/database_run_plan_schema.dart';
+import 'package:workout_notes/models/periodization_phase_draft.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/models/run_plan.dart';
@@ -13,6 +11,9 @@ import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
+import 'support/periodization_fixtures.dart';
+import 'support/run_plan_fixtures.dart';
+import 'support/test_db.dart';
 
 /// Covers how the periodization plan resolves "which run is due today" and how
 /// the running targets feed phase adherence.
@@ -25,65 +26,15 @@ void main() {
   final phaseStart = DateTime(2026, 1, 5);
   final phaseEnd = DateTime(2026, 2, 1);
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 45,
-        onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-        onCreate: (db, version) async {
-          await db.execute(
-            'CREATE TABLE routines (id TEXT PRIMARY KEY, name TEXT NOT NULL, notes TEXT, created_at TEXT NOT NULL)',
-          );
-          await db.execute(
-            'CREATE TABLE routine_days (id TEXT PRIMARY KEY, routine_id TEXT NOT NULL, name TEXT NOT NULL, order_index INTEGER NOT NULL DEFAULT 0, FOREIGN KEY (routine_id) REFERENCES routines(id) ON DELETE CASCADE)',
-          );
-          await db.execute(
-            'CREATE TABLE workouts (id TEXT PRIMARY KEY, date TEXT NOT NULL, start_time TEXT, end_time TEXT, duration_seconds INTEGER, routine_id TEXT, created_at TEXT NOT NULL)',
-          );
-          await db.execute(
-            'CREATE TABLE exercise_entries (id TEXT PRIMARY KEY, workout_id TEXT NOT NULL, exercise_id TEXT NOT NULL, order_index INTEGER, FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE)',
-          );
-          await db.execute(
-            'CREATE TABLE sets (id TEXT PRIMARY KEY, exercise_entry_id TEXT NOT NULL, weight REAL, reps INTEGER, rpe REAL, is_complete INTEGER DEFAULT 0, is_warmup INTEGER DEFAULT 0, order_index INTEGER, FOREIGN KEY (exercise_entry_id) REFERENCES exercise_entries(id) ON DELETE CASCADE)',
-          );
-          await db.execute(
-            'CREATE TABLE body_measurements (id TEXT PRIMARY KEY, type TEXT, value REAL, unit TEXT, date TEXT, created_at TEXT)',
-          );
-          await db.execute(
-            'CREATE TABLE sleep_entries (id TEXT PRIMARY KEY, date TEXT, sleep_minutes INTEGER, actual_sleep_minutes INTEGER, estimated_sleep_minutes INTEGER)',
-          );
-          await db.execute(
-            'CREATE TABLE meal_logs (id TEXT PRIMARY KEY, date TEXT, meal_type TEXT)',
-          );
-          await db.execute(
-            'CREATE TABLE meal_log_items (id TEXT PRIMARY KEY, meal_log_id TEXT, calories REAL, protein_g REAL, carbs_g REAL, fat_g REAL, FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE)',
-          );
-          await db.execute(
-            'CREATE TABLE run_activities (id TEXT PRIMARY KEY, started_at TEXT NOT NULL, ended_at TEXT, '
-            'duration_seconds INTEGER NOT NULL DEFAULT 0, moving_time_seconds INTEGER NOT NULL DEFAULT 0, '
-            'distance_meters REAL NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT \'completed\', '
-            'created_at TEXT NOT NULL, updated_at TEXT NOT NULL, plan_workout_id TEXT)',
-          );
-          await DatabasePeriodizationSchema.create(db);
-          await DatabaseRunPlanSchema.create(db);
-        },
-      ),
-    );
-    DatabaseHelper.overrideDatabase = database;
+    database = await installTestDb();
     periodization = PeriodizationRepository();
     runPlans = RunPlanRepository();
   });
 
-  tearDown(() async {
-    DatabaseHelper.overrideDatabase = null;
-    await database.close();
-  });
+  tearDown(uninstallTestDb);
 
   /// Creates an active plan with one phase covering [phaseStart]..[phaseEnd],
   /// whose weekly target links [runPlanIds] and carries the given run volume.
@@ -100,7 +51,7 @@ void main() {
       startDate: phaseStart,
       endDate: phaseEnd,
     );
-    final phase = await periodization.addPhase(
+    final phase = await addPhaseFixture(periodization, 
       planId: plan.id,
       name: 'Acumulação',
       color: 0xFF00FF00,
@@ -304,7 +255,7 @@ void main() {
       );
       await seedPhase(runPlanIds: [plan.id]);
       // Moved from Tuesday to Wednesday.
-      final scheduled = await runPlans.scheduleRun(
+      final scheduled = await scheduleRunFixture(runPlans, 
         date: DateTime(2026, 1, 7),
         runPlanId: plan.id,
         runPlanWorkoutId: session.id,
@@ -454,40 +405,38 @@ void main() {
   });
 
   group('run targets persistence', () {
-    test('saveTargetVersion keeps the routine and running links', () async {
-      final routine = 'routine-1';
+    test('a saved target keeps the routine and running links', () async {
+      const routine = 'routine-1';
       await database.insert('routines', {
         'id': routine,
         'name': 'Full body',
         'created_at': phaseStart.toIso8601String(),
       });
       final phaseId = await seedPhase();
-      final saved = await periodization.saveTargetVersion(
+      await periodization.savePhaseSetup(
         phaseId,
-        PeriodizationTarget(
-          id: '',
-          phaseId: phaseId,
-          version: 0,
-          validFrom: phaseStart,
-          calories: 2400,
-          routineIds: [routine],
-          runPlanIds: ['plan-y'],
-          runSessionsPerWeek: 4,
-          runWeeklyDistanceMeters: 40000,
-          longRunDistanceMeters: 16000,
-          qualitySessionsPerWeek: 2,
-          runPlanStartWeek: 3,
-          createdAt: phaseStart,
-        ),
-        validFrom: phaseStart,
+        name: 'Acumulação',
+        templateKey: 'accumulation',
+        color: 0xFF00FF00,
+        fromWeek: 0,
+        weeks: [
+          PeriodizationTarget(
+            id: '',
+            phaseId: phaseId,
+            version: 0,
+            validFrom: phaseStart,
+            calories: 2400,
+            routineIds: [routine],
+            runPlanIds: ['plan-y'],
+            runSessionsPerWeek: 4,
+            runWeeklyDistanceMeters: 40000,
+            longRunDistanceMeters: 16000,
+            qualitySessionsPerWeek: 2,
+            runPlanStartWeek: 3,
+            createdAt: phaseStart,
+          ),
+        ],
       );
-
-      // A new version used to be written with only the nutrition/strength
-      // numbers, silently unlinking the routine and the running plan.
-      expect(saved.routineIds, [routine]);
-      expect(saved.runPlanIds, ['plan-y']);
-      expect(saved.runSessionsPerWeek, 4);
-      expect(saved.runPlanStartWeek, 3);
 
       final reread = await periodization.getEffectiveTarget(
         phaseId,
@@ -526,8 +475,28 @@ void main() {
     });
 
     test('rejects more quality sessions than total runs', () async {
-      expect(
-        () => seedPhase(runSessionsPerWeek: 2, qualitySessionsPerWeek: 4),
+      await expectLater(
+        periodization.createPlanWithPhases(
+          name: 'Base',
+          startDate: phaseStart,
+          phases: [
+            PeriodizationPhaseDraft(
+              name: 'Acumulação',
+              color: 0xFF00FF00,
+              startDate: phaseStart,
+              endDate: phaseEnd,
+              target: PeriodizationTarget(
+                id: '',
+                phaseId: '',
+                version: 0,
+                validFrom: phaseStart,
+                runSessionsPerWeek: 2,
+                qualitySessionsPerWeek: 4,
+                createdAt: phaseStart,
+              ),
+            ),
+          ],
+        ),
         throwsA(isA<PeriodizationValidationException>()),
       );
     });

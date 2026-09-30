@@ -11,7 +11,7 @@
     <img alt="Maintenance" src="https://img.shields.io/badge/Maintained%3F-yes-0B7285.svg" />
   </a>
   <a href="https://github.com/RafaelGoulartB/workout-notes/blob/main/LICENSE">
-    <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-0B7285.svg" />
+    <img alt="License: AGPL v3" src="https://img.shields.io/badge/License-AGPL_v3-0B7285.svg" />
   </a>
   <a href="https://github.com/RafaelGoulartB/workout-notes/actions/workflows/release-android.yml">
     <img alt="Android release" src="https://img.shields.io/github/actions/workflow/status/RafaelGoulartB/workout-notes/release-android.yml?branch=main&label=Android%20release&color=0B7285" />
@@ -32,7 +32,7 @@
 
 Workout Notes brings strength training, GPS runs, food logging, sleep tracking, and body measurements together. Build routines, follow a periodized plan, and see how your habits change over time. Your journal lives on your device, with no account required.
 
-Built with Flutter and Material 3, with English and Brazilian Portuguese, metric and imperial units, light and dark themes, and a customizable accent color. **Android is the most complete target**: background tracking, sleep monitoring, alarms, barcode scanning, and run voice coaching rely on native Android integrations.
+Built with Flutter and Material 3, with English and Brazilian Portuguese, metric and imperial units, light and dark themes, and a customizable accent color. **Android only**: background tracking, sleep monitoring, alarms, barcode scanning, and run voice coaching rely on native Android integrations.
 
 ## Train and track your progress
 
@@ -56,7 +56,7 @@ Built with Flutter and Material 3, with English and Brazilian Portuguese, metric
 ## Connect food, recovery, and planning
 
 - **[Nutrition](https://rafaelgoulartb.github.io/workout-notes/docs/nutrition.html):** keep a daily food diary with calorie and macro targets, saved meals, food search, barcode lookup, and nutrition trends.
-- **[Sleep](https://rafaelgoulartb.github.io/workout-notes/docs/sleep.html):** log nights or monitor sleep on Android. Review duration, efficiency, regularity, estimated sleep stages, and weekly summaries; configure alarms and a sleep goal.
+- **[Sleep](https://rafaelgoulartb.github.io/workout-notes/docs/sleep.html):** log nights or monitor sleep with the microphone. Review duration, efficiency, regularity, estimated sleep stages, and weekly summaries; configure alarms and a sleep goal.
 - **[Periodization](https://rafaelgoulartb.github.io/workout-notes/docs/periodization.html):** organize training into phases and weeks, link routines and running plans, set nutrition, training, weight, and sleep targets, and review check-ins or compare cycles.
 
 <table>
@@ -97,7 +97,7 @@ Built with Flutter and Material 3, with English and Brazilian Portuguese, metric
 
 Use the [AI Coach guide](https://rafaelgoulartb.github.io/workout-notes/docs/ai-coach.html) to connect your own OpenAI-compatible provider to discuss training, running, nutrition, and recovery using context from your journal. Configure the provider URL, API token, and model in **Settings > Configure AI**.
 
-When used, the coach sends conversation and relevant app data to your chosen provider. Routine and manual-food changes are presented as proposals for approval before they are applied. Credentials stay in platform secure storage; no API key or hosted AI service is bundled.
+When used, the coach sends conversation and relevant app data to your chosen provider. Routine and manual-food changes are presented as proposals for approval before they are applied. Credentials stay in Android secure storage; no API key or hosted AI service is bundled.
 
 ## Your data
 
@@ -126,10 +126,12 @@ flutter test
 flutter build apk --release
 ```
 
-For native unit tests, run `./gradlew test` from `android/` (`.\gradlew.bat test` on Windows). See [AGENTS.md](AGENTS.md) for architecture, migrations, localization, and contribution conventions. Issues and pull requests are welcome.
+For native unit tests, run `./gradlew test` from `android/`. See [CLAUDE.md](CLAUDE.md) for architecture, migrations, localization, and contribution conventions. Issues and pull requests are welcome.
 
 The Android release workflow validates app changes on `main` before building an APK. README and screenshot-only changes do not trigger it; manual runs are available in Actions.
 
 ## License
 
-[MIT](LICENSE) · [Rafael Goulart](https://www.linkedin.com/in/rafael-goulartb/)
+Copyright (C) 2026 [Rafael Goulart](https://www.linkedin.com/in/rafael-goulartb/)
+
+This program is free software: you can redistribute it and/or modify it under the terms of the [GNU Affero General Public License v3.0](LICENSE) as published by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY; see the license for details. Any modified version you distribute, or run as a network service, must also be released under the AGPL-3.0 with its complete source code.

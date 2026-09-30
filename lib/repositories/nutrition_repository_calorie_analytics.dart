@@ -4,29 +4,6 @@ part of 'nutrition_repository.dart';
 /// screens. Kept as an extension so the main repository remains focused on
 /// persistence primitives while preserving its existing public API.
 extension NutritionRepositoryCalorieAnalytics on NutritionRepository {
-  /// Aggregated totals for the [days] window. [goal] is the active calorie
-  /// target, or null when no goal is configured.
-  Future<CalorieBalance> getCalorieBalance({
-    required int days,
-    required double? goal,
-  }) => getCalorieBalanceForRange(
-    startDate: DateTime.now().subtract(Duration(days: days - 1)),
-    endDate: DateTime.now(),
-    goal: goal,
-  );
-
-  Future<CalorieBalance> getCalorieBalanceForRange({
-    required DateTime startDate,
-    required DateTime endDate,
-    required double? goal,
-  }) async {
-    final dailies = await getDailyCalorieTotalsForRange(
-      startDate: startDate,
-      endDate: endDate,
-    );
-    return calculateCalorieBalance(dailies: dailies, goal: goal);
-  }
-
   /// Builds the aggregate balance from totals already loaded by a caller.
   /// This avoids repeating the daily-totals query on analytics screens.
   CalorieBalance calculateCalorieBalance({

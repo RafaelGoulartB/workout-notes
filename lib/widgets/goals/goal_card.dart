@@ -2,8 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/goal.dart';
 import 'package:workout_notes/widgets/goals/goal_formatters.dart';
+import 'package:workout_notes/widgets/goals/goal_progress_ring.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
-/// Compact full-width goal row matching progress chart card styling.
+/// Where a goal stands against the time already spent in its period.
+enum GoalPace { done, onTrack, behind, paused }
+
+/// Goal row for the goals card: progress ring, title with a pace pill, the
+/// period and what is left, and the current/target value on the right.
 class GoalCard extends StatelessWidget {
   final Goal goal;
   final GoalProgress progress;
@@ -24,26 +30,26 @@ class GoalCard extends StatelessWidget {
     this.onDelete,
   });
 
-  Color _accent(BuildContext context) {
-    if (progress.isComplete) return const Color(0xFF43A047);
-    if (goal.color != null) return Color(goal.color!);
-    final theme = Theme.of(context);
-    return goal.scope == GoalScope.aerobic
-        ? const Color(0xFFE53935)
-        : theme.colorScheme.primary;
+  /// Behind means the goal trails the share of the period already elapsed by
+  /// more than a small margin (so day one never reads as late).
+  static GoalPace paceOf(Goal goal, GoalProgress progress) {
+    if (!goal.isActive) return GoalPace.paused;
+    if (progress.isComplete) return GoalPace.done;
+    final total =
+        progress.periodEnd.difference(progress.periodStart).inDays + 1;
+    if (total <= 0) return GoalPace.onTrack;
+    final expected = (progress.daysElapsed / total).clamp(0.0, 1.0);
+    return progress.percent + 0.1 >= expected
+        ? GoalPace.onTrack
+        : GoalPace.behind;
   }
 
-  IconData _metricIcon() {
-    switch (goal.metric) {
-      case GoalMetric.volume:
-        return Icons.auto_graph;
-      case GoalMetric.days:
-        return Icons.calendar_today_outlined;
-      case GoalMetric.distance:
-        return Icons.map_outlined;
-      case GoalMetric.time:
-        return Icons.timer_outlined;
-    }
+  Color _accent(ColorScheme colors) {
+    if (progress.isComplete) return const Color(0xFF43A047);
+    if (goal.color != null) return Color(goal.color!);
+    return goal.scope == GoalScope.aerobic
+        ? const Color(0xFFE53935)
+        : colors.primary;
   }
 
   String _metricLabel(AppLocalizations loc) {
@@ -59,149 +65,128 @@ class GoalCard extends StatelessWidget {
     }
   }
 
+  String _value(double value) => goal.metric == GoalMetric.days
+      ? value.toStringAsFixed(0)
+      : GoalFormatters.formatValueShort(goal.metric, value, isKm: isKm);
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
-    final accent = _accent(context);
-    final percent = progress.percent.clamp(0.0, 1.0);
-    final isComplete = progress.isComplete;
-    final isPaused = !goal.isActive;
+    final pace = paceOf(goal, progress);
+    final accent = pace == GoalPace.paused
+        ? colors.onSurfaceVariant
+        : _accent(colors);
     final title = goal.title.isNotEmpty ? goal.title : _metricLabel(loc);
-    final current = GoalFormatters.formatValueShort(
-      goal.metric,
-      progress.currentValue,
-      isKm: isKm,
-    );
-    final target = GoalFormatters.formatValueShort(
-      goal.metric,
-      progress.targetValue,
-      isKm: isKm,
-    );
-    final periodLabel = goal.period == GoalPeriod.weekly
+    final period = goal.period == GoalPeriod.weekly
         ? loc.goalPeriodWeekly
         : loc.goalPeriodMonthly;
+    final left = progress.targetValue - progress.currentValue;
+    final subtitle = [
+      if (goal.title.isNotEmpty) _metricLabel(loc),
+      period,
+      if (pace != GoalPace.done && pace != GoalPace.paused)
+        loc.goalDaysRemaining(progress.daysRemaining),
+    ].join(' · ');
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: () => _showContextMenu(context),
-        borderRadius: BorderRadius.circular(14),
-        child: Opacity(
-          opacity: isPaused ? 0.55 : 1,
-          child: Container(
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: theme.colorScheme.outlineVariant.withAlpha(80),
-              ),
-            ),
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: accent.withAlpha(28),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        isComplete
-                            ? Icons.check_rounded
-                            : (isPaused ? Icons.pause_rounded : _metricIcon()),
-                        size: 18,
-                        color: accent,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              height: 1.15,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${_metricLabel(loc)} · $periodLabel',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 11,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${(percent * 100).round()}%',
-                      style: theme.textTheme.titleSmall?.copyWith(
+    return InkWell(
+      onTap: onTap,
+      onLongPress: () => _showContextMenu(context),
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        child: Row(
+          children: [
+            GoalProgressRing(
+              percent: progress.percent,
+              color: accent,
+              trackColor: accent.withAlpha(35),
+              size: 44,
+              strokeWidth: 4.5,
+              child: pace == GoalPace.done
+                  ? Icon(Icons.check_rounded, size: 20, color: accent)
+                  : pace == GoalPace.paused
+                  ? Icon(Icons.pause_rounded, size: 18, color: accent)
+                  : Text(
+                      '${(progress.percent.clamp(0.0, 1.0) * 100).round()}%',
+                      style: theme.textTheme.labelSmall?.copyWith(
                         fontWeight: FontWeight.w800,
-                        color: accent,
+                        fontFeatures: AppUi.tabular,
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(99),
-                  child: LinearProgressIndicator(
-                    value: percent,
-                    minHeight: 6,
-                    backgroundColor: accent.withAlpha(28),
-                    valueColor: AlwaysStoppedAnimation<Color>(accent),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '$current / $target',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 6),
+                      _PacePill(pace: pace),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
                     ),
-                    Icon(
-                      isComplete
-                          ? Icons.emoji_events_outlined
-                          : Icons.schedule_outlined,
-                      size: 14,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      isComplete
-                          ? loc.goalCompleted
-                          : loc.goalDaysRemaining(progress.daysRemaining),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontSize: 11,
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w500,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: _value(progress.currentValue)),
+                      TextSpan(
+                        text: '/${_value(progress.targetValue)}',
+                        style: TextStyle(
+                          color: colors.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontFeatures: AppUi.tabular,
+                  ),
+                ),
+                Text(
+                  pace == GoalPace.done || left <= 0
+                      ? (goal.metric == GoalMetric.days
+                            ? loc.goalRowDaysUnit
+                            : _metricLabel(loc).toLowerCase())
+                      : goal.metric == GoalMetric.days
+                      ? loc.goalRowLeftDays(left.ceil())
+                      : loc.goalRowLeft(_value(left)),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    fontFeatures: AppUi.tabular,
+                  ),
                 ),
               ],
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -250,6 +235,40 @@ class GoalCard extends StatelessWidget {
                 },
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PacePill extends StatelessWidget {
+  final GoalPace pace;
+
+  const _PacePill({required this.pace});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
+    final (label, color) = switch (pace) {
+      GoalPace.done => (loc.goalStatusDone, const Color(0xFF43A047)),
+      GoalPace.onTrack => (loc.goalStatusOnTrack, colors.primary),
+      GoalPace.behind => (loc.goalStatusBehind, colors.tertiary),
+      GoalPace.paused => (loc.goalStatusPaused, colors.onSurfaceVariant),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withAlpha(30),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: theme.textTheme.labelSmall?.copyWith(
+          fontSize: 10.5,
+          color: color,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

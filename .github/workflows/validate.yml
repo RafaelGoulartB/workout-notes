@@ -1,0 +1,74 @@
+name: Validate
+
+on:
+  pull_request:
+    paths:
+      - "lib/**"
+      - "test/**"
+      - "tool/**"
+      - "android/**"
+      - "pubspec.*"
+      - "l10n.yaml"
+      - "analysis_options.yaml"
+      - ".github/workflows/**"
+  push:
+    branches:
+      - "**"
+    paths:
+      - "lib/**"
+      - "test/**"
+      - "tool/**"
+      - "android/**"
+      - "pubspec.*"
+      - "l10n.yaml"
+      - "analysis_options.yaml"
+      - ".github/workflows/**"
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Analyze and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      # Keep the Flutter version in sync with release-android.yml; bump both
+      # in an explicit change.
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.47.5"
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate localizations
+        run: flutter gen-l10n
+
+      - name: Run static analysis
+        run: flutter analyze --no-pub
+
+      - name: Run Dart tests
+        run: flutter test --no-pub
+
+      - name: Run Android unit tests
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest

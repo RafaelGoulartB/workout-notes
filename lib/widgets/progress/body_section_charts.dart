@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/screens/body/body_tracker_screen.dart';
 import 'package:workout_notes/utils/progress_helpers.dart';
-import 'package:workout_notes/screens/workout/body_tracker_screen.dart';
-import 'package:workout_notes/navigation/ai_coach_navigation.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Displays body measurement section: summary grid, composition chart,
 /// weight-vs-volume chart, and link to body tracker.
@@ -150,7 +151,9 @@ class _BodySummaryGrid extends StatelessWidget {
         Map<String, dynamic>? previous;
         try {
           latest = bodySummary.firstWhere((s) => s['type'] == typeId);
-        } catch (_) {}
+        } catch (_) {
+          // No summary for this type yet.
+        }
 
         if (latest != null && bodyComposition.isNotEmpty) {
           final latestDate = latest['date'] as String? ?? '';
@@ -256,176 +259,171 @@ class _BodyCompositionChart extends StatelessWidget {
         .map((d) => (d['weight'] as num?)?.toDouble() ?? 0)
         .reduce((a, b) => a > b ? a : b);
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              spacing: 12,
-              runSpacing: 4,
-              children: [
-                _legendDot(Colors.indigo, loc.bodyTrackerWeight),
-                if (bodyFats.isNotEmpty)
-                  _legendDot(Colors.orange, loc.bodyTrackerBodyFat),
-                if (waists.isNotEmpty)
-                  _legendDot(Colors.teal, loc.bodyTrackerWaist),
-                if (chests.isNotEmpty)
-                  _legendDot(Colors.blue, loc.bodyTrackerChest),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 200,
-              child: LineChart(
-                LineChartData(
-                  minY: 0,
-                  maxY: maxWeight * 1.15,
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: niceInterval(maxWeight / 4),
-                  ),
-                  titlesData: FlTitlesData(
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 36,
-                        getTitlesWidget: (v, _) => Text(
-                          v > 100
-                              ? '${(v / 1000).toStringAsFixed(0)}k'
-                              : v.toStringAsFixed(0),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontSize: 8,
-                          ),
+    return AppSectionCard(
+      margin: const EdgeInsets.all(4),
+      radius: 12,
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
+            children: [
+              _legendDot(Colors.indigo, loc.bodyTrackerWeight),
+              if (bodyFats.isNotEmpty)
+                _legendDot(Colors.orange, loc.bodyTrackerBodyFat),
+              if (waists.isNotEmpty)
+                _legendDot(Colors.teal, loc.bodyTrackerWaist),
+              if (chests.isNotEmpty)
+                _legendDot(Colors.blue, loc.bodyTrackerChest),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 200,
+            child: LineChart(
+              LineChartData(
+                minY: 0,
+                maxY: maxWeight * 1.15,
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: niceInterval(maxWeight / 4),
+                ),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 36,
+                      getTitlesWidget: (v, _) => Text(
+                        v > 100
+                            ? '${(v / 1000).toStringAsFixed(0)}k'
+                            : v.toStringAsFixed(0),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 8,
                         ),
                       ),
                     ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 20,
-                        interval: validData.length > 8 ? 2 : 1,
-                        getTitlesWidget: (v, _) {
-                          final idx = v.toInt();
-                          if (idx < 0 || idx >= validData.length) {
-                            return const SizedBox.shrink();
-                          }
-                          final d = validData[idx]['date'] as String? ?? '';
-                          return Text(
-                            d.length >= 10 ? d.substring(5) : d,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 7,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
                   ),
-                  borderData: FlBorderData(show: false),
-                  lineBarsData: [
-                    // Weight
-                    LineChartBarData(
-                      spots: validData.asMap().entries.map((e) {
-                        final w = (e.value['weight'] as num?)?.toDouble() ?? 0;
-                        return FlSpot(e.key.toDouble(), w);
-                      }).toList(),
-                      isCurved: true,
-                      color: Colors.indigo,
-                      barWidth: 3,
-                      dotData: FlDotData(
-                        show: true,
-                        getDotPainter: (s, p, b, i) =>
-                            FlDotCirclePainter(radius: 4, color: Colors.indigo),
-                      ),
-                      belowBarData: BarAreaData(show: false),
-                    ),
-                    // Body fat
-                    if (bodyFats.length >= 2)
-                      LineChartBarData(
-                        spots: validData
-                            .asMap()
-                            .entries
-                            .map((e) {
-                              final bf = (e.value['body_fat'] as num?)
-                                  ?.toDouble();
-                              return FlSpot(e.key.toDouble(), bf ?? 0);
-                            })
-                            .where((s) => s.y > 0)
-                            .toList(),
-                        isCurved: true,
-                        color: Colors.orange,
-                        barWidth: 2,
-                        dashArray: [6, 3],
-                        dotData: FlDotData(show: false),
-                        belowBarData: BarAreaData(show: false),
-                      ),
-                    // Waist
-                    if (waists.length >= 2)
-                      LineChartBarData(
-                        spots: validData
-                            .asMap()
-                            .entries
-                            .map((e) {
-                              final w = (e.value['waist'] as num?)?.toDouble();
-                              return FlSpot(e.key.toDouble(), w ?? 0);
-                            })
-                            .where((s) => s.y > 0)
-                            .toList(),
-                        isCurved: true,
-                        color: Colors.teal,
-                        barWidth: 2,
-                        dashArray: [3, 3],
-                        dotData: FlDotData(show: false),
-                        belowBarData: BarAreaData(show: false),
-                      ),
-                  ],
-                  lineTouchData: LineTouchData(
-                    touchTooltipData: LineTouchTooltipData(
-                      getTooltipItems: (spots) => spots.map((s) {
-                        final idx = s.spotIndex;
-                        final d = idx < validData.length
-                            ? (validData[idx]['date'] as String? ?? '')
-                            : '';
-                        String label;
-                        if (s.barIndex == 0) {
-                          label =
-                              '${loc.bodyTrackerWeight}: ${s.y.toStringAsFixed(1)}kg';
-                        } else if (s.barIndex == 1) {
-                          label =
-                              '${loc.bodyTrackerBodyFat}: ${s.y.toStringAsFixed(1)}%';
-                        } else {
-                          label =
-                              '${loc.bodyTrackerWaist}: ${s.y.toStringAsFixed(1)}cm';
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 20,
+                      interval: validData.length > 8 ? 2 : 1,
+                      getTitlesWidget: (v, _) {
+                        final idx = v.toInt();
+                        if (idx < 0 || idx >= validData.length) {
+                          return const SizedBox.shrink();
                         }
-                        return LineTooltipItem(
-                          '$d\n$label',
-                          TextStyle(
-                            color: theme.colorScheme.onSurface,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 10,
+                        final d = validData[idx]['date'] as String? ?? '';
+                        return Text(
+                          _shortDate(d),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 7,
                           ),
                         );
-                      }).toList(),
+                      },
                     ),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                lineBarsData: [
+                  // Weight
+                  LineChartBarData(
+                    spots: validData.asMap().entries.map((e) {
+                      final w = (e.value['weight'] as num?)?.toDouble() ?? 0;
+                      return FlSpot(e.key.toDouble(), w);
+                    }).toList(),
+                    isCurved: true,
+                    color: Colors.indigo,
+                    barWidth: 3,
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (s, p, b, i) =>
+                          FlDotCirclePainter(radius: 4, color: Colors.indigo),
+                    ),
+                    belowBarData: BarAreaData(show: false),
+                  ),
+                  // Body fat
+                  if (bodyFats.length >= 2)
+                    LineChartBarData(
+                      spots: validData
+                          .asMap()
+                          .entries
+                          .map((e) {
+                            final bf = (e.value['body_fat'] as num?)
+                                ?.toDouble();
+                            return FlSpot(e.key.toDouble(), bf ?? 0);
+                          })
+                          .where((s) => s.y > 0)
+                          .toList(),
+                      isCurved: true,
+                      color: Colors.orange,
+                      barWidth: 2,
+                      dashArray: [6, 3],
+                      dotData: const FlDotData(show: false),
+                      belowBarData: BarAreaData(show: false),
+                    ),
+                  // Waist
+                  if (waists.length >= 2)
+                    LineChartBarData(
+                      spots: validData
+                          .asMap()
+                          .entries
+                          .map((e) {
+                            final w = (e.value['waist'] as num?)?.toDouble();
+                            return FlSpot(e.key.toDouble(), w ?? 0);
+                          })
+                          .where((s) => s.y > 0)
+                          .toList(),
+                      isCurved: true,
+                      color: Colors.teal,
+                      barWidth: 2,
+                      dashArray: [3, 3],
+                      dotData: const FlDotData(show: false),
+                      belowBarData: BarAreaData(show: false),
+                    ),
+                ],
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipItems: (spots) => spots.map((s) {
+                      final idx = s.spotIndex;
+                      final d = idx < validData.length
+                          ? (validData[idx]['date'] as String? ?? '')
+                          : '';
+                      String label;
+                      if (s.barIndex == 0) {
+                        label =
+                            '${loc.bodyTrackerWeight}: ${s.y.toStringAsFixed(1)}kg';
+                      } else if (s.barIndex == 1) {
+                        label =
+                            '${loc.bodyTrackerBodyFat}: ${s.y.toStringAsFixed(1)}%';
+                      } else {
+                        label =
+                            '${loc.bodyTrackerWaist}: ${s.y.toStringAsFixed(1)}cm';
+                      }
+                      return LineTooltipItem(
+                        '${_longDate(d)}\n$label',
+                        TextStyle(
+                          color: theme.colorScheme.onSurface,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -440,7 +438,7 @@ class _BodyCompositionChart extends StatelessWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 10)),
+        Text(label, style: const TextStyle(fontSize: 10)),
       ],
     );
   }
@@ -472,143 +470,138 @@ class _BodyWeightChart extends StatelessWidget {
 
     final maxY = maxWeight > maxVolume ? maxWeight * 1.15 : maxVolume * 1.15;
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                _legendDot(Colors.indigo, loc.progressBodyWeight),
-                const SizedBox(width: 16),
-                _legendDot(Colors.teal, loc.commonVolume),
-              ],
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 180,
-              child: LineChart(
-                LineChartData(
-                  minY: 0,
-                  maxY: maxY,
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: niceInterval(
-                      (maxWeight > maxVolume ? maxWeight : maxVolume) / 4,
-                    ),
+    return AppSectionCard(
+      margin: const EdgeInsets.all(4),
+      radius: 12,
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _legendDot(Colors.indigo, loc.progressBodyWeight),
+              const SizedBox(width: 16),
+              _legendDot(Colors.teal, loc.commonVolume),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 180,
+            child: LineChart(
+              LineChartData(
+                minY: 0,
+                maxY: maxY,
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: niceInterval(
+                    (maxWeight > maxVolume ? maxWeight : maxVolume) / 4,
                   ),
-                  titlesData: FlTitlesData(
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 36,
-                        getTitlesWidget: (v, _) => Text(
-                          v > 100
-                              ? '${(v / 1000).toStringAsFixed(0)}k'
-                              : v.toStringAsFixed(0),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontSize: 8,
-                          ),
+                ),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 36,
+                      getTitlesWidget: (v, _) => Text(
+                        v > 100
+                            ? '${(v / 1000).toStringAsFixed(0)}k'
+                            : v.toStringAsFixed(0),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 8,
                         ),
                       ),
                     ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 20,
-                        interval: data.length > 8 ? 2 : 1,
-                        getTitlesWidget: (v, _) {
-                          final idx = v.toInt();
-                          if (idx < 0 || idx >= data.length) {
-                            return const SizedBox.shrink();
-                          }
-                          final d = data[idx]['date'] as String? ?? '';
-                          return Text(
-                            d.length >= 10 ? d.substring(5) : d,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 7,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 20,
+                      interval: data.length > 8 ? 2 : 1,
+                      getTitlesWidget: (v, _) {
+                        final idx = v.toInt();
+                        if (idx < 0 || idx >= data.length) {
+                          return const SizedBox.shrink();
+                        }
+                        final d = data[idx]['date'] as String? ?? '';
+                        return Text(
+                          _shortDate(d),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 7,
+                          ),
+                        );
+                      },
                     ),
                   ),
-                  borderData: FlBorderData(show: false),
-                  lineBarsData: [
-                    // Weight line
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                lineBarsData: [
+                  // Weight line
+                  LineChartBarData(
+                    spots: weights
+                        .asMap()
+                        .entries
+                        .map((e) => FlSpot(e.key.toDouble(), e.value))
+                        .toList(),
+                    isCurved: true,
+                    color: Colors.indigo,
+                    barWidth: 3,
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (s, p, b, i) =>
+                          FlDotCirclePainter(radius: 4, color: Colors.indigo),
+                    ),
+                    belowBarData: BarAreaData(show: false),
+                  ),
+                  // Volume line
+                  if (maxVolume > 0)
                     LineChartBarData(
-                      spots: weights
+                      spots: volumes
                           .asMap()
                           .entries
                           .map((e) => FlSpot(e.key.toDouble(), e.value))
                           .toList(),
                       isCurved: true,
-                      color: Colors.indigo,
-                      barWidth: 3,
+                      color: Colors.teal,
+                      barWidth: 2,
+                      dashArray: [6, 3],
                       dotData: FlDotData(
                         show: true,
                         getDotPainter: (s, p, b, i) =>
-                            FlDotCirclePainter(radius: 4, color: Colors.indigo),
+                            FlDotCirclePainter(radius: 3, color: Colors.teal),
                       ),
                       belowBarData: BarAreaData(show: false),
                     ),
-                    // Volume line
-                    if (maxVolume > 0)
-                      LineChartBarData(
-                        spots: volumes
-                            .asMap()
-                            .entries
-                            .map((e) => FlSpot(e.key.toDouble(), e.value))
-                            .toList(),
-                        isCurved: true,
-                        color: Colors.teal,
-                        barWidth: 2,
-                        dashArray: [6, 3],
-                        dotData: FlDotData(
-                          show: true,
-                          getDotPainter: (s, p, b, i) =>
-                              FlDotCirclePainter(radius: 3, color: Colors.teal),
+                ],
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipItems: (spots) => spots.map((s) {
+                      final idx = s.spotIndex;
+                      final d = idx < data.length
+                          ? (data[idx]['date'] as String? ?? '')
+                          : '';
+                      final isWeight = s.barIndex == 0;
+                      return LineTooltipItem(
+                        '${_longDate(d)}\n${isWeight ? '${loc.progressBodyWeight}: ${s.y.toStringAsFixed(1)}${loc.workoutDetailKg}' : '${loc.commonVolume}: ${formatVolume(s.y)}'}',
+                        TextStyle(
+                          color: theme.colorScheme.onSurface,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
                         ),
-                        belowBarData: BarAreaData(show: false),
-                      ),
-                  ],
-                  lineTouchData: LineTouchData(
-                    touchTooltipData: LineTouchTooltipData(
-                      getTooltipItems: (spots) => spots.map((s) {
-                        final idx = s.spotIndex;
-                        final d = idx < data.length
-                            ? (data[idx]['date'] as String? ?? '')
-                            : '';
-                        final isWeight = s.barIndex == 0;
-                        return LineTooltipItem(
-                          '$d\n${isWeight ? '${loc.progressBodyWeight}: ${s.y.toStringAsFixed(1)}${loc.workoutDetailKg}' : '${loc.commonVolume}: ${formatVolume(s.y)}'}',
-                          TextStyle(
-                            color: theme.colorScheme.onSurface,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                          ),
-                        );
-                      }).toList(),
-                    ),
+                      );
+                    }).toList(),
                   ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -623,7 +616,7 @@ class _BodyWeightChart extends StatelessWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 10)),
+        Text(label, style: const TextStyle(fontSize: 10)),
       ],
     );
   }
@@ -636,21 +629,16 @@ class _BodyTrackerLink extends StatelessWidget {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
+    return AppSectionCard(
+      margin: const EdgeInsets.all(4),
+      radius: 12,
+      padding: EdgeInsets.zero,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
           Navigator.push(
             context,
-            AiCoachNavigation.route(
-              kind: AiCoachRouteKind.normalWithFab,
-              builder: (_) => const BodyTrackerScreen(),
-            ),
+            MaterialPageRoute(builder: (_) => const BodyTrackerScreen()),
           );
         },
         child: Padding(
@@ -700,4 +688,16 @@ class _BodyTrackerLink extends StatelessWidget {
       ),
     );
   }
+}
+
+/// `dd/MM` for an ISO `yyyy-MM-dd` date (axis labels).
+String _shortDate(String iso) {
+  final date = DateTime.tryParse(iso);
+  return date == null ? iso : DateFormat('dd/MM').format(date);
+}
+
+/// `dd/MM/yyyy` for an ISO `yyyy-MM-dd` date (tooltips).
+String _longDate(String iso) {
+  final date = DateTime.tryParse(iso);
+  return date == null ? iso : DateFormat('dd/MM/yyyy').format(date);
 }

@@ -3,6 +3,7 @@ package com.workoutnotes.workout_notes.sleep
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.workoutnotes.workout_notes.medication.MedicationReminderScheduler
 
 class SleepAlarmBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
@@ -13,6 +14,7 @@ class SleepAlarmBootReceiver : BroadcastReceiver() {
         ) {
             SleepAlarmScheduler.restore(context)
             TraditionalAlarmScheduler.restore(context)
+            MedicationReminderScheduler.restore(context)
         }
     }
 }

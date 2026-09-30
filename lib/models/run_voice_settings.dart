@@ -11,13 +11,6 @@ enum RunVoiceLanguage {
     RunVoiceLanguage.english => 'en',
   };
 
-  String get localeTag => switch (this) {
-    RunVoiceLanguage.portuguese => 'pt-BR',
-    RunVoiceLanguage.app || RunVoiceLanguage.english => 'en-US',
-  };
-
-  bool get isPortuguese => this == RunVoiceLanguage.portuguese;
-
   RunVoiceLanguage resolve(String? appLocale) {
     if (this != RunVoiceLanguage.app) return this;
     return appLocale?.toLowerCase().startsWith('pt') == true
@@ -128,6 +121,16 @@ class RunVoiceSettings {
   final bool intervalsEnabledByDefault;
   final RunIntervalPreset interval;
 
+  /// Stops the moving clock while standing still (traffic lights, stretching).
+  final bool autoPause;
+  final bool announceAutoPause;
+  final bool announceLaps;
+
+  /// Seconds counted down before recording starts: 0, 3, 5 or 10.
+  final int countdownSeconds;
+
+  static const countdownOptions = [0, 3, 5, 10];
+
   const RunVoiceSettings({
     required this.enabled,
     required this.language,
@@ -143,6 +146,10 @@ class RunVoiceSettings {
     required this.announceIntervals,
     required this.intervalsEnabledByDefault,
     required this.interval,
+    this.autoPause = true,
+    this.announceAutoPause = true,
+    this.announceLaps = true,
+    this.countdownSeconds = 3,
   });
 
   const RunVoiceSettings.defaults()
@@ -179,6 +186,10 @@ class RunVoiceSettings {
     bool? announceIntervals,
     bool? intervalsEnabledByDefault,
     RunIntervalPreset? interval,
+    bool? autoPause,
+    bool? announceAutoPause,
+    bool? announceLaps,
+    int? countdownSeconds,
   }) {
     return RunVoiceSettings(
       enabled: enabled ?? this.enabled,
@@ -198,6 +209,10 @@ class RunVoiceSettings {
       intervalsEnabledByDefault:
           intervalsEnabledByDefault ?? this.intervalsEnabledByDefault,
       interval: interval ?? this.interval,
+      autoPause: autoPause ?? this.autoPause,
+      announceAutoPause: announceAutoPause ?? this.announceAutoPause,
+      announceLaps: announceLaps ?? this.announceLaps,
+      countdownSeconds: countdownSeconds ?? this.countdownSeconds,
     );
   }
 
@@ -216,6 +231,10 @@ class RunVoiceSettings {
     'announceIntervals': announceIntervals,
     'intervalsEnabledByDefault': intervalsEnabledByDefault,
     'interval': interval.toJson(),
+    'autoPause': autoPause,
+    'announceAutoPause': announceAutoPause,
+    'announceLaps': announceLaps,
+    'countdownSeconds': countdownSeconds,
   };
 
   factory RunVoiceSettings.fromJson(Map<String, dynamic>? json) {
@@ -242,6 +261,15 @@ class RunVoiceSettings {
       interval: RunIntervalPreset.fromJson(
         intervalRaw is Map ? Map<String, dynamic>.from(intervalRaw) : null,
       ),
+      autoPause: json['autoPause'] as bool? ?? true,
+      announceAutoPause: json['announceAutoPause'] as bool? ?? true,
+      announceLaps: json['announceLaps'] as bool? ?? true,
+      countdownSeconds: _countdown(json['countdownSeconds']),
     );
+  }
+
+  static int _countdown(Object? raw) {
+    final value = (raw as num?)?.toInt();
+    return countdownOptions.contains(value) ? value! : 3;
   }
 }

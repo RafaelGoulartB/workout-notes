@@ -2,19 +2,18 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
-import 'l10n/app_localizations.dart';
-import 'navigation/ai_coach_navigation.dart';
-import 'services/notification_service.dart';
-import 'services/sleep_monitor_service.dart';
-import 'services/traditional_alarm_service.dart';
-import 'services/run_tracking_service.dart';
-import 'screens/main_shell.dart';
-import 'state/ai_chat_service.dart';
-import 'state/ai_settings_notifier.dart';
-import 'state/sections_notifier.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/screens/main_shell.dart';
+import 'package:workout_notes/services/medication_reminder_service.dart';
+import 'package:workout_notes/services/run_tracking_service.dart';
+import 'package:workout_notes/services/sleep_monitor_service.dart';
+import 'package:workout_notes/services/traditional_alarm_service.dart';
+import 'package:workout_notes/state/ai_chat_service.dart';
+import 'package:workout_notes/state/ai_settings_notifier.dart';
+import 'package:workout_notes/state/sections_notifier.dart';
 
 /// List of accent seed colors available in settings.
 class AccentColors {
@@ -26,9 +25,10 @@ class AccentColors {
     Color(0xFF6A1B9A), // Deep Purple
     Color(0xFF0D47A1), // Dark Blue
     Color(0xFF37474F), // Graphite
-    Color(0xFF4A6741), // Forest Green (default)
+    Color(0xFF4A6741), // Forest Green
   ];
 
+  /// Graphite.
   static const defaultColor = Color(0xFF37474F);
   static const defaultIndex = 6;
 
@@ -124,30 +124,31 @@ void main() async {
 }
 
 Future<void> _initializeDeferredServices() async {
-  final notificationService = NotificationService.instance;
+  // The notification service initialises itself on first use.
+  //
+  // The steps are independent, so they run concurrently: SQLite serialises the
+  // database work and each service reconciles its own state (recovering what
+  // a killed process left behind is durable and does not depend on the
+  // others). A failure only affects its own feature, which surfaces its own
+  // error when opened.
+  await Future.wait([
+    _guarded(() async {
+      await WorkoutNotesApp.aiSettings.load();
+      await AiChatService.bootstrap(settings: WorkoutNotesApp.aiSettings);
+    }),
+    _guarded(SleepMonitorService.instance.initialize),
+    _guarded(TraditionalAlarmService.instance.initialize),
+    _guarded(MedicationReminderService.instance.initialize),
+    _guarded(RunTrackingService.instance.initialize),
+  ]);
+}
+
+Future<void> _guarded(Future<void> Function() step) async {
   try {
-    await notificationService.init();
-    await notificationService.loadSettings();
-  } catch (_) {
-    // Individual features surface their own errors when opened.
+    await step();
+  } catch (error) {
+    debugPrint('Startup step failed: $error');
   }
-
-  try {
-    await WorkoutNotesApp.aiSettings.load();
-    await AiChatService.bootstrap(settings: WorkoutNotesApp.aiSettings);
-  } catch (_) {}
-
-  // Keep recovery ordering deterministic. All three can touch SQLite or
-  // platform channels while reconciling state left by a killed process.
-  try {
-    await SleepMonitorService.instance.initialize();
-  } catch (_) {}
-  try {
-    await TraditionalAlarmService.instance.initialize();
-  } catch (_) {}
-  try {
-    await RunTrackingService.instance.initialize();
-  } catch (_) {}
 }
 
 Locale _parseLocale(String value) {
@@ -202,10 +203,6 @@ class _WorkoutNotesAppState extends State<WorkoutNotesApp> {
     _locale = widget.initialLocale;
     WorkoutNotesApp.themeNotifier.addListener(_onThemeChanged);
     WorkoutNotesApp.localeNotifier.addListener(_onLocaleChanged);
-    // Sync the notifier's initial values
-    WorkoutNotesApp.themeNotifier.setSeedColor(_seedColor);
-    WorkoutNotesApp.themeNotifier.setThemeMode(_themeMode);
-    WorkoutNotesApp.localeNotifier.setLocale(_locale);
   }
 
   @override
@@ -235,7 +232,7 @@ class _WorkoutNotesAppState extends State<WorkoutNotesApp> {
         brightness: brightness,
       ),
       useMaterial3: true,
-      appBarTheme: AppBarTheme(
+      appBarTheme: const AppBarTheme(
         centerTitle: true,
         elevation: 0,
         scrolledUnderElevation: 1,
@@ -273,7 +270,6 @@ class _WorkoutNotesAppState extends State<WorkoutNotesApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
-      navigatorKey: AiCoachNavigation.navigatorKey,
       theme: _buildTheme(_seedColor, Brightness.light),
       darkTheme: _buildTheme(_seedColor, Brightness.dark),
       themeMode: _themeMode,

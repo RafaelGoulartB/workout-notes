@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Distinguishes "not passed" from an explicit null in [PeriodizationTarget.copyWith].
 const Object _unset = Object();
@@ -45,6 +46,27 @@ class PeriodizationTarget {
   /// Routines linked to the week this target applies to. Serialized inside
   /// [trainingJson]; each phase week may carry its own routine sequence.
   final List<String> routineIds;
+
+  /// Weekdays (1 = Monday … 7 = Sunday) of the phase's template week that
+  /// carry a strength session. Serialized as `strength_days` in
+  /// [trainingJson]; empty for targets saved before the template week.
+  final List<int> strengthDays;
+
+  /// Weekdays with a run when no running plan is linked (a linked plan brings
+  /// its own weekdays). Serialized as `run_days` inside the `run` sub-map.
+  final List<int> runDays;
+
+  /// Rest-day nutrition. When [restCalories] is set, days without a planned
+  /// strength session or run use these values and training days use the
+  /// top-level ones. Serialized as a `rest_day` sub-map of [nutritionJson].
+  final double? restCalories;
+  final double? restProteinG;
+  final double? restCarbsG;
+  final double? restFatG;
+
+  /// Short free label for the week this target applies to ("Deload",
+  /// "Refeed"). Serialized as `week_label` in [trainingJson].
+  final String? weekLabel;
   final double? targetWeightKg;
   final double? weeklyWeightChangePercent;
   final double? sleepHours;
@@ -75,11 +97,20 @@ class PeriodizationTarget {
     this.qualitySessionsPerWeek,
     List<String> runPlanIds = const [],
     this.runPlanStartWeek,
+    List<int> strengthDays = const [],
+    List<int> runDays = const [],
+    this.restCalories,
+    this.restProteinG,
+    this.restCarbsG,
+    this.restFatG,
+    this.weekLabel,
     this.targetWeightKg,
     this.weeklyWeightChangePercent,
     this.sleepHours,
     required this.createdAt,
-  }) : routineIds = routineIds.isNotEmpty
+  }) : strengthDays = List.unmodifiable(_normalizeDays(strengthDays)),
+       runDays = List.unmodifiable(_normalizeDays(runDays)),
+       routineIds = routineIds.isNotEmpty
            ? List.unmodifiable(routineIds)
            : routineId == null
            ? const []
@@ -105,6 +136,10 @@ class PeriodizationTarget {
       longRunDistanceMeters == null &&
       qualitySessionsPerWeek == null &&
       runPlanIds.isEmpty &&
+      strengthDays.isEmpty &&
+      runDays.isEmpty &&
+      restCalories == null &&
+      (weekLabel == null || weekLabel!.isEmpty) &&
       targetWeightKg == null &&
       weeklyWeightChangePercent == null &&
       sleepHours == null;
@@ -117,7 +152,40 @@ class PeriodizationTarget {
     if (proteinGPerKg != null) 'protein_g_per_kg': proteinGPerKg,
     if (fatGPerKg != null) 'fat_g_per_kg': fatGPerKg,
     if (weightKgUsed != null) 'weight_kg_used': weightKgUsed,
+    if (restCalories != null)
+      'rest_day': {
+        'calories': restCalories,
+        if (restProteinG != null) 'protein_g': restProteinG,
+        if (restCarbsG != null) 'carbs_g': restCarbsG,
+        if (restFatG != null) 'fat_g': restFatG,
+      },
   };
+
+  /// True when rest days carry their own nutrition target.
+  bool get hasRestDayNutrition => restCalories != null;
+
+  /// True when the template week says which weekdays are training days.
+  bool get hasTemplateWeek => strengthDays.isNotEmpty || runDays.isNotEmpty;
+
+  /// Nutrition values for a training day ([trainingDay] true) or a rest day.
+  /// Rest days fall back to the training-day values field by field.
+  ({double? calories, double? proteinG, double? carbsG, double? fatG})
+  nutritionFor({required bool trainingDay}) {
+    if (trainingDay || !hasRestDayNutrition) {
+      return (
+        calories: calories,
+        proteinG: proteinG,
+        carbsG: carbsG,
+        fatG: fatG,
+      );
+    }
+    return (
+      calories: restCalories,
+      proteinG: restProteinG ?? proteinG,
+      carbsG: restCarbsG ?? carbsG,
+      fatG: restFatG ?? fatG,
+    );
+  }
 
   Map<String, dynamic> get trainingJson => {
     if (workoutsPerWeek != null) 'workouts_per_week': workoutsPerWeek,
@@ -127,6 +195,8 @@ class PeriodizationTarget {
     if (maxRpe != null) 'max_rpe': maxRpe,
     if (routineIds.isNotEmpty) 'routine_ids': routineIds,
     if (routineIds.isNotEmpty) 'routine_id': routineIds.first,
+    if (strengthDays.isNotEmpty) 'strength_days': strengthDays,
+    if (weekLabel != null && weekLabel!.isNotEmpty) 'week_label': weekLabel,
     if (runJson.isNotEmpty) 'run': runJson,
   };
 
@@ -143,6 +213,7 @@ class PeriodizationTarget {
     if (runPlanIds.isNotEmpty) 'run_plan_ids': runPlanIds,
     if (runPlanIds.isNotEmpty && runPlanStartWeek != null)
       'run_plan_start_week': runPlanStartWeek,
+    if (runDays.isNotEmpty) 'run_days': runDays,
   };
 
   Map<String, dynamic> get bodyJson => {
@@ -180,6 +251,13 @@ class PeriodizationTarget {
     int? qualitySessionsPerWeek,
     List<String>? runPlanIds,
     Object? runPlanStartWeek = _unset,
+    List<int>? strengthDays,
+    List<int>? runDays,
+    Object? restCalories = _unset,
+    Object? restProteinG = _unset,
+    Object? restCarbsG = _unset,
+    Object? restFatG = _unset,
+    Object? weekLabel = _unset,
     double? targetWeightKg,
     double? weeklyWeightChangePercent,
     double? sleepHours,
@@ -213,6 +291,21 @@ class PeriodizationTarget {
     runPlanStartWeek: identical(runPlanStartWeek, _unset)
         ? this.runPlanStartWeek
         : runPlanStartWeek as int?,
+    strengthDays: strengthDays ?? this.strengthDays,
+    runDays: runDays ?? this.runDays,
+    restCalories: identical(restCalories, _unset)
+        ? this.restCalories
+        : restCalories as double?,
+    restProteinG: identical(restProteinG, _unset)
+        ? this.restProteinG
+        : restProteinG as double?,
+    restCarbsG: identical(restCarbsG, _unset)
+        ? this.restCarbsG
+        : restCarbsG as double?,
+    restFatG: identical(restFatG, _unset) ? this.restFatG : restFatG as double?,
+    weekLabel: identical(weekLabel, _unset)
+        ? this.weekLabel
+        : weekLabel as String?,
     targetWeightKg: targetWeightKg ?? this.targetWeightKg,
     weeklyWeightChangePercent:
         weeklyWeightChangePercent ?? this.weeklyWeightChangePercent,
@@ -222,7 +315,7 @@ class PeriodizationTarget {
 
   Map<String, dynamic> toSnapshot() => {
     'version': version,
-    'valid_from': _date(validFrom),
+    'valid_from': dateKey(validFrom),
     'nutrition': nutritionJson,
     'training': trainingJson,
     'body': bodyJson,
@@ -237,12 +330,14 @@ class PeriodizationTarget {
     'body_json': jsonEncode(bodyJson),
     'sleep_json': jsonEncode(sleepJson),
     'version': version,
-    'valid_from': _date(validFrom),
+    'valid_from': dateKey(validFrom),
     'created_at': createdAt.toIso8601String(),
   };
 
   factory PeriodizationTarget.fromMap(Map<String, dynamic> map) {
     final nutrition = _decode(map['nutrition_json']);
+    final rawRest = nutrition['rest_day'];
+    final rest = rawRest is Map ? Map<String, dynamic>.from(rawRest) : const {};
     final training = _decode(map['training_json']);
     final rawRun = training['run'];
     final run = rawRun is Map ? Map<String, dynamic>.from(rawRun) : const {};
@@ -273,6 +368,13 @@ class PeriodizationTarget {
           ?.toInt(),
       runPlanIds: _runPlanIds(run),
       runPlanStartWeek: (run['run_plan_start_week'] as num?)?.toInt(),
+      strengthDays: _days(training['strength_days']),
+      runDays: _days(run['run_days']),
+      restCalories: _double(rest['calories']),
+      restProteinG: _double(rest['protein_g']),
+      restCarbsG: _double(rest['carbs_g']),
+      restFatG: _double(rest['fat_g']),
+      weekLabel: training['week_label'] as String?,
       targetWeightKg: _double(body['target_weight_kg']),
       weeklyWeightChangePercent: _double(body['weekly_weight_change_percent']),
       sleepHours: _double(sleep['hours']),
@@ -287,6 +389,15 @@ class PeriodizationTarget {
   }
 
   static double? _double(dynamic value) => (value as num?)?.toDouble();
+
+  static List<int> _days(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw.whereType<num>().map((day) => day.toInt()).toList();
+  }
+
+  /// Valid weekdays only, deduplicated and sorted Monday → Sunday.
+  static List<int> _normalizeDays(List<int> days) =>
+      days.where((day) => day >= 1 && day <= 7).toSet().toList()..sort();
 
   static List<String> _runPlanIds(Map<dynamic, dynamic> run) {
     final raw = run['run_plan_ids'];
@@ -304,9 +415,4 @@ class PeriodizationTarget {
     return legacy is String && legacy.isNotEmpty ? [legacy] : const [];
   }
 
-  static String _date(DateTime value) => DateTime(
-    value.year,
-    value.month,
-    value.day,
-  ).toIso8601String().substring(0, 10);
 }

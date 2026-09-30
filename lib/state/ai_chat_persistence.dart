@@ -12,11 +12,12 @@ extension _AiChatPersistence on AiChatService {
     final title = firstUserText.length > 48
         ? '${firstUserText.substring(0, 45)}…'
         : firstUserText;
-    final resolvedTitle = title.isEmpty ? 'Nova conversa' : title;
+    // An empty title is the neutral marker: the UI localizes it.
+    final resolvedTitle = title.isEmpty ? AiChatThread.genericTitle : title;
     final preview = firstUserText.length > 96
         ? '${firstUserText.substring(0, 93)}…'
         : firstUserText;
-    await _db.upsertAiChatThread(
+    await _db.aiChatRepo.upsertAiChatThread(
       id: id,
       title: resolvedTitle,
       createdAt: now,
@@ -26,8 +27,9 @@ extension _AiChatPersistence on AiChatService {
     );
     // Keep the just-created thread in memory before the first turn is
     // persisted. Otherwise `_persistCurrentThread` cannot resolve it and
-    // overwrites its descriptive title with the generic fallback "Conversa".
+    // overwrites its descriptive title with the generic marker.
     _state = _state.copyWith(
+      totalThreadCount: (_state.totalThreadCount ?? _state.threads.length) + 1,
       threads: [
         AiChatThread(
           id: id,
@@ -47,30 +49,70 @@ extension _AiChatPersistence on AiChatService {
     if (id == null) return;
     try {
       final preview = _lastUserOrAssistantPreview();
-      await _db.upsertAiChatThread(
+      // A thread opened from search may not be among the loaded pages; read
+      // its stored row so title, creation time and pin are never reset.
+      final existing = _state.activeThread ?? await _loadStoredThread(id);
+      final now = DateTime.now();
+      final thread = AiChatThread(
         id: id,
-        title: _state.activeThread?.title ?? 'Conversa',
-        createdAt: _state.activeThread?.createdAt ?? DateTime.now(),
-        updatedAt: DateTime.now(),
+        title: existing?.title ?? AiChatThread.genericTitle,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
         lastMessagePreview: preview,
-        isPinned: _state.activeThread?.isPinned ?? false,
+        isPinned: existing?.isPinned ?? false,
       );
-      final allRows = _state.messages
-          .where((m) => m.role != AiMessageRole.system)
-          .map((m) => m.toRow()..['thread_id'] = id)
-          .toList();
-      final rows = allRows
-          .where((row) {
-            final messageId = row['id'] as String;
-            return _persistedMessageSignatures[messageId] != jsonEncode(row);
-          })
-          .toList(growable: false);
-      await _db.upsertAiChatMessages(id, rows);
-      for (final row in rows) {
-        _persistedMessageSignatures[row['id'] as String] = jsonEncode(row);
+      await _db.aiChatRepo.upsertAiChatThread(
+        id: id,
+        title: thread.title,
+        createdAt: thread.createdAt,
+        updatedAt: thread.updatedAt,
+        lastMessagePreview: preview,
+        isPinned: thread.isPinned,
+      );
+      // Messages are immutable: the same instance as the last save is clean
+      // without encoding it again. Others are encoded once and only written
+      // when their row really changed.
+      final changedRows = <Map<String, dynamic>>[];
+      final seen = <String, ({AiChatMessage message, String signature})>{};
+      for (final message in _state.messages) {
+        if (message.role == AiMessageRole.system) continue;
+        final known = _persistedMessages[message.id];
+        if (identical(known?.message, message)) continue;
+        final row = message.toRow()..['thread_id'] = id;
+        final signature = jsonEncode(row);
+        if (known?.signature != signature) changedRows.add(row);
+        seen[message.id] = (message: message, signature: signature);
       }
-      await refreshThreads();
-    } catch (_) {}
+      await _db.aiChatRepo.upsertAiChatMessages(id, changedRows);
+      _persistedMessages.addAll(seen);
+      _upsertThreadInMemory(thread);
+    } catch (error) {
+      debugPrint('Saving the AI chat thread failed: $error');
+    }
+  }
+
+  Future<AiChatThread?> _loadStoredThread(String id) async {
+    final row = await _db.aiChatRepo.getAiChatThread(id);
+    return row == null ? null : AiChatThread.fromRow(row);
+  }
+
+  /// Keeps the loaded thread list in step with a save without reloading it:
+  /// the saved thread moves to the top of its pinned/unpinned group
+  /// (`is_pinned DESC, updated_at DESC`) and loaded pages are preserved.
+  void _upsertThreadInMemory(AiChatThread thread) {
+    final threads = [
+      for (final t in _state.threads)
+        if (t.id != thread.id) t,
+    ];
+    var index = threads.indexWhere(
+      (t) => t.isPinned == thread.isPinned
+          ? !t.updatedAt.isAfter(thread.updatedAt)
+          : !t.isPinned,
+    );
+    if (index < 0) index = threads.length;
+    threads.insert(index, thread);
+    _state = _state.copyWith(threads: threads);
+    _emit();
   }
 
   void _replaceProposal(AiRoutineProposal proposal, {bool notify = true}) {
@@ -109,8 +151,10 @@ extension _AiChatPersistence on AiChatService {
       );
       wire.add({
         'role': 'user',
-        'content':
-            'EVENTO INTERNO DO APP: a proposta foi aplicada com sucesso. Responda agora, em português brasileiro, com um resumo breve e factual do que foi feito. Não use ferramentas e não diga que houve aprovação pendente. Dados confirmados: ${jsonEncode({'action': proposal.action.storageValue, 'routineName': proposal.routineName, 'routineId': proposal.appliedRoutineId, 'diff': proposal.diff})}',
+        'content': appliedProposalEventPrompt(
+          proposal,
+          languageCode: _settings!.appLanguageCode,
+        ),
       });
       final completion = await _service.sendChat(
         baseUrl: provider.baseUrl,
@@ -138,7 +182,7 @@ extension _AiChatPersistence on AiChatService {
         phase: AiTurnPhase.idle,
         phaseMessage: null,
       );
-      await _db.updateAiRoutineProposal(proposal.id, {
+      await _db.aiChatRepo.updateAiRoutineProposal(proposal.id, {
         'error_code': null,
         'error_message': null,
       });
@@ -149,7 +193,7 @@ extension _AiChatPersistence on AiChatService {
     } catch (_) {
       // The routine is already committed. Keep it applied and expose a retry
       // on the proposal card instead of risking a second mutation.
-      await _db.updateAiRoutineProposal(proposal.id, {
+      await _db.aiChatRepo.updateAiRoutineProposal(proposal.id, {
         'error_code': 'summary_pending',
         'error_message': 'Resumo da IA pendente.',
       });
@@ -171,4 +215,20 @@ extension _AiChatPersistence on AiChatService {
     }
     return null;
   }
+}
+
+/// Internal event that asks the model to summarise an applied proposal. The
+/// reply language follows the app language the user picked in Settings.
+String appliedProposalEventPrompt(
+  AiRoutineProposal proposal, {
+  required String languageCode,
+}) {
+  final language = languageCode == 'pt' ? 'português brasileiro' : 'inglês';
+  final confirmed = jsonEncode({
+    'action': proposal.action.storageValue,
+    'routineName': proposal.routineName,
+    'routineId': proposal.appliedRoutineId,
+    'diff': proposal.diff,
+  });
+  return 'EVENTO INTERNO DO APP: a proposta foi aplicada com sucesso. Responda agora, em $language, com um resumo breve e factual do que foi feito. Não use ferramentas e não diga que houve aprovação pendente. Dados confirmados: $confirmed';
 }

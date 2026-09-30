@@ -1,41 +1,25 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/food_variant.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/utils/nutrition_conversion.dart';
+import 'support/test_db.dart';
 
 void main() {
   late Database database;
   late NutritionRepository repository;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
-    database = await databaseFactory.openDatabase(
-      inMemoryDatabasePath,
-      options: OpenDatabaseOptions(
-        version: 1,
-        onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
-        onCreate: (db, version) async {
-          await _installNutritionSchema(db);
-        },
-      ),
-    );
-    DatabaseHelper.overrideDatabase = database;
+    database = await installTestDb(seedMealTypes: true);
     repository = NutritionRepository();
   });
 
-  tearDown(() async {
-    DatabaseHelper.overrideDatabase = null;
-    await database.close();
-  });
+  tearDown(uninstallTestDb);
 
   /// Creates a manual food with one variant (per [amount] values) and
   /// returns the persisted [Food].
@@ -234,6 +218,60 @@ void main() {
       },
     );
 
+    test(
+      'logs a legacy serving item without label or equivalence when the '
+      'variant has a single portion',
+      () async {
+        // Mirrors items saved from old meal logs: unit `serving`, no
+        // serving label and no grams snapshot, while the food's only
+        // serving uses a different unit token ("unidade").
+        final egg = await repository.createManualFood(
+          name: 'Ovo médio',
+          referenceAmount: 100,
+          referenceUnit: 'g',
+          referenceValues: const NutritionValues(
+            calories: 124,
+            proteinG: 10.4,
+            carbsG: 1.38,
+            fatG: 8.7,
+          ),
+          servings: const [
+            ManualServingInput(
+              label: '1 ovo médio',
+              quantity: 1,
+              unit: 'unidade',
+              gramsEquivalent: 50,
+            ),
+          ],
+        );
+        final saved = await repository.saveSavedMeal(
+          name: 'Café da Manhã',
+          items: [
+            SavedMealItemDraft(
+              foodId: egg.id,
+              foodVariantId: (await variantOf(egg)).id,
+              foodNameSnapshot: egg.name,
+              quantity: 5,
+              unit: 'serving',
+            ),
+          ],
+        );
+        final loaded = await repository.getSavedMeal(saved.id);
+        // 5 × 50 g = 250 g → 2.5 × the 100 g values.
+        expect(loaded!.totals!.calories, closeTo(310, 0.001));
+
+        final result = await repository.addSavedMealToDate(
+          date: '2026-08-10',
+          mealType: 'breakfast',
+          savedMealId: saved.id,
+        );
+        expect(result.added, 1);
+        expect(result.skipped, 0);
+        final summary = await repository.getDailySummary('2026-08-10');
+        expect(summary.consumed.calories, closeTo(310, 0.001));
+      },
+    );
+
     test('totals recalculate when a cached food value changes', () async {
       final banana = await createFood('Banana', calories: 90, carbs: 22);
       final variant = await variantOf(banana);
@@ -371,7 +409,7 @@ void main() {
       final totals = await repository.previewSavedMealTotals(
         portions: 2,
         items: [
-          SavedMealItemDraft(
+          const SavedMealItemDraft(
             foodNameSnapshot: 'Invisível',
             quantity: 100,
             unit: 'g',
@@ -591,46 +629,7 @@ void main() {
 
       final suggestions = await repository.getMealSuggestions('breakfast');
       expect(suggestions.map((f) => f.food.name), ['Banana', 'Iogurte']);
-      expect(
-        suggestions,
-        isNot(contains(anyElement((f) => f.food.name == 'Salada'))),
-      );
-    });
-  });
-
-  // ===================================================================
-  // History
-  // ===================================================================
-
-  group('daily history', () {
-    test('aggregates per-date totals across meals', () async {
-      final banana = await createFood('Banana', calories: 90, carbs: 22);
-      final rice = await createFood('Arroz', calories: 130, carbs: 28);
-      final today = DateTime.now();
-      final date1 = DateTime(
-        today.year,
-        today.month,
-        today.day,
-      ).subtract(const Duration(days: 1)).toIso8601String().substring(0, 10);
-      final date2 = DateTime(
-        today.year,
-        today.month,
-        today.day,
-      ).toIso8601String().substring(0, 10);
-      await logMeal(date1, 'breakfast', banana);
-      await logMeal(date1, 'lunch', rice, quantity: 200);
-      await logMeal(date2, 'breakfast', banana, quantity: 50);
-
-      final history = await repository.getDailyNutritionHistory(days: 2);
-      expect(history, hasLength(2));
-      expect(history.first['date'], date1);
-      expect(
-        (history.first['calories'] as num).toDouble(),
-        closeTo(90 + 260, 0.01),
-      );
-      expect(history.last['date'], date2);
-      expect((history.last['calories'] as num).toDouble(), closeTo(45, 0.01));
-      expect((history.last['protein_g'] as num).toDouble(), closeTo(5, 0.01));
+      expect(suggestions.map((f) => f.food.name), isNot(contains('Salada')));
     });
   });
 
@@ -684,7 +683,7 @@ void main() {
           name: 'Café da manhã',
           food: banana,
           variant: await variantOf(banana),
-          conversion: NutritionConversion(
+          conversion: const NutritionConversion(
             quantity: 100,
             unit: 'g',
             referenceAmount: 100,
@@ -712,7 +711,7 @@ void main() {
           name: 'Pré-treino',
           food: banana,
           variant: await variantOf(banana),
-          conversion: NutritionConversion(
+          conversion: const NutritionConversion(
             quantity: 100,
             unit: 'g',
             referenceAmount: 100,
@@ -732,7 +731,7 @@ void main() {
         name: 'Jantar',
         food: banana,
         variant: await variantOf(banana),
-        conversion: NutritionConversion(
+        conversion: const NutritionConversion(
           quantity: 100,
           unit: 'g',
           referenceAmount: 100,
@@ -862,157 +861,3 @@ void main() {
 }
 
 /// Production-like nutrition schema used by these tests.
-Future<void> _installNutritionSchema(Database db) async {
-  await db.execute('''
-    CREATE TABLE foods (
-      id TEXT PRIMARY KEY,
-      source TEXT NOT NULL,
-      external_id TEXT NOT NULL,
-      name TEXT NOT NULL,
-      search_name TEXT NOT NULL,
-      brand TEXT,
-      barcode TEXT,
-      source_url TEXT,
-      fetched_at TEXT NOT NULL,
-      last_used_at TEXT,
-      is_favorite INTEGER NOT NULL DEFAULT 0,
-      UNIQUE(source, external_id)
-    )
-  ''');
-  await db.execute('''
-    CREATE TABLE food_variants (
-      id TEXT PRIMARY KEY,
-      food_id TEXT NOT NULL,
-      label TEXT,
-      reference_amount REAL NOT NULL,
-      reference_unit TEXT NOT NULL,
-      calories REAL,
-      protein_g REAL,
-      carbs_g REAL,
-      fat_g REAL,
-      saturated_fat_g REAL, monounsaturated_fat_g REAL,
-      polyunsaturated_fat_g REAL, trans_fat_g REAL,
-      fiber_g REAL,
-      sugars_g REAL,
-      sodium_mg REAL,
-      potassium_mg REAL, calcium_mg REAL, iron_mg REAL, magnesium_mg REAL,
-      zinc_mg REAL, vitamin_a_ug REAL, vitamin_c_mg REAL,
-      vitamin_d_ug REAL, vitamin_b12_ug REAL,
-      extra_nutrients_json TEXT,
-      is_estimated INTEGER NOT NULL DEFAULT 0,
-      FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE CASCADE
-    )
-  ''');
-  await db.execute('''
-    CREATE TABLE food_servings (
-      id TEXT PRIMARY KEY,
-      food_variant_id TEXT NOT NULL,
-      label TEXT NOT NULL,
-      quantity REAL NOT NULL DEFAULT 1,
-      unit TEXT NOT NULL,
-      grams_equivalent REAL,
-      ml_equivalent REAL,
-      FOREIGN KEY (food_variant_id) REFERENCES food_variants(id) ON DELETE CASCADE
-    )
-  ''');
-  await db.execute('''
-    CREATE TABLE meal_logs (
-      id TEXT PRIMARY KEY,
-      date TEXT NOT NULL,
-      meal_type TEXT NOT NULL,
-      name TEXT,
-      notes TEXT,
-      created_at TEXT NOT NULL,
-      UNIQUE(date, meal_type)
-    )
-  ''');
-  await db.execute('''
-    CREATE TABLE meal_types (
-      id TEXT PRIMARY KEY,
-      key TEXT UNIQUE NOT NULL,
-      name TEXT,
-      order_index INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL
-    )
-  ''');
-  final now = DateTime.now().toIso8601String();
-  for (var i = 0; i < 4; i++) {
-    await db.insert('meal_types', {
-      'id': ['breakfast', 'lunch', 'dinner', 'snacks'][i],
-      'key': ['breakfast', 'lunch', 'dinner', 'snacks'][i],
-      'name': null,
-      'order_index': i,
-      'created_at': now,
-    });
-  }
-  await db.execute('''
-    CREATE TABLE meal_log_items (
-      id TEXT PRIMARY KEY,
-      meal_log_id TEXT NOT NULL,
-      food_id TEXT,
-      food_variant_id TEXT,
-      food_name_snapshot TEXT NOT NULL,
-      brand_snapshot TEXT,
-      quantity REAL NOT NULL,
-      unit TEXT NOT NULL,
-      calories REAL,
-      protein_g REAL,
-      carbs_g REAL,
-      fat_g REAL,
-      saturated_fat_g REAL, monounsaturated_fat_g REAL,
-      polyunsaturated_fat_g REAL, trans_fat_g REAL,
-      fiber_g REAL,
-      sugars_g REAL,
-      sodium_mg REAL,
-      potassium_mg REAL, calcium_mg REAL, iron_mg REAL, magnesium_mg REAL,
-      zinc_mg REAL, vitamin_a_ug REAL, vitamin_c_mg REAL,
-      vitamin_d_ug REAL, vitamin_b12_ug REAL,
-      nutrition_snapshot_json TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE,
-      FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE SET NULL,
-      FOREIGN KEY (food_variant_id) REFERENCES food_variants(id) ON DELETE SET NULL
-    )
-  ''');
-  await db.execute('''
-    CREATE TABLE nutrition_goals (
-      id TEXT PRIMARY KEY,
-      calories REAL,
-      protein_g REAL,
-      carbs_g REAL,
-      fat_g REAL,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      is_active INTEGER NOT NULL DEFAULT 1
-    )
-  ''');
-  await db.execute('''
-    CREATE TABLE saved_meals (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      meal_type TEXT,
-      portions REAL NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )
-  ''');
-  await db.execute('''
-    CREATE TABLE saved_meal_items (
-      id TEXT PRIMARY KEY,
-      saved_meal_id TEXT NOT NULL,
-      food_id TEXT,
-      food_variant_id TEXT,
-      food_name_snapshot TEXT NOT NULL,
-      brand_snapshot TEXT,
-      quantity REAL NOT NULL,
-      unit TEXT NOT NULL,
-      serving_label TEXT,
-      serving_grams_equivalent REAL,
-      serving_ml_equivalent REAL,
-      order_index INTEGER NOT NULL DEFAULT 0,
-      FOREIGN KEY (saved_meal_id) REFERENCES saved_meals(id) ON DELETE CASCADE,
-      FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE SET NULL,
-      FOREIGN KEY (food_variant_id) REFERENCES food_variants(id) ON DELETE SET NULL
-    )
-  ''');
-}

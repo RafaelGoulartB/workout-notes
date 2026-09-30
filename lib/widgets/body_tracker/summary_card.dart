@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
 import 'package:workout_notes/utils/body_tracker_utils.dart';
 import 'package:workout_notes/widgets/body_tracker/body_sparkline.dart';
-import 'package:workout_notes/widgets/body_tracker_badges.dart';
+import 'package:workout_notes/widgets/body_tracker/body_tracker_badges.dart';
 
 /// Hero card showing the current value, delta, and sparkline.
 class BodySummaryCard extends StatelessWidget {

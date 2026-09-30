@@ -4,14 +4,10 @@ import android.app.Activity
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
-import android.os.Build
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.view.Gravity
 import android.view.View
-import android.view.WindowManager
-import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -23,14 +19,14 @@ class SleepEmergencyChallengeActivity : Activity() {
     private lateinit var progressBar: ProgressBar
     private lateinit var countdownView: TextView
     private lateinit var counterView: TextView
-    private lateinit var tapButton: Button
+    private lateinit var tapButton: android.widget.Button
     private var timer: CountDownTimer? = null
     private var closing = false
     private var completed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        configureLockScreen()
+        SleepAlarmUi.configureWindow(this)
         if (!SleepAlarmScheduler.beginEmergencyChallenge(this)) {
             finish()
             return
@@ -67,14 +63,12 @@ class SleepEmergencyChallengeActivity : Activity() {
     }
 
     private fun render() {
+        val snoozed = SleepAlarmScheduler.read(this)?.isSnoozed == true
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(28), dp(32), dp(28), dp(28))
-            background = GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.rgb(19, 24, 54), Color.rgb(55, 42, 92)),
-            )
+            setPadding(dp(28), dp(56), dp(28), dp(28))
+            background = SleepAlarmUi.background(ringing = !snoozed)
         }
 
         progressBar = ProgressBar(
@@ -129,20 +123,24 @@ class SleepEmergencyChallengeActivity : Activity() {
         }
         root.addView(counterView)
 
-        tapButton = Button(this).apply {
-            textSize = 18f
-            isAllCaps = false
-            setTextColor(Color.rgb(35, 31, 63))
-            backgroundTintList = ColorStateList.valueOf(Color.rgb(226, 222, 255))
-            setOnClickListener { onEmergencyTap() }
-        }
+        tapButton = SleepAlarmUi.pillButton(
+            this,
+            getString(R.string.sleep_alarm_emergency_tap_button),
+            filled = true,
+        ) { onEmergencyTap() }
         root.addView(tapButton, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            dp(68),
+            dp(76),
         ).apply { topMargin = dp(20) })
 
         root.addView(TextView(this).apply {
-            text = getString(R.string.sleep_alarm_emergency_cancel_hint)
+            text = getString(
+                if (snoozed) {
+                    R.string.sleep_alarm_emergency_cancel_hint_snoozed
+                } else {
+                    R.string.sleep_alarm_emergency_cancel_hint
+                },
+            )
             textSize = 13f
             gravity = Gravity.CENTER
             setTextColor(Color.rgb(185, 181, 209))
@@ -216,22 +214,6 @@ class SleepEmergencyChallengeActivity : Activity() {
 
     private fun abortChallenge() {
         timeoutChallenge()
-    }
-
-    private fun configureLockScreen() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
-        } else {
-            @Suppress("DEPRECATION")
-            window.addFlags(
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
-            )
-        }
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        window.statusBarColor = Color.rgb(16, 18, 38)
-        window.navigationBarColor = Color.rgb(16, 18, 38)
     }
 
     private fun margins(top: Int = 0): LinearLayout.LayoutParams =

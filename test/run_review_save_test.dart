@@ -7,6 +7,8 @@ import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
+import 'support/run_plan_fixtures.dart';
+import 'support/test_db.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -14,10 +16,7 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   late Database database;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -51,7 +50,7 @@ void main() {
       weekIndex: 0,
       name: 'Rodagem',
     );
-    final scheduled = await planRepository.scheduleRun(
+    final scheduled = await scheduleRunFixture(planRepository, 
       date: DateTime(2026, 8, 25),
       runPlanId: plan.id,
       runPlanWorkoutId: workout.id,
