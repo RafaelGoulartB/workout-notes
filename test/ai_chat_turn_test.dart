@@ -9,6 +9,7 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/ai_chat_message.dart';
 import 'package:workout_notes/models/ai_message_role.dart';
 import 'package:workout_notes/models/ai_proposal.dart';
+import 'package:workout_notes/models/ai_tool_call.dart';
 import 'package:workout_notes/models/ai_tool_domain.dart';
 import 'package:workout_notes/repositories/ai_memory_repository.dart';
 import 'package:workout_notes/services/ai_context_service.dart';
@@ -168,8 +169,8 @@ void main() {
     expect(messages.last.content, 'Resposta final.');
   });
 
-  test('reasoning extras are echoed inside the turn and dropped after it; '
-      'tool-call signatures are kept', () async {
+  test('reasoning extras and tool-call signatures are echoed inside the turn '
+      'and dropped after it', () async {
     var turn = 0;
     await setUpChat(
       script: (p) {
@@ -208,7 +209,10 @@ void main() {
     );
     final nextTurn = assistantWithCalls(provider.payloads[2]);
     expect(nextTurn, isNot(contains('reasoning_content')));
-    expect((nextTurn['tool_calls'] as List).first, contains('extra_content'));
+    expect(
+      (nextTurn['tool_calls'] as List).first,
+      isNot(contains('extra_content')),
+    );
   });
 
   test('history before the current message is byte-identical across turns '
@@ -432,6 +436,95 @@ void main() {
     },
   );
 
+  test('stubbing old tool results without a summary cut is saved, so the '
+      'next turn sends the same prefix', () async {
+    var summaries = 0;
+    await setUpChat(
+      script: (p) {
+        final system = '${((p['messages'] as List).first as Map)['content']}';
+        if (system.startsWith('You maintain')) {
+          summaries++;
+          return _Reply.text('resumo', stream: false);
+        }
+        return _Reply.text('ok');
+      },
+    );
+    final repo = DatabaseHelper.instance.aiChatRepo;
+    await repo.upsertAiChatThread(
+      id: 't',
+      title: 'T',
+      createdAt: DateTime(2026, 9, 1),
+      updatedAt: DateTime(2026, 9, 1),
+    );
+    final big = '{"ok":true,"data":{"t":"${'x' * 11500}"}}';
+    final rows = <Map<String, dynamic>>[];
+    for (var i = 0; i < 4; i++) {
+      final at = DateTime(2026, 9, 1, 8, i);
+      rows.addAll([
+        AiChatMessage(
+          id: 'u$i',
+          threadId: 't',
+          role: AiMessageRole.user,
+          content: 'q$i',
+          createdAt: at,
+        ).toRow(),
+        AiChatMessage(
+          id: 'a$i',
+          threadId: 't',
+          role: AiMessageRole.assistant,
+          toolCalls: [
+            AiToolCall(id: 'c${i}a', name: 'get_sleep', arguments: const {}),
+            AiToolCall(
+              id: 'c${i}b',
+              name: 'get_nutrition',
+              arguments: const {},
+            ),
+          ],
+          createdAt: at.add(const Duration(seconds: 1)),
+        ).toRow(),
+        for (final suffix in ['a', 'b'])
+          AiChatMessage(
+            id: 'r$i$suffix',
+            threadId: 't',
+            role: AiMessageRole.tool,
+            toolCallId: 'c$i$suffix',
+            toolName: 'get_sleep',
+            content: big,
+            createdAt: at.add(const Duration(seconds: 2)),
+          ).toRow(),
+        AiChatMessage(
+          id: 'f$i',
+          threadId: 't',
+          role: AiMessageRole.assistant,
+          content: 'a$i',
+          createdAt: at.add(const Duration(seconds: 3)),
+        ).toRow(),
+      ]);
+    }
+    await repo.upsertAiChatMessages('t', rows);
+    await chat.openThread('t');
+
+    await chat.send('nova');
+    await idle();
+    expect(summaries, 0, reason: 'stubs alone were enough');
+    final saved = await repo.getAiChatThreadSummary('t');
+    expect(saved?['through_message_id'], '');
+    expect(saved?['tools_through_message_id'], isNotNull);
+
+    await chat.send('outra');
+    await idle();
+    final a = (provider.payloads[0]['messages'] as List).cast<Map>();
+    final b = (provider.payloads[1]['messages'] as List).cast<Map>();
+    expect(
+      jsonEncode(b.take(a.length - 1).toList()),
+      jsonEncode(a.take(a.length - 1).toList()),
+    );
+    final stubs = a.where(
+      (m) => m['role'] == 'tool' && '${m['content']}'.contains('omitted'),
+    );
+    expect(stubs, isNotEmpty);
+  });
+
   test('a context-length error folds history away and retries once', () async {
     var calls = 0;
     await setUpChat(
@@ -559,12 +652,84 @@ void main() {
     );
   });
 
+  test('a failed proposal is final: no retry offered, approving again adds '
+      'no duplicate event', () async {
+    final proposals = _FakeProposals()..approveTo = AiProposalStatus.failed;
+    await setUpChat(
+      proposals: proposals,
+      script: (p) => _toolMessages(p).isEmpty
+          ? _Reply.tools([
+              _call('p1', 'propose_body_measurement', {'weight': 80}),
+            ])
+          : _Reply.text('Prévia pronta.'),
+    );
+    await chat.send('Registre 80 kg');
+    await idle();
+
+    await chat.approveProposal('prop-1');
+    expect(chat.state.proposals.single.status, AiProposalStatus.failed);
+    expect(chat.state.error, 'ai_error:proposal_apply_failed');
+    expect(chat.state.errorAction.name, 'none');
+
+    await chat.approveProposal('prop-1');
+    await chat.rejectProposal('prop-1');
+    final events = chat.state.messages.where((m) => m.isEvent).toList();
+    expect(events, hasLength(1));
+  });
+
   test('consent is required before the first message', () async {
     await setUpChat();
     await settings.setDataSharingAccepted(false);
     expect(await chat.send('oi'), isFalse);
     expect(chat.state.error, 'ai_error:consent_required');
     expect(provider.payloads, isEmpty);
+  });
+
+  test('repeated or missing tool-call ids are made unique, so results and '
+      'proposals never pair with an older call', () async {
+    var round = 0;
+    await setUpChat(
+      script: (p) {
+        round++;
+        if (round <= 3) {
+          // A server that reuses "call_0" every round.
+          return _Reply.tools([
+            _call('call_0', 'get_sleep', {'days': round}),
+          ]);
+        }
+        if (round == 4) return _Reply.text('ok');
+        // Next turn: a server that sends no id at all.
+        if (round <= 6) {
+          return _Reply.tools([
+            {
+              ..._call('', 'get_sleep', {'days': 10 + round}),
+            }..remove('id'),
+          ]);
+        }
+        return _Reply.text('ok');
+      },
+    );
+    await chat.send('um');
+    await idle();
+    await chat.send('dois');
+    await idle();
+
+    final messages = await stored(chat.state.activeThreadId!);
+    final ids = [
+      for (final m in messages)
+        for (final c in m.toolCalls) c.id,
+    ];
+    expect(ids, hasLength(5));
+    expect(ids.toSet(), hasLength(5), reason: 'ids: $ids');
+    // Each result belongs to its own call (days 1, 2, 3, 15, 16).
+    final days = [
+      for (final m in messages)
+        if (m.isTool) ((jsonDecode(m.content!) as Map)['data'] as Map)['days'],
+    ];
+    expect(days, [1, 2, 3, 15, 16]);
+    for (final m in messages.where((m) => m.isTool)) {
+      expect(ids, contains(m.toolCallId));
+    }
   });
 
   test('a switched-off domain cannot be read or proposed by calling its tool '
@@ -819,6 +984,7 @@ class _FakeContext extends AiContextService {
 
 class _FakeProposals extends AiProposalService {
   AiProposal? _proposal;
+  AiProposalStatus approveTo = AiProposalStatus.applied;
 
   @override
   List<AiToolSpec> toolSpecs() => [
@@ -867,8 +1033,13 @@ class _FakeProposals extends AiProposalService {
       AiProposalApplyMode.transactional;
 
   @override
-  Future<AiProposal> approve(String id) async =>
-      _proposal = _proposal!.copyWith(status: AiProposalStatus.applied);
+  Future<AiProposal> approve(String id) async {
+    if (!_proposal!.isPending) return _proposal!;
+    return _proposal = _proposal!.copyWith(
+      status: approveTo,
+      errorCode: approveTo == AiProposalStatus.failed ? 'apply_failed' : null,
+    );
+  }
 
   @override
   Future<AiProposal> reject(String id) async =>

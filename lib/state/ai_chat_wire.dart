@@ -65,7 +65,11 @@ extension AiChatWire on AiChatService {
       {'role': 'system', 'content': system.toString()},
     ];
 
-    var stubbing = history.toolsThroughMessageId != null;
+    // A boundary that is not in the window (deleted by a retry) stubs
+    // nothing rather than everything.
+    var stubbing =
+        history.toolsThroughMessageId != null &&
+        history.messages.any((m) => m.id == history.toolsThroughMessageId);
     final historyWire = <Map<String, dynamic>>[];
     for (final m in history.messages) {
       historyWire.addAll(
@@ -149,7 +153,9 @@ extension AiChatWire on AiChatService {
         final text = m.content;
         entry['content'] = (text == null || text.isEmpty) ? null : text;
         if (m.toolCalls.isNotEmpty) {
-          entry['tool_calls'] = m.toolCalls.map((c) => c.toJson()).toList();
+          entry['tool_calls'] = [
+            for (final c in m.toolCalls) c.toJson(includeExtras: currentTurn),
+          ];
         }
         if (currentTurn) {
           for (final extra in m.providerExtras.entries) {

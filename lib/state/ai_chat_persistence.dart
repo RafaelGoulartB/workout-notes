@@ -142,9 +142,13 @@ extension _AiChatPersistence on AiChatService {
   /// describes messages that no longer exist, so it is dropped.
   Future<void> _resetSummaryIfCutDeleted(String threadId) async {
     final row = await _db.aiChatRepo.getAiChatThreadSummary(threadId);
-    final cut = row?['through_message_id'] as String?;
-    if (cut == null) return;
-    if (!await _db.aiChatRepo.messageExists(cut)) {
+    if (row == null) return;
+    final cut = row['through_message_id'] as String? ?? '';
+    final tools = row['tools_through_message_id'] as String?;
+    final cutGone = cut.isNotEmpty && !await _db.aiChatRepo.messageExists(cut);
+    final toolsGone =
+        tools != null && !await _db.aiChatRepo.messageExists(tools);
+    if (cutGone || toolsGone) {
       await _db.aiChatRepo.deleteAiChatThreadSummary(threadId);
     }
   }

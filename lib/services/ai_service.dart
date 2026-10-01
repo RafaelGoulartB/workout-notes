@@ -388,7 +388,9 @@ class AiService {
 
       if (res.statusCode >= 400) {
         final body = await _readBody(res, abort);
-        final adjustment = res.statusCode == 401 || res.statusCode == 404
+        // Only a request the provider refused as invalid (400/422) teaches a
+        // compatibility flag; outages and auth errors never do.
+        final adjustment = res.statusCode != 400 && res.statusCode != 422
             ? null
             : _applyCompatibilityAdjustment(
                 responseBody: body,
@@ -802,9 +804,7 @@ class AiService {
         if (raw is Map) {
           final parsed = AiToolCall.fromJson(raw.cast<String, dynamic>());
           calls.add(
-            parsed.id.isEmpty
-                ? parsed.withId('call_${calls.length + 1}')
-                : parsed,
+            parsed.id.isEmpty ? parsed.withId(_fallbackCallId()) : parsed,
           );
         }
       }
@@ -843,8 +843,7 @@ class AiService {
           case 'function_call':
             calls.add(
               AiToolCall.fromJson({
-                'id':
-                    item['call_id'] ?? item['id'] ?? 'call_${calls.length + 1}',
+                'id': item['call_id'] ?? item['id'] ?? _fallbackCallId(),
                 'type': 'function',
                 'function': {
                   'name': item['name'] ?? '',
@@ -1122,9 +1121,7 @@ class AiService {
       if (call.name.isEmpty) continue;
       final parsed = AiToolCall.fromJson(call.toJson());
       parsedCalls.add(
-        parsed.id.isEmpty
-            ? parsed.withId('call_${parsedCalls.length + 1}')
-            : parsed,
+        parsed.id.isEmpty ? parsed.withId(_fallbackCallId()) : parsed,
       );
     }
     final rawText = text.isEmpty ? null : text.toString();
@@ -1275,8 +1272,14 @@ class AiService {
     }
   }
 
+  /// [parameter] as a whole word (`stream` does not match `upstream` or
+  /// `stream_options`).
+  static bool _mentions(String error, String parameter) => RegExp(
+    '(^|[^a-z0-9_.])${RegExp.escape(parameter)}(\$|[^a-z0-9_])',
+  ).hasMatch(error);
+
   static bool _rejects(String error, String parameter) =>
-      error.contains(parameter) &&
+      _mentions(error, parameter) &&
       (error.contains('unsupported') ||
           error.contains('not supported') ||
           error.contains('unknown') ||
@@ -1304,7 +1307,10 @@ class AiService {
         (error.contains('reasoning') && error.contains('effort'));
     final reasoningUnsupported =
         mentionsReasoningEffort &&
-        (_rejects(error, 'reasoning') || _rejects(error, 'effort'));
+        (_rejects(error, 'reasoning_effort') ||
+            _rejects(error, 'reasoning.effort') ||
+            _rejects(error, 'reasoning') ||
+            _rejects(error, 'effort'));
     if (reasoningUnsupported &&
         (sentPayload.containsKey('reasoning_effort') ||
             sentPayload.containsKey('reasoning')) &&
@@ -1341,7 +1347,7 @@ class AiService {
       }
     }
     if (sentPayload.containsKey('stream_options') &&
-        error.contains('stream_options') &&
+        _mentions(error, 'stream_options') &&
         !compatibility.omitStreamOptions) {
       return learn(
         true,
@@ -1359,7 +1365,7 @@ class AiService {
       );
     }
     if (sentPayload.containsKey('prompt_cache_key') &&
-        error.contains('prompt_cache_key')) {
+        _mentions(error, 'prompt_cache_key')) {
       return learn(
         !compatibility.omitCacheKey,
         () => compatibility.omitCacheKey = true,
@@ -1367,7 +1373,7 @@ class AiService {
       );
     }
     if (sentPayload.containsKey('cache_control') &&
-        error.contains('cache_control')) {
+        _mentions(error, 'cache_control')) {
       return learn(
         !compatibility.omitCacheControl,
         () => compatibility.omitCacheControl = true,
@@ -1384,7 +1390,8 @@ class AiService {
         'max tokens omitted',
       );
     }
-    if (sentPayload.containsKey('include') && error.contains('include')) {
+    if (sentPayload.containsKey('include') &&
+        (error.contains('encrypted_content') || _rejects(error, 'include'))) {
       return learn(
         !compatibility.omitReasoningInclude,
         () => compatibility.omitReasoningInclude = true,
@@ -1520,6 +1527,16 @@ class AiService {
     }
     return null;
   }
+
+  static int _fallbackCallCounter = 0;
+
+  /// Id for a tool call the provider sent without one. Unique across
+  /// rounds, turns and launches: proposals and same-turn result reuse are
+  /// keyed by tool-call id, so `call_1` coming back every round would make a
+  /// new proposal reuse an old one and pair results with the wrong call.
+  static String _fallbackCallId() =>
+      'call_gen_${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
+      '_${(_fallbackCallCounter++).toRadixString(36)}';
 
   static String _truncate(String s) =>
       s.length > 300 ? '${s.substring(0, 300)}…' : s;

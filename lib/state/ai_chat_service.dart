@@ -142,6 +142,7 @@ class AiChatService extends ChangeNotifier {
     _state = const AiChatState();
     _persistedMessages.clear();
     _schemaCache.clear();
+    _tokenScale = 1.0;
     _toolsInstance = null;
     _isReady = false;
     _readyFuture = null;
@@ -499,22 +500,32 @@ class AiChatService extends ChangeNotifier {
     if (_state.busyProposalIds.contains(proposalId)) return;
     _setProposalBusy(proposalId, true);
     try {
+      final before = await _proposals.get(proposalId);
+      if (before == null || !before.isPending) {
+        // Already resolved (applied, rejected, failed, stale…): nothing to
+        // apply again and no new event; just show its real state.
+        if (before != null) _replaceProposal(before);
+        if (_state.errorProposalId == proposalId) {
+          _state = _state.copyWith(clearError: true);
+        }
+        return;
+      }
       final proposal = await _proposals.approve(proposalId);
       _replaceProposal(proposal);
       if (proposal.status != AiProposalStatus.awaiting) {
         await _appendProposalEvent(proposal);
       }
       if (proposal.status == AiProposalStatus.failed) {
-        _setError(
-          'ai_error:proposal_${proposal.errorCode ?? 'failed'}',
-          action: AiErrorAction.retryProposal,
-          proposalId: proposalId,
-        );
+        // Terminal: the apply was rolled back and the proposal cannot run
+        // again. No retry; the user can ask the coach for a new one.
+        _setError('ai_error:proposal_${proposal.errorCode ?? 'failed'}');
       } else if (_state.errorProposalId == proposalId) {
         _state = _state.copyWith(clearError: true);
       }
       _context.invalidate();
     } catch (error) {
+      // The approval itself broke (nothing committed): the proposal is still
+      // awaiting, so approving again is meaningful.
       _setError(
         'ai_error:proposal_failed',
         action: AiErrorAction.retryProposal,
@@ -530,6 +541,11 @@ class AiChatService extends ChangeNotifier {
     if (_state.busyProposalIds.contains(proposalId)) return;
     _setProposalBusy(proposalId, true);
     try {
+      final before = await _proposals.get(proposalId);
+      if (before == null || !before.isPending) {
+        if (before != null) _replaceProposal(before);
+        return;
+      }
       final proposal = await _proposals.reject(proposalId);
       _replaceProposal(proposal);
       await _appendProposalEvent(proposal);
@@ -546,6 +562,11 @@ class AiChatService extends ChangeNotifier {
     Map<String, dynamic>? result,
   }) async {
     try {
+      final before = await _proposals.get(proposalId);
+      if (before == null || !before.isPending) {
+        if (before != null) _replaceProposal(before);
+        return;
+      }
       final proposal = await _proposals.markApplied(proposalId, result: result);
       _replaceProposal(proposal);
       await _appendProposalEvent(proposal);

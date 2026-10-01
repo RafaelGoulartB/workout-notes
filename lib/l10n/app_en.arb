@@ -128,8 +128,6 @@
   "commonCharts": "Charts",
   "commonMoreOptions": "More options",
   "commonSeconds": "Seconds",
-  "commonDays": "Days",
-  "commonDay": "Day",
   "commonInvalidValue": "Invalid value",
   "commonReorderError": "Could not reorder: {error}",
   "@commonReorderError": {"placeholders": {"error": {"type": "String"}}},

@@ -273,9 +273,13 @@ void main() {
   ) async {
     final h = await start(tester);
     await show(tester);
+    await send(tester, 'First question');
+    await idle(tester);
+    await tester.enterText(find.byType(TextField), 'Blocked question');
+    await tester.pump();
     await tester.runAsync(() async {
       await h.settings.setDataSharingAccepted(false);
-      await h.chat.send('Hello');
+      await h.chat.send('Blocked question');
     });
     await tester.pump();
     expect(
@@ -287,7 +291,9 @@ void main() {
     await tester.tap(find.byTooltip('Retry'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Agree and send'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await until(tester, () => h.provider.payloads.length == 2, reason: 'sent');
+    await idle(tester);
     expect(h.settings.settings.dataSharingAccepted, isTrue);
     expect(
       find.text(
@@ -295,6 +301,14 @@ void main() {
       ),
       findsNothing,
     );
+    // The blocked text is what goes out; the earlier exchange is untouched.
+    final last = (h.provider.payloads.last['messages'] as List).last as Map;
+    expect('${last['content']}', endsWith('Blocked question'));
+    final users = [
+      for (final m in h.chat.state.messages)
+        if (m.isUser) m.content,
+    ];
+    expect(users, ['First question', 'Blocked question']);
   });
 
   testWidgets('a saved memory shows a line with undo, and undo is recorded', (

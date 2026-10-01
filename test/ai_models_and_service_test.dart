@@ -294,6 +294,35 @@ void main() {
       expect(notifier.systemMessage, isNot(contains('# The user')));
     });
 
+    test(
+      'consent: decided once on first launch and never re-derived',
+      () async {
+        // New user: no provider on first launch, adds one, restarts.
+        SharedPreferences.setMockInitialValues({});
+        var prefs = await SharedPreferences.getInstance();
+        var notifier = AiSettingsNotifier(prefs: prefs);
+        await notifier.load();
+        expect(notifier.settings.dataSharingAccepted, isFalse);
+        await notifier.addProvider(name: 'P', baseUrl: 'https://p.test');
+        notifier = AiSettingsNotifier(prefs: prefs);
+        await notifier.load();
+        expect(notifier.settings.dataSharingAccepted, isFalse);
+
+        // Upgrade from the previous coach with a provider already configured.
+        SharedPreferences.setMockInitialValues({
+          'ai_providers_v1':
+              '[{"id":"a","name":"A","baseUrl":"https://a.test/v1",'
+              '"availableModels":[],"selectedModel":"m",'
+              '"createdAt":"2026-01-01T00:00:00.000"}]',
+        });
+        prefs = await SharedPreferences.getInstance();
+        notifier = AiSettingsNotifier(prefs: prefs);
+        await notifier.load();
+        expect(notifier.settings.dataSharingAccepted, isTrue);
+        expect(prefs.getBool('ai_data_sharing_accepted_v1'), isTrue);
+      },
+    );
+
     test('a short custom prompt survives reloads', () async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
@@ -690,6 +719,55 @@ void main() {
       expect(client.payloads[2], isNot(contains('reasoning_effort')));
     });
 
+    test(
+      'only 400/422 refusals that name the parameter teach a flag',
+      () async {
+        final client = _SequenceHttpClient([
+          // An outage mentioning "upstream" and "include" teaches nothing.
+          const _HttpReply(
+            503,
+            '{"error":{"message":"upstream invalid: include retry later"}}',
+          ),
+          const _HttpReply(200, '{"choices":[{"message":{"content":"ok"}}]}'),
+          // A 400 whose text merely contains "upstream" is not about stream.
+          const _HttpReply(
+            400,
+            '{"error":{"message":"invalid upstream response"}}',
+          ),
+          const _HttpReply(200, 'data: [DONE]\n\n'),
+        ]);
+        final service = AiService(client: client, delay: (_) async {});
+        await service.sendChat(
+          baseUrl: 'https://example.test/v1',
+          token: 't',
+          model: 'm',
+          messages: const [
+            {'role': 'user', 'content': 'oi'},
+          ],
+        );
+        expect(
+          service.compatibilityAdjustments('https://example.test/v1', 'm'),
+          isEmpty,
+        );
+        await expectLater(
+          service.sendChat(
+            baseUrl: 'https://example.test/v1',
+            token: 't',
+            model: 'm',
+            stream: true,
+            messages: const [
+              {'role': 'user', 'content': 'oi'},
+            ],
+          ),
+          throwsA(isA<AiServiceException>()),
+        );
+        expect(
+          service.compatibilityAdjustments('https://example.test/v1', 'm'),
+          isEmpty,
+        );
+      },
+    );
+
     test('retries transient upstream 503 failures', () async {
       final client = _SequenceHttpClient([
         const _HttpReply(
@@ -813,7 +891,7 @@ void main() {
         ],
       );
 
-      expect(completion.toolCalls.single.id, 'call_1');
+      expect(completion.toolCalls.single.id, startsWith('call_gen_'));
       expect(
         completion.toolCalls.single.arguments['name'],
         'Pão francês médio',

@@ -244,8 +244,9 @@ extension AiChatTurn on AiChatService {
   Future<void> _runToolStep(
     _TurnContext ctx,
     AiChatCompletion completion,
-    List<AiToolCall> calls,
+    List<AiToolCall> providerCalls,
   ) async {
+    final calls = await _uniqueCallIds(ctx, providerCalls);
     final assistant = AiChatMessage(
       id: _uuid.v4(),
       threadId: ctx.threadId,
@@ -376,6 +377,31 @@ extension AiChatTurn on AiChatService {
     }
   }
 
+  /// Tool-call ids must be unique in a conversation: results, proposals and
+  /// cards are paired by id. Some servers reuse ids (`call_0` every round);
+  /// a repeated or empty id is renamed, consistently on the assistant message
+  /// and its result.
+  Future<List<AiToolCall>> _uniqueCallIds(
+    _TurnContext ctx,
+    List<AiToolCall> calls,
+  ) async {
+    final seen = <String>{
+      for (final m in ctx.messages) ...[for (final c in m.toolCalls) c.id],
+    };
+    final out = <AiToolCall>[];
+    for (final call in calls) {
+      var id = call.id;
+      if (id.isEmpty ||
+          seen.contains(id) ||
+          await _db.aiChatRepo.toolCallIdExists(ctx.threadId, id)) {
+        id = 'call_${_uuid.v4().replaceAll('-', '').substring(0, 20)}';
+      }
+      seen.add(id);
+      out.add(id == call.id ? call : call.withId(id));
+    }
+    return out;
+  }
+
   bool _isSequentialTool(String name) =>
       _proposals.handles(name) || _memory.handles(name);
 
@@ -456,7 +482,7 @@ extension AiChatTurn on AiChatService {
     final summaryRow = await _db.aiChatRepo.getAiChatThreadSummary(threadId);
     String? cutCreatedAt;
     final cutId = summaryRow?['through_message_id'] as String?;
-    if (cutId != null) {
+    if (cutId != null && cutId.isNotEmpty) {
       final cutRow = await _db.aiChatRepo.getAiChatMessage(cutId);
       cutCreatedAt = cutRow?['created_at'] as String?;
     }
@@ -508,7 +534,9 @@ extension AiChatTurn on AiChatService {
     }
 
     var total = 0;
-    var stubbing = history.toolsThroughMessageId != null;
+    var stubbing =
+        history.toolsThroughMessageId != null &&
+        history.messages.any((m) => m.id == history.toolsThroughMessageId);
     for (final turn in turns) {
       total += turnTokens(turn, stub: stubbing);
       if (stubbing && turn.any((m) => m.id == history.toolsThroughMessageId)) {
@@ -543,11 +571,15 @@ extension AiChatTurn on AiChatService {
     final toolsThrough = keptTurns.length >= 3
         ? keptTurns[keptTurns.length - 3].last.id
         : null;
-    if (cutId != null) {
+    // Saved even when nothing was folded away (only the tool results were
+    // stubbed): the boundary must be the same on the next turns or the
+    // history prefix changes and the provider cache misses. An empty cut
+    // means "no summary cut yet".
+    if (cutId != null || toolsThrough != null) {
       await _db.aiChatRepo.upsertAiChatThreadSummary(
         threadId: ctx.threadId,
         summary: summary ?? '',
-        throughMessageId: cutId,
+        throughMessageId: cutId ?? '',
         toolsThroughMessageId: toolsThrough,
       );
       // Payloads before the cut are never sent again: stop storing them.

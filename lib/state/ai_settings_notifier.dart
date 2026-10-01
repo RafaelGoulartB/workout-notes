@@ -103,17 +103,26 @@ class AiSettingsNotifier extends ChangeNotifier {
         for (final domain in AiToolDomain.values)
           if (!disabled.contains(domain)) domain,
       },
-      dataSharingAccepted:
-          prefs.getBool(_kPrefsDataSharingAccepted) ??
-          // Users of the previous coach already sent data with a configured
-          // provider; they are not interrupted by the first-use notice.
-          providers.isNotEmpty,
+      dataSharingAccepted: await _loadDataSharingAccepted(providers),
       developerMode: prefs.getBool(_kPrefsDeveloperMode) ?? false,
     );
 
     await _migrateLegacyToken(providers);
     _loaded = true;
     notifyListeners();
+  }
+
+  /// Whether the user accepted sending data to the provider. Decided once and
+  /// stored on the first launch of this version: someone who already had a
+  /// provider configured was using the previous coach (and its data sharing),
+  /// so they are not interrupted; everyone else, including a new user who
+  /// adds a provider later, sees the notice before their first message.
+  Future<bool> _loadDataSharingAccepted(List<AiProvider> providers) async {
+    final stored = prefs.getBool(_kPrefsDataSharingAccepted);
+    if (stored != null) return stored;
+    final upgraded = providers.isNotEmpty;
+    await prefs.setBool(_kPrefsDataSharingAccepted, upgraded);
+    return upgraded;
   }
 
   /// Custom instructions, migrating the v1 "whole prompt" setting: a stored

@@ -121,8 +121,6 @@
   "commonCharts": "Gráficos",
   "commonMoreOptions": "Mais opções",
   "commonSeconds": "Segundos",
-  "commonDays": "Dias",
-  "commonDay": "Dia",
   "commonInvalidValue": "Valor inválido",
   "commonReorderError": "Erro ao reordenar: {error}",
   "@commonReorderError": {"placeholders": {"error": {"type": "String"}}},

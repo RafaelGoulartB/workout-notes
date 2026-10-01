@@ -215,7 +215,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
       if (!accepted || !mounted) return;
       await _settings.setDataSharingAccepted(true);
       service.dismissError();
-      await service.retryLastTurn();
+      // Nothing was sent: the blocked text and images are still in the
+      // composer, so send them now (never re-run an older message).
+      if (!mounted) return;
+      if (_controller.text.trim().isNotEmpty || _pendingImages.isNotEmpty) {
+        await _send();
+      }
       return;
     }
     switch (state.errorAction) {

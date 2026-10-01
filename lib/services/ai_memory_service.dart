@@ -260,11 +260,21 @@ class AiMemoryService extends ChangeNotifier {
 
   static String _short(String id) => id.length <= 8 ? id : id.substring(0, 8);
 
+  /// The memory [id] names: an exact id, or the 8-character short id shown
+  /// in `<memory>`. A prefix must be at least 6 characters and match exactly
+  /// one entry; anything else (empty, truncated, ambiguous) matches nothing,
+  /// because these tools change memory without an approval step.
   static AiMemory? _find(List<AiMemory> memories, String id) {
-    final needle = id.trim().replaceAll(RegExp(r'^\[|\]$'), '');
+    final needle = id.trim().replaceAll(RegExp(r'^\[|\]$'), '').trim();
+    if (needle.isEmpty) return null;
     for (final memory in memories) {
-      if (memory.id == needle || memory.id.startsWith(needle)) return memory;
+      if (memory.id == needle) return memory;
     }
-    return null;
+    if (needle.length < 6) return null;
+    final matches = [
+      for (final memory in memories)
+        if (memory.id.startsWith(needle)) memory,
+    ];
+    return matches.length == 1 ? matches.single : null;
   }
 }

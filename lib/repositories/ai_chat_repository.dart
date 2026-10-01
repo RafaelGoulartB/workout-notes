@@ -272,6 +272,19 @@ class AiChatRepository extends BaseRepository {
     return rows.isEmpty ? null : rows.first;
   }
 
+  /// Whether a tool result for [toolCallId] is already stored in [threadId].
+  Future<bool> toolCallIdExists(String threadId, String toolCallId) async {
+    final db = await this.db;
+    final rows = await db.query(
+      'ai_chat_messages',
+      columns: ['id'],
+      where: 'thread_id = ? AND tool_call_id = ?',
+      whereArgs: [threadId, toolCallId],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
   Future<bool> messageExists(String id) async {
     final db = await this.db;
     final rows = await db.query(
