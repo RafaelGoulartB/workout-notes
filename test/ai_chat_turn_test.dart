@@ -567,6 +567,42 @@ void main() {
     expect(provider.payloads, isEmpty);
   });
 
+  test('a switched-off domain cannot be read or proposed by calling its tool '
+      'by name', () async {
+    _FakeRegistry.executed.clear();
+    final proposals = _FakeProposals();
+    await setUpChat(
+      proposals: proposals,
+      script: (p) => _toolMessages(p).isEmpty
+          ? _Reply.tools([
+              _call('s1', 'get_sleep', {'days': 7}),
+              _call('n1', 'get_nutrition', {'days': 7}),
+              _call('b1', 'propose_body_measurement', {'weight': 80}),
+            ])
+          : _Reply.text('ok'),
+    );
+    await settings.setDomainEnabled(AiToolDomain.sleep, false);
+    await settings.setDomainEnabled(AiToolDomain.body, false);
+    await chat.send('Como dormi? E registre 80 kg');
+    await idle();
+
+    expect(_FakeRegistry.executed, ['get_nutrition']);
+    expect(chat.state.proposals, isEmpty);
+    final results = {
+      for (final m in await stored(chat.state.activeThreadId!))
+        if (m.isTool) m.toolName: jsonDecode(m.content!) as Map,
+    };
+    expect(results['get_sleep']!['code'], 'tool_not_available');
+    expect(results['propose_body_measurement']!['code'], 'tool_not_available');
+    expect(results['get_nutrition']!['ok'], isTrue);
+    final tools = [
+      for (final t in provider.payloads.first['tools'] as List)
+        ((t as Map)['function'] as Map)['name'],
+    ];
+    expect(tools, isNot(contains('get_sleep')));
+    expect(tools, isNot(contains('propose_body_measurement')));
+  });
+
   test('disabled domains leave the catalog', () async {
     await setUpChat();
     final all = chat.toolCatalogChars();
@@ -743,6 +779,8 @@ class _Provider extends http.BaseClient {
 // =============================================================================
 
 class _FakeRegistry extends AiToolRegistry {
+  static final List<String> executed = [];
+
   @override
   List<Map<String, dynamic>> readToolsSchema({Set<AiToolDomain>? domains}) => [
     for (final (name, domain) in const [
@@ -764,8 +802,13 @@ class _FakeRegistry extends AiToolRegistry {
   Future<AiToolResult> executeRead({
     required String toolName,
     required Map<String, dynamic> args,
-  }) async =>
-      AiToolResult(ok: true, data: {'tool': toolName, 'days': args['days']});
+  }) async {
+    executed.add(toolName);
+    return AiToolResult(
+      ok: true,
+      data: {'tool': toolName, 'days': args['days']},
+    );
+  }
 }
 
 class _FakeContext extends AiContextService {

@@ -455,6 +455,15 @@ class RunPlanProposalHandler extends AiProposalHandler {
           .where((w) => w.id == payload['workout_id'])
           .firstOrNull;
       if (workout == null) return 'stale_target_missing';
+      // Approved late: the target weekday may have passed since the preview
+      // (a Friday move approved on Saturday). Never move a run into the past.
+      if (plan.isActivated) {
+        final target = addDays(
+          _weekStart(plan, week, today),
+          (payload['day_of_week'] as num).toInt() - 1,
+        );
+        if (target.isBefore(today)) return 'stale_date_passed';
+      }
       return _moveHash(workout, rows) == proposal.baseHash
           ? null
           : 'stale_revision';

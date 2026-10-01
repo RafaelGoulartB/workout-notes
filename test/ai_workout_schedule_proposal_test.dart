@@ -201,6 +201,23 @@ void main() {
       expect(await db.query('workouts'), isEmpty);
     });
 
+    test(
+      'editing a set of the routine day after the preview is stale',
+      () async {
+        final id = await prepareProposal(service, _tool, args());
+        await db.update(
+          'predefined_sets',
+          {'weight': 80.0},
+          where: 'id = ?',
+          whereArgs: ['ps1'],
+        );
+        final result = await service.approve(id);
+        expect(result.status, AiProposalStatus.stale);
+        expect(result.errorCode, 'stale_revision');
+        expect(await db.query('workouts'), isEmpty);
+      },
+    );
+
     test('an approval after the date passed is stale', () async {
       final id = await prepareProposal(
         service,
@@ -307,6 +324,51 @@ void main() {
       final sets = await db.query('sets');
       expect(sets, hasLength(2));
       expect(sets.where((s) => s['is_complete'] == 0), hasLength(1));
+    });
+
+    test('a copy whose source was edited after the preview is stale', () async {
+      await workout(
+        'done',
+        '2026-09-20',
+        start: '2026-09-20T08:00:00',
+        end: '2026-09-20T09:00:00',
+      );
+      final id = await prepareProposal(service, _tool, {
+        'action': 'copy',
+        'date': '2026-10-06',
+        'workout_id': 'done',
+      });
+      // The user swaps the exercise and changes the set after the preview.
+      await db.update(
+        'exercise_entries',
+        {'exercise_id': 'bench'},
+        where: 'id = ?',
+        whereArgs: ['ee-done'],
+      );
+      final swapped = await service.approve(id);
+      expect(swapped.status, AiProposalStatus.stale);
+      expect(swapped.errorCode, 'stale_revision');
+      expect(await db.query('workouts'), hasLength(1));
+
+      // A set edit alone is enough too.
+      await db.update(
+        'exercise_entries',
+        {'exercise_id': 'squat'},
+        where: 'id = ?',
+        whereArgs: ['ee-done'],
+      );
+      final second = await prepareProposal(service, _tool, {
+        'action': 'copy',
+        'date': '2026-10-07',
+        'workout_id': 'done',
+      });
+      await db.update(
+        'sets',
+        {'weight': 140.0},
+        where: 'id = ?',
+        whereArgs: ['set-done'],
+      );
+      expect((await service.approve(second)).status, AiProposalStatus.stale);
     });
 
     test('action specific arguments are enforced', () async {

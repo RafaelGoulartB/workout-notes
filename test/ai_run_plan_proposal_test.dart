@@ -327,6 +327,22 @@ void main() {
       },
     );
 
+    test(
+      'approved after the target day passed: stale, nothing moves',
+      () async {
+        // Prepared on Wednesday for Friday, approved on Saturday.
+        final id = await prepareProposal(service, _tool, move('quality2', 5));
+        clock = DateTime(2026, 10, 3, 9);
+        final result = await service.approve(id);
+        expect(result.status, AiProposalStatus.stale);
+        expect(result.errorCode, 'stale_date_passed');
+        final kept = (await reload())
+            .workoutsForWeek(2)
+            .firstWhere((w) => w.id == sessions['quality2']!.id);
+        expect(kept.dayOfWeek, 4);
+      },
+    );
+
     test('a session moved elsewhere in the meantime makes it stale', () async {
       final id = await prepareProposal(service, _tool, move('quality2', 5));
       await plans.moveWorkoutToDay(sessions['quality2']!.id, 6);

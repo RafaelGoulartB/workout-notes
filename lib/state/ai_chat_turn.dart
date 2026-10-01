@@ -280,9 +280,26 @@ extension AiChatTurn on AiChatService {
     }
 
     final results = List<AiToolResult?>.filled(calls.length, null);
+    // Only tools of the catalog this turn was offered may run: a domain the
+    // user switched off stays closed even if the model calls its tool by
+    // name (from an older turn, a summary or a guess).
+    final allowed = _allowedToolNames(ctx.setup.domains);
+    for (var i = 0; i < calls.length; i++) {
+      if (!allowed.contains(calls[i].name)) {
+        results[i] = AiToolResult(
+          ok: false,
+          code: 'tool_not_available',
+          message: 'Tool "${calls[i].name}" is not available.',
+          hint:
+              'The user switched off access to this data or the tool does '
+              'not exist. Use only the tools you were given; tell the user '
+              'if the answer needs data you cannot read.',
+        );
+      }
+    }
     await Future.wait([
       for (var i = 0; i < calls.length; i++)
-        if (!_isSequentialTool(calls[i].name))
+        if (results[i] == null && !_isSequentialTool(calls[i].name))
           () async {
             final call = calls[i];
             if (call.argumentsError != null) {

@@ -232,6 +232,12 @@ class AiChatService extends ChangeNotifier {
     }();
   }
 
+  /// Names of the tools in the catalog for [domains] (what may run).
+  Set<String> _allowedToolNames(Set<AiToolDomain> domains) => {
+    for (final tool in _toolSchema(domains).schema)
+      (tool['function'] as Map)['name'] as String,
+  };
+
   /// Arguments with sorted keys (to compare two calls).
   static Object? _sortedArgs(Object? value) {
     if (value is Map) {

@@ -137,7 +137,10 @@ class WorkoutScheduleProposalHandler extends AiProposalHandler {
           'warnings': warnings,
         },
         base: {'routine_day_id': routineDayId},
-        baseHash: aiRevision({'day': routineDayId, 'exercises': exercises}),
+        baseHash: aiRevision({
+          'day': routineDayId,
+          'content': await _dayContent(db, routineDayId),
+        }),
         subjectId: routineDayId,
         summary: {
           'action': action,
@@ -207,6 +210,7 @@ class WorkoutScheduleProposalHandler extends AiProposalHandler {
         'date': workout['date'],
         'start': workout['start_time'],
         'end': workout['end_time'],
+        'content': await _workoutContent(db, workoutId),
       }),
       subjectId: workoutId,
       summary: {
@@ -231,21 +235,23 @@ class WorkoutScheduleProposalHandler extends AiProposalHandler {
       final id = payload['routine_day_id'] as String? ?? '';
       final day = await _routineDay(txn, id);
       if (day == null) return 'stale_target_missing';
-      final exercises = await _dayExercises(txn, id);
-      if (exercises.isEmpty) return 'stale_target_missing';
-      return aiRevision({'day': id, 'exercises': exercises}) ==
-              proposal.baseHash
+      final content = await _dayContent(txn, id);
+      if (content.isEmpty) return 'stale_target_missing';
+      return aiRevision({'day': id, 'content': content}) == proposal.baseHash
           ? null
           : 'stale_revision';
     }
     final id = payload['workout_id'] as String? ?? '';
     final workout = await _db.workoutRepo.getWorkoutIn(txn, id);
     if (workout == null) return 'stale_target_missing';
+    // Exercises and sets are part of the revision: a copy must reproduce
+    // the workout the user saw in the preview, not one edited afterwards.
     final hash = aiRevision({
       'id': id,
       'date': workout['date'],
       'start': workout['start_time'],
       'end': workout['end_time'],
+      'content': await _workoutContent(txn, id),
     });
     return hash == proposal.baseHash ? null : 'stale_revision';
   }
@@ -344,6 +350,48 @@ class WorkoutScheduleProposalHandler extends AiProposalHandler {
       ORDER BY ee.order_index, ee.id
       ''',
       [workoutId],
+    );
+    return [for (final row in rows) Map<String, Object?>.from(row)];
+  }
+
+  /// Every exercise and set of a workout, in order (the copied content).
+  Future<List<Map<String, Object?>>> _workoutContent(
+    DatabaseExecutor db,
+    String workoutId,
+  ) async {
+    final rows = await db.rawQuery(
+      '''
+      SELECT ee.id AS entry_id, ee.exercise_id, ee.order_index AS entry_order,
+        s.id AS set_id, s.weight, s.reps, s.distance, s.time_seconds,
+        s.is_warmup, s.rpe, s.order_index AS set_order
+      FROM exercise_entries ee
+      LEFT JOIN sets s ON s.exercise_entry_id = ee.id
+      WHERE ee.workout_id = ?
+      ORDER BY ee.order_index, ee.id, s.order_index, s.id
+      ''',
+      [workoutId],
+    );
+    return [for (final row in rows) Map<String, Object?>.from(row)];
+  }
+
+  /// Every exercise and predefined set of a routine day, in order.
+  Future<List<Map<String, Object?>>> _dayContent(
+    DatabaseExecutor db,
+    String dayId,
+  ) async {
+    final rows = await db.rawQuery(
+      '''
+      SELECT re.id AS routine_exercise_id, re.exercise_id,
+        re.order_index AS exercise_order, re.superset_group_id,
+        re.rest_time_seconds, ps.id AS set_id, ps.weight, ps.reps,
+        ps.distance, ps.time_seconds, ps.is_warmup,
+        ps.order_index AS set_order
+      FROM routine_exercises re
+      LEFT JOIN predefined_sets ps ON ps.routine_exercise_id = re.id
+      WHERE re.routine_day_id = ?
+      ORDER BY re.order_index, re.id, ps.order_index, ps.id
+      ''',
+      [dayId],
     );
     return [for (final row in rows) Map<String, Object?>.from(row)];
   }
