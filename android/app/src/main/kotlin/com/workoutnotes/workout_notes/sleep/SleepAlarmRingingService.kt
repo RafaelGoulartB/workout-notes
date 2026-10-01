@@ -12,6 +12,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.workoutnotes.workout_notes.R
@@ -285,7 +286,19 @@ class SleepAlarmRingingService : Service() {
         }
 
         ensureChannel()
-        startForeground(NOTIFICATION_ID, buildNotification(alarmAt, snapshot?.requiresMission == true))
+        try {
+            startForeground(
+                NOTIFICATION_ID,
+                buildNotification(alarmAt, snapshot?.requiresMission == true),
+            )
+        } catch (error: Throwable) {
+            // Refused (e.g. right after a boot): ring again shortly instead
+            // of crashing the app with the alarm stuck as "ringing".
+            Log.w("SleepAlarm", "Ringing refused to start", error)
+            SleepAlarmScheduler.recoverRefusedRing(this)
+            stopSelf()
+            return START_NOT_STICKY
+        }
         val emergencyRemaining = SleepAlarmScheduler.emergencyRemainingMillis(this)
         if (emergencyRemaining > 0L) {
             acquireWakeLock()

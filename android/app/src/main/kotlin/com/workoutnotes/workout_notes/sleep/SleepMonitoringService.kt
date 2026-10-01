@@ -457,10 +457,10 @@ class SleepMonitoringService : Service() {
                     val deadline = snapshot.alarmAtMillis
                     // Off the capture thread: ringing stops this recording,
                     // which joins that thread.
+                    // A refused early ring is not retried: the deadline,
+                    // still armed, rings as usual.
                     mainHandler.post {
-                        if (!SleepAlarmScheduler.fireEarly(applicationContext, deadline, trigger)) {
-                            smartFired = false
-                        }
+                        SleepAlarmScheduler.fireEarly(applicationContext, deadline, trigger)
                     }
                 }
             }

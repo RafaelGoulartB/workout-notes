@@ -48,7 +48,7 @@ object MedicationNotifications {
         val notification = NotificationCompat.Builder(context, REMINDER_CHANNEL)
             .setSmallIcon(android.R.drawable.ic_popup_reminder)
             .setColor(ACCENT)
-            .setContentTitle(context.getString(R.string.medication_reminder_title))
+            .setContentTitle(reminderTitle(context, slot))
             .setContentText(doseLabel(slot))
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(
@@ -83,6 +83,21 @@ object MedicationNotifications {
         },
         PendingIntentFlags.UPDATE_IMMUTABLE,
     )
+
+    /**
+     * "Time for your medication", or "Missed dose from 08:00" for a dose
+     * reminded late after the phone was off.
+     */
+    private fun reminderTitle(context: Context, slot: MedicationReminderScheduler.Slot): String {
+        val late = slot.pendingDueAt > 0L &&
+            System.currentTimeMillis() - slot.pendingDueAt > LATE_AFTER_MILLIS
+        if (!late) return context.getString(R.string.medication_reminder_title)
+        val time = android.text.format.DateFormat.getTimeFormat(context)
+            .format(java.util.Date(slot.pendingDueAt))
+        return context.getString(R.string.medication_reminder_late_title, time)
+    }
+
+    private const val LATE_AFTER_MILLIS = 5L * 60_000L
 
     fun doseLabel(slot: MedicationReminderScheduler.Slot): String =
         if (slot.dosage.isNullOrBlank()) slot.name else "${slot.name} · ${slot.dosage}"

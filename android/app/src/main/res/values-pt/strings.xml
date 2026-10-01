@@ -62,6 +62,7 @@
     <string name="medication_alarm_channel_name">Alarmes de remédio</string>
     <string name="medication_alarm_channel_description">Toca quando uma dose não foi confirmada a tempo</string>
     <string name="medication_reminder_title">Hora do remédio</string>
+    <string name="medication_reminder_late_title">Dose das %1$s atrasada</string>
     <string name="medication_reminder_confirm_hint">Toque para confirmar que você tomou.</string>
     <string name="medication_alarm_title">Remédio não confirmado</string>
     <string name="medication_alarm_body">Esta dose ainda não foi confirmada. Tome e confirme para parar o alarme.</string>

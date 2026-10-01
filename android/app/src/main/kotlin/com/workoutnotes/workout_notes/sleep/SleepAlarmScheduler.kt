@@ -9,10 +9,13 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import com.workoutnotes.workout_notes.MainActivity
+import com.workoutnotes.workout_notes.common.AlarmRestorePolicy
 import com.workoutnotes.workout_notes.common.PendingIntentFlags
 
 object SleepAlarmScheduler {
+    private const val TAG = "SleepAlarmScheduler"
     const val ACTION_FIRE = "com.workoutnotes.workout_notes.sleep.ALARM_FIRE"
     const val ACTION_DISMISS_SNOOZE = "com.workoutnotes.workout_notes.sleep.ALARM_DISMISS_SNOOZE"
     const val EXTRA_ALARM_AT = "alarm_at_epoch_ms"
@@ -287,40 +290,49 @@ object SleepAlarmScheduler {
     /**
      * Rings the first alarm of the night now, before its deadline (smart
      * wake). Only a scheduled, never-snoozed alarm still aimed at
-     * [expectedAlarmAtMillis] qualifies; its pending deadline is cancelled so
-     * it cannot ring a second time. Must run on the main thread: it stops the
-     * monitoring service, whose capture thread may be the caller's.
+     * [expectedAlarmAtMillis] qualifies. The pending deadline is cancelled
+     * only once the ringing service has started; if it cannot start, the
+     * deadline stays armed and rings as usual. Must run on the main thread:
+     * it stops the monitoring service, whose capture thread may be the
+     * caller's.
      */
     fun fireEarly(context: Context, expectedAlarmAtMillis: Long, trigger: String): Boolean {
-        synchronized(this) {
-            val snapshot = read(context) ?: return false
-            if (snapshot.state != STATE_SCHEDULED ||
-                snapshot.snoozeCount > 0 ||
-                snapshot.alarmAtMillis != expectedAlarmAtMillis ||
-                snapshot.alarmAtMillis <= System.currentTimeMillis()
-            ) return false
-            context.getSystemService(AlarmManager::class.java).cancel(
-                fireIntent(context, snapshot.alarmAtMillis, snapshot.sessionId,
-                    snapshot.monitorMode, snapshot.missionType, snapshot.missionHash,
-                    snapshot.missionSalt, snapshot.missionFormat),
-            )
+        val snapshot = synchronized(this) {
+            read(context)?.takeIf {
+                it.state == STATE_SCHEDULED &&
+                    it.snoozeCount == 0 &&
+                    it.alarmAtMillis == expectedAlarmAtMillis &&
+                    it.alarmAtMillis > System.currentTimeMillis()
+            }
+        } ?: return false
+        if (!ring(context, expectedAlarmAtMillis, trigger, rearmOnFailure = false)) {
+            return false
         }
-        return ring(context, expectedAlarmAtMillis, trigger)
+        context.getSystemService(AlarmManager::class.java).cancel(
+            fireIntent(context, snapshot.alarmAtMillis, snapshot.sessionId,
+                snapshot.monitorMode, snapshot.missionType, snapshot.missionHash,
+                snapshot.missionSalt, snapshot.missionFormat),
+        )
+        return true
     }
 
     /**
-     * Marks the alarm ringing, records when and why on the night, ends the
-     * monitoring and starts the ringing service. Shared by the exact alarm
-     * (the deadline), a smart early ring and a restore after reboot.
+     * Marks the alarm ringing and starts the ringing service; only once it
+     * started does it record when and why on the night and end the
+     * monitoring (whose foreground service is what lets a smart ring start
+     * from the background). If Android refuses the start, the alarm goes back
+     * to scheduled and, with [rearmOnFailure], is re-armed as an exact alarm
+     * shortly after. Shared by the exact alarm (the deadline), a smart
+     * early ring and the re-armed restores.
      */
-    fun ring(context: Context, alarmAtMillis: Long, trigger: String): Boolean {
+    fun ring(
+        context: Context,
+        alarmAtMillis: Long,
+        trigger: String,
+        rearmOnFailure: Boolean = true,
+    ): Boolean {
         val before = read(context)
         if (!markFired(context, alarmAtMillis)) return false
-        // A snooze ringing again is not the moment the night's alarm went off.
-        if ((before?.snoozeCount ?: 0) == 0) {
-            SleepMonitoringService.recordAlarmFired(context, trigger, System.currentTimeMillis())
-        }
-        SleepMonitoringService.stopCurrent("alarm")
         val snapshot = read(context)
         val ringing = Intent(context, SleepAlarmRingingService::class.java).apply {
             action = SleepAlarmRingingService.ACTION_START
@@ -332,12 +344,71 @@ object SleepAlarmScheduler {
             putExtra(EXTRA_MISSION_SALT, snapshot?.missionSalt)
             putExtra(EXTRA_MISSION_FORMAT, snapshot?.missionFormat)
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(ringing)
-        } else {
-            context.startService(ringing)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(ringing)
+            } else {
+                context.startService(ringing)
+            }
+        } catch (error: Throwable) {
+            Log.w(TAG, "Alarm ringing service refused to start", error)
+            unmarkFired(context, alarmAtMillis)
+            if (rearmOnFailure) read(context)?.let { rearmSoon(context, it, afterBoot = true) }
+            return false
         }
+        // A snooze ringing again is not the moment the night's alarm went off.
+        if ((before?.snoozeCount ?: 0) == 0) {
+            SleepMonitoringService.recordAlarmFired(context, trigger, System.currentTimeMillis())
+        }
+        SleepMonitoringService.stopCurrent("alarm")
         return true
+    }
+
+    /**
+     * The ringing service could not become a foreground service (Android
+     * refused it, typically right after a boot): put the alarm back to
+     * scheduled and ring it again once the refusal no longer applies.
+     */
+    fun recoverRefusedRing(context: Context) {
+        val snapshot = read(context) ?: return
+        if (snapshot.state != STATE_RINGING) return
+        rearmSoon(context, snapshot, afterBoot = true)
+    }
+
+    /** Undoes [markFired] when the ring could not start. */
+    @Synchronized
+    private fun unmarkFired(context: Context, alarmAtMillis: Long) {
+        val snapshot = read(context) ?: return
+        if (snapshot.state != STATE_RINGING || snapshot.alarmAtMillis != alarmAtMillis) return
+        preferences(context).edit().putString(KEY_STATE, STATE_SCHEDULED).apply()
+    }
+
+    /**
+     * Re-arms [snapshot] as an exact alarm shortly ahead (past the boot window
+     * when [afterBoot]), keeping its
+     * snoozes, mission and smart window. The alarm's receiver may start the
+     * ringing service where a boot receiver may not.
+     */
+    private fun rearmSoon(context: Context, snapshot: Snapshot, afterBoot: Boolean) {
+        try {
+            schedule(
+                context,
+                AlarmRestorePolicy.rearmAt(System.currentTimeMillis(), afterBoot),
+                snapshot.sessionId,
+                snapshot.monitorMode,
+                snapshot.missionType,
+                snapshot.missionHash,
+                snapshot.missionSalt,
+                snapshot.missionFormat,
+                snapshot.maxSnoozes,
+                snapshot.snoozeCount,
+                snapshot.smartWindowMinutes,
+                snapshot.smartThreshold,
+            )
+        } catch (error: Throwable) {
+            // Exact alarms were revoked: the next launch or boot retries.
+            Log.w(TAG, "Could not re-arm the sleep alarm", error)
+        }
     }
 
     fun emergencyTaps(context: Context): Int =
@@ -443,15 +514,23 @@ object SleepAlarmScheduler {
         return next
     }
 
+    /**
+     * Re-arms the stored alarm after a reboot or an update. One that was
+     * ringing, or came due while the phone was off, rings again a few
+     * seconds later through an exact alarm (never started from the boot
+     * receiver itself); one missed by more than
+     * [AlarmRestorePolicy.MAX_LATE_RING_MILLIS] is closed instead.
+     */
     fun restore(context: Context) {
         val stored = read(context) ?: return
         if (stored.state == STATE_COMPLETED) return
-        if (stored.state == STATE_RINGING) {
-            SleepAlarmRingingService.start(context, stored.alarmAtMillis)
-            return
-        }
-        if (stored.alarmAtMillis <= System.currentTimeMillis()) {
-            ring(context, stored.alarmAtMillis, SmartWakePolicy.TRIGGER_DEADLINE)
+        val now = System.currentTimeMillis()
+        if (stored.state == STATE_RINGING || stored.alarmAtMillis <= now) {
+            if (AlarmRestorePolicy.shouldRingLate(stored.alarmAtMillis, now)) {
+                rearmSoon(context, stored, afterBoot = true)
+            } else {
+                complete(context)
+            }
             return
         }
         try {

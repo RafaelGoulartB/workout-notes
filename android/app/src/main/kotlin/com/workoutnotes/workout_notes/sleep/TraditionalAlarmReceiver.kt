@@ -10,6 +10,6 @@ class TraditionalAlarmReceiver : BroadcastReceiver() {
         val id = intent.getStringExtra(TraditionalAlarmScheduler.EXTRA_ID) ?: return
         val alarmAt = intent.getLongExtra(TraditionalAlarmScheduler.EXTRA_ALARM_AT, Long.MIN_VALUE)
         if (!TraditionalAlarmScheduler.markRinging(context, id, alarmAt)) return
-        TraditionalAlarmRingingService.start(context, id)
+        TraditionalAlarmScheduler.startRinging(context, id)
     }
 }

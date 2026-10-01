@@ -62,6 +62,7 @@
     <string name="medication_alarm_channel_name">Medication alarms</string>
     <string name="medication_alarm_channel_description">Rings when a dose was not confirmed in time</string>
     <string name="medication_reminder_title">Time for your medication</string>
+    <string name="medication_reminder_late_title">Missed dose from %1$s</string>
     <string name="medication_reminder_confirm_hint">Tap to confirm you took it.</string>
     <string name="medication_alarm_title">Medication not confirmed</string>
     <string name="medication_alarm_body">This dose was not confirmed yet. Take it and confirm to stop the alarm.</string>
