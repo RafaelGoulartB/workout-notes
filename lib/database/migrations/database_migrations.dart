@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 
+import 'package:workout_notes/database/database_ai_schema.dart';
 import 'package:workout_notes/database/database_medication_schema.dart';
 import 'package:workout_notes/database/database_run_extras_schema.dart';
 import 'package:workout_notes/database/database_run_plan_schema.dart';
@@ -261,6 +262,26 @@ abstract final class DatabaseMigrations {
         'ALTER TABLE traditional_alarms ADD COLUMN gradual_volume INTEGER NOT NULL DEFAULT 0',
       ]) {
         await tryExecute(db, statement);
+      }
+    }
+    if (step(61)) {
+      // AI Coach v2: generic proposals (routine proposals are copied over and
+      // their table dropped), long-term memories, durable turns and folded
+      // search text.
+      for (final statement in DatabaseAiSchema.v61Columns) {
+        await tryExecute(db, statement);
+      }
+      await DatabaseAiSchema.create(db);
+      await DatabaseAiSchema.migrateRoutineProposals(db);
+      await DatabaseAiSchema.backfillSearchText(db);
+      await db.execute(DatabaseRunPlanSchema.scheduledRunsPlanIndex);
+      for (final statement in const [
+        'DROP INDEX IF EXISTS idx_ai_routine_proposals_thread_status',
+        'DROP TABLE IF EXISTS ai_routine_proposals',
+        'DROP INDEX IF EXISTS idx_ai_chat_messages_thread',
+        'DROP INDEX IF EXISTS idx_ai_chat_threads_updated',
+      ]) {
+        await db.execute(statement);
       }
     }
   }

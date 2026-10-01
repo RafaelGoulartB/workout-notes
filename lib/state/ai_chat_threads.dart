@@ -16,8 +16,9 @@ class AiThreadSearchPage {
 }
 
 /// Public thread lifecycle operations kept separate from turn execution.
+/// None of them disturbs a running turn: it stays bound to its own thread.
 extension AiChatThreadManagement on AiChatService {
-  static const int _messagePageSize = 100;
+  static const int _messagePageSize = 80;
   static const int _threadPageSize = 100;
 
   Future<void> refreshThreads({bool notify = true}) async {
@@ -40,8 +41,8 @@ extension AiChatThreadManagement on AiChatService {
   }
 
   /// One page of threads matching [query] straight from SQLite (title,
-  /// preview and message text), so conversations outside the loaded pages are
-  /// found too. [total] is only computed for the first page.
+  /// preview and message text; case- and accent-insensitive). [total] is
+  /// only computed for the first page.
   Future<AiThreadSearchPage> searchThreads(
     String query, {
     int offset = 0,
@@ -52,12 +53,15 @@ extension AiChatThreadManagement on AiChatService {
       limit: limit + 1,
       offset: offset,
     );
+    final hasMore = rows.length > limit;
     final total = offset == 0
-        ? await _db.aiChatRepo.countAiChatThreads(query: query)
+        ? (hasMore
+              ? await _db.aiChatRepo.countAiChatThreads(query: query)
+              : rows.length)
         : null;
     return AiThreadSearchPage(
       threads: rows.take(limit).map(AiChatThread.fromRow).toList(),
-      hasMore: rows.length > limit,
+      hasMore: hasMore,
       total: total,
     );
   }
@@ -89,15 +93,16 @@ extension AiChatThreadManagement on AiChatService {
     }
   }
 
+  /// Shows an empty conversation. A running turn keeps going in its thread.
   Future<void> newChat() async {
     if (_state.activeThreadId == null && _state.messages.isEmpty) return;
     _state = _state.copyWith(
       clearActiveThread: true,
       messages: const [],
+      proposals: const [],
       hasOlderMessages: false,
       isLoadingOlderMessages: false,
       clearError: true,
-      phase: AiTurnPhase.idle,
     );
     _persistedMessages.clear();
     _emit();
@@ -106,34 +111,27 @@ extension AiChatThreadManagement on AiChatService {
   Future<void> openThread(String threadId) async {
     if (_state.activeThreadId == threadId) return;
     try {
-      final rows = await _db.aiChatRepo.getAiChatMessagesThreadPage(
+      final rows = await _db.aiChatRepo.getAiChatMessagesPage(
         threadId,
         limit: _messagePageSize + 1,
       );
       final hasOlder = rows.length > _messagePageSize;
-      final visibleRows = hasOlder ? rows.sublist(1) : rows;
-      final messages = visibleRows.map(AiChatMessage.fromRow).toList();
+      final visible = (hasOlder ? rows.sublist(1) : rows)
+          .map(AiChatMessage.fromRow)
+          .toList();
+      final messages = await _markInterruptedTurns(threadId, visible);
       _persistedMessages
         ..clear()
-        ..addEntries(
-          messages.map(
-            (message) => MapEntry(message.id, (
-              message: message,
-              signature: jsonEncode(message.toRow()),
-            )),
-          ),
-        );
-      final proposals = await _routineMutations.getThreadProposals(threadId);
+        ..addEntries(messages.map((m) => MapEntry(m.id, m)));
+      final proposals = await _proposals.forThread(threadId);
       _state = _state.copyWith(
         activeThreadId: threadId,
         messages: messages,
         clearError: true,
-        phase: AiTurnPhase.idle,
-        routineProposals: proposals,
+        proposals: proposals,
         hasOlderMessages: hasOlder,
         isLoadingOlderMessages: false,
       );
-      _recoverInterruptedTurn(messages);
       _emit();
     } catch (e) {
       _state = _state.copyWith(error: _readableError(e));
@@ -141,32 +139,57 @@ extension AiChatThreadManagement on AiChatService {
     }
   }
 
+  /// A user message still marked `running` with no turn running for it was
+  /// cut short (app killed, crash): mark it interrupted, persistently.
+  Future<List<AiChatMessage>> _markInterruptedTurns(
+    String threadId,
+    List<AiChatMessage> messages,
+  ) async {
+    final runningId = _turn?.threadId == threadId
+        ? _turn!.userMessage.id
+        : null;
+    final out = <AiChatMessage>[];
+    for (final m in messages) {
+      if (m.isUser &&
+          m.turnStatus == AiTurnStatus.running &&
+          m.id != runningId) {
+        final interrupted = m.copyWith(turnStatus: AiTurnStatus.interrupted);
+        await _db.aiChatRepo.setTurnStatus(m.id, AiTurnStatus.interrupted.name);
+        out.add(interrupted);
+      } else {
+        out.add(m);
+      }
+    }
+    return out;
+  }
+
+  /// Loads the page before the oldest loaded message (keyset pagination).
   Future<void> loadOlderMessages() async {
     final threadId = _state.activeThreadId;
     if (threadId == null ||
         !_state.hasOlderMessages ||
-        _state.isLoadingOlderMessages) {
+        _state.isLoadingOlderMessages ||
+        _state.messages.isEmpty) {
       return;
     }
     _state = _state.copyWith(isLoadingOlderMessages: true);
     _emit();
     try {
-      final rows = await _db.aiChatRepo.getAiChatMessagesThreadPage(
+      final oldest = _state.messages.first;
+      final rows = await _db.aiChatRepo.getAiChatMessagesPage(
         threadId,
         limit: _messagePageSize + 1,
-        offset: _state.messages.length,
+        beforeCreatedAt: oldest.createdAt.toIso8601String(),
+        beforeId: oldest.id,
       );
+      if (_state.activeThreadId != threadId) return;
       final hasOlder = rows.length > _messagePageSize;
-      final visibleRows = hasOlder ? rows.sublist(1) : rows;
-      final older = visibleRows.map(AiChatMessage.fromRow).toList();
-      _persistedMessages.addEntries(
-        older.map(
-          (message) => MapEntry(message.id, (
-            message: message,
-            signature: jsonEncode(message.toRow()),
-          )),
-        ),
-      );
+      final older = (hasOlder ? rows.sublist(1) : rows)
+          .map(AiChatMessage.fromRow)
+          .toList();
+      for (final m in older) {
+        _persistedMessages[m.id] = m;
+      }
       _state = _state.copyWith(
         messages: [...older, ..._state.messages],
         hasOlderMessages: hasOlder,
@@ -182,16 +205,25 @@ extension AiChatThreadManagement on AiChatService {
     }
   }
 
+  /// Deletes a conversation (its running turn, if any, is cancelled first).
   Future<void> deleteThread(String threadId) async {
-    var attachments = <AiImageAttachment>[];
+    if (_turn?.threadId == threadId) cancelTurn();
+    final attachments = <AiImageAttachment>[];
     try {
-      final rows = await _db.aiChatRepo.getAiChatMessagesThread(threadId);
-      attachments = rows
-          .map(AiChatMessage.fromRow)
-          .expand((message) => message.attachments)
-          .toList();
-    } catch (_) {
-      // Attachment cleanup is best-effort; the thread is still deleted.
+      for (final raw in await _db.aiChatRepo.getAttachmentsJson(threadId)) {
+        final decoded = jsonDecode(raw);
+        if (decoded is! List) continue;
+        for (final item in decoded) {
+          if (item is Map) {
+            attachments.add(
+              AiImageAttachment.fromJson(item.cast<String, dynamic>()),
+            );
+          }
+        }
+      }
+    } catch (error) {
+      // Attachment cleanup is best-effort; orphans are swept on next launch.
+      debugPrint('Reading AI attachments to delete failed: $error');
     }
     try {
       await _db.aiChatRepo.deleteAiChatThread(threadId);
@@ -206,6 +238,7 @@ extension AiChatThreadManagement on AiChatService {
             : (_state.totalThreadCount! - 1).clamp(0, 1 << 30),
         clearActiveThread: clearActive,
         messages: clearActive ? const [] : _state.messages,
+        proposals: clearActive ? const [] : _state.proposals,
         hasOlderMessages: clearActive ? false : _state.hasOlderMessages,
         isLoadingOlderMessages: false,
       );
@@ -221,8 +254,12 @@ extension AiChatThreadManagement on AiChatService {
     if (trimmed.isEmpty) return false;
     try {
       await _db.aiChatRepo.renameAiChatThread(threadId, trimmed);
-      await refreshThreads(notify: false);
-      _state = _state.copyWith(clearError: true);
+      _state = _state.copyWith(
+        threads: [
+          for (final t in _state.threads)
+            t.id == threadId ? t.copyWith(title: trimmed) : t,
+        ],
+      );
       _emit();
       return true;
     } catch (e) {
@@ -235,9 +272,12 @@ extension AiChatThreadManagement on AiChatService {
   Future<bool> setThreadPinned(String threadId, bool isPinned) async {
     try {
       await _db.aiChatRepo.setAiChatThreadPinned(threadId, isPinned);
-      await refreshThreads(notify: false);
-      _state = _state.copyWith(clearError: true);
-      _emit();
+      final thread = _state.threads.where((t) => t.id == threadId);
+      if (thread.isNotEmpty) {
+        _upsertThreadInMemory(thread.first.copyWith(isPinned: isPinned));
+      } else {
+        await refreshThreads();
+      }
       return true;
     } catch (e) {
       _state = _state.copyWith(error: _readableError(e));

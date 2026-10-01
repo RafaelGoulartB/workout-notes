@@ -43,62 +43,80 @@ class WorkoutRepository extends BaseRepository {
     List<Map<String, dynamic>>? exercises,
   }) async {
     final db = await this.db;
-    final id = const Uuid().v4();
-    final now = DateTime.now();
-    await db.transaction((txn) async {
-      // A routine day always belongs to a routine: fill it in when the caller
-      // only knows the day.
-      if (routineDayId != null && routineId == null) {
-        final day = await txn.query(
-          'routine_days',
-          columns: ['routine_id'],
-          where: 'id = ?',
-          whereArgs: [routineDayId],
-          limit: 1,
-        );
-        if (day.isNotEmpty) routineId = day.first['routine_id'] as String?;
-      }
-      final batch = txn.batch();
-      batch.insert('workouts', {
-        'id': id,
-        'date': dateKey(date ?? now),
-        'is_from_routine': routineId != null ? 1 : 0,
-        'routine_id': routineId,
-        'routine_day_id': ?routineDayId,
-        'created_at': now.toIso8601String(),
-      });
-      for (int i = 0; i < (exercises?.length ?? 0); i++) {
-        final exercise = exercises![i];
-        final entryId = const Uuid().v4();
-        batch.insert('exercise_entries', {
-          'id': entryId,
-          'workout_id': id,
-          'exercise_id': exercise['exercise_id'],
-          'order_index': i,
-          'notes': exercise['notes'],
-          'rest_time_seconds': exercise['rest_time_seconds'],
-        });
-        final sets = exercise['sets'] as List<Map<String, dynamic>>? ?? [];
-        for (int j = 0; j < sets.length; j++) {
-          final s = sets[j];
-          batch.insert('sets', {
-            'id': const Uuid().v4(),
-            'exercise_entry_id': entryId,
-            'weight': s['weight'],
-            'reps': s['reps'],
-            'distance': s['distance'],
-            'time_seconds': s['time_seconds'],
-            'is_complete': 0,
-            'is_warmup': s['is_warmup'] ?? 0,
-            'rpe': s['rpe'],
-            'comment': s['comment'],
-            'order_index': j,
-          });
-        }
-      }
-      await batch.commit(noResult: true);
-    });
+    return db.transaction(
+      (txn) => createWorkoutIn(
+        txn,
+        date: date,
+        routineId: routineId,
+        routineDayId: routineDayId,
+        exercises: exercises,
+      ),
+    );
+  }
 
+  /// [createWorkout] on an explicit executor (callers fold it into their own
+  /// transaction). A caller-supplied [id] becomes the workout's primary key.
+  Future<String> createWorkoutIn(
+    DatabaseExecutor txn, {
+    String? id,
+    DateTime? date,
+    String? routineId,
+    String? routineDayId,
+    List<Map<String, dynamic>>? exercises,
+  }) async {
+    id ??= const Uuid().v4();
+    final now = DateTime.now();
+    // A routine day always belongs to a routine: fill it in when the caller
+    // only knows the day.
+    if (routineDayId != null && routineId == null) {
+      final day = await txn.query(
+        'routine_days',
+        columns: ['routine_id'],
+        where: 'id = ?',
+        whereArgs: [routineDayId],
+        limit: 1,
+      );
+      if (day.isNotEmpty) routineId = day.first['routine_id'] as String?;
+    }
+    final batch = txn.batch();
+    batch.insert('workouts', {
+      'id': id,
+      'date': dateKey(date ?? now),
+      'is_from_routine': routineId != null ? 1 : 0,
+      'routine_id': routineId,
+      'routine_day_id': ?routineDayId,
+      'created_at': now.toIso8601String(),
+    });
+    for (int i = 0; i < (exercises?.length ?? 0); i++) {
+      final exercise = exercises![i];
+      final entryId = const Uuid().v4();
+      batch.insert('exercise_entries', {
+        'id': entryId,
+        'workout_id': id,
+        'exercise_id': exercise['exercise_id'],
+        'order_index': i,
+        'notes': exercise['notes'],
+        'rest_time_seconds': exercise['rest_time_seconds'],
+      });
+      final sets = exercise['sets'] as List<Map<String, dynamic>>? ?? [];
+      for (int j = 0; j < sets.length; j++) {
+        final s = sets[j];
+        batch.insert('sets', {
+          'id': const Uuid().v4(),
+          'exercise_entry_id': entryId,
+          'weight': s['weight'],
+          'reps': s['reps'],
+          'distance': s['distance'],
+          'time_seconds': s['time_seconds'],
+          'is_complete': 0,
+          'is_warmup': s['is_warmup'] ?? 0,
+          'rpe': s['rpe'],
+          'comment': s['comment'],
+          'order_index': j,
+        });
+      }
+    }
+    await batch.commit(noResult: true);
     return id;
   }
 
@@ -154,50 +172,59 @@ class WorkoutRepository extends BaseRepository {
     String routineDayId,
   ) async {
     final db = await this.db;
-    await db.transaction((txn) async {
-      await _linkRoutineDay(txn, workoutId, routineDayId);
-      final routineExercises = await _getRoutineExercises(txn, routineDayId);
-      final firstOrder = await _entryCount(txn, workoutId);
-      final batch = txn.batch();
+    await db.transaction(
+      (txn) => importRoutineDayToWorkoutIn(txn, workoutId, routineDayId),
+    );
+  }
 
-      for (var i = 0; i < routineExercises.length; i++) {
-        final re = routineExercises[i];
-        final entryId = const Uuid().v4();
-        final exerciseId = re['exercise_id'] as String;
-        batch.insert('exercise_entries', {
-          'id': entryId,
-          'workout_id': workoutId,
-          'exercise_id': exerciseId,
-          'order_index': firstOrder + i,
-          'rest_time_seconds': re['rest_time_seconds'],
+  /// [importRoutineDayToWorkout] on an explicit executor.
+  Future<void> importRoutineDayToWorkoutIn(
+    DatabaseExecutor txn,
+    String workoutId,
+    String routineDayId,
+  ) async {
+    await _linkRoutineDay(txn, workoutId, routineDayId);
+    final routineExercises = await _getRoutineExercises(txn, routineDayId);
+    final firstOrder = await _entryCount(txn, workoutId);
+    final batch = txn.batch();
+
+    for (var i = 0; i < routineExercises.length; i++) {
+      final re = routineExercises[i];
+      final entryId = const Uuid().v4();
+      final exerciseId = re['exercise_id'] as String;
+      batch.insert('exercise_entries', {
+        'id': entryId,
+        'workout_id': workoutId,
+        'exercise_id': exerciseId,
+        'order_index': firstOrder + i,
+        'rest_time_seconds': re['rest_time_seconds'],
+      });
+
+      final lastSets = await _lastWorkoutSets(
+        txn,
+        exerciseId,
+        excludeWorkoutId: workoutId,
+      );
+      final sourceSets = lastSets.isNotEmpty
+          ? lastSets
+          : await _getPredefinedSets(txn, re['id'] as String);
+
+      for (int j = 0; j < sourceSets.length; j++) {
+        final s = sourceSets[j];
+        batch.insert('sets', {
+          'id': const Uuid().v4(),
+          'exercise_entry_id': entryId,
+          'weight': s['weight'],
+          'reps': s['reps'],
+          'distance': s['distance'],
+          'time_seconds': s['time_seconds'],
+          'is_complete': 0,
+          'is_warmup': s['is_warmup'] ?? 0,
+          'order_index': j,
         });
-
-        final lastSets = await _lastWorkoutSets(
-          txn,
-          exerciseId,
-          excludeWorkoutId: workoutId,
-        );
-        final sourceSets = lastSets.isNotEmpty
-            ? lastSets
-            : await _getPredefinedSets(txn, re['id'] as String);
-
-        for (int j = 0; j < sourceSets.length; j++) {
-          final s = sourceSets[j];
-          batch.insert('sets', {
-            'id': const Uuid().v4(),
-            'exercise_entry_id': entryId,
-            'weight': s['weight'],
-            'reps': s['reps'],
-            'distance': s['distance'],
-            'time_seconds': s['time_seconds'],
-            'is_complete': 0,
-            'is_warmup': s['is_warmup'] ?? 0,
-            'order_index': j,
-          });
-        }
       }
-      await batch.commit(noResult: true);
-    });
+    }
+    await batch.commit(noResult: true);
   }
 
   /// Copies a workout (entries and sets, all unchecked) to [newDate] in one
@@ -207,79 +234,109 @@ class WorkoutRepository extends BaseRepository {
     DateTime newDate,
   ) async {
     final db = await this.db;
-    final newId = const Uuid().v4();
-    await db.transaction((txn) async {
-      final sourceWorkout = await _getWorkout(txn, sourceWorkoutId);
-      if (sourceWorkout == null) throw Exception('Source workout not found');
+    return db.transaction(
+      (txn) => copyWorkoutToDateIn(txn, sourceWorkoutId, newDate),
+    );
+  }
 
-      final entries = await txn.query(
-        'exercise_entries',
-        where: 'workout_id = ?',
-        whereArgs: [sourceWorkoutId],
+  /// [copyWorkoutToDate] on an explicit executor. A caller-supplied [newId]
+  /// becomes the copy's primary key.
+  Future<String> copyWorkoutToDateIn(
+    DatabaseExecutor txn,
+    String sourceWorkoutId,
+    DateTime newDate, {
+    String? newId,
+  }) async {
+    newId ??= const Uuid().v4();
+    final sourceWorkout = await _getWorkout(txn, sourceWorkoutId);
+    if (sourceWorkout == null) throw Exception('Source workout not found');
+
+    final entries = await txn.query(
+      'exercise_entries',
+      where: 'workout_id = ?',
+      whereArgs: [sourceWorkoutId],
+      orderBy: 'order_index ASC',
+    );
+    final setsByEntry = <Object?, List<Map<String, Object?>>>{};
+    if (entries.isNotEmpty) {
+      final sets = await txn.query(
+        'sets',
+        where:
+            'exercise_entry_id IN '
+            '(${List.filled(entries.length, '?').join(', ')})',
+        whereArgs: [for (final entry in entries) entry['id']],
         orderBy: 'order_index ASC',
       );
-      final setsByEntry = <Object?, List<Map<String, Object?>>>{};
-      if (entries.isNotEmpty) {
-        final sets = await txn.query(
-          'sets',
-          where:
-              'exercise_entry_id IN '
-              '(${List.filled(entries.length, '?').join(', ')})',
-          whereArgs: [for (final entry in entries) entry['id']],
-          orderBy: 'order_index ASC',
-        );
-        for (final set in sets) {
-          setsByEntry.putIfAbsent(set['exercise_entry_id'], () => []).add(set);
-        }
+      for (final set in sets) {
+        setsByEntry.putIfAbsent(set['exercise_entry_id'], () => []).add(set);
       }
+    }
 
-      final batch = txn.batch();
-      batch.insert('workouts', {
-        'id': newId,
-        'date': dateKey(newDate),
-        'start_time': null,
-        'end_time': null,
-        'duration_seconds': null,
-        'comment': null,
-        'feeling_rating': null,
-        'is_from_routine': sourceWorkout['is_from_routine'] ?? 0,
-        'routine_id': sourceWorkout['routine_id'],
-        'routine_day_id': ?sourceWorkout['routine_day_id'],
-        'created_at': DateTime.now().toIso8601String(),
-      });
-      for (final entry in entries) {
-        final newEntryId = const Uuid().v4();
-        batch.insert('exercise_entries', {
-          'id': newEntryId,
-          'workout_id': newId,
-          'exercise_id': entry['exercise_id'],
-          'order_index': entry['order_index'],
-          'superset_group_id': entry['superset_group_id'],
-          'notes': entry['notes'],
-          'rest_time_seconds': entry['rest_time_seconds'],
-        });
-        for (final s in setsByEntry[entry['id']] ??
-            const <Map<String, Object?>>[]) {
-          batch.insert('sets', {
-            'id': const Uuid().v4(),
-            'exercise_entry_id': newEntryId,
-            'weight': s['weight'],
-            'reps': s['reps'],
-            'distance': s['distance'],
-            'time_seconds': s['time_seconds'],
-            'is_complete': 0,
-            'is_warmup': s['is_warmup'] ?? 0,
-            'rpe': s['rpe'],
-            'comment': s['comment'],
-            'order_index': s['order_index'],
-          });
-        }
-      }
-      await batch.commit(noResult: true);
+    final batch = txn.batch();
+    batch.insert('workouts', {
+      'id': newId,
+      'date': dateKey(newDate),
+      'start_time': null,
+      'end_time': null,
+      'duration_seconds': null,
+      'comment': null,
+      'feeling_rating': null,
+      'is_from_routine': sourceWorkout['is_from_routine'] ?? 0,
+      'routine_id': sourceWorkout['routine_id'],
+      'routine_day_id': ?sourceWorkout['routine_day_id'],
+      'created_at': DateTime.now().toIso8601String(),
     });
-
+    for (final entry in entries) {
+      final newEntryId = const Uuid().v4();
+      batch.insert('exercise_entries', {
+        'id': newEntryId,
+        'workout_id': newId,
+        'exercise_id': entry['exercise_id'],
+        'order_index': entry['order_index'],
+        'superset_group_id': entry['superset_group_id'],
+        'notes': entry['notes'],
+        'rest_time_seconds': entry['rest_time_seconds'],
+      });
+      for (final s in setsByEntry[entry['id']] ??
+          const <Map<String, Object?>>[]) {
+        batch.insert('sets', {
+          'id': const Uuid().v4(),
+          'exercise_entry_id': newEntryId,
+          'weight': s['weight'],
+          'reps': s['reps'],
+          'distance': s['distance'],
+          'time_seconds': s['time_seconds'],
+          'is_complete': 0,
+          'is_warmup': s['is_warmup'] ?? 0,
+          'rpe': s['rpe'],
+          'comment': s['comment'],
+          'order_index': s['order_index'],
+        });
+      }
+    }
+    await batch.commit(noResult: true);
     return newId;
   }
+
+  /// [getWorkout] on an explicit executor.
+  Future<Map<String, dynamic>?> getWorkoutIn(
+    DatabaseExecutor executor,
+    String id,
+  ) => _getWorkout(executor, id);
+
+  /// Moves a still-planned workout (not started, not finished) to [newDate] on
+  /// [executor]. Returns the number of rows changed: 0 means the workout is
+  /// missing or was started/finished in the meantime.
+  Future<int> reschedulePlannedWorkoutIn(
+    DatabaseExecutor executor,
+    String id,
+    DateTime newDate,
+  ) => executor.update(
+    'workouts',
+    {'date': dateKey(newDate)},
+    where: 'id = ? AND start_time IS NULL AND end_time IS NULL',
+    whereArgs: [id],
+  );
 
   Future<Map<String, dynamic>?> getWorkout(String id) async {
     final db = await this.db;

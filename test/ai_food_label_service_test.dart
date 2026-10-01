@@ -27,8 +27,14 @@ class _StubAiService extends AiService {
     required List<Map<String, dynamic>> messages,
     List<Map<String, dynamic>>? tools,
     Object? toolChoice,
-    double temperature = 0.3,
+    double? temperature = 0.3,
     String? reasoningEffort,
+    AiApiStyle apiStyle = AiApiStyle.chatCompletions,
+    bool stream = false,
+    void Function(AiStreamDelta delta)? onDelta,
+    Future<void>? abortTrigger,
+    String? cacheKey,
+    int? maxOutputTokens,
   }) async {
     lastBaseUrl = baseUrl;
     lastToken = token;
@@ -248,6 +254,30 @@ void main() {
       );
     });
 
+    test('throws parse_failed when the reference amount is missing', () async {
+      ai.response = AiChatCompletion(
+        text: jsonEncode({..._validJson()}..remove('reference_amount')),
+      );
+      expect(
+        () => service.analyze(imageBytes: Uint8List.fromList([1])),
+        throwsA(
+          isA<AiFoodLabelException>().having(
+            (e) => e.code,
+            'code',
+            'parse_failed',
+          ),
+        ),
+      );
+    });
+
+    test('the prompt lists every nutrient the parser reads', () async {
+      await service.analyze(imageBytes: Uint8List.fromList([1]));
+      final prompt = ai.lastMessages!.first['content'] as String;
+      for (final key in AiFoodLabelDraft.nutrientKeys) {
+        expect(prompt, contains('"$key"'));
+      }
+    });
+
     test('throws parse_failed when the JSON lacks a name', () async {
       ai.response = AiChatCompletion(text: jsonEncode({'brand': 'X'}));
       expect(
@@ -267,6 +297,8 @@ void main() {
     test('treats missing fields as null, never zero', () {
       final draft = AiFoodLabelDraft.fromJson({
         'name': 'Suco',
+        'reference_amount': 100,
+        'reference_unit': 'g',
         'per': {'calories': 45, 'protein_g': 0},
       });
       expect(draft.values.calories, 45);
@@ -279,6 +311,8 @@ void main() {
     test('accepts numeric strings with comma decimal separator', () {
       final draft = AiFoodLabelDraft.fromJson({
         'name': 'Biscoito',
+        'reference_amount': 100,
+        'reference_unit': 'g',
         'per': {'calories': '120,5', 'fat_g': '3,2'},
       });
       expect(draft.values.calories, closeTo(120.5, 0.001));
@@ -288,6 +322,8 @@ void main() {
     test('parses all supported fat subtypes independently', () {
       final draft = AiFoodLabelDraft.fromJson({
         'name': 'Pasta de amendoim',
+        'reference_amount': 100,
+        'reference_unit': 'g',
         'per': {
           'fat_g': 50,
           'saturated_fat_g': 8,
@@ -306,6 +342,8 @@ void main() {
     test('parses the supported micronutrients and preserves their units', () {
       final draft = AiFoodLabelDraft.fromJson({
         'name': 'Multivitamínico',
+        'reference_amount': 100,
+        'reference_unit': 'g',
         'per': {
           'potassium_mg': 350,
           'calcium_mg': 120,
@@ -324,6 +362,107 @@ void main() {
       expect(draft.values.vitaminCMg, 12);
       expect(draft.values.vitaminDUg, 2.5);
       expect(draft.values.vitaminB12Ug, 0.6);
+    });
+
+    test('rejects a missing or unreadable reference instead of using 100 g', () {
+      for (final reference in <Map<String, dynamic>>[
+        {'reference_unit': 'g'},
+        {'reference_amount': null, 'reference_unit': 'g'},
+        {'reference_amount': 'n/a', 'reference_unit': 'g'},
+        {'reference_amount': 0, 'reference_unit': 'g'},
+        {'reference_amount': 100},
+        {'reference_amount': 100, 'reference_unit': 'null'},
+      ]) {
+        expect(
+          () => AiFoodLabelDraft.fromJson({'name': 'Suco', ...reference}),
+          throwsFormatException,
+          reason: '$reference',
+        );
+      }
+    });
+
+    test('reads the leading number of "12 g", "<1" and "~30 kcal"', () {
+      final draft = AiFoodLabelDraft.fromJson({
+        'name': 'Barra',
+        'reference_amount': '30 g',
+        'reference_unit': 'g',
+        'per': {
+          'calories': '~120 kcal',
+          'protein_g': '12 g',
+          'sugars_g': '<1',
+          'sodium_mg': '1,5 mg',
+          'fat_g': 'abc',
+          'carbs_g': -4,
+        },
+      });
+      expect(draft.referenceAmount, 30);
+      expect(draft.values.calories, 120);
+      expect(draft.values.proteinG, 12);
+      expect(draft.values.sugarsG, 1);
+      expect(draft.values.sodiumMg, 1.5);
+      expect(draft.values.fatG, isNull);
+      expect(draft.values.carbsG, isNull);
+    });
+
+    test('treats the strings "null", "none" and "" as absent', () {
+      final draft = AiFoodLabelDraft.fromJson({
+        'name': 'Água',
+        'brand': 'null',
+        'barcode': '',
+        'reference_amount': 100,
+        'reference_unit': 'ml',
+        'per': {'calories': 'null', 'protein_g': 'N/A', 'fat_g': ''},
+      });
+      expect(draft.brand, isNull);
+      expect(draft.barcode, isNull);
+      expect(draft.values.calories, isNull);
+      expect(draft.values.proteinG, isNull);
+      expect(draft.values.fatG, isNull);
+    });
+
+    test('drops empty and zero servings but keeps real ones', () {
+      final draft = AiFoodLabelDraft.fromJson({
+        'name': 'Pão',
+        'reference_amount': 100,
+        'reference_unit': 'g',
+        'servings': [
+          {'label': '', 'unit': '', 'quantity': 1},
+          {'label': 'fatia', 'unit': 'fatia', 'quantity': 0},
+          {'label': 'null', 'unit': 'null'},
+          {'label': '1 fatia', 'unit': 'fatia', 'grams_equivalent': 0},
+          'not a map',
+        ],
+      });
+      expect(draft.servings, hasLength(1));
+      expect(draft.servings.single.label, '1 fatia');
+      expect(draft.servings.single.quantity, 1);
+      expect(draft.servings.single.gramsEquivalent, isNull);
+    });
+
+    test('flags impossible values for the review', () {
+      final draft = AiFoodLabelDraft.fromJson({
+        'name': 'Estranho',
+        'reference_amount': 100,
+        'reference_unit': 'g',
+        'per': {'calories': 120, 'carbs_g': 250},
+      });
+      expect(draft.problems(), isNotEmpty);
+      expect(
+        AiFoodLabelDraft.fromJson({
+          'name': 'Normal',
+          'reference_amount': 100,
+          'reference_unit': 'g',
+          'per': {'calories': 120, 'carbs_g': 20, 'fat_g': 3},
+        }).problems(),
+        isEmpty,
+      );
+    });
+
+    test('every nutrient key comes from one list', () {
+      expect(AiFoodLabelDraft.nutrientKeys, hasLength(20));
+      expect(AiFoodLabelDraft.nutrientUnit('sodium_mg'), 'mg');
+      expect(AiFoodLabelDraft.nutrientUnit('vitamin_a_ug'), 'µg');
+      expect(AiFoodLabelDraft.nutrientUnit('calories'), 'kcal');
     });
 
     test('round-trips AI food drafts including gram and ml servings', () {

@@ -487,12 +487,80 @@ class PeriodizationRepository extends BaseRepository {
     });
   }
 
+  /// Sets the calorie/macro targets of [phase] from phase week [fromWeek]
+  /// (0-based) through its last week, on [executor] so a caller can fold it
+  /// into its own transaction. Earlier weeks keep their stored targets (lived
+  /// weeks are history and never rewritten); every other field of each week's
+  /// target (training days, run plan, sleep…) is preserved. Returns the number
+  /// of weeks written.
+  Future<int> applyNutritionFromWeekIn(
+    DatabaseExecutor executor,
+    PeriodizationPhase phase, {
+    required int fromWeek,
+    double? calories,
+    double? proteinG,
+    double? carbsG,
+    double? fatG,
+  }) async {
+    if (fromWeek < 0 || fromWeek >= phase.totalWeeks) {
+      throw const PeriodizationValidationException('target_outside_phase');
+    }
+    final rows = await executor.query(
+      'phase_targets',
+      where: 'phase_id = ?',
+      whereArgs: [phase.id],
+    );
+    final history = rows.map(PeriodizationTarget.fromMap).toList();
+    final boundary = phase.startDate.add(Duration(days: 7 * fromWeek));
+    final weeks = <PeriodizationTarget>[
+      for (var week = fromWeek; week < phase.totalWeeks; week++)
+        (_targetForDate(
+                  history,
+                  phase.startDate.add(Duration(days: 7 * week)),
+                ) ??
+                PeriodizationTarget(
+                  id: '',
+                  phaseId: phase.id,
+                  version: 0,
+                  validFrom: boundary,
+                  createdAt: DateTime.now(),
+                ))
+            .copyWith(
+              calories: calories,
+              proteinG: proteinG,
+              carbsG: carbsG,
+              fatG: fatG,
+            ),
+    ];
+    _validateWeeklyWindow(boundary, phase.startDate, phase.endDate, weeks);
+    await _replaceTargetsFrom(
+      executor,
+      phaseId: phase.id,
+      phaseEnd: phase.endDate,
+      boundary: boundary,
+      weeks: weeks,
+    );
+    return weeks.length;
+  }
+
   /// The effective target of each phase week (index 0 = first week), read
   /// at each week's start. Null entries are weeks without any target.
   Future<List<PeriodizationTarget?>> getWeeklyTargets(
     PeriodizationPhase phase,
+  ) async => getWeeklyTargetsIn(await db, phase);
+
+  /// [getWeeklyTargets] on an explicit executor.
+  Future<List<PeriodizationTarget?>> getWeeklyTargetsIn(
+    DatabaseExecutor database,
+    PeriodizationPhase phase,
   ) async {
-    final history = await getTargetHistory(phase.id);
+    final rows = await database.query(
+      'phase_targets',
+      where: 'phase_id = ?',
+      whereArgs: [phase.id],
+      orderBy: 'version DESC',
+    );
+    final history = rows.map(PeriodizationTarget.fromMap).toList();
     return [
       for (var week = 0; week < phase.totalWeeks; week++)
         history.isEmpty
@@ -700,8 +768,14 @@ class PeriodizationRepository extends BaseRepository {
     return rows.map(PeriodizationPhase.fromMap).toList();
   }
 
-  Future<PeriodizationPhase?> getPhase(String id) async {
-    final database = await db;
+  Future<PeriodizationPhase?> getPhase(String id) async =>
+      getPhaseIn(await db, id);
+
+  /// [getPhase] on an explicit executor.
+  Future<PeriodizationPhase?> getPhaseIn(
+    DatabaseExecutor database,
+    String id,
+  ) async {
     final rows = await database.query(
       'periodization_phases',
       where: 'id = ?',

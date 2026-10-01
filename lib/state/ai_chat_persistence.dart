@@ -1,39 +1,36 @@
 part of 'ai_chat_service.dart';
 
-/// Persists chat transcripts and finalises approved routine proposals.
+/// Persistence by explicit thread id: nothing here reads "the active thread"
+/// to decide where a message goes, so a turn running in one conversation can
+/// never write into another.
 extension _AiChatPersistence on AiChatService {
-  Future<String> _ensureThread(
-    List<AiChatMessage> messages,
-    DateTime now,
-    String firstUserText,
-  ) async {
-    if (_state.activeThreadId != null) return _state.activeThreadId!;
+  /// The open conversation, or a new one titled after [firstUserText].
+  Future<String> _ensureThread(DateTime now, String firstUserText) async {
+    final active = _state.activeThreadId;
+    if (active != null) return active;
     final id = _uuid.v4();
-    final title = firstUserText.length > 48
-        ? '${firstUserText.substring(0, 45)}…'
-        : firstUserText;
-    // An empty title is the neutral marker: the UI localizes it.
-    final resolvedTitle = title.isEmpty ? AiChatThread.genericTitle : title;
-    final preview = firstUserText.length > 96
-        ? '${firstUserText.substring(0, 93)}…'
-        : firstUserText;
+    // An empty title is the neutral marker the UI localizes (e.g. a message
+    // with images only).
+    final title = _autoTitle(firstUserText);
+    final preview = _preview(firstUserText);
     await _db.aiChatRepo.upsertAiChatThread(
       id: id,
-      title: resolvedTitle,
+      title: title,
       createdAt: now,
       updatedAt: now,
       lastMessagePreview: preview,
-      isPinned: false,
     );
-    // Keep the just-created thread in memory before the first turn is
-    // persisted. Otherwise `_persistCurrentThread` cannot resolve it and
-    // overwrites its descriptive title with the generic marker.
+    _persistedMessages.clear();
     _state = _state.copyWith(
+      activeThreadId: id,
+      messages: const [],
+      proposals: const [],
+      hasOlderMessages: false,
       totalThreadCount: (_state.totalThreadCount ?? _state.threads.length) + 1,
       threads: [
         AiChatThread(
           id: id,
-          title: resolvedTitle,
+          title: title,
           createdAt: now,
           updatedAt: now,
           lastMessagePreview: preview,
@@ -44,61 +41,61 @@ extension _AiChatPersistence on AiChatService {
     return id;
   }
 
-  Future<void> _persistCurrentThread() async {
-    final id = _state.activeThreadId;
-    if (id == null) return;
-    try {
-      final preview = _lastUserOrAssistantPreview();
-      // A thread opened from search may not be among the loaded pages; read
-      // its stored row so title, creation time and pin are never reset.
-      final existing = _state.activeThread ?? await _loadStoredThread(id);
-      final now = DateTime.now();
-      final thread = AiChatThread(
-        id: id,
-        title: existing?.title ?? AiChatThread.genericTitle,
-        createdAt: existing?.createdAt ?? now,
-        updatedAt: now,
-        lastMessagePreview: preview,
-        isPinned: existing?.isPinned ?? false,
-      );
-      await _db.aiChatRepo.upsertAiChatThread(
-        id: id,
-        title: thread.title,
-        createdAt: thread.createdAt,
-        updatedAt: thread.updatedAt,
-        lastMessagePreview: preview,
-        isPinned: thread.isPinned,
-      );
-      // Messages are immutable: the same instance as the last save is clean
-      // without encoding it again. Others are encoded once and only written
-      // when their row really changed.
-      final changedRows = <Map<String, dynamic>>[];
-      final seen = <String, ({AiChatMessage message, String signature})>{};
-      for (final message in _state.messages) {
-        if (message.role == AiMessageRole.system) continue;
-        final known = _persistedMessages[message.id];
-        if (identical(known?.message, message)) continue;
-        final row = message.toRow()..['thread_id'] = id;
-        final signature = jsonEncode(row);
-        if (known?.signature != signature) changedRows.add(row);
-        seen[message.id] = (message: message, signature: signature);
-      }
-      await _db.aiChatRepo.upsertAiChatMessages(id, changedRows);
-      _persistedMessages.addAll(seen);
-      _upsertThreadInMemory(thread);
-    } catch (error) {
-      debugPrint('Saving the AI chat thread failed: $error');
+  static String _autoTitle(String text) => text.length > 48
+      ? '${text.substring(0, 45)}…'
+      : (text.isEmpty ? AiChatThread.genericTitle : text);
+
+  static String _preview(String text) =>
+      text.length > 96 ? '${text.substring(0, 93)}…' : text;
+
+  /// Writes [messages] of [threadId]; unchanged instances are skipped.
+  Future<void> _persistMessages(
+    String threadId,
+    List<AiChatMessage> messages,
+  ) async {
+    final rows = <Map<String, dynamic>>[];
+    for (final message in messages) {
+      if (identical(_persistedMessages[message.id], message)) continue;
+      rows.add(message.toRow()..['thread_id'] = threadId);
+    }
+    if (rows.isEmpty) return;
+    await _db.aiChatRepo.upsertAiChatMessages(threadId, rows);
+    for (final message in messages) {
+      _persistedMessages[message.id] = message;
     }
   }
 
-  Future<AiChatThread?> _loadStoredThread(String id) async {
-    final row = await _db.aiChatRepo.getAiChatThread(id);
-    return row == null ? null : AiChatThread.fromRow(row);
+  /// Bumps the thread's update time and preview after a turn.
+  Future<void> _touchThread(String threadId) async {
+    final row = await _db.aiChatRepo.getAiChatThread(threadId);
+    if (row == null) return;
+    final stored = AiChatThread.fromRow(row);
+    final last = await _db.aiChatRepo.getAiChatMessagesPage(threadId, limit: 6);
+    String? preview;
+    for (final r in last.reversed) {
+      final m = AiChatMessage.fromRow(r);
+      if ((m.isUser || m.isAssistant) && (m.content?.isNotEmpty ?? false)) {
+        preview = _preview(m.content!);
+        break;
+      }
+    }
+    final thread = stored.copyWith(
+      updatedAt: _clock(),
+      lastMessagePreview: preview ?? stored.lastMessagePreview,
+    );
+    await _db.aiChatRepo.upsertAiChatThread(
+      id: thread.id,
+      title: thread.title,
+      createdAt: thread.createdAt,
+      updatedAt: thread.updatedAt,
+      lastMessagePreview: thread.lastMessagePreview,
+      isPinned: thread.isPinned,
+    );
+    _upsertThreadInMemory(thread);
   }
 
   /// Keeps the loaded thread list in step with a save without reloading it:
-  /// the saved thread moves to the top of its pinned/unpinned group
-  /// (`is_pinned DESC, updated_at DESC`) and loaded pages are preserved.
+  /// the thread moves to the top of its pinned/unpinned group.
   void _upsertThreadInMemory(AiChatThread thread) {
     final threads = [
       for (final t in _state.threads)
@@ -115,120 +112,40 @@ extension _AiChatPersistence on AiChatService {
     _emit();
   }
 
-  void _replaceProposal(AiRoutineProposal proposal, {bool notify = true}) {
-    final proposals = [..._state.routineProposals];
-    final index = proposals.indexWhere((item) => item.id == proposal.id);
-    if (index == -1) {
-      proposals.add(proposal);
-    } else {
-      proposals[index] = proposal;
+  /// Appends an app event to [threadId] (persisted; shown in the open
+  /// conversation as a status line and sent to the model as `<app_event>`).
+  Future<void> _appendEvent(String threadId, Map<String, dynamic> event) async {
+    final message = AiChatMessage(
+      id: _uuid.v4(),
+      threadId: threadId,
+      role: AiMessageRole.event,
+      content: jsonEncode(event),
+      createdAt: _nextTimestamp(),
+    );
+    await _persistMessages(threadId, [message]);
+    if (_state.activeThreadId == threadId) {
+      _state = _state.copyWith(messages: [..._state.messages, message]);
+      _emit();
     }
-    _state = _state.copyWith(routineProposals: proposals);
+  }
+
+  void _replaceMessageInState(AiChatMessage message, {bool notify = true}) {
+    final index = _state.messages.indexWhere((m) => m.id == message.id);
+    if (index < 0) return;
+    final messages = [..._state.messages];
+    messages[index] = message;
+    _state = _state.copyWith(messages: messages);
     if (notify) _emit();
   }
 
-  Future<void> _sendAppliedProposalSummary(AiRoutineProposal proposal) async {
-    if (_settings == null || !_settings!.isConfigured) return;
-    final provider = _settings!.activeProvider!;
-    final token = await _settings!.getToken(provider.id);
-    if (token == null || token.isEmpty || provider.selectedModel.isEmpty) {
-      return;
-    }
-    _state = _state.copyWith(
-      phase: AiTurnPhase.sending,
-      phaseMessage: 'finalising',
-      clearError: true,
-    );
-    _emit();
-    try {
-      final context = await _context.build(mode: _settings!.contextMode);
-      final wire = _buildWireMessages(
-        _state.messages,
-        _TurnWireOptions(
-          systemPrompt: _settings!.effectiveSystemPrompt,
-          contextJson: context,
-        ),
-      );
-      wire.add({
-        'role': 'user',
-        'content': appliedProposalEventPrompt(
-          proposal,
-          languageCode: _settings!.appLanguageCode,
-        ),
-      });
-      final completion = await _service.sendChat(
-        baseUrl: provider.baseUrl,
-        token: token,
-        model: provider.selectedModel,
-        reasoningEffort: provider.reasoningEffortFor().apiValue,
-        messages: wire,
-      );
-      final text = completion.text?.trim();
-      if (text == null || text.isEmpty) {
-        throw const AiServiceException(
-          'Resumo vazio.',
-          code: 'invalid_response',
-        );
-      }
-      final summary = AiChatMessage(
-        id: _uuid.v4(),
-        threadId: _state.activeThreadId ?? '',
-        role: AiMessageRole.assistant,
-        content: text,
-        createdAt: DateTime.now(),
-      );
-      _state = _state.copyWith(
-        messages: [..._state.messages, summary],
-        phase: AiTurnPhase.idle,
-        phaseMessage: null,
-      );
-      await _db.aiChatRepo.updateAiRoutineProposal(proposal.id, {
-        'error_code': null,
-        'error_message': null,
-      });
-      final refreshed = await _routineMutations.getProposal(proposal.id);
-      if (refreshed != null) _replaceProposal(refreshed, notify: false);
-      _emit();
-      await _persistCurrentThread();
-    } catch (_) {
-      // The routine is already committed. Keep it applied and expose a retry
-      // on the proposal card instead of risking a second mutation.
-      await _db.aiChatRepo.updateAiRoutineProposal(proposal.id, {
-        'error_code': 'summary_pending',
-        'error_message': 'Resumo da IA pendente.',
-      });
-      final refreshed = await _routineMutations.getProposal(proposal.id);
-      if (refreshed != null) _replaceProposal(refreshed, notify: false);
-      _state = _state.copyWith(phase: AiTurnPhase.idle, phaseMessage: null);
-      _emit();
+  /// A retry deleted the message the summary was cut at: the summary
+  /// describes messages that no longer exist, so it is dropped.
+  Future<void> _resetSummaryIfCutDeleted(String threadId) async {
+    final row = await _db.aiChatRepo.getAiChatThreadSummary(threadId);
+    final cut = row?['through_message_id'] as String?;
+    if (cut == null) return;
+    if (!await _db.aiChatRepo.messageExists(cut)) {
+      await _db.aiChatRepo.deleteAiChatThreadSummary(threadId);
     }
   }
-
-  String? _lastUserOrAssistantPreview() {
-    for (var i = _state.messages.length - 1; i >= 0; i--) {
-      final m = _state.messages[i];
-      if (m.isUser || m.isAssistant) {
-        final text = m.content;
-        if (text == null || text.isEmpty) continue;
-        return text.length > 96 ? '${text.substring(0, 93)}…' : text;
-      }
-    }
-    return null;
-  }
-}
-
-/// Internal event that asks the model to summarise an applied proposal. The
-/// reply language follows the app language the user picked in Settings.
-String appliedProposalEventPrompt(
-  AiRoutineProposal proposal, {
-  required String languageCode,
-}) {
-  final language = languageCode == 'pt' ? 'português brasileiro' : 'inglês';
-  final confirmed = jsonEncode({
-    'action': proposal.action.storageValue,
-    'routineName': proposal.routineName,
-    'routineId': proposal.appliedRoutineId,
-    'diff': proposal.diff,
-  });
-  return 'EVENTO INTERNO DO APP: a proposta foi aplicada com sucesso. Responda agora, em $language, com um resumo breve e factual do que foi feito. Não use ferramentas e não diga que houve aprovação pendente. Dados confirmados: $confirmed';
 }

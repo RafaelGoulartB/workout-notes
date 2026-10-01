@@ -1,100 +1,35 @@
+import 'package:workout_notes/models/ai_tool_domain.dart';
+import 'package:workout_notes/services/ai_tool_deps.dart';
 import 'package:workout_notes/services/ai_tool_spec.dart';
-import 'package:workout_notes/utils/date_utils.dart';
+
+const _scopes = ['anaerobic', 'aerobic'];
+const _metrics = ['volume', 'days', 'distance', 'time'];
 
 /// Goal tools.
 List<AiToolSpec> goalToolSpecs(AiToolDeps d) => [
   AiToolSpec(
     name: 'list_goals',
-    description: 'Lista metas (goals) ativas com progresso atual.',
+    description:
+        'Weekly/monthly goals: unit, target, current value, progress_pct. '
+        'history_periods adds past periods per goal.',
+    domain: AiToolDomain.goals,
     properties: {
-      'scope': {'type': 'string', 'description': 'anaerobic ou aerobic.'},
-      'metric': {
-        'type': 'string',
-        'description': 'volume, days, distance ou time.',
-      },
-      'is_active': {'type': 'boolean', 'default': true},
+      'scope': AiParam.enumOf(_scopes, 'Strength or cardio.'),
+      'metric': AiParam.enumOf(_metrics, 'Goal metric.'),
+      'history_periods': AiParam.integer('Past periods (default 0).', min: 0, max: 12),
     },
-    handler: (a) async {
-      final scope = a['scope'] as String?;
-      final metric = a['metric'] as String?;
-      final activeOnly = (a['is_active'] as bool?) ?? true;
-      final goals = await d.goalRepo.getAll(activeOnly: activeOnly);
-      final filtered = goals.where(
-        (g) =>
-            (scope == null || g.scope.value == scope) &&
-            (metric == null || g.metric.value == metric),
-      );
-      final out = await Future.wait(
-        filtered.map((g) async {
-          try {
-            final p = await d.goalRepo.getProgress(g);
-            return <String, dynamic>{
-              'id': g.id,
-              'title': g.title,
-              'scope': g.scope.value,
-              'metric': g.metric.value,
-              'period': g.period.value,
-              'currentValue': p.currentValue,
-              'targetValue': p.targetValue,
-              'progressPct': p.percent,
-              'isComplete': p.isComplete,
-              'daysRemaining': p.daysRemaining,
-            };
-          } catch (_) {
-            return <String, dynamic>{
-              'id': g.id,
-              'title': g.title,
-              'scope': g.scope.value,
-              'metric': g.metric.value,
-              'period': g.period.value,
-              'targetValue': g.targetValue,
-            };
-          }
-        }),
-      );
-      return aiToolOk({'goals': out});
-    },
-  ),
-  AiToolSpec(
-    name: 'get_goal_progress_history',
-    description: 'Progresso de uma meta nos últimos N períodos.',
-    properties: {
-      'goal_id': {'type': 'string'},
-      'periods_back': {'type': 'integer', 'default': 6},
-    },
-    required: ['goal_id'],
-    handler: (a) async {
-      final id = (a['goal_id'] as String?) ?? (a['goalId'] as String?);
-      if (id == null) return aiToolOk({'error': 'goal_id é obrigatório'});
-      final periods = a.boundedInt('periods', 6, 1, 12);
-      final goal = await d.goalRepo.getById(id);
-      if (goal == null) return aiToolOk({'error': 'meta não encontrada'});
-      final (current, history) = await d.goalRepo.getProgressWithHistory(
-        goal,
-        historyCount: periods,
-      );
-      return aiToolOk({
-        'goalId': id,
-        'title': goal.title,
-        'current': {
-          'currentValue': current.currentValue,
-          'targetValue': current.targetValue,
-          'progressPct': current.percent,
-          'isComplete': current.isComplete,
-          'daysRemaining': current.daysRemaining,
-        },
-        'history': history
-            .map(
-              (r) => {
-                'start': dateKey(r.start),
-                'end': dateKey(r.end),
-                'value': r.value,
-                'targetValue': r.targetValue,
-                'wasCompleted': r.wasCompleted,
-              },
-            )
-            .toList(),
-      });
-    },
+    handler: (a) async => aiToolOk(
+      await d.goals.listGoals(
+        scope: a.enumValue('scope', _scopes),
+        metric: a.enumValue('metric', _metrics),
+        activeOnly: true,
+        historyPeriods: a.integer(
+          'history_periods',
+          fallback: 0,
+          min: 0,
+          max: 12,
+        ),
+      ),
+    ),
   ),
 ];

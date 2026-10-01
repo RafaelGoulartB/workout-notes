@@ -9,99 +9,64 @@ import 'package:workout_notes/models/ai_chat_message.dart';
 import 'package:workout_notes/models/ai_chat_state.dart';
 import 'package:workout_notes/models/ai_chat_thread.dart';
 import 'package:workout_notes/models/ai_image_attachment.dart';
+import 'package:workout_notes/models/ai_memory.dart';
 import 'package:workout_notes/models/ai_message_role.dart';
+import 'package:workout_notes/models/ai_proposal.dart';
 import 'package:workout_notes/models/ai_provider.dart';
-import 'package:workout_notes/models/ai_routine_proposal.dart';
 import 'package:workout_notes/models/ai_tool_call.dart';
-import 'package:workout_notes/models/nutrition/ai_manual_food_proposal.dart';
+import 'package:workout_notes/models/ai_tool_domain.dart';
 import 'package:workout_notes/services/ai_context_service.dart';
 import 'package:workout_notes/services/ai_image_attachment_store.dart';
-import 'package:workout_notes/services/ai_routine_mutation_service.dart';
+import 'package:workout_notes/services/ai_memory_service.dart';
+import 'package:workout_notes/services/ai_prompts.dart';
+import 'package:workout_notes/services/ai_proposal_service.dart';
 import 'package:workout_notes/services/ai_service.dart';
 import 'package:workout_notes/services/ai_tool_registry.dart';
 import 'package:workout_notes/state/ai_settings_notifier.dart';
+import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/utils/text_sanitizer.dart';
 import 'package:workout_notes/utils/token_estimator.dart';
 
 part 'ai_chat_persistence.dart';
 part 'ai_chat_threads.dart';
+part 'ai_chat_turn.dart';
 part 'ai_chat_wire.dart';
 
 const _uuid = Uuid();
 
-/// Upper bound on tool rounds per turn. The real limiter is
+/// Upper bound on provider rounds per turn. The real limiter is
 /// [kMaxTurnInputTokens]; this only stops a model that loops forever.
-const int kMaxToolRounds = 8;
+const int kMaxToolRounds = 10;
 
-/// Once a request (history + tool results + schema) is estimated above this,
-/// the next provider call is made without tools so the turn ends.
-const int kMaxTurnInputTokens = 48000;
+/// Once a request is estimated (or reported) above this, the next round is
+/// the final one: same tools, `tool_choice: none`, the model must answer.
+const int kMaxTurnInputTokens = 60000;
 
-/// Prior conversation kept on the wire. Anything older is summarised.
-const int kHistoryTokenBudget = 24000;
-const int kTargetInputTokenBudget = 32000;
-const int kMinHistoryTokenBudget = 4000;
+/// Target size of a request at the start of a turn (static prompt + tools +
+/// summary + history). History beyond it is folded into the summary.
+const int kTargetInputTokens = 36000;
+const int kMaxHistoryTokens = 28000;
+const int kMinHistoryTokens = 6000;
 
-/// A single tool result larger than this is cut on the wire (about 2.3k
-/// tokens) with a marker telling the model to narrow the query. Several
-/// rounds of analytics results add up fast, and slow providers time out on
-/// requests past ~60k characters.
-const int kMaxToolResultChars = 8000;
-const int kMaxInvalidAnswerRegenerations = 2;
-const int kMaxMissingToolCallRetries = 1;
-const String _dataGroundingPolicy = r'''# Consulta obrigatória aos dados do app
-As ferramentas são a fonte primária para fatos pessoais do usuário. Quando a solicitação depender de treino, sono, nutrição, medidas, metas, rotinas ou qualquer outro dado registrado, consulte a ferramenta relevante neste turno antes de responder. Não substitua a consulta por conhecimento geral, inferência ou lembrança de uma resposta anterior.
+/// Compaction hysteresis: compact when history passes [kCompactHighWater] of
+/// its budget, down to [kCompactLowWater]. Between two compactions the
+/// history prefix is byte-identical, so providers serve it from cache, and
+/// the summary call happens once every several turns instead of every turn.
+const double kCompactHighWater = 0.9;
+const double kCompactLowWater = 0.5;
 
-Interprete continuações usando a conversa recente. Se o usuário mudar apenas o domínio, preserve os qualificadores ainda aplicáveis do pedido anterior, especialmente período, comparação e objetivo. Exemplo: depois de um resumo da última semana, "E o sono?" exige consultar o resumo de sono para o mesmo período. O usuário nunca precisa pedir explicitamente que você use uma tool.
-
-Todo o catálogo de ferramentas está sempre disponível; escolha pela descrição. Você pode chamar a mesma ferramenta mais de uma vez com parâmetros diferentes (outra página, outro período, outro identificador) e cruzar domínios no mesmo turno. Se um resultado vier marcado como truncado, refine a consulta em vez de deduzir o que faltou. Se uma consulta falhar ou não tiver registros suficientes, informe isso; nunca complete a lacuna com dados inventados.
-
-Para alimentação, escolha a ferramenta mais específica: diário do dia para refeições e itens consumidos; histórico para totais por dia; micronutrientes para vitaminas, minerais, fibras, açúcares e sódio; biblioteca para alimentos cadastrados; refeições salvas para modelos; perfil para meta e tipos de refeição. Preserve `null` como dado não informado, nunca como zero.
-
-Para treinos de força, escolha a ferramenta mais específica: histórico para localizar treinos por período ou status; detalhe para horários, rotina de origem, exercícios, supersets, descanso, notas e todas as séries; perfil do exercício para equipamento e configuração; histórico e recordes para desempenho específico; resumo do período para frequência, RPE, densidade, grupos e carga total. Para corrida e bicicleta, use histórico de atividades para localizar a sessão, detalhe para rota agregada e planejado versus realizado, progresso para tendências e comparação entre períodos, conquistas para recordes, e plano/agenda para aderência. Diferencie sempre `completed`, `in_progress` e `planned`. Ao descrever trabalho executado, use apenas dados concluídos e não apresente sessões planejadas como realizadas.
-
-# Propostas de alimentos manuais (política fixa)
-Quando o usuário pedir para criar ou cadastrar um alimento, use `propose_manual_food_creation`. Identifique a descrição com precisão e preencha o máximo possível dos dados suportados: nome, marca e código somente quando conhecidos, referência nutricional, calorias, macronutrientes, tipos de gordura, fibras, açúcares, sódio, micronutrientes e porções comuns.
-
-Para alimentos genéricos, use valores típicos plausíveis e marque nas notas o preparo, a variedade ou a estimativa assumida. Para produtos de marca sem rótulo suficiente, não invente números exatos nem código de barras: use apenas o que o usuário forneceu e deixe os demais campos ausentes. Faça uma pergunta somente se a ambiguidade impedir uma prévia útil; caso contrário, gere a melhor prévia editável possível.
-
-A ferramenta nunca salva o alimento. Explique que a prévia precisa ser aprovada e que a aprovação apenas abrirá o formulário manual preenchido; a criação só acontecerá quando o usuário revisar e tocar em Salvar nessa tela.''';
-const String _routineMutationPolicy = r'''# Propostas de rotina (política fixa)
-Você pode preparar uma proposta quando isso cumprir o pedido do usuário ou transformar uma recomendação relevante em uma prévia útil. Interprete a intenção pelo significado e pelo contexto da conversa, sem exigir palavras-chave ou uma formulação específica.
-
-Quando houver esse pedido, você DEVE usar ferramentas; não responda dizendo que não consegue criar a rotina. Siga este fluxo:
-1. Para criação, chame `list_exercises` para obter IDs reais dos exercícios necessários.
-2. Para edição, chame `list_routines` e depois `get_routine_detail`; preserve os campos `source_*_id` retornados.
-3. Seja proativo: se faltarem nome, divisão, séries, repetições ou descanso, NÃO peça uma lista de detalhes. Use a solicitação atual, a conversa anterior e os dados do app para decidir. Se o usuário disser “crie essa rotina”, a rotina mencionada/sugerida anteriormente na conversa é a especificação principal.
-4. Na ausência de preferência explícita, escolha uma divisão equilibrada coerente com a frequência e os grupos musculares disponíveis, 3 séries de trabalho por exercício, faixas de 8–12 repetições para musculação e 90 segundos de descanso. Dê um nome descritivo à rotina. Essas escolhas são uma prévia segura porque o usuário ainda precisa aprovar.
-5. Chame `propose_routine_change` com a árvore final completa. Campos opcionais podem ser omitidos; não escreva null se não precisar do campo.
-6. Só faça uma pergunta em vez de propor se não houver exercício compatível na biblioteca ou se houver uma restrição de segurança relevante. Caso contrário, entregue a proposta para aprovação quando ela ajudar a concluir a tarefa.
-7. Depois do resultado da ferramenta, explique que a prévia está disponível para aprovação.
-
-`propose_routine_change` apenas prepara a prévia: ela não aplica nada. Nunca diga que criou ou editou uma rotina antes da aprovação e do resultado confirmado pelo app. Após uma aprovação, resuma somente os fatos retornados pelo app.''';
-const String _manualFoodProposalPrompt =
-    r'''Você prepara rascunhos de alimentos para revisão humana em um app de nutrição.
-
-Quando solicitado, chame `propose_manual_food_creation` uma única vez. Identifique o alimento e preencha o máximo possível de: nome, marca e código de barras quando realmente conhecidos; referência em g ou ml; calorias; proteínas; carboidratos; gorduras e seus tipos; fibras; açúcares; sódio; potássio; cálcio; ferro; magnésio; zinco; vitaminas A, C, D e B12; e porções comuns.
-
-Para alimentos genéricos, use valores típicos plausíveis e informe em `notes` o preparo ou variedade assumidos. Para produtos de marca sem rótulo suficiente, não invente valores exatos nem código de barras. Todos os nutrientes devem corresponder à quantidade de referência. A ferramenta só cria uma prévia: o usuário ainda revisará e salvará o formulário.''';
-const String _manualFoodJsonFallbackPrompt =
-    r'''Converta o pedido do usuário em um único objeto JSON, sem markdown nem comentários, usando exatamente esta estrutura:
-{"name":"...","brand":"... opcional","barcode":"... opcional","reference_amount":100,"reference_unit":"g ou ml","per":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"saturated_fat_g":0,"monounsaturated_fat_g":0,"polyunsaturated_fat_g":0,"trans_fat_g":0,"fiber_g":0,"sugars_g":0,"sodium_mg":0,"potassium_mg":0,"calcium_mg":0,"iron_mg":0,"magnesium_mg":0,"zinc_mg":0,"vitamin_a_ug":0,"vitamin_c_mg":0,"vitamin_d_ug":0,"vitamin_b12_ug":0},"servings":[{"label":"...","quantity":1,"unit":"...","grams_equivalent":0,"ml_equivalent":0}],"notes":"..."}
-
-Omita campos opcionais ou nutrientes que não puder identificar com segurança; não escreva null. Para alimentos genéricos, use valores típicos plausíveis e descreva a hipótese em notes. Todos os nutrientes devem corresponder à quantidade de referência.''';
-const String _threadSummaryPrompt =
-    r'''Você mantém o resumo compacto de uma conversa entre um usuário e seu treinador de IA em um app de treino, sono e nutrição. Atualize o resumo incorporando as novas mensagens.
-
-Preserve: objetivos, preferências e restrições do usuário; decisões tomadas; recomendações dadas; rotinas, planos ou alimentos propostos e se foram aprovados; períodos, métricas e números citados; pendências ou perguntas em aberto. Descarte cumprimentos e repetições.
-
-Escreva em português brasileiro, em texto corrido ou lista curta, com no máximo 250 palavras. Não invente nada que não esteja nas mensagens ou no resumo atual. Responda somente com o resumo atualizado.''';
+/// A tool result larger than this is shortened on the wire (valid JSON with
+/// a note asking the model to narrow the query). Tools already cap their own
+/// output well below it; this is a safety net.
+const int kMaxToolResultChars = 12000;
 
 /// Singleton orchestrator for AI chat turns. Owns the chat state.
 ///
-/// Uses [AiSettingsNotifier] for provider config, [AiService] for HTTP,
-/// [AiContextService] for system-prompt context injection and
-/// [AiToolRegistry] for read tool execution.
+/// A turn is bound to the conversation it started in ([_TurnContext]): it
+/// keeps running and persisting there even if the user opens another
+/// conversation, starts a new one or leaves the screen. Only one turn runs at
+/// a time; [cancelTurn] stops it for real (the HTTP request is aborted).
 class AiChatService extends ChangeNotifier {
   static final AiChatService instance = AiChatService._();
 
@@ -109,24 +74,36 @@ class AiChatService extends ChangeNotifier {
 
   final DatabaseHelper _db = DatabaseHelper.instance;
   AiService _service = AiService.shared;
-  AiToolRegistry _tools = AiToolRegistry();
+  AiToolRegistry? _toolsOverride;
+  AiToolRegistry? _toolsInstance;
+  AiProposalService? _proposalsInstance;
+  AiMemoryService _memory = AiMemoryService.instance;
   AiContextService _context = AiContextService();
-  AiRoutineMutationService _routineMutations = AiRoutineMutationService();
   AiImageAttachmentStore _imageStore = const AiImageAttachmentStore();
+  DateTime Function() _clock = DateTime.now;
   AiSettingsNotifier? _settings;
   bool _isReady = false;
   Future<void>? _readyFuture;
 
-  /// Last persisted instance and row signature per message id. Messages are
-  /// immutable, so an identical instance is known-clean without re-encoding.
-  final Map<String, ({AiChatMessage message, String signature})>
-  _persistedMessages = {};
-  _AiTurnDiagnostics? _activeTurnDiagnostics;
-  String? _activeReasoningEffort;
+  AiToolRegistry get _tools =>
+      _toolsOverride ?? (_toolsInstance ??= AiToolRegistry());
+  AiProposalService get _proposals =>
+      _proposalsInstance ??= AiProposalService();
+
+  /// Last persisted instance per message id: an identical instance is
+  /// known-clean and is not written again.
+  final Map<String, AiChatMessage> _persistedMessages = {};
+
+  _TurnContext? _turn;
+  DateTime _lastTimestamp = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// Multiplier applied to the chars-per-token heuristic, learned from the
-  /// `prompt_tokens` the provider reports. See `_calibrateTokenScale`.
+  /// `prompt_tokens` the provider reports. Kept in memory only.
   double _tokenScale = 1.0;
+
+  /// Encoded tool schema and its length per enabled-domain set.
+  final Map<String, ({List<Map<String, dynamic>> schema, int chars})>
+  _schemaCache = {};
 
   AiChatState _state = const AiChatState();
 
@@ -139,19 +116,40 @@ class AiChatService extends ChangeNotifier {
   void overrideForTest({
     AiService? service,
     AiToolRegistry? tools,
+    AiProposalService? proposals,
+    AiMemoryService? memory,
     AiContextService? context,
-    AiRoutineMutationService? routineMutations,
     AiImageAttachmentStore? imageStore,
+    DateTime Function()? clock,
+    AiSettingsNotifier? settings,
   }) {
     if (service != null) _service = service;
-    if (tools != null) _tools = tools;
+    if (tools != null) _toolsOverride = tools;
+    if (proposals != null) _proposalsInstance = proposals;
+    if (memory != null) _memory = memory;
     if (context != null) _context = context;
-    if (routineMutations != null) _routineMutations = routineMutations;
     if (imageStore != null) _imageStore = imageStore;
+    if (clock != null) _clock = clock;
+    if (settings != null) _settings = settings;
+    _schemaCache.clear();
   }
 
-  /// Wires the settings notifier. Must be called once at app boot
-  /// (after `SharedPreferences.getInstance()`).
+  /// Forgets every in-memory conversation state (tests, and after a backup
+  /// restore replaced the AI tables).
+  void reset() {
+    _turn?.cancel();
+    _turn = null;
+    _state = const AiChatState();
+    _persistedMessages.clear();
+    _schemaCache.clear();
+    _toolsInstance = null;
+    _isReady = false;
+    _readyFuture = null;
+    _context.invalidate();
+    _emit();
+  }
+
+  /// Wires the settings notifier. Must be called once at app boot.
   static Future<AiChatService> bootstrap({
     required AiSettingsNotifier settings,
   }) async {
@@ -181,16 +179,8 @@ class AiChatService extends ChangeNotifier {
 
   Future<void> _cleanupOrphanedImages() async {
     try {
-      final db = await _db.database;
-      final rows = await db.query(
-        'ai_chat_messages',
-        columns: ['attachments_json'],
-        where: 'attachments_json IS NOT NULL',
-      );
       final retained = <String>{};
-      for (final row in rows) {
-        final raw = row['attachments_json'] as String?;
-        if (raw == null) continue;
+      for (final raw in await _db.aiChatRepo.getAllAttachmentsJson()) {
         final decoded = jsonDecode(raw);
         if (decoded is! List) continue;
         for (final item in decoded) {
@@ -199,1056 +189,457 @@ class AiChatService extends ChangeNotifier {
           }
         }
       }
+      // A message being written right now is not in the table yet.
+      for (final message in [..._state.messages, ...?_turn?.messages]) {
+        for (final attachment in message.attachments) {
+          retained.add(attachment.path);
+        }
+      }
       await _imageStore.deleteOrphans(retained);
-    } catch (_) {
-      // Orphan image cleanup is best-effort; retried on the next run.
+    } catch (error) {
+      // Orphan image cleanup is best-effort; retried on the next launch.
+      debugPrint('AI image cleanup failed: $error');
     }
   }
+
+  /// Strictly increasing message timestamps (millisecond precision), so the
+  /// `(created_at, id)` order always matches the order of the conversation.
+  DateTime _nextTimestamp() {
+    var now = _clock();
+    now = DateTime.fromMillisecondsSinceEpoch(now.millisecondsSinceEpoch);
+    if (!now.isAfter(_lastTimestamp)) {
+      now = _lastTimestamp.add(const Duration(milliseconds: 1));
+    }
+    _lastTimestamp = now;
+    return now;
+  }
+
+  /// The catalog for [domains]: read tools, proposal tools and memory tools,
+  /// in a stable order. Encoded once per domain set: the catalog only changes
+  /// when the user changes the enabled domains.
+  ({List<Map<String, dynamic>> schema, int chars}) _toolSchema(
+    Set<AiToolDomain> domains,
+  ) {
+    final key = (domains.map((d) => d.name).toList()..sort()).join(',');
+    return _schemaCache[key] ??= () {
+      final schema = [
+        ..._tools.readToolsSchema(domains: domains),
+        for (final spec in _proposals.toolSpecs())
+          if (domains.contains(spec.domain)) spec.schema,
+        for (final spec in _memory.toolSpecs()) spec.schema,
+      ];
+      return (schema: schema, chars: jsonEncode(schema).length);
+    }();
+  }
+
+  /// Arguments with sorted keys (to compare two calls).
+  static Object? _sortedArgs(Object? value) {
+    if (value is Map) {
+      final keys = value.keys.map((k) => '$k').toList()..sort();
+      return {for (final k in keys) k: _sortedArgs(value[k])};
+    }
+    if (value is List) return value.map(_sortedArgs).toList();
+    return value;
+  }
+
+  /// Size of the catalog for the current settings (diagnostics, tests).
+  int toolCatalogChars() => _toolSchema(
+    _settings?.effectiveDomains ?? {...AiToolDomain.values},
+  ).chars;
 
   // ===========================================================================
   // SENDING
   // ===========================================================================
 
+  /// Starts a turn with a new user message. Returns false when nothing was
+  /// sent (empty input, a turn already running, missing configuration).
   Future<bool> send(
     String text, {
     List<AiPendingImage> images = const [],
-    List<AiImageAttachment> existingAttachments = const [],
     VoidCallback? onAccepted,
   }) async {
-    await ensureReady();
-    final trimmed = text.trim();
-    if (trimmed.isEmpty && images.isEmpty && existingAttachments.isEmpty) {
-      return false;
-    }
-    if (images.length + existingAttachments.length >
-        AiImageAttachmentStore.maxImagesPerMessage) {
-      _state = _state.copyWith(error: 'ai_error:too_many_images');
-      notifyListeners();
-      return false;
-    }
-    if (isSending) return false;
-    if (_settings == null || !_settings!.isConfigured) {
-      _state = _state.copyWith(error: 'ai_error:missing_provider');
-      notifyListeners();
-      return false;
-    }
-    final provider = _settings!.activeProvider!;
-    final token = await _settings!.getToken(provider.id);
-    if (token == null || token.isEmpty) {
-      _state = _state.copyWith(error: 'ai_error:missing_token');
-      notifyListeners();
-      return false;
-    }
-    if (provider.selectedModel.isEmpty) {
-      _state = _state.copyWith(error: 'ai_error:missing_model');
-      notifyListeners();
-      return false;
-    }
+    // Synchronous guard: a double tap must not start two turns.
+    if (_turn != null || _sendInFlight) return false;
+    _sendInFlight = true;
+    try {
+      await ensureReady();
+      final trimmed = text.trim();
+      if (trimmed.isEmpty && images.isEmpty) return false;
+      if (images.length > AiImageAttachmentStore.maxImagesPerMessage) {
+        _setError('ai_error:too_many_images');
+        return false;
+      }
+      final setup = await _turnSetup();
+      if (setup == null) return false;
 
-    final now = DateTime.now();
-    List<AiImageAttachment> attachments;
-    try {
-      attachments = existingAttachments.isNotEmpty
-          ? existingAttachments
-          : await _imageStore.saveAll(images);
-    } on AiImageAttachmentException catch (error) {
-      _state = _state.copyWith(error: 'ai_error:${error.code}');
-      notifyListeners();
-      return false;
-    }
-    final fallbackText = attachments.isEmpty ? trimmed : 'Imagem enviada';
-    late final String threadId;
-    try {
-      threadId = await _ensureThread(
-        _state.messages,
-        now,
-        trimmed.isEmpty ? fallbackText : trimmed,
-      );
-    } catch (error) {
-      if (existingAttachments.isEmpty) {
+      List<AiImageAttachment> attachments;
+      try {
+        attachments = await _imageStore.saveAll(images);
+      } on AiImageAttachmentException catch (error) {
+        _setError('ai_error:${error.code}');
+        return false;
+      }
+      final now = _nextTimestamp();
+      late final String threadId;
+      try {
+        threadId = await _ensureThread(now, trimmed);
+      } catch (error) {
         await _imageStore.deleteAll(attachments);
+        _setError(_readableError(error));
+        return false;
       }
-      _state = _state.copyWith(error: _readableError(error));
-      notifyListeners();
-      return false;
-    }
-    final userMsg = AiChatMessage(
-      id: _uuid.v4(),
-      threadId: threadId,
-      role: AiMessageRole.user,
-      content: trimmed,
-      attachments: attachments,
-      createdAt: now,
-    );
-    final messages = [..._state.messages, userMsg];
-
-    _state = _state.copyWith(activeThreadId: threadId);
-
-    _state = _state.copyWith(
-      messages: messages,
-      phase: AiTurnPhase.sending,
-      clearError: true,
-      phaseMessage: 'sending',
-    );
-    notifyListeners();
-    onAccepted?.call();
-
-    try {
-      _activeReasoningEffort = provider.reasoningEffortFor().apiValue;
-      _activeTurnDiagnostics = _AiTurnDiagnostics(
-        stage: 'preparing_context',
-        provider: provider.name,
-        model: provider.selectedModel,
+      final userMsg = AiChatMessage(
+        id: _uuid.v4(),
+        threadId: threadId,
+        role: AiMessageRole.user,
+        content: trimmed,
+        attachments: attachments,
+        createdAt: now,
+        turnStatus: AiTurnStatus.running,
       );
-      await _runTurn(
-        messages: messages,
-        baseUrl: provider.baseUrl,
-        token: token,
-        model: provider.selectedModel,
-        systemPrompt: _settings!.effectiveSystemPrompt,
-        contextMode: _settings!.contextMode,
-      );
-    } catch (e) {
-      _state = _state.copyWith(
-        phase: AiTurnPhase.failed,
-        error: _readableError(e),
-        errorDetails: _technicalErrorDetails(e),
-        phaseMessage: null,
-      );
-      notifyListeners();
-      await _persistCurrentThread();
+      // Write-ahead: the message survives the app being killed mid-turn.
+      await _persistMessages(threadId, [userMsg]);
+      if (_state.activeThreadId == threadId) {
+        _state = _state.copyWith(
+          messages: [..._state.messages, userMsg],
+          clearError: true,
+        );
+      }
+      final ctx = _startTurn(setup, threadId, userMsg);
+      onAccepted?.call();
+      unawaited(_runTurn(ctx));
+      return true;
     } finally {
-      _activeTurnDiagnostics = null;
-      _activeReasoningEffort = null;
-    }
-    return true;
-  }
-
-  Future<void> rejectRoutineProposal(String proposalId) async {
-    try {
-      final proposal = await _routineMutations.reject(proposalId);
-      _replaceProposal(proposal);
-      await _persistCurrentThread();
-    } catch (e) {
-      _state = _state.copyWith(error: _readableError(e));
-      notifyListeners();
+      _sendInFlight = false;
     }
   }
 
-  Future<void> approveRoutineProposal(String proposalId) async {
-    if (isSending) return;
-    _state = _state.copyWith(
-      phase: AiTurnPhase.applyingProposal,
-      phaseMessage: 'applying_proposal',
-      clearError: true,
+  bool _sendInFlight = false;
+
+  /// Provider, token and settings for a new turn, or null (with an error in
+  /// the state) when the coach is not ready to send.
+  Future<_TurnSetup?> _turnSetup() async {
+    final settings = _settings;
+    if (settings == null || !settings.isConfigured) {
+      _setError('ai_error:missing_provider');
+      return null;
+    }
+    if (!settings.settings.dataSharingAccepted) {
+      _setError('ai_error:consent_required');
+      return null;
+    }
+    final provider = settings.activeProvider!;
+    if (provider.selectedModel.isEmpty) {
+      _setError('ai_error:missing_model');
+      return null;
+    }
+    final token = await settings.getToken(provider.id) ?? '';
+    if (token.isEmpty && !_isLocalEndpoint(provider.baseUrl)) {
+      _setError('ai_error:missing_token');
+      return null;
+    }
+    return _TurnSetup(
+      provider: provider,
+      token: token,
+      systemPrompt: settings.systemMessage,
+      languageCode: settings.appLanguageCode,
+      domains: settings.effectiveDomains,
     );
-    notifyListeners();
+  }
+
+  static bool _isLocalEndpoint(String baseUrl) {
+    final host = Uri.tryParse(baseUrl)?.host ?? '';
+    return host == 'localhost' ||
+        host == '127.0.0.1' ||
+        host == '10.0.2.2' ||
+        host.startsWith('192.168.') ||
+        host.startsWith('10.') ||
+        host.endsWith('.local');
+  }
+
+  _TurnContext _startTurn(
+    _TurnSetup setup,
+    String threadId,
+    AiChatMessage userMsg,
+  ) {
+    final ctx = _TurnContext(
+      setup: setup,
+      threadId: threadId,
+      userMessage: userMsg,
+      startedAt: _clock(),
+    );
+    _turn = ctx;
+    _state = _state.copyWith(
+      turn: AiTurnProgress(
+        threadId: threadId,
+        userMessageId: userMsg.id,
+        phase: AiTurnPhase.waiting,
+        startedAt: ctx.startedAt,
+      ),
+    );
+    _emit();
+    return ctx;
+  }
+
+  /// Stops the running turn: aborts the request in flight, keeps what was
+  /// already done (the user message, finished tool steps) and marks the turn
+  /// cancelled.
+  void cancelTurn() {
+    final ctx = _turn;
+    if (ctx == null || ctx.cancelled) return;
+    ctx.cancel();
+    final turn = _state.turn;
+    if (turn != null) {
+      _state = _state.copyWith(turn: turn.copyWith(cancelling: true));
+      _emit();
+    }
+  }
+
+  /// Runs the turn of [userMessageId] again: everything after it is deleted
+  /// (messages and pending proposals) and the same message is answered anew.
+  Future<void> retryTurn(String userMessageId) async {
+    if (_turn != null || _sendInFlight) return;
+    _sendInFlight = true;
     try {
-      final cachedProposal = _state.proposalById(proposalId);
-      if (cachedProposal != null) {
-        await _routineMutations.restorePendingProposal(cachedProposal);
+      final threadId = _state.activeThreadId;
+      if (threadId == null) return;
+      final setup = await _turnSetup();
+      if (setup == null) return;
+      final row = await _db.aiChatRepo.getAiChatMessage(userMessageId);
+      if (row == null) return;
+      final userMsg = AiChatMessage.fromRow(row);
+      if (!userMsg.isUser || userMsg.threadId != threadId) return;
+      final later = (await _db.aiChatRepo.getAiChatMessagesAfter(
+        threadId,
+        afterCreatedAt: row['created_at'] as String,
+        afterId: userMsg.id,
+      )).map(AiChatMessage.fromRow).toList();
+      await _db.aiChatRepo.deleteAiChatMessages(
+        threadId,
+        [for (final m in later) m.id],
+        toolCallIds: [
+          for (final m in later)
+            for (final call in m.toolCalls) call.id,
+        ],
+      );
+      for (final m in later) {
+        _persistedMessages.remove(m.id);
       }
-      final proposal = await _routineMutations.approve(proposalId);
-      _replaceProposal(proposal, notify: false);
-      await _persistCurrentThread();
-      if (proposal.status != AiRoutineProposalStatus.applied) {
-        _state = _state.copyWith(phase: AiTurnPhase.idle, phaseMessage: null);
-        notifyListeners();
-        return;
-      }
-      await _sendAppliedProposalSummary(proposal);
-    } catch (e) {
+      await _resetSummaryIfCutDeleted(threadId);
+      final restarted = userMsg.copyWith(turnStatus: AiTurnStatus.running);
+      await _persistMessages(threadId, [restarted]);
+      final laterIds = {for (final m in later) m.id};
       _state = _state.copyWith(
-        phase: AiTurnPhase.failed,
-        phaseMessage: null,
-        error: e is AiRoutineMutationException
-            ? 'ai_error:${e.code}:$proposalId'
-            : _readableError(e),
+        messages: [
+          for (final m in _state.messages)
+            if (!laterIds.contains(m.id)) m.id == restarted.id ? restarted : m,
+        ],
+        proposals: [
+          for (final p in _state.proposals)
+            if (!later.any((m) => m.toolCalls.any((c) => c.id == p.toolCallId)))
+              p,
+        ],
+        clearError: true,
       );
-      notifyListeners();
+      final ctx = _startTurn(setup, threadId, restarted);
+      unawaited(_runTurn(ctx));
+    } finally {
+      _sendInFlight = false;
     }
   }
 
-  Future<void> retryAppliedProposalSummary(String proposalId) async {
-    final proposal =
-        _state.proposalById(proposalId) ??
-        await _routineMutations.getProposal(proposalId);
-    if (proposal?.status != AiRoutineProposalStatus.applied || isSending) {
-      return;
-    }
-    await _sendAppliedProposalSummary(proposal!);
-  }
-
-  /// Records the outcome of a manual-food preview in the persisted chat.
-  /// The actual food has already been saved by the manual-food form when this
-  /// is called; this only prevents the preview card from looking pending after
-  /// the user returns to the conversation.
-  Future<void> completeManualFoodProposal({
-    required String toolMessageId,
-    required String foodId,
-  }) => _updateManualFoodProposal(
-    toolMessageId: toolMessageId,
-    status: AiManualFoodProposalStatus.created,
-    foodId: foodId,
-  );
-
-  Future<void> rejectManualFoodProposal(String toolMessageId) =>
-      _updateManualFoodProposal(
-        toolMessageId: toolMessageId,
-        status: AiManualFoodProposalStatus.rejected,
-      );
-
-  Future<void> _updateManualFoodProposal({
-    required String toolMessageId,
-    required AiManualFoodProposalStatus status,
-    String? foodId,
-  }) async {
-    final index = _state.messages.indexWhere(
-      (message) =>
-          message.id == toolMessageId &&
-          message.toolName == 'propose_manual_food_creation',
-    );
-    if (index < 0) return;
-    try {
-      final decoded = jsonDecode(_state.messages[index].content ?? '');
-      if (decoded is! Map) return;
-      final resultMap = decoded.cast<String, dynamic>();
-      final rawData = resultMap['data'];
-      if (rawData is! Map) return;
-      final proposal = AiManualFoodProposal.fromJson(
-        rawData.cast<String, dynamic>(),
-      ).copyWith(status: status, createdFoodId: foodId);
-      resultMap['data'] = proposal.toJson();
-      final result = AiToolResult.fromMap(resultMap);
-      final messages = [..._state.messages];
-      messages[index] = messages[index].copyWith(
-        content: jsonEncode(_pruneNulls(result.toMap())),
-        toolResult: result,
-      );
-      _state = _state.copyWith(messages: messages);
-      notifyListeners();
-      await _persistCurrentThread();
-    } catch (_) {
-      // A malformed historic tool result falls back to the generic tool card.
-    }
-  }
-
-  /// Truncates messages after [fromIndex] and resends from that point.
-  Future<void> retryFromMessage(int fromIndex) async {
-    if (fromIndex < 0 || fromIndex >= _state.messages.length) return;
-    var userIndex = fromIndex;
-    while (userIndex >= 0 && !_state.messages[userIndex].isUser) {
-      userIndex--;
-    }
-    if (userIndex < 0) {
-      _state = _state.copyWith(error: 'ai_error:user_message_missing');
-      notifyListeners();
-      return;
-    }
-    final lastUser = _state.messages[userIndex];
-    final remaining = _state.messages.sublist(0, userIndex);
-    _state = _state.copyWith(
-      messages: remaining,
-      clearError: true,
-      phase: AiTurnPhase.idle,
-    );
-    notifyListeners();
-    await send(
-      lastUser.content ?? '',
-      existingAttachments: lastUser.attachments,
-    );
-  }
-
+  /// Retries the last user message of the open conversation.
   Future<void> retryLastTurn() async {
     for (var i = _state.messages.length - 1; i >= 0; i--) {
       if (_state.messages[i].isUser) {
-        await retryFromMessage(i);
+        await retryTurn(_state.messages[i].id);
         return;
       }
     }
   }
+
+  void dismissError() {
+    if (_state.error == null) return;
+    _state = _state.copyWith(clearError: true);
+    _emit();
+  }
+
+  void _setError(
+    String code, {
+    AiChatErrorDetails? details,
+    AiErrorAction action = AiErrorAction.none,
+    String? proposalId,
+  }) {
+    _state = _state.copyWith(
+      error: code,
+      errorDetails: details,
+      errorAction: action,
+      errorProposalId: proposalId,
+    );
+    _emit();
+  }
+
   // ===========================================================================
-  // TURN LOOP
+  // PROPOSALS
   // ===========================================================================
 
-  Future<void> _runTurn({
-    required List<AiChatMessage> messages,
-    required String baseUrl,
-    required String token,
-    required String model,
-    required String systemPrompt,
-    required AiContextMode contextMode,
-  }) async {
-    var current = [...messages];
-    final visionMessage = current.lastWhere((message) => message.isUser);
-    final imageDataUrls = visionMessage.attachments.isEmpty
-        ? const <String>[]
-        : await _imageStore.readDataUrls(visionMessage.attachments);
-    final latestUserText = visionMessage.content ?? '';
-    final routineProposalFollowUp = _isRoutineProposalFollowUp(
-      current,
-      latestUserText,
-    );
-    final toolHints = _toolHintsForTurn(current, latestUserText);
-    final manualFoodProposalTurn =
-        toolHints.length == 1 &&
-        toolHints.contains('propose_manual_food_creation');
-    final manualFoodTextTurn = manualFoodProposalTurn && imageDataUrls.isEmpty;
-    if (routineProposalFollowUp) {
-      toolHints.addAll({
-        'list_exercises',
-        'list_routines',
-        'get_routine_detail',
-        'propose_routine_change',
-      });
+  /// How approving [proposal] works: transactional kinds are applied by
+  /// [approveProposal]; user-confirmed kinds open a form first (the UI calls
+  /// [completeUserConfirmedProposal] when the user saved it).
+  AiProposalApplyMode proposalApplyMode(AiProposal proposal) =>
+      _proposals.applyModeOf(proposal);
+
+  Future<void> approveProposal(String proposalId) async {
+    if (_state.busyProposalIds.contains(proposalId)) return;
+    _setProposalBusy(proposalId, true);
+    try {
+      final proposal = await _proposals.approve(proposalId);
+      _replaceProposal(proposal);
+      if (proposal.status != AiProposalStatus.awaiting) {
+        await _appendProposalEvent(proposal);
+      }
+      if (proposal.status == AiProposalStatus.failed) {
+        _setError(
+          'ai_error:proposal_${proposal.errorCode ?? 'failed'}',
+          action: AiErrorAction.retryProposal,
+          proposalId: proposalId,
+        );
+      } else if (_state.errorProposalId == proposalId) {
+        _state = _state.copyWith(clearError: true);
+      }
+      _context.invalidate();
+    } catch (error) {
+      _setError(
+        'ai_error:proposal_failed',
+        action: AiErrorAction.retryProposal,
+        proposalId: proposalId,
+        details: _technicalErrorDetails(error, stage: 'apply_proposal'),
+      );
+    } finally {
+      _setProposalBusy(proposalId, false);
     }
-    final requiresGroundedToolCall = _requiresGroundedToolCall(
-      latestUserText,
-      toolHints,
-      routineProposalFollowUp: routineProposalFollowUp,
-    );
-    final contextJson = manualFoodTextTurn
-        ? const <String, dynamic>{}
-        : await _context.build(mode: contextMode);
-    // One catalog for the whole turn: the model can pick any tool by
-    // description, re-call one with new parameters and cross domains, and the
-    // provider can cache the identical request prefix across rounds.
-    final fullSchema = _tools.openAiChatToolsSchema();
-    final manualFoodSchema = _tools.openAiChatToolsSchema(
-      names: const {'propose_manual_food_creation'},
-      includeRoutineProposal: false,
-    );
-    final fullSchemaChars = _tools.chatToolsSchemaCharacters();
-    final historyBudget = _historyBudgetFor(
-      systemPrompt: systemPrompt,
-      contextJson: contextJson,
-      toolsSchemaChars: fullSchemaChars,
-    );
-    final threadSummary = manualFoodTextTurn
-        ? null
-        : await _ensureThreadSummary(
-            current: current,
-            historyBudget: historyBudget,
-            baseUrl: baseUrl,
-            token: token,
-            model: model,
-          );
-    final options = _TurnWireOptions(
-      systemPrompt: systemPrompt,
-      contextJson: contextJson,
-      threadSummary: threadSummary,
-      toolHints: toolHints.toList()..sort(),
-      visionMessageId: visionMessage.id,
-      imageDataUrls: imageDataUrls,
-      historyTokenBudget: historyBudget,
-    );
+  }
 
-    int? lastPromptTokens;
-    for (var round = 0; ; round++) {
-      final manualFoodRound = manualFoodTextTurn && round == 0;
-      final wire = manualFoodRound
-          ? _buildManualFoodProposalWire(current)
-          : _buildWireMessages(current, options);
-      // The request is encoded once per round; every estimate and the
-      // diagnostics reuse this length (the schema length is cached).
-      final wireChars = jsonEncode(wire).length;
-      // Tools stay available while the request fits the turn budget. Beyond
-      // that (or past the round cap) the model must answer with what it has.
-      final inputExceeded =
-          (lastPromptTokens ?? 0) > kMaxTurnInputTokens ||
-          _estimateWireTokens(wireChars, fullSchemaChars) > kMaxTurnInputTokens;
-      final allowTools = round < kMaxToolRounds && !inputExceeded;
-      final toolsSchema = !allowTools
-          ? null
-          : manualFoodRound
-          ? manualFoodSchema
-          : fullSchema;
+  Future<void> rejectProposal(String proposalId) async {
+    if (_state.busyProposalIds.contains(proposalId)) return;
+    _setProposalBusy(proposalId, true);
+    try {
+      final proposal = await _proposals.reject(proposalId);
+      _replaceProposal(proposal);
+      await _appendProposalEvent(proposal);
+    } catch (error) {
+      _setError(_readableError(error));
+    } finally {
+      _setProposalBusy(proposalId, false);
+    }
+  }
 
-      _state = _state.copyWith(
-        phase: round == 0 ? AiTurnPhase.sending : AiTurnPhase.executingReads,
-        phaseMessage: !allowTools
-            ? 'finalising'
-            : round == 0
-            ? 'sending'
-            : 'reading',
-      );
-      notifyListeners();
+  /// A user-confirmed proposal (a pre-filled form) was saved by the user.
+  Future<void> completeUserConfirmedProposal(
+    String proposalId, {
+    Map<String, dynamic>? result,
+  }) async {
+    try {
+      final proposal = await _proposals.markApplied(proposalId, result: result);
+      _replaceProposal(proposal);
+      await _appendProposalEvent(proposal);
+      _context.invalidate();
+    } catch (error) {
+      _setError(_readableError(error));
+    }
+  }
 
-      final toolChoice = round == 0 && requiresGroundedToolCall && allowTools
-          ? _requiredToolChoice()
-          : 'auto';
-      _activeTurnDiagnostics = _activeTurnDiagnostics?.copyWith(
-        stage: !allowTools
-            ? 'final_provider_request'
-            : round == 0
-            ? 'initial_provider_request'
-            : 'followup_provider_request',
-        round: round + 1,
-        schemaToolCount: toolsSchema?.length ?? 0,
-        requestCharacters: wireChars,
-        tools: toolsSchema == null
-            ? const []
-            : (toolsSchema
-                  .map((tool) => (tool['function'] as Map)['name'] as String)
-                  .toList()
-                ..sort()),
-      );
-      var completion = manualFoodRound
-          ? await _sendManualFoodProposalCompletion(
-              baseUrl: baseUrl,
-              token: token,
-              model: model,
-              messages: wire,
-              toolsSchema: manualFoodSchema,
-              toolChoice: toolChoice,
-            )
-          : await _sendCompletion(
-              baseUrl: baseUrl,
-              token: token,
-              model: model,
-              messages: wire,
-              tools: toolsSchema,
-              toolChoice: toolChoice,
-              hasImages: imageDataUrls.isNotEmpty,
-            );
-      _calibrateTokenScale(
-        wireChars: wireChars,
-        toolsSchemaChars: toolsSchema == null
-            ? 0
-            : identical(toolsSchema, fullSchema)
-            ? fullSchemaChars
-            : jsonEncode(toolsSchema).length,
-        promptTokens: completion.promptTokens,
-      );
-      lastPromptTokens = completion.promptTokens;
+  void _setProposalBusy(String id, bool busy) {
+    final ids = {..._state.busyProposalIds};
+    busy ? ids.add(id) : ids.remove(id);
+    _state = _state.copyWith(busyProposalIds: ids);
+    _emit();
+  }
 
-      if (round == 0 &&
-          allowTools &&
-          !manualFoodRound &&
-          requiresGroundedToolCall &&
-          !completion.hasToolCalls) {
-        _activeTurnDiagnostics = _activeTurnDiagnostics?.copyWith(
-          stage: 'required_tool_retry',
-        );
-        completion = await _retryMissingRequiredToolCall(
-          firstCompletion: completion,
-          wire: wire,
-          baseUrl: baseUrl,
-          token: token,
-          model: model,
-          toolsSchema: fullSchema,
-          toolChoice: toolChoice,
-          hasImages: imageDataUrls.isNotEmpty,
-        );
-      }
+  void _replaceProposal(AiProposal proposal) {
+    if (_state.activeThreadId != proposal.threadId) return;
+    final proposals = [..._state.proposals];
+    final index = proposals.indexWhere((item) => item.id == proposal.id);
+    if (index == -1) {
+      proposals.add(proposal);
+    } else {
+      proposals[index] = proposal;
+    }
+    _state = _state.copyWith(proposals: proposals);
+    _emit();
+  }
 
-      // Persist the assistant message (may be empty if only tool calls).
-      final assistant = AiChatMessage(
-        id: _uuid.v4(),
-        threadId: _state.activeThreadId ?? '',
-        role: AiMessageRole.assistant,
-        content: completion.text,
-        toolCalls: completion.toolCalls,
-        createdAt: DateTime.now(),
-      );
-      current = [...current, assistant];
+  /// Records the outcome of a proposal in its conversation so the model
+  /// learns what happened on the next turn, without an extra provider call.
+  Future<void> _appendProposalEvent(AiProposal proposal) => _appendEvent(
+    proposal.threadId,
+    {'type': 'proposal_outcome', ..._proposals.outcomeFacts(proposal)},
+  );
 
-      if (!completion.hasToolCalls) {
-        final accepted = await _regenerateInvalidAnswer(
-          completion: completion,
-          current: current,
-          baseUrl: baseUrl,
-          token: token,
-          model: model,
-          options: options,
-        );
-        if (accepted != null) {
-          current = [...current.sublist(0, current.length - 1), accepted];
-        }
-        // Done only after the answer has passed output validation.
-        _state = _state.copyWith(
-          messages: current,
-          phase: AiTurnPhase.idle,
-          phaseMessage: null,
-          clearError: true,
-        );
-        notifyListeners();
-        await _persistCurrentThread();
-        return;
-      }
+  // ===========================================================================
+  // MEMORY
+  // ===========================================================================
 
-      _state = _state.copyWith(messages: current);
-      notifyListeners();
-
-      final hasRoutineProposal = completion.toolCalls.any(
-        (call) => call.name == 'propose_routine_change',
-      );
-      final hasFoodProposal = completion.toolCalls.any(
-        (call) => call.name == 'propose_manual_food_creation',
-      );
-      final hasProposal = hasRoutineProposal || hasFoodProposal;
-      _state = _state.copyWith(
-        phase: hasProposal
-            ? AiTurnPhase.preparingProposal
-            : AiTurnPhase.executingReads,
-        phaseMessage: hasFoodProposal
-            ? 'preparing_food_proposal'
-            : hasRoutineProposal
-            ? 'preparing_proposal'
-            : 'reading',
-        phaseToolCount: completion.toolCalls.length,
-      );
-      notifyListeners();
-
-      // Read-only calls are independent and can run concurrently. Proposal
-      // preparation remains ordered and executes after all reads finish.
-      final readResults = await Future.wait(
-        completion.toolCalls.map((call) async {
-          if (call.argumentsError != null) {
-            return AiToolResult(
-              ok: false,
-              code: 'invalid_arguments_json',
-              message:
-                  '${call.argumentsError} Reenvie a chamada com um objeto '
-                  'JSON válido.',
+  /// Reverts the memory change a `save_memory` / `delete_memory` tool result
+  /// made, and tells the model through an app event.
+  Future<void> undoMemoryChange(String toolMessageId) async {
+    final index = _state.messages.indexWhere((m) => m.id == toolMessageId);
+    if (index < 0) return;
+    final message = _state.messages[index];
+    final decoded = _decodeToolContent(message.content);
+    final data = decoded?['data'];
+    if (data is! Map || data['undone'] == true) return;
+    final memoryId = data['memory_id'] as String?;
+    if (memoryId == null) return;
+    try {
+      switch (data['status']) {
+        case 'saved':
+          await _memory.remove(memoryId);
+        case 'updated':
+          final current = await _memory.byId(memoryId);
+          if (current != null) {
+            await _memory.update(
+              current.copyWith(
+                content: data['previous_content'] as String?,
+                category: AiMemoryCategory.fromStorage(
+                  data['previous_category'] as String?,
+                ),
+              ),
             );
           }
-          if (call.name == 'propose_routine_change') return null;
-          return _tools.executeRead(toolName: call.name, args: call.arguments);
+        case 'deleted':
+          final now = _clock();
+          await _memory.restore(
+            AiMemory(
+              id: memoryId,
+              content: '${data['content'] ?? ''}',
+              category: AiMemoryCategory.fromStorage(
+                data['category'] as String?,
+              ),
+              createdAt: DateTime.tryParse('${data['created_at']}') ?? now,
+              updatedAt: now,
+              sourceThreadId: message.threadId,
+            ),
+          );
+        default:
+          return;
+      }
+      final updated = message.copyWith(
+        content: jsonEncode({
+          ...decoded!,
+          'data': {...data, 'undone': true},
         }),
       );
-      var preparedManualFood = false;
-      for (var i = 0; i < completion.toolCalls.length; i++) {
-        final call = completion.toolCalls[i];
-        final result =
-            readResults[i] ??
-            await _routineMutations.prepareProposal(
-              threadId: _state.activeThreadId ?? '',
-              toolCallId: call.id,
-              args: call.arguments,
-            );
-        if (call.name == 'propose_routine_change' && result.ok) {
-          final data = result.data as Map?;
-          final proposalId = data?['proposalId'] as String?;
-          if (proposalId != null) {
-            final proposal = await _routineMutations.getProposal(proposalId);
-            if (proposal != null) _replaceProposal(proposal, notify: false);
-          }
-        }
-        if (call.name == 'propose_manual_food_creation' && result.ok) {
-          preparedManualFood = true;
-        }
-        final toolMsg = AiChatMessage(
-          id: _uuid.v4(),
-          threadId: _state.activeThreadId ?? '',
-          role: AiMessageRole.tool,
-          content: _encodeToolResult(result),
-          toolCallId: call.id,
-          toolName: call.name,
-          toolResult: result,
-          createdAt: DateTime.now(),
-        );
-        current = [...current, toolMsg];
-      }
-      _state = _state.copyWith(messages: current);
-      notifyListeners();
-
-      // The preview card is the final product of this turn. A second provider
-      // request adds no value and several OpenAI-compatible backends reject
-      // the assistant/tool transcript even after accepting the first call.
-      if (preparedManualFood) {
-        _state = _state.copyWith(phase: AiTurnPhase.idle, phaseMessage: null);
-        notifyListeners();
-        await _persistCurrentThread();
-        return;
-      }
-    }
-  }
-
-  Future<AiChatCompletion> _sendCompletion({
-    required String baseUrl,
-    required String token,
-    required String model,
-    required List<Map<String, dynamic>> messages,
-    List<Map<String, dynamic>>? tools,
-    Object? toolChoice,
-    required bool hasImages,
-  }) {
-    if (hasImages) {
-      return _service.sendMultimodalChat(
-        baseUrl: baseUrl,
-        token: token,
-        model: model,
-        reasoningEffort: _activeReasoningEffort,
-        messages: messages,
-        tools: tools,
-        toolChoice: toolChoice,
-      );
-    }
-    return _service.sendChat(
-      baseUrl: baseUrl,
-      token: token,
-      model: model,
-      reasoningEffort: _activeReasoningEffort,
-      messages: messages,
-      tools: tools,
-      toolChoice: toolChoice,
-    );
-  }
-
-  // ===========================================================================
-  // ROLLING THREAD SUMMARY
-  // ===========================================================================
-
-  /// Returns the summary of the part of [current] that no longer fits the
-  /// history budget, refreshing it with one extra provider call when new
-  /// messages fell out of the window. Failures degrade to the last summary.
-  Future<String?> _ensureThreadSummary({
-    required List<AiChatMessage> current,
-    required int historyBudget,
-    required String baseUrl,
-    required String token,
-    required String model,
-  }) async {
-    final threadId = _state.activeThreadId;
-    if (threadId == null) return null;
-    Map<String, dynamic>? existing;
-    try {
-      existing = await _db.aiChatRepo.getAiChatThreadSummary(threadId);
-    } catch (_) {
-      // Without a stored summary the thread is summarized from scratch.
-    }
-    final existingSummary = existing?['summary'] as String?;
-    final existingThrough = existing?['through_message_id'] as String?;
-
-    final dropped = _compactHistoryDetailed(
-      current,
-      tokenBudget: historyBudget,
-    ).dropped;
-    if (dropped.isEmpty || existingThrough == dropped.last.id) {
-      return existingSummary;
-    }
-    var deltaStart = 0;
-    if (existingThrough != null) {
-      final index = dropped.indexWhere((m) => m.id == existingThrough);
-      if (index >= 0) deltaStart = index + 1;
-    }
-    final delta = dropped.sublist(deltaStart);
-    if (delta.isEmpty) return existingSummary;
-
-    _state = _state.copyWith(phaseMessage: 'compacting');
-    notifyListeners();
-    _activeTurnDiagnostics = _activeTurnDiagnostics?.copyWith(
-      stage: 'thread_summary',
-    );
-    try {
-      final request = StringBuffer();
-      if (existingSummary != null && existingSummary.trim().isNotEmpty) {
-        request.write('Resumo atual:\n$existingSummary\n\n');
-      }
-      request.write(
-        'Novas mensagens a incorporar:\n${_transcriptForSummary(delta)}',
-      );
-      final completion = await _service.sendChat(
-        baseUrl: baseUrl,
-        token: token,
-        model: model,
-        reasoningEffort: _activeReasoningEffort,
-        messages: [
-          const {'role': 'system', 'content': _threadSummaryPrompt},
-          {'role': 'user', 'content': request.toString()},
-        ],
-      );
-      final text = completion.text?.trim();
-      if (text == null || text.isEmpty) return existingSummary;
-      final summary = TextSanitizer.sanitize(text).trim();
-      if (summary.isEmpty) return existingSummary;
-      await _db.aiChatRepo.upsertAiChatThreadSummary(
-        threadId: threadId,
-        summary: summary,
-        throughMessageId: dropped.last.id,
-      );
-      return summary;
-    } catch (_) {
-      return existingSummary;
-    }
-  }
-
-  String _transcriptForSummary(List<AiChatMessage> messages) {
-    const perMessage = 1500;
-    const total = 24000;
-    final buffer = StringBuffer();
-    for (final message in messages) {
-      final content = message.content?.trim();
-      if (content == null || content.isEmpty) continue;
-      final compact = content.length <= perMessage
-          ? content
-          : '${content.substring(0, perMessage)}…';
-      final line = '${message.isUser ? 'Usuário' : 'Treinador'}: $compact\n';
-      if (buffer.length + line.length > total) {
-        buffer.write('[mensagens restantes omitidas por tamanho]\n');
-        break;
-      }
-      buffer.write(line);
-    }
-    return buffer.toString();
-  }
-
-  @visibleForTesting
-  Future<void> persistCurrentThreadForTest() => _persistCurrentThread();
-
-  @visibleForTesting
-  String transcriptForSummaryForTest(List<AiChatMessage> messages) =>
-      _transcriptForSummary(messages);
-
-  // ===========================================================================
-  // MANUAL FOOD FLOW
-  // ===========================================================================
-
-  List<Map<String, dynamic>> _buildManualFoodProposalWire(
-    List<AiChatMessage> messages,
-  ) {
-    final recent = <Map<String, dynamic>>[];
-    var characters = 0;
-    for (var i = messages.length - 1; i >= 0 && recent.length < 6; i--) {
-      final message = messages[i];
-      if (!message.isUser && !message.isAssistant) continue;
-      final content = message.content?.trim();
-      if (content == null || content.isEmpty) continue;
-      final remaining = 4000 - characters;
-      if (remaining <= 0) break;
-      final compact = content.length <= remaining
-          ? content
-          : content.substring(content.length - remaining);
-      recent.insert(0, {
-        'role': message.isUser ? 'user' : 'assistant',
-        'content': compact,
+      await _persistMessages(message.threadId, [updated]);
+      _replaceMessageInState(updated);
+      await _appendEvent(message.threadId, {
+        'type': 'memory_change_undone',
+        'memory_id': memoryId.substring(0, 8),
+        'undone_status': data['status'],
+        'content': data['content'],
       });
-      characters += compact.length;
-    }
-    return [
-      const {'role': 'system', 'content': _manualFoodProposalPrompt},
-      ...recent,
-    ];
-  }
-
-  Future<AiChatCompletion> _sendManualFoodProposalCompletion({
-    required String baseUrl,
-    required String token,
-    required String model,
-    required List<Map<String, dynamic>> messages,
-    required List<Map<String, dynamic>> toolsSchema,
-    required Object toolChoice,
-  }) async {
-    try {
-      final completion = await _service.sendChat(
-        baseUrl: baseUrl,
-        token: token,
-        model: model,
-        reasoningEffort: _activeReasoningEffort,
-        messages: messages,
-        tools: toolsSchema,
-        toolChoice: toolChoice,
-      );
-      if (completion.hasToolCalls) return completion;
-      if (kDebugMode) {
-        debugPrint(
-          'AiChatService: provider ignored the required manual-food tool; '
-          'retrying with JSON fallback.',
-        );
-      }
-      return await _sendManualFoodJsonFallback(
-        baseUrl: baseUrl,
-        token: token,
-        model: model,
-        messages: messages,
-      );
-    } on AiServiceException catch (error) {
-      if (error.code != 'http_error') rethrow;
-      if (kDebugMode) {
-        debugPrint(
-          'AiChatService: provider rejected manual-food tool schema; '
-          'retrying with JSON fallback. $error',
-        );
-      }
-      return _sendManualFoodJsonFallback(
-        baseUrl: baseUrl,
-        token: token,
-        model: model,
-        messages: messages,
-      );
-    }
-  }
-
-  Future<AiChatCompletion> _sendManualFoodJsonFallback({
-    required String baseUrl,
-    required String token,
-    required String model,
-    required List<Map<String, dynamic>> messages,
-  }) async {
-    final fallback = await _service.sendChat(
-      baseUrl: baseUrl,
-      token: token,
-      model: model,
-      reasoningEffort: _activeReasoningEffort,
-      messages: [
-        const {'role': 'system', 'content': _manualFoodJsonFallbackPrompt},
-        ...messages.where((message) => message['role'] != 'system'),
-      ],
-    );
-    final text = fallback.text?.trim();
-    if (text == null || text.isEmpty) {
-      throw const AiServiceException(
-        'The provider returned no manual-food draft.',
-        code: 'invalid_response',
-      );
-    }
-    final arguments = _parseJsonObject(text);
-    return AiChatCompletion(
-      toolCalls: [
-        AiToolCall(
-          id: 'food_${_uuid.v4()}',
-          name: 'propose_manual_food_creation',
-          arguments: arguments,
-        ),
-      ],
-      promptTokens: fallback.promptTokens,
-      completionTokens: fallback.completionTokens,
-    );
-  }
-
-  Map<String, dynamic> _parseJsonObject(String raw) {
-    var cleaned = raw.trim();
-    final fenced = RegExp(
-      r'```(?:json)?\s*([\s\S]*?)```',
-      caseSensitive: false,
-    ).firstMatch(cleaned);
-    if (fenced != null) cleaned = fenced.group(1)!.trim();
-    final start = cleaned.indexOf('{');
-    final end = cleaned.lastIndexOf('}');
-    if (start >= 0 && end > start) {
-      cleaned = cleaned.substring(start, end + 1);
-    }
-    try {
-      final decoded = jsonDecode(cleaned);
-      if (decoded is Map<String, dynamic>) return decoded;
-      if (decoded is Map) return decoded.cast<String, dynamic>();
-    } catch (_) {
-      // Falls through to the invalid-draft error below.
-    }
-    throw const AiServiceException(
-      'The provider returned an invalid manual-food draft.',
-      code: 'invalid_response',
-    );
-  }
-
-  // ===========================================================================
-  // ANSWER VALIDATION
-  // ===========================================================================
-
-  /// Asks once more for a tool call when a grounded turn came back without
-  /// one. If the model still answers directly, that answer is accepted: a
-  /// possibly less grounded reply beats failing the whole turn.
-  Future<AiChatCompletion> _retryMissingRequiredToolCall({
-    required AiChatCompletion firstCompletion,
-    required List<Map<String, dynamic>> wire,
-    required String baseUrl,
-    required String token,
-    required String model,
-    required List<Map<String, dynamic>> toolsSchema,
-    required Object toolChoice,
-    required bool hasImages,
-  }) async {
-    var completion = firstCompletion;
-    for (
-      var attempt = 0;
-      attempt < kMaxMissingToolCallRetries && !completion.hasToolCalls;
-      attempt++
-    ) {
-      final retryWire = [...wire];
-      final firstConversationMessage = retryWire.indexWhere(
-        (message) => message['role'] != 'system',
-      );
-      retryWire.insert(
-        firstConversationMessage < 0
-            ? retryWire.length
-            : firstConversationMessage,
-        const {
-          'role': 'system',
-          'content':
-              'A solicitação atual depende de dados pessoais do app. A '
-              'resposta sem consulta foi rejeitada. Chame agora uma das '
-              'ferramentas fornecidas e só responda depois do resultado.',
-        },
-      );
-      try {
-        completion = await _sendCompletion(
-          baseUrl: baseUrl,
-          token: token,
-          model: model,
-          messages: retryWire,
-          tools: toolsSchema,
-          toolChoice: toolChoice,
-          hasImages: hasImages,
-        );
-      } catch (_) {
-        break;
-      }
-    }
-    if (!completion.hasToolCalls && kDebugMode) {
-      debugPrint(
-        'AiChatService: provider answered a grounded turn without tools; '
-        'accepting the direct answer.',
-      );
-    }
-    return completion.text == null && !completion.hasToolCalls
-        ? firstCompletion
-        : completion;
-  }
-
-  Future<AiChatMessage?> _regenerateInvalidAnswer({
-    required AiChatCompletion completion,
-    required List<AiChatMessage> current,
-    required String baseUrl,
-    required String token,
-    required String model,
-    required _TurnWireOptions options,
-  }) async {
-    var text = completion.text;
-    if (text == null || !TextSanitizer.containsReferencePlaceholder(text)) {
-      return null;
-    }
-
-    // The rejected answer remains in the wire transcript so the model can see
-    // exactly what it must rewrite. Tool messages are also preserved in full.
-    var transcript = [...current];
-    for (var attempt = 0; attempt < kMaxInvalidAnswerRegenerations; attempt++) {
-      transcript = [
-        ...transcript,
-        AiChatMessage(
-          id: _uuid.v4(),
-          threadId: _state.activeThreadId ?? '',
-          role: AiMessageRole.user,
-          content:
-              'A resposta anterior foi rejeitada porque deixou marcadores '
-              'no lugar de valores reais. Reescreva a resposta completa agora. '
-              'Copie literalmente dos resultados das ferramentas os nomes, '
-              'datas e números correspondentes. Não explique a correção e não '
-              'use marcadores de referência.',
-          createdAt: DateTime.now(),
-        ),
-      ];
-      final wire = _buildWireMessages(transcript, options);
-      _activeTurnDiagnostics = _activeTurnDiagnostics?.copyWith(
-        stage: 'answer_validation_retry',
-        round: attempt + 1,
-        schemaToolCount: 0,
-        requestCharacters: jsonEncode(wire).length,
-        tools: const [],
-      );
-      AiChatCompletion regenerated;
-      try {
-        regenerated = await _sendCompletion(
-          baseUrl: baseUrl,
-          token: token,
-          model: model,
-          messages: wire,
-          hasImages: options.imageDataUrls.isNotEmpty,
-        );
-      } catch (_) {
-        break;
-      }
-      text = regenerated.text;
-      if (text != null && !TextSanitizer.containsReferencePlaceholder(text)) {
-        return AiChatMessage(
-          id: _uuid.v4(),
-          threadId: _state.activeThreadId ?? '',
-          role: AiMessageRole.assistant,
-          content: text,
-          createdAt: DateTime.now(),
-        );
-      }
-      transcript = [
-        ...transcript,
-        AiChatMessage(
-          id: _uuid.v4(),
-          threadId: _state.activeThreadId ?? '',
-          role: AiMessageRole.assistant,
-          content: text,
-          createdAt: DateTime.now(),
-        ),
-      ];
-    }
-    // Some compatible providers repeat citation placeholders even after a
-    // rewrite request or throttle the rewrite itself. The narrow sanitizer is
-    // the final safety net: it removes only those markers and preserves the
-    // factual answer already grounded in the tool result.
-    final fallback = _sanitizedAnswerFallback(completion.text);
-    if (fallback != null) {
-      return AiChatMessage(
-        id: _uuid.v4(),
-        threadId: _state.activeThreadId ?? '',
-        role: AiMessageRole.assistant,
-        content: fallback,
-        createdAt: DateTime.now(),
-      );
-    }
-    throw const AiServiceException(
-      'A IA retornou uma resposta vazia após a validação.',
-      code: 'invalid_grounded_answer',
-    );
-  }
-
-  String? _sanitizedAnswerFallback(String? text) {
-    if (text == null) return null;
-    final sanitized = TextSanitizer.sanitize(text).trim();
-    return sanitized.isEmpty ? null : sanitized;
-  }
-
-  @visibleForTesting
-  String? sanitizedAnswerFallbackForTest(String? text) =>
-      _sanitizedAnswerFallback(text);
-  // ===========================================================================
-  // INTERRUPTED-TURN RECOVERY
-  // ===========================================================================
-
-  void _recoverInterruptedTurn(List<AiChatMessage> messages) {
-    // Find the last assistant message with tool_calls and check whether all
-    // of them have a matching tool response.
-    for (var i = messages.length - 1; i >= 0; i--) {
-      final m = messages[i];
-      if (!m.isAssistant || m.toolCalls.isEmpty) continue;
-      final answeredIds = <String>{};
-      for (var j = i + 1; j < messages.length; j++) {
-        final n = messages[j];
-        if (n.isTool && n.toolCallId != null) answeredIds.add(n.toolCallId!);
-        if (n.isAssistant) break;
-      }
-      final missing = m.toolCalls
-          .where((c) => !answeredIds.contains(c.id))
-          .toList();
-      if (missing.isEmpty) continue;
-      // Synthesize interrupted responses and append.
-      final synth = <AiChatMessage>[];
-      for (final call in missing) {
-        synth.add(
-          AiChatMessage(
-            id: _uuid.v4(),
-            threadId: m.threadId,
-            role: AiMessageRole.tool,
-            content: jsonEncode({
-              'ok': false,
-              'code': 'interrupted',
-              'message': 'Turno interrompido; resposta perdida.',
-            }),
-            toolCallId: call.id,
-            toolName: call.name,
-            createdAt: DateTime.now(),
-          ),
-        );
-      }
-      _state = _state.copyWith(messages: [..._state.messages, ...synth]);
-      return;
+    } catch (error) {
+      _setError(_readableError(error));
     }
   }
 
@@ -1259,49 +650,51 @@ class AiChatService extends ChangeNotifier {
   String _readableError(Object e) {
     if (e is TimeoutException) return 'ai_error:timeout';
     if (e is AiImageAttachmentException) return 'ai_error:${e.code}';
-    if (e is AiServiceException) {
-      return 'ai_error:${e.code ?? 'generic'}';
-    }
-    if (e is AiRoutineMutationException) return 'ai_error:${e.code}';
+    if (e is AiServiceException) return 'ai_error:${e.code ?? 'generic'}';
     return 'ai_error:generic';
   }
 
-  AiChatErrorDetails _technicalErrorDetails(Object error) {
-    final diagnostics = _activeTurnDiagnostics;
+  AiChatErrorDetails _technicalErrorDetails(
+    Object error, {
+    required String stage,
+    _TurnContext? ctx,
+  }) {
     final serviceError = error is AiServiceException ? error : null;
     return AiChatErrorDetails(
       code:
           serviceError?.code ??
           (error is TimeoutException ? 'timeout' : 'generic'),
-      stage: diagnostics?.stage ?? 'unknown',
-      message: _safeTechnicalMessage(serviceError?.message ?? error.toString()),
+      stage: stage,
+      message: safeTechnicalMessage(serviceError?.message ?? error.toString()),
       httpStatus: serviceError?.statusCode,
       endpoint: _safeEndpoint(serviceError?.endpoint),
-      provider: diagnostics?.provider,
-      model: diagnostics?.model,
-      round: diagnostics?.round,
-      schemaToolCount: diagnostics?.schemaToolCount,
-      requestCharacters: diagnostics?.requestCharacters,
-      tools: diagnostics?.tools ?? const [],
+      provider: ctx?.setup.provider.name,
+      model: ctx?.setup.provider.selectedModel,
+      round: ctx?.round,
+      requestCharacters: ctx?.lastRequestChars,
       providerAttempts: serviceError?.attemptCount,
       compatibilityAdjustments:
           serviceError?.compatibilityAdjustments ?? const [],
     );
   }
 
-  String _safeTechnicalMessage(String message) {
+  /// Redacts credentials from a provider message while keeping it readable
+  /// (e.g. "maximum context length is 8192 tokens" stays intact).
+  @visibleForTesting
+  static String safeTechnicalMessage(String message) {
     var safe = message
-        .replaceAll(
+        .replaceAllMapped(
+          RegExp(r'(bearer\s+)[A-Za-z0-9._~+/=-]{8,}', caseSensitive: false),
+          (m) => '${m.group(1)}***',
+        )
+        .replaceAllMapped(
           RegExp(
-            r'(bearer|api[_-]?key|token)\s*[:=]?\s*[^\s,;]+',
+            r'''((?:api[_-]?key|access[_-]?token|secret)["']?\s*[:=]\s*["']?)[^\s"',;]+''',
             caseSensitive: false,
           ),
-          r'$1 [oculto]',
+          (m) => '${m.group(1)}***',
         )
-        .replaceAll(
-          RegExp(r'sk-[a-z0-9_-]+', caseSensitive: false),
-          '[chave oculta]',
-        )
+        .replaceAll(RegExp(r'\bsk-[A-Za-z0-9_-]{8,}'), 'sk-***')
         .replaceAll(RegExp(r'[\r\n\t]+'), ' ')
         .trim();
     if (safe.length > 360) safe = '${safe.substring(0, 357)}…';
@@ -1314,40 +707,63 @@ class AiChatService extends ChangeNotifier {
     if (uri == null) return null;
     return '${uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}${uri.path}';
   }
+
+  static Map<String, dynamic>? _decodeToolContent(String? content) {
+    if (content == null || content.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(content);
+      return decoded is Map ? decoded.cast<String, dynamic>() : null;
+    } on FormatException {
+      return null;
+    }
+  }
 }
 
-class _AiTurnDiagnostics {
-  final String stage;
-  final String provider;
-  final String model;
-  final int? round;
-  final int? schemaToolCount;
-  final int? requestCharacters;
-  final List<String> tools;
+/// Provider, credentials and settings captured when a turn starts.
+class _TurnSetup {
+  final AiProvider provider;
+  final String token;
+  final String systemPrompt;
+  final String languageCode;
+  final Set<AiToolDomain> domains;
 
-  const _AiTurnDiagnostics({
-    required this.stage,
+  const _TurnSetup({
     required this.provider,
-    required this.model,
-    this.round,
-    this.schemaToolCount,
-    this.requestCharacters,
-    this.tools = const [],
+    required this.token,
+    required this.systemPrompt,
+    required this.languageCode,
+    required this.domains,
   });
 
-  _AiTurnDiagnostics copyWith({
-    String? stage,
-    int? round,
-    int? schemaToolCount,
-    int? requestCharacters,
-    List<String>? tools,
-  }) => _AiTurnDiagnostics(
-    stage: stage ?? this.stage,
-    provider: provider,
-    model: model,
-    round: round ?? this.round,
-    schemaToolCount: schemaToolCount ?? this.schemaToolCount,
-    requestCharacters: requestCharacters ?? this.requestCharacters,
-    tools: tools ?? this.tools,
-  );
+  String? get reasoningEffort => provider.reasoningEffortFor().apiValue;
+}
+
+/// One running turn, bound to the conversation it started in.
+class _TurnContext {
+  final _TurnSetup setup;
+  final String threadId;
+  final AiChatMessage userMessage;
+  final DateTime startedAt;
+  final Completer<void> _abort = Completer<void>();
+
+  /// Messages produced in this turn (assistant steps, tool results), in order.
+  final List<AiChatMessage> messages = [];
+  final List<AiRoundDiagnostics> diagnostics = [];
+  bool cancelled = false;
+  int round = 0;
+  int? lastRequestChars;
+
+  _TurnContext({
+    required this.setup,
+    required this.threadId,
+    required this.userMessage,
+    required this.startedAt,
+  });
+
+  Future<void> get abortTrigger => _abort.future;
+
+  void cancel() {
+    cancelled = true;
+    if (!_abort.isCompleted) _abort.complete();
+  }
 }

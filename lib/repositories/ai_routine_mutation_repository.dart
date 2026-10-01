@@ -1,167 +1,16 @@
-import 'package:collection/collection.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:uuid/uuid.dart';
-import 'package:workout_notes/models/ai_routine_proposal.dart';
 import 'package:workout_notes/repositories/base_repository.dart';
+import 'package:workout_notes/utils/ai_derived_id.dart';
 
-const _uuid = Uuid();
-
-/// SQL behind AI routine proposals: the routine tree snapshot used for diffs
-/// and staleness checks, exercise lookups, and the atomic reject / approve
-/// transactions that write routines. The proposal rows themselves live in
-/// `AiChatRepository`; `AiRoutineMutationService` keeps the rules
-/// (normalisation, validation, diff).
+/// SQL behind AI routine proposals: the routine tree snapshot used for diffs,
+/// exercise lookups and the two write paths (insert-only create, two-phase
+/// update). Every method runs on the executor it is given so the routine
+/// handler can fold them into the approval transaction; the rules
+/// (validation, diff) live in the routine proposal handler.
 class AiRoutineMutationRepository extends BaseRepository {
   /// Snapshot of a routine (days, exercises, predefined sets) using the
   /// `source_*_id` keys proposals refer to, or null when it does not exist.
-  Future<Map<String, dynamic>?> loadRoutineTree(String id) async =>
-      _loadRoutineTree(await db, id);
-
-  Future<bool> exerciseExists(String id) async {
-    final database = await db;
-    final rows = await database.query(
-      'exercises',
-      columns: ['id'],
-      where: 'id = ?',
-      whereArgs: [id],
-      limit: 1,
-    );
-    return rows.isNotEmpty;
-  }
-
-  Future<String?> exerciseName(String id) async {
-    final database = await db;
-    final rows = await database.query(
-      'exercises',
-      columns: ['name'],
-      where: 'id = ?',
-      whereArgs: [id],
-      limit: 1,
-    );
-    return rows.isEmpty ? null : rows.first['name'] as String?;
-  }
-
-  /// Marks an awaiting proposal as rejected. Throws [StateError] when the
-  /// proposal does not exist; resolved proposals are left untouched.
-  Future<void> rejectProposal(String id) async {
-    final database = await db;
-    await database.transaction((txn) async {
-      final rows = await txn.query(
-        'ai_routine_proposals',
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-      if (rows.isEmpty) throw StateError('Proposta não encontrada.');
-      final p = AiRoutineProposal.fromRow(rows.first);
-      if (p.status != AiRoutineProposalStatus.awaitingApproval) return;
-      await txn.update(
-        'ai_routine_proposals',
-        {
-          'status': AiRoutineProposalStatus.rejected.storageValue,
-          'resolved_at': DateTime.now().toIso8601String(),
-        },
-        where: 'id = ? AND status = ?',
-        whereArgs: [id, AiRoutineProposalStatus.awaitingApproval.storageValue],
-      );
-    });
-  }
-
-  /// Applies an awaiting proposal in a single transaction. The proposal ends
-  /// as applied, failed (an exercise disappeared) or stale (the routine
-  /// changed since it was prepared); a resolved proposal is a no-op.
-  Future<void> approveProposal(String id) async {
-    final database = await db;
-    await database.transaction((txn) async {
-      final rows = await txn.query(
-        'ai_routine_proposals',
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-      if (rows.isEmpty) throw StateError('Proposta não encontrada.');
-      final p = AiRoutineProposal.fromRow(rows.first);
-      if (p.status != AiRoutineProposalStatus.awaitingApproval) return;
-      final missingExerciseId = await _missingExerciseId(txn, p.target);
-      if (missingExerciseId != null) {
-        await txn.update(
-          'ai_routine_proposals',
-          {
-            'status': AiRoutineProposalStatus.failed.storageValue,
-            'error_code': 'exercise_missing',
-            'error_message':
-                'Um exercício da prévia não existe mais na biblioteca. Gere uma nova proposta.',
-            'resolved_at': DateTime.now().toIso8601String(),
-          },
-          where: 'id = ?',
-          whereArgs: [id],
-        );
-        return;
-      }
-      final claimed = await txn.update(
-        'ai_routine_proposals',
-        {'status': AiRoutineProposalStatus.applying.storageValue},
-        where: 'id = ? AND status = ?',
-        whereArgs: [id, AiRoutineProposalStatus.awaitingApproval.storageValue],
-      );
-      if (claimed != 1) return;
-      if (p.action == AiRoutineProposalAction.update) {
-        final live = await _loadRoutineTree(txn, p.routineId!);
-        if (!const DeepCollectionEquality().equals(live, p.before)) {
-          await txn.update(
-            'ai_routine_proposals',
-            {
-              'status': AiRoutineProposalStatus.stale.storageValue,
-              'error_code': 'stale',
-              'error_message':
-                  'A rotina foi alterada depois que esta proposta foi criada.',
-              'resolved_at': DateTime.now().toIso8601String(),
-            },
-            where: 'id = ?',
-            whereArgs: [id],
-          );
-          return;
-        }
-      }
-      final appliedId = await _applyTarget(txn, p);
-      await txn.update(
-        'ai_routine_proposals',
-        {
-          'status': AiRoutineProposalStatus.applied.storageValue,
-          'applied_routine_id': appliedId,
-          'resolved_at': DateTime.now().toIso8601String(),
-          'error_code': null,
-          'error_message': null,
-        },
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-    });
-  }
-
-  Future<String?> _missingExerciseId(
-    DatabaseExecutor executor,
-    Map<String, dynamic> target,
-  ) async {
-    final ids = <String>{};
-    for (final rawDay in target['days'] as List) {
-      for (final rawExercise in (rawDay as Map)['exercises'] as List) {
-        final id = (rawExercise as Map)['exercise_id'] as String;
-        ids.add(id);
-      }
-    }
-    for (final id in ids) {
-      final rows = await executor.query(
-        'exercises',
-        columns: ['id'],
-        where: 'id = ?',
-        whereArgs: [id],
-        limit: 1,
-      );
-      if (rows.isEmpty) return id;
-    }
-    return null;
-  }
-
-  Future<Map<String, dynamic>?> _loadRoutineTree(
+  Future<Map<String, dynamic>?> loadRoutineTree(
     DatabaseExecutor executor,
     String id,
   ) async {
@@ -169,230 +18,342 @@ class AiRoutineMutationRepository extends BaseRepository {
       'routines',
       where: 'id = ?',
       whereArgs: [id],
+      limit: 1,
     );
     if (routineRows.isEmpty) return null;
     final routine = routineRows.first;
-    final days = await executor.query(
-      'routine_days',
-      where: 'routine_id = ?',
-      whereArgs: [id],
-      orderBy: 'order_index ASC',
+    final rows = await executor.rawQuery(
+      '''
+      SELECT d.id AS day_id, d.name AS day_name, d.notes AS day_notes,
+        re.id AS re_id, re.exercise_id, re.rest_time_seconds,
+        re.superset_group_id,
+        ps.id AS set_id, ps.weight, ps.reps, ps.distance, ps.time_seconds,
+        ps.is_warmup
+      FROM routine_days d
+      LEFT JOIN routine_exercises re ON re.routine_day_id = d.id
+      LEFT JOIN predefined_sets ps ON ps.routine_exercise_id = re.id
+      WHERE d.routine_id = ?
+      ORDER BY d.order_index, d.id, re.order_index, re.id, ps.order_index, ps.id
+      ''',
+      [id],
     );
-    final dayOut = <Map<String, dynamic>>[];
-    for (final day in days) {
-      final exercises = await executor.query(
-        'routine_exercises',
-        where: 'routine_day_id = ?',
-        whereArgs: [day['id']],
-        orderBy: 'order_index ASC',
-      );
-      final exOut = <Map<String, dynamic>>[];
-      for (final exercise in exercises) {
-        final sets = await executor.query(
-          'predefined_sets',
-          where: 'routine_exercise_id = ?',
-          whereArgs: [exercise['id']],
-          orderBy: 'order_index ASC',
-        );
-        exOut.add({
-          'source_routine_exercise_id': exercise['id'],
-          'exercise_id': exercise['exercise_id'],
-          'rest_time_seconds': exercise['rest_time_seconds'],
-          'superset_group_id': exercise['superset_group_id'],
-          'sets': sets
-              .map(
-                (set) => {
-                  'source_set_id': set['id'],
-                  'weight': set['weight'],
-                  'reps': set['reps'],
-                  'distance': set['distance'],
-                  'time_seconds': set['time_seconds'],
-                  'is_warmup': (set['is_warmup'] as num? ?? 0) == 1,
-                },
-              )
-              .toList(),
-        });
+    final days = <Map<String, dynamic>>[];
+    Map<String, dynamic>? day;
+    Map<String, dynamic>? exercise;
+    for (final row in rows) {
+      if (day == null || day['source_day_id'] != row['day_id']) {
+        day = {
+          'source_day_id': row['day_id'],
+          'name': row['day_name'],
+          'notes': row['day_notes'],
+          'exercises': <Map<String, dynamic>>[],
+        };
+        days.add(day);
+        exercise = null;
       }
-      dayOut.add({
-        'source_day_id': day['id'],
-        'name': day['name'],
-        'notes': day['notes'],
-        'exercises': exOut,
+      final reId = row['re_id'];
+      if (reId == null) continue;
+      if (exercise == null || exercise['source_routine_exercise_id'] != reId) {
+        exercise = {
+          'source_routine_exercise_id': reId,
+          'exercise_id': row['exercise_id'],
+          'rest_time_seconds': row['rest_time_seconds'],
+          'superset_group_id': row['superset_group_id'],
+          'sets': <Map<String, dynamic>>[],
+        };
+        (day['exercises'] as List).add(exercise);
+      }
+      if (row['set_id'] == null) continue;
+      (exercise['sets'] as List).add({
+        'source_set_id': row['set_id'],
+        'weight': row['weight'],
+        'reps': row['reps'],
+        'distance': row['distance'],
+        'time_seconds': row['time_seconds'],
+        'is_warmup': (row['is_warmup'] as num? ?? 0) == 1,
       });
     }
     return {
       'id': routine['id'],
       'name': routine['name'],
       'notes': routine['notes'],
-      'days': dayOut,
+      'days': days,
     };
   }
 
-  Future<String> _applyTarget(
-    Transaction txn,
-    AiRoutineProposal proposal,
+  /// `id → {name, locale_key, type}` of the library exercises in [ids];
+  /// ids missing from the library are absent from the result.
+  Future<Map<String, Map<String, dynamic>>> exerciseInfo(
+    DatabaseExecutor executor,
+    Iterable<String> ids,
   ) async {
-    final target = proposal.target;
-    final routineId = proposal.action == AiRoutineProposalAction.create
-        ? _uuid.v4()
-        : proposal.routineId!;
-    if (proposal.action == AiRoutineProposalAction.create) {
-      await txn.insert('routines', {
-        'id': routineId,
-        'name': target['name'],
-        'notes': target['notes'],
-        'created_at': DateTime.now().toIso8601String(),
+    final unique = ids.toSet().toList();
+    final out = <String, Map<String, dynamic>>{};
+    for (var i = 0; i < unique.length; i += 400) {
+      final chunk = unique.sublist(i, (i + 400).clamp(0, unique.length));
+      final rows = await executor.query(
+        'exercises',
+        columns: ['id', 'name', 'locale_key', 'type'],
+        where: 'id IN (${List.filled(chunk.length, '?').join(', ')})',
+        whereArgs: chunk,
+      );
+      for (final row in rows) {
+        out[row['id'] as String] = {
+          'name': row['name'],
+          'locale_key': row['locale_key'],
+          'type': row['type'],
+        };
+      }
+    }
+    return out;
+  }
+
+  /// Ids of the library exercises in [ids] that no longer exist.
+  Future<Set<String>> missingExerciseIds(
+    DatabaseExecutor executor,
+    Iterable<String> ids,
+  ) async {
+    final wanted = ids.toSet();
+    final found = await exerciseInfo(executor, wanted);
+    return wanted.difference(found.keys.toSet());
+  }
+
+  /// Inserts a new routine with its whole tree. Insert-only: the target must
+  /// not carry any `source_*` id. The routine takes [proposalId] as its
+  /// primary key and every child a deterministic id derived from it, so the
+  /// same proposal can never create the tree twice.
+  Future<String> createRoutine(
+    DatabaseExecutor txn, {
+    required String proposalId,
+    required Map<String, dynamic> target,
+  }) async {
+    await txn.insert('routines', {
+      'id': proposalId,
+      'name': target['name'],
+      'notes': target['notes'],
+      'created_at': DateTime.now().toIso8601String(),
+    });
+    final days = (target['days'] as List).cast<Map<String, dynamic>>();
+    for (var d = 0; d < days.length; d++) {
+      final day = days[d];
+      final dayId = aiDerivedId(proposalId, 'day$d');
+      await txn.insert('routine_days', {
+        'id': dayId,
+        'routine_id': proposalId,
+        'name': day['name'],
+        'notes': day['notes'],
+        'order_index': d,
       });
-    } else {
+      final exercises = (day['exercises'] as List).cast<Map<String, dynamic>>();
+      for (var e = 0; e < exercises.length; e++) {
+        final exercise = exercises[e];
+        final reId = aiDerivedId(proposalId, 'day$d/ex$e');
+        await txn.insert('routine_exercises', {
+          'id': reId,
+          'routine_day_id': dayId,
+          'exercise_id': exercise['exercise_id'],
+          'order_index': e,
+          'rest_time_seconds': exercise['rest_time_seconds'],
+          'superset_group_id': exercise['superset_group_id'],
+        });
+        final sets = (exercise['sets'] as List).cast<Map<String, dynamic>>();
+        for (var s = 0; s < sets.length; s++) {
+          await txn.insert('predefined_sets', {
+            'id': aiDerivedId(proposalId, 'day$d/ex$e/set$s'),
+            ..._setValues(sets[s], reId, s),
+          });
+        }
+      }
+    }
+    return proposalId;
+  }
+
+  /// Rewrites [routineId] to [target] in two phases: first every kept (and
+  /// new) row is upserted, then whatever the target no longer contains is
+  /// deleted across the whole routine. Doing the deletes last means an
+  /// exercise moved to another day (its row is re-parented in phase one) is
+  /// never lost. Every UPDATE must hit exactly one row, otherwise the whole
+  /// transaction aborts.
+  Future<void> updateRoutine(
+    DatabaseExecutor txn, {
+    required String proposalId,
+    required String routineId,
+    required Map<String, dynamic> target,
+  }) async {
+    await _expectOne(
       await txn.update(
         'routines',
         {'name': target['name'], 'notes': target['notes']},
         where: 'id = ?',
         whereArgs: [routineId],
-      );
-    }
-    final keepDays = <String>{};
-    final days = target['days'] as List;
-    for (var i = 0; i < days.length; i++) {
-      final day = (days[i] as Map).cast<String, dynamic>();
-      final dayId = day['source_day_id'] as String? ?? _uuid.v4();
-      keepDays.add(dayId);
-      final values = {
+      ),
+      'routine $routineId',
+    );
+    final keptDays = <String>{};
+    final keptExercises = <String>{};
+    final keptSets = <String>{};
+    final days = (target['days'] as List).cast<Map<String, dynamic>>();
+    for (var d = 0; d < days.length; d++) {
+      final day = days[d];
+      final sourceDay = day['source_day_id'] as String?;
+      final dayId = sourceDay ?? aiDerivedId(proposalId, 'day$d');
+      keptDays.add(dayId);
+      final dayValues = {
         'routine_id': routineId,
         'name': day['name'],
         'notes': day['notes'],
-        'order_index': i,
+        'order_index': d,
       };
-      if (day['source_day_id'] == null) {
-        await txn.insert('routine_days', {'id': dayId, ...values});
+      if (sourceDay == null) {
+        await txn.insert('routine_days', {'id': dayId, ...dayValues});
       } else {
-        await txn.update(
-          'routine_days',
-          values,
-          where: 'id = ?',
-          whereArgs: [dayId],
+        await _expectOne(
+          await txn.update(
+            'routine_days',
+            dayValues,
+            where: 'id = ? AND routine_id = ?',
+            whereArgs: [dayId, routineId],
+          ),
+          'routine day $dayId',
         );
       }
-      await _applyExercises(
-        txn,
-        dayId,
-        (day['exercises'] as List).cast<Map>(),
-        proposal.action == AiRoutineProposalAction.update,
+      final exercises = (day['exercises'] as List).cast<Map<String, dynamic>>();
+      for (var e = 0; e < exercises.length; e++) {
+        final exercise = exercises[e];
+        final sourceExercise =
+            exercise['source_routine_exercise_id'] as String?;
+        final reId = sourceExercise ?? aiDerivedId(proposalId, 'day$d/ex$e');
+        keptExercises.add(reId);
+        final exerciseValues = {
+          'routine_day_id': dayId,
+          'exercise_id': exercise['exercise_id'],
+          'order_index': e,
+          'rest_time_seconds': exercise['rest_time_seconds'],
+          'superset_group_id': exercise['superset_group_id'],
+        };
+        if (sourceExercise == null) {
+          await txn.insert('routine_exercises', {
+            'id': reId,
+            ...exerciseValues,
+          });
+        } else {
+          await _expectOne(
+            await txn.update(
+              'routine_exercises',
+              exerciseValues,
+              where:
+                  'id = ? AND routine_day_id IN '
+                  '(SELECT id FROM routine_days WHERE routine_id = ?)',
+              whereArgs: [reId, routineId],
+            ),
+            'routine exercise $reId',
+          );
+        }
+        final sets = (exercise['sets'] as List).cast<Map<String, dynamic>>();
+        for (var s = 0; s < sets.length; s++) {
+          final sourceSet = sets[s]['source_set_id'] as String?;
+          final setId =
+              sourceSet ?? aiDerivedId(proposalId, 'day$d/ex$e/set$s');
+          keptSets.add(setId);
+          final values = _setValues(sets[s], reId, s);
+          if (sourceSet == null) {
+            await txn.insert('predefined_sets', {'id': setId, ...values});
+          } else {
+            await _expectOne(
+              await txn.update(
+                'predefined_sets',
+                values,
+                where: 'id = ?',
+                whereArgs: [setId],
+              ),
+              'predefined set $setId',
+            );
+          }
+        }
+      }
+    }
+    // Phase two: delete what the target dropped, across the whole routine.
+    final existingSets = await txn.rawQuery(
+      '''
+      SELECT ps.id FROM predefined_sets ps
+      JOIN routine_exercises re ON re.id = ps.routine_exercise_id
+      JOIN routine_days d ON d.id = re.routine_day_id
+      WHERE d.routine_id = ?
+      ''',
+      [routineId],
+    );
+    await _deleteIds(
+      txn,
+      'predefined_sets',
+      [
+        for (final row in existingSets) row['id'] as String,
+      ].where((id) => !keptSets.contains(id)),
+    );
+    final existingExercises = await txn.rawQuery(
+      '''
+      SELECT re.id FROM routine_exercises re
+      JOIN routine_days d ON d.id = re.routine_day_id
+      WHERE d.routine_id = ?
+      ''',
+      [routineId],
+    );
+    await _deleteIds(
+      txn,
+      'routine_exercises',
+      [
+        for (final row in existingExercises) row['id'] as String,
+      ].where((id) => !keptExercises.contains(id)),
+    );
+    final existingDays = await txn.query(
+      'routine_days',
+      columns: ['id'],
+      where: 'routine_id = ?',
+      whereArgs: [routineId],
+    );
+    await _deleteIds(
+      txn,
+      'routine_days',
+      [
+        for (final row in existingDays) row['id'] as String,
+      ].where((id) => !keptDays.contains(id)),
+    );
+  }
+
+  Map<String, Object?> _setValues(
+    Map<String, dynamic> set,
+    String routineExerciseId,
+    int index,
+  ) => {
+    'routine_exercise_id': routineExerciseId,
+    'weight': set['weight'],
+    'reps': set['reps'],
+    'distance': set['distance'],
+    'time_seconds': set['time_seconds'],
+    'is_warmup': set['is_warmup'] == true ? 1 : 0,
+    'order_index': index,
+  };
+
+  Future<void> _deleteIds(
+    DatabaseExecutor txn,
+    String table,
+    Iterable<String> ids,
+  ) async {
+    final list = ids.toList();
+    for (var i = 0; i < list.length; i += 400) {
+      final chunk = list.sublist(i, (i + 400).clamp(0, list.length));
+      await txn.delete(
+        table,
+        where: 'id IN (${List.filled(chunk.length, '?').join(', ')})',
+        whereArgs: chunk,
       );
     }
-    if (proposal.action == AiRoutineProposalAction.update) {
-      final placeholders = List.filled(keepDays.length, '?').join(',');
-      if (keepDays.isEmpty) {
-        await txn.delete(
-          'routine_days',
-          where: 'routine_id = ?',
-          whereArgs: [routineId],
-        );
-      } else {
-        await txn.delete(
-          'routine_days',
-          where: 'routine_id = ? AND id NOT IN ($placeholders)',
-          whereArgs: [routineId, ...keepDays],
-        );
-      }
-    }
-    return routineId;
   }
 
-  Future<void> _applyExercises(
-    Transaction txn,
-    String dayId,
-    List<Map> exercises,
-    bool updating,
-  ) async {
-    final keep = <String>{};
-    for (var i = 0; i < exercises.length; i++) {
-      final ex = exercises[i].cast<String, dynamic>();
-      final id = ex['source_routine_exercise_id'] as String? ?? _uuid.v4();
-      keep.add(id);
-      final values = {
-        'routine_day_id': dayId,
-        'exercise_id': ex['exercise_id'],
-        'order_index': i,
-        'rest_time_seconds': ex['rest_time_seconds'],
-        'superset_group_id': ex['superset_group_id'],
-      };
-      if (ex['source_routine_exercise_id'] == null) {
-        await txn.insert('routine_exercises', {'id': id, ...values});
-      } else {
-        await txn.update(
-          'routine_exercises',
-          values,
-          where: 'id = ?',
-          whereArgs: [id],
-        );
-      }
-      await _applySets(txn, id, (ex['sets'] as List).cast<Map>(), updating);
-    }
-    if (updating) {
-      if (keep.isEmpty) {
-        await txn.delete(
-          'routine_exercises',
-          where: 'routine_day_id = ?',
-          whereArgs: [dayId],
-        );
-      } else {
-        await txn.delete(
-          'routine_exercises',
-          where:
-              'routine_day_id = ? AND id NOT IN (${List.filled(keep.length, '?').join(',')})',
-          whereArgs: [dayId, ...keep],
-        );
-      }
-    }
-  }
-
-  Future<void> _applySets(
-    Transaction txn,
-    String routineExerciseId,
-    List<Map> sets,
-    bool updating,
-  ) async {
-    final keep = <String>{};
-    for (var i = 0; i < sets.length; i++) {
-      final set = sets[i].cast<String, dynamic>();
-      final id = set['source_set_id'] as String? ?? _uuid.v4();
-      keep.add(id);
-      final values = {
-        'routine_exercise_id': routineExerciseId,
-        'weight': set['weight'],
-        'reps': set['reps'],
-        'distance': set['distance'],
-        'time_seconds': set['time_seconds'],
-        'is_warmup': set['is_warmup'] == true ? 1 : 0,
-        'order_index': i,
-      };
-      if (set['source_set_id'] == null) {
-        await txn.insert('predefined_sets', {'id': id, ...values});
-      } else {
-        await txn.update(
-          'predefined_sets',
-          values,
-          where: 'id = ?',
-          whereArgs: [id],
-        );
-      }
-    }
-    if (updating) {
-      if (keep.isEmpty) {
-        await txn.delete(
-          'predefined_sets',
-          where: 'routine_exercise_id = ?',
-          whereArgs: [routineExerciseId],
-        );
-      } else {
-        await txn.delete(
-          'predefined_sets',
-          where:
-              'routine_exercise_id = ? AND id NOT IN (${List.filled(keep.length, '?').join(',')})',
-          whereArgs: [routineExerciseId, ...keep],
-        );
-      }
+  Future<void> _expectOne(int affected, String what) async {
+    if (affected != 1) {
+      throw StateError(
+        'Expected to update exactly one row of $what, got $affected',
+      );
     }
   }
 }

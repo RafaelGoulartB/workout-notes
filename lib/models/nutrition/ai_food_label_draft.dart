@@ -1,6 +1,7 @@
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
+import 'package:workout_notes/utils/ai_json.dart';
 
-/// One serving extracted from a nutrition label photo.
+/// One serving extracted from a nutrition label photo or proposed by the AI.
 class AiFoodLabelServingDraft {
   final String label;
   final double quantity;
@@ -16,13 +17,25 @@ class AiFoodLabelServingDraft {
     this.mlEquivalent,
   });
 
-  factory AiFoodLabelServingDraft.fromJson(Map<String, dynamic> json) {
+  /// Null when the entry is empty or unusable: no label and no unit, or a
+  /// quantity that is present but zero.
+  static AiFoodLabelServingDraft? tryParse(Map<String, dynamic> json) {
+    final label = AiJson.text(json['label']) ?? '';
+    final unit = AiJson.text(json['unit']) ?? '';
+    if (label.isEmpty && unit.isEmpty) return null;
+    final rawQuantity = json['quantity'];
+    final quantity = AiJson.number(rawQuantity);
+    // A missing quantity means one serving; a zero or garbage quantity means
+    // the entry is not a real serving.
+    if (AiJson.text(rawQuantity) != null || rawQuantity is num) {
+      if (quantity == null || quantity <= 0) return null;
+    }
     return AiFoodLabelServingDraft(
-      label: _nullableString(json['label']) ?? '',
-      quantity: _nonNegativeDouble(json['quantity']) ?? 1,
-      unit: _nullableString(json['unit']) ?? '',
-      gramsEquivalent: _nonNegativeDouble(json['grams_equivalent']),
-      mlEquivalent: _nonNegativeDouble(json['ml_equivalent']),
+      label: label,
+      quantity: quantity ?? 1,
+      unit: unit,
+      gramsEquivalent: AiJson.positive(json['grams_equivalent']),
+      mlEquivalent: AiJson.positive(json['ml_equivalent']),
     );
   }
 
@@ -35,8 +48,9 @@ class AiFoodLabelServingDraft {
   };
 }
 
-/// Food identified by the AI from a nutrition label photo. Values refer
-/// to [referenceAmount] of [referenceUnit] (normally 100 g).
+/// Food identified by the AI (from a nutrition label photo or described by
+/// the user in the chat). Values refer to [referenceAmount] of
+/// [referenceUnit] (normally 100 g).
 class AiFoodLabelDraft {
   final String name;
   final String? brand;
@@ -56,65 +70,94 @@ class AiFoodLabelDraft {
     this.servings = const [],
   });
 
+  /// Keys of the nutrient fields, in display order. The single source for the
+  /// parser, the tool schema and the extraction prompt.
+  static List<String> get nutrientKeys =>
+      NutritionValues.empty.toMap().keys.toList(growable: false);
+
+  /// Unit of a nutrient key (`calories` → kcal, `sodium_mg` → mg…).
+  static String nutrientUnit(String key) {
+    if (key == 'calories') return 'kcal';
+    final suffix = key.split('_').last;
+    return const {'g': 'g', 'mg': 'mg', 'ug': 'µg'}[suffix] ?? '';
+  }
+
+  /// Parses the model's answer. Throws [FormatException] naming the field
+  /// when the name, the reference amount or the reference unit is missing or
+  /// unreadable: a reference is never guessed (it would silently scale every
+  /// nutrient).
   factory AiFoodLabelDraft.fromJson(Map<String, dynamic> json) {
-    final name = _nullableString(json['name']) ?? '';
-    if (name.isEmpty) {
-      throw const FormatException('missing food name');
+    final name = AiJson.text(json['name']);
+    if (name == null) throw const FormatException('name is required');
+    final amount = AiJson.positive(json['reference_amount']);
+    if (amount == null) {
+      throw const FormatException(
+        'reference_amount is required and must be a positive number',
+      );
     }
-    final per = json['per'];
-    final values = per is Map
-        ? NutritionValues(
-            calories: _nonNegativeDouble(per['calories']),
-            proteinG: _nonNegativeDouble(per['protein_g']),
-            carbsG: _nonNegativeDouble(per['carbs_g']),
-            fatG: _nonNegativeDouble(per['fat_g']),
-            saturatedFatG: _nonNegativeDouble(per['saturated_fat_g']),
-            monounsaturatedFatG: _nonNegativeDouble(
-              per['monounsaturated_fat_g'],
-            ),
-            polyunsaturatedFatG: _nonNegativeDouble(
-              per['polyunsaturated_fat_g'],
-            ),
-            transFatG: _nonNegativeDouble(per['trans_fat_g']),
-            fiberG: _nonNegativeDouble(per['fiber_g']),
-            sugarsG: _nonNegativeDouble(per['sugars_g']),
-            sodiumMg: _nonNegativeDouble(per['sodium_mg']),
-            potassiumMg: _nonNegativeDouble(per['potassium_mg']),
-            calciumMg: _nonNegativeDouble(per['calcium_mg']),
-            ironMg: _nonNegativeDouble(per['iron_mg']),
-            magnesiumMg: _nonNegativeDouble(per['magnesium_mg']),
-            zincMg: _nonNegativeDouble(per['zinc_mg']),
-            vitaminAUg: _nonNegativeDouble(per['vitamin_a_ug']),
-            vitaminCMg: _nonNegativeDouble(per['vitamin_c_mg']),
-            vitaminDUg: _nonNegativeDouble(per['vitamin_d_ug']),
-            vitaminB12Ug: _nonNegativeDouble(per['vitamin_b12_ug']),
-          )
-        : NutritionValues.empty;
+    final unit = AiJson.text(json['reference_unit']);
+    if (unit == null) {
+      throw const FormatException('reference_unit is required (g or ml)');
+    }
+    final per = AiJson.objectOrNull(json['per']) ?? const {};
+    final values = NutritionValues.fromMap({
+      for (final key in nutrientKeys) key: AiJson.number(per[key]),
+    });
     final servings = <AiFoodLabelServingDraft>[];
     final rawServings = json['servings'];
     if (rawServings is List) {
       for (final item in rawServings) {
-        if (item is Map) {
-          try {
-            servings.add(
-              AiFoodLabelServingDraft.fromJson(item.cast<String, dynamic>()),
-            );
-          } catch (_) {
-            // Skip a malformed serving and keep the rest of the draft.
-          }
-        }
+        final map = AiJson.objectOrNull(item);
+        if (map == null) continue;
+        final serving = AiFoodLabelServingDraft.tryParse(map);
+        if (serving != null) servings.add(serving);
       }
     }
-    final unit = _nullableString(json['reference_unit']) ?? 'g';
     return AiFoodLabelDraft(
       name: name,
-      brand: _nullableString(json['brand']),
-      barcode: _nullableString(json['barcode']),
-      referenceAmount: _nonNegativeDouble(json['reference_amount']) ?? 100,
+      brand: AiJson.text(json['brand']),
+      barcode: AiJson.text(json['barcode']),
+      referenceAmount: amount,
       referenceUnit: unit,
       values: values,
       servings: servings,
     );
+  }
+
+  /// Plausibility problems the user should not have to discover: negative or
+  /// impossible numbers are already dropped by the parser, so this checks
+  /// relations (a macro cannot weigh more than the amount it is per).
+  List<String> problems() {
+    final out = <String>[];
+    final unit = referenceUnit.trim().toLowerCase();
+    final weighable = unit == 'g' || unit == 'ml';
+    if (weighable) {
+      for (final entry in values.toMap().entries) {
+        final value = entry.value as double?;
+        if (value == null) continue;
+        if (nutrientUnit(entry.key) == 'g' && value > referenceAmount) {
+          out.add(
+            '${entry.key} ($value g) is larger than the reference amount '
+            '($referenceAmount $unit)',
+          );
+        }
+      }
+    }
+    final calories = values.calories;
+    if (calories != null && weighable && calories > referenceAmount * 9.5) {
+      out.add(
+        'calories ($calories kcal) is impossible for $referenceAmount $unit',
+      );
+    }
+    final macros =
+        (values.proteinG ?? 0) + (values.carbsG ?? 0) + (values.fatG ?? 0);
+    if (weighable && macros > referenceAmount * 1.05) {
+      out.add(
+        'protein + carbs + fat ($macros g) is larger than the reference '
+        'amount ($referenceAmount $unit)',
+      );
+    }
+    return out;
   }
 
   Map<String, dynamic> toJson() => {
@@ -129,24 +172,4 @@ class AiFoodLabelDraft {
     },
     'servings': servings.map((serving) => serving.toJson()).toList(),
   };
-}
-
-double? _nonNegativeDouble(dynamic value) {
-  if (value == null) return null;
-  double? parsed;
-  if (value is num) {
-    parsed = value.toDouble();
-  } else if (value is String) {
-    parsed = double.tryParse(value.trim().replaceAll(',', '.'));
-  }
-  if (parsed == null || parsed.isNaN || parsed.isInfinite || parsed < 0) {
-    return null;
-  }
-  return parsed;
-}
-
-String? _nullableString(dynamic value) {
-  if (value is! String) return null;
-  final trimmed = value.trim();
-  return trimmed.isEmpty ? null : trimmed;
 }

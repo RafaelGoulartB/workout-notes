@@ -63,7 +63,13 @@ class AiImageAttachmentStore {
   Future<List<String>> readDataUrls(List<AiImageAttachment> attachments) async {
     final urls = <String>[];
     for (final attachment in attachments) {
-      final file = File(attachment.path);
+      var file = File(attachment.path);
+      if (!await file.exists()) {
+        // The app data prefix can change (restore, migration): look the
+        // file up by name in the current images directory.
+        final root = await _rootDirectory();
+        file = File(p.join(root.path, p.basename(attachment.path)));
+      }
       if (!await file.exists()) {
         throw const AiImageAttachmentException('image_missing');
       }
@@ -84,10 +90,13 @@ class AiImageAttachmentStore {
     }
   }
 
+  /// Deletes image files no stored message references. Files are matched by
+  /// name, so a changed app-data prefix never makes every file look orphaned.
   Future<void> deleteOrphans(Set<String> retainedPaths) async {
+    final retainedNames = {for (final path in retainedPaths) p.basename(path)};
     final root = await _rootDirectory();
     await for (final entity in root.list(followLinks: false)) {
-      if (entity is File && !retainedPaths.contains(entity.path)) {
+      if (entity is File && !retainedNames.contains(p.basename(entity.path))) {
         try {
           await entity.delete();
         } catch (_) {

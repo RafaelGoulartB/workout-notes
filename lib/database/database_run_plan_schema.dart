@@ -11,6 +11,10 @@ import 'package:sqflite/sqflite.dart';
 /// `repeat_group` are repeated `repeat_count` times by the engine. This keeps
 /// the table shape as simple as `predefined_sets`.
 abstract final class DatabaseRunPlanSchema {
+  /// Plan lookups of scheduled runs (v61; shared with the upgrade).
+  static const String scheduledRunsPlanIndex =
+      'CREATE INDEX IF NOT EXISTS idx_scheduled_runs_plan ON scheduled_runs(run_plan_id)';
+
   static Future<void> create(DatabaseExecutor db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS run_plans (
@@ -113,6 +117,7 @@ abstract final class DatabaseRunPlanSchema {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_scheduled_runs_activity ON scheduled_runs(run_activity_id)',
     );
+    await db.execute(DatabaseRunPlanSchema.scheduledRunsPlanIndex);
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_run_activity_steps_activity ON run_activity_steps(run_activity_id, order_index)',
     );
