@@ -5,12 +5,18 @@ import 'package:workout_notes/database/database_seed.dart';
 
 /// Initializes the sqflite FFI factory once for the current test isolate.
 ///
-/// Safe to call from every `setUpAll`; replaces the `sqfliteFfiInit()` +
-/// `databaseFactory = databaseFactoryFfi` boilerplate.
+/// Safe to call from every `setUpAll` and every [openTestDb]; replaces the
+/// `sqfliteFfiInit()` + `databaseFactory = databaseFactoryFfi` boilerplate.
+/// The factory is assigned only once per isolate: sqflite prints a warning on
+/// every reassignment.
 void initSqfliteFfiForTests() {
+  if (_ffiInitialized && identical(databaseFactory, databaseFactoryFfi)) return;
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
+  _ffiInitialized = true;
 }
+
+bool _ffiInitialized = false;
 
 /// Opens an in-memory database with the REAL current schema
 /// ([DatabaseSchema.createSchema], foreign keys on) and no seed rows.

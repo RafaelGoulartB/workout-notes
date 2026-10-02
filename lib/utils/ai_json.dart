@@ -1,7 +1,14 @@
 import 'dart:convert';
 
-/// Lenient readers for JSON produced by a language model.
+/// Lenient readers for JSON produced by a language model, plus the number
+/// format used when writing values back into model-facing text.
 abstract final class AiJson {
+  /// [value] as text for model-facing payloads: whole numbers without a
+  /// decimal point (`80`), others as Dart prints them (`82.5`). Invariant,
+  /// never locale-aware.
+  static String formatNumber(double value) =>
+      value == value.roundToDouble() ? '${value.round()}' : '$value';
+
   /// Decodes the JSON object in [raw]: tolerates a markdown fence and prose
   /// around the braces. Throws [FormatException] when there is no object.
   static Map<String, dynamic> parseObject(String raw) {

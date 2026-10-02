@@ -9,6 +9,7 @@ import 'package:workout_notes/repositories/workout_repository.dart';
 import 'package:workout_notes/services/ai_tool_math.dart';
 import 'package:workout_notes/services/ai_tool_result_shaper.dart';
 import 'package:workout_notes/services/ai_tool_spec.dart';
+import 'package:workout_notes/utils/ai_json.dart';
 import 'package:workout_notes/utils/ai_revision.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 
@@ -1256,9 +1257,6 @@ class _Session {
   };
 }
 
-String _num(double value) =>
-    value == value.roundToDouble() ? '${value.round()}' : '$value';
-
 String _clock(int seconds) =>
     '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
 
@@ -1275,7 +1273,7 @@ String _setText(
   final buffer = StringBuffer();
   switch (type) {
     case 'distanceTime':
-      buffer.write('${_num(distance ?? 0)}/${_clock(time ?? 0)}');
+      buffer.write('${AiJson.formatNumber(distance ?? 0)}/${_clock(time ?? 0)}');
     case 'timeOnly':
       buffer.write('${time ?? 0}s');
     case 'repsOnly':
@@ -1283,10 +1281,10 @@ String _setText(
     default:
       buffer.write(
         weight != null && weight > 0
-            ? '${_num(weight)}x${reps ?? 0}'
+            ? '${AiJson.formatNumber(weight)}x${reps ?? 0}'
             : 'BWx${reps ?? 0}',
       );
   }
-  if (rpe != null) buffer.write('@${_num(rpe)}');
+  if (rpe != null) buffer.write('@${AiJson.formatNumber(rpe)}');
   return buffer.toString();
 }

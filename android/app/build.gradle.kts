@@ -42,6 +42,15 @@ android {
         }
     }
 
+    lint {
+        // Existing findings live in lint-baseline.xml so CI only fails on new
+        // ones. Regenerate with `./gradlew :app:updateLintBaseline` after
+        // fixing issues (never to hide a new one).
+        baseline = file("lint-baseline.xml")
+        abortOnError = true
+        checkReleaseBuilds = false
+    }
+
     testOptions {
         // android.util.Log and friends return defaults in JVM unit tests.
         unitTests.isReturnDefaultValues = true

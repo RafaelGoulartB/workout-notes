@@ -3,6 +3,7 @@ import 'package:workout_notes/models/ai_message_role.dart';
 import 'package:workout_notes/models/ai_proposal.dart';
 import 'package:workout_notes/models/ai_tool_domain.dart';
 import 'package:workout_notes/services/ai_tool_spec.dart';
+import 'package:workout_notes/utils/ai_json.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 
 /// A typed failure of a proposal. Raised while preparing (the model receives
@@ -415,10 +416,10 @@ class AiProposalArgs {
   void _range(String key, double value, double? min, double? max) {
     if ((min != null && value < min) || (max != null && value > max)) {
       final bounds = min != null && max != null
-          ? 'between ${_num(min)} and ${_num(max)}'
+          ? 'between ${AiJson.formatNumber(min)} and ${AiJson.formatNumber(max)}'
           : min != null
-          ? 'at least ${_num(min)}'
-          : 'at most ${_num(max!)}';
+          ? 'at least ${AiJson.formatNumber(min)}'
+          : 'at most ${AiJson.formatNumber(max!)}';
       throw AiProposalException(
         'invalid_args',
         '"${_at(key)}" is out of range.',
@@ -429,9 +430,6 @@ class AiProposalArgs {
       );
     }
   }
-
-  static String _num(double value) =>
-      value == value.roundToDouble() ? value.toInt().toString() : '$value';
 
   AiProposalException _missing(String key, String expected) =>
       AiProposalException(

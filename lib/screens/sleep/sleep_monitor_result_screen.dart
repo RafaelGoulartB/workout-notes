@@ -40,7 +40,9 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> wit
       // The entry is an extra: a failed read must not hide the session.
       try {
         entry = await _repository.getSleepEntry(session.sleepEntryId!);
-      } catch (_) {}
+      } catch (error) {
+        debugPrint('Could not load the linked sleep entry: $error');
+      }
     }
     if (!mounted) return;
     setState(() {
