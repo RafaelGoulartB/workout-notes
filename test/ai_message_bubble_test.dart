@@ -32,6 +32,29 @@ void main() {
     expect(find.textContaining(r'$1'), findsNothing);
   });
 
+  testWidgets('a cut-off answer shows a notice, a complete one does not', (
+    tester,
+  ) async {
+    AiChatMessage answer({required bool cutOff}) => AiChatMessage(
+      id: 'm-$cutOff',
+      threadId: 't',
+      role: AiMessageRole.assistant,
+      content: 'Resposta pela metade',
+      createdAt: DateTime(2026, 9, 30),
+      providerExtras: {if (cutOff) kAiCutOffExtra: true},
+    );
+
+    await tester.pumpWidget(
+      _testApp(AiMessageBubble(message: answer(cutOff: true))),
+    );
+    expect(find.text('Esta resposta foi cortada antes do fim.'), findsOneWidget);
+
+    await tester.pumpWidget(
+      _testApp(AiMessageBubble(message: answer(cutOff: false))),
+    );
+    expect(find.text('Esta resposta foi cortada antes do fim.'), findsNothing);
+  });
+
   testWidgets('assistant response stays readable at narrow mobile width', (
     tester,
   ) async {

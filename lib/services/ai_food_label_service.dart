@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:workout_notes/models/nutrition/ai_food_label_draft.dart';
 import 'package:workout_notes/services/ai_service.dart';
 import 'package:workout_notes/state/ai_settings_notifier.dart';
+import 'package:workout_notes/utils/ai_endpoint_policy.dart';
 import 'package:workout_notes/utils/ai_json.dart';
 import 'package:workout_notes/utils/base64_encoder.dart';
 
@@ -103,11 +104,20 @@ Regras:
     if (model.isEmpty) {
       throw const AiFoodLabelException('no_model', 'No model selected');
     }
+    // Same consent rule as the coach: nothing is sent before the user allows
+    // sharing data with the provider.
+    if (!settings.settings.dataSharingAccepted) {
+      throw const AiFoodLabelException(
+        'consent_required',
+        'Data sharing with the AI provider is not allowed',
+      );
+    }
     final token = await settings.getToken(provider.id) ?? '';
     // Keep this flow consistent with AiChatService. Without this check a
     // secure-storage read failure became an unauthenticated request and the
     // screen hid the resulting 401 behind a generic label-analysis error.
-    if (token.isEmpty) {
+    // Local endpoints (a LAN Ollama) work without a token, as in the chat.
+    if (token.isEmpty && !AiEndpointPolicy.isLocalEndpoint(provider.baseUrl)) {
       throw const AiFoodLabelException('missing_token', 'Missing API token');
     }
 

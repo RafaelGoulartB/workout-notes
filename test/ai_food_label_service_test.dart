@@ -64,6 +64,7 @@ void main() {
       token: 'secret-token',
     );
     await settings.setSelectedModel(provider.id, 'vision-model');
+    await settings.setDataSharingAccepted(true);
     service = AiFoodLabelService(settings: settings, service: ai);
   });
 
@@ -189,6 +190,59 @@ void main() {
         () => lonely.analyze(imageBytes: Uint8List.fromList([1])),
         throwsA(
           isA<AiFoodLabelException>().having((e) => e.code, 'code', 'no_model'),
+        ),
+      );
+    });
+
+    test('throws consent_required before sending anything', () async {
+      await settings.setDataSharingAccepted(false);
+      expect(
+        () => service.analyze(imageBytes: Uint8List.fromList([1])),
+        throwsA(
+          isA<AiFoodLabelException>().having(
+            (e) => e.code,
+            'code',
+            'consent_required',
+          ),
+        ),
+      );
+      expect(ai.lastMessages, isNull);
+    });
+
+    test('a local endpoint works without a token', () async {
+      final local = AiSettingsNotifier(prefs: prefs, service: ai);
+      final provider = await local.addProvider(
+        name: 'Ollama',
+        baseUrl: 'http://192.168.1.20:11434/v1',
+      );
+      await local.setSelectedModel(provider.id, 'llava');
+      await local.setDataSharingAccepted(true);
+      final lan = AiFoodLabelService(settings: local, service: ai);
+
+      final draft = await lan.analyze(imageBytes: Uint8List.fromList([1]));
+
+      expect(draft.name, 'Iogurte natural');
+      expect(ai.lastToken, '');
+      expect(ai.lastBaseUrl, 'http://192.168.1.20:11434/v1');
+    });
+
+    test('a look-alike host still needs a token', () async {
+      final fake = AiSettingsNotifier(prefs: prefs, service: ai);
+      final provider = await fake.addProvider(
+        name: 'Fake',
+        baseUrl: 'https://10.evil.com/v1',
+      );
+      await fake.setSelectedModel(provider.id, 'm');
+      await fake.setDataSharingAccepted(true);
+      final lonely = AiFoodLabelService(settings: fake, service: ai);
+      expect(
+        () => lonely.analyze(imageBytes: Uint8List.fromList([1])),
+        throwsA(
+          isA<AiFoodLabelException>().having(
+            (e) => e.code,
+            'code',
+            'missing_token',
+          ),
         ),
       );
     });

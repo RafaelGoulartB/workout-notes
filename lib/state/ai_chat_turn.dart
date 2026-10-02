@@ -152,7 +152,11 @@ extension AiChatTurn on AiChatService {
             role: AiMessageRole.assistant,
             content: TextSanitizer.sanitize(text).trim(),
             createdAt: _nextTimestamp(),
-            providerExtras: completion.providerExtras,
+            providerExtras: {
+              ...completion.providerExtras,
+              // Kept as received and flagged; never re-requested on its own.
+              if (completion.truncated) kAiCutOffExtra: true,
+            },
           );
           await _commitStep(ctx, [answer]);
           break;
@@ -564,10 +568,26 @@ extension AiChatTurn on AiChatService {
 
     _updateTurn(ctx, (t) => t.copyWith(phase: AiTurnPhase.compacting));
     var summary = history.summary;
+    var cutId = history.cutMessageId;
+    // Dropped messages the summary did not absorb (a failed summary call)
+    // stay in the history: nothing is removed without being summarized.
+    var unfolded = const <AiChatMessage>[];
+    var folded = const <AiChatMessage>[];
     if (dropped.isNotEmpty) {
-      summary = await _summarize(ctx, history.summary, dropped);
+      final fold = await _foldIntoSummary(ctx, history.summary, dropped);
+      if (fold.endMessageId == null) {
+        // Nothing was folded: keep the stored cut, stubs and payloads as
+        // they are and send the full history this turn. The next turn tries
+        // again; if the history is too large for the model, its own
+        // context-length error reaches the user instead of a silent loss.
+        return history;
+      }
+      summary = fold.summary;
+      cutId = fold.endMessageId;
+      final count = dropped.indexWhere((m) => m.id == cutId) + 1;
+      folded = dropped.take(count).toList();
+      unfolded = dropped.skip(count).toList();
     }
-    final cutId = dropped.isNotEmpty ? dropped.last.id : history.cutMessageId;
     final toolsThrough = keptTurns.length >= 3
         ? keptTurns[keptTurns.length - 3].last.id
         : null;
@@ -583,16 +603,16 @@ extension AiChatTurn on AiChatService {
         toolsThroughMessageId: toolsThrough,
       );
       // Payloads before the cut are never sent again: stop storing them.
-      if (dropped.isNotEmpty) {
+      if (folded.isNotEmpty) {
         await _db.aiChatRepo.archiveToolPayloads(
           ctx.threadId,
-          throughCreatedAt: dropped.last.createdAt.toIso8601String(),
+          throughCreatedAt: folded.last.createdAt.toIso8601String(),
           archivedContent: '{"ok":true,"archived":true}',
         );
       }
     }
     return _History(
-      messages: [for (final turn in keptTurns) ...turn],
+      messages: [...unfolded, for (final turn in keptTurns) ...turn],
       summary: summary,
       cutMessageId: cutId,
       toolsThroughMessageId: toolsThrough,
@@ -613,82 +633,135 @@ extension AiChatTurn on AiChatService {
     return turns;
   }
 
-  /// One summary call (utility model when configured). On failure the old
-  /// summary is kept with a note, so the turn still goes on.
+  /// Folds [dropped] into the running summary chunk by chunk (one summary
+  /// call each, the previous result is the next call's input). The result
+  /// covers the messages up to [_SummaryFold.endMessageId], the last turn
+  /// boundary whose chunk succeeded; a null end means nothing was folded.
+  Future<_SummaryFold> _foldIntoSummary(
+    _TurnContext ctx,
+    String? existing,
+    List<AiChatMessage> dropped,
+  ) async {
+    var working = existing;
+    var committed = existing;
+    String? committedEnd;
+    for (final chunk in _summaryChunks(dropped)) {
+      if (chunk.text.isNotEmpty) {
+        final next = await _summarize(ctx, working, chunk.text);
+        if (next == null) break;
+        working = next;
+      }
+      final end = chunk.endMessageId;
+      if (end != null) {
+        committed = working;
+        committedEnd = end;
+      }
+    }
+    return _SummaryFold(summary: committed, endMessageId: committedEnd);
+  }
+
+  /// One summary call (utility model when configured). Null when it failed
+  /// or came back cut off: the caller then keeps the messages.
   Future<String?> _summarize(
     _TurnContext ctx,
     String? existing,
-    List<AiChatMessage> delta,
+    String transcript,
   ) async {
     final provider = ctx.setup.provider;
-    final model = provider.utilityModel.isNotEmpty
-        ? provider.utilityModel
-        : provider.selectedModel;
     final request = StringBuffer();
     if (existing != null && existing.trim().isNotEmpty) {
       request.write('Current summary:\n$existing\n\n');
     }
-    request.write('New messages to fold in:\n${_transcriptForSummary(delta)}');
-    try {
-      final completion = await _service.sendChat(
-        baseUrl: provider.baseUrl,
-        token: ctx.setup.token,
-        model: model,
-        reasoningEffort: provider.utilityModel.isNotEmpty
-            ? null
-            : ctx.setup.reasoningEffort,
-        apiStyle: provider.apiStyle,
-        abortTrigger: ctx.abortTrigger,
-        messages: [
-          {
-            'role': 'system',
-            'content': AiPrompts.threadSummary(ctx.setup.languageCode),
-          },
-          {'role': 'user', 'content': request.toString()},
-        ],
-      );
-      final text = TextSanitizer.sanitize(completion.text ?? '').trim();
-      if (text.isNotEmpty) return text;
-    } on AiServiceException catch (error) {
-      if (error.code == 'cancelled') rethrow;
-      debugPrint('AI thread summary failed: $error');
+    request.write('New messages to fold in:\n$transcript');
+    // The utility model first when configured; a broken utility model falls
+    // back to the chat model so compaction keeps working.
+    final attempts = [
+      if (provider.utilityModel.isNotEmpty) provider.utilityModel,
+      provider.selectedModel,
+    ];
+    for (final model in attempts) {
+      final isUtility = model == provider.utilityModel &&
+          provider.utilityModel.isNotEmpty &&
+          model != provider.selectedModel;
+      try {
+        final completion = await _service.sendChat(
+          baseUrl: provider.baseUrl,
+          token: ctx.setup.token,
+          model: model,
+          reasoningEffort: isUtility ? null : ctx.setup.reasoningEffort,
+          apiStyle: provider.apiStyle,
+          abortTrigger: ctx.abortTrigger,
+          messages: [
+            {
+              'role': 'system',
+              'content': AiPrompts.threadSummary(ctx.setup.languageCode),
+            },
+            {'role': 'user', 'content': request.toString()},
+          ],
+        );
+        final text = TextSanitizer.sanitize(completion.text ?? '').trim();
+        if (text.isNotEmpty && !completion.truncated) return text;
+      } on AiServiceException catch (error) {
+        if (error.code == 'cancelled') rethrow;
+        debugPrint('AI thread summary failed ($model): $error');
+      }
+      if (!isUtility) break;
     }
-    final note = ctx.setup.languageCode == 'pt'
-        ? '(Algumas mensagens antigas não puderam ser resumidas.)'
-        : '(Some older messages could not be summarized.)';
-    return [
-      if (existing != null && existing.trim().isNotEmpty) existing,
-      note,
-    ].join('\n');
+    return null;
   }
 
-  String _transcriptForSummary(List<AiChatMessage> messages) {
+  /// The transcript of [messages] as summary input, cut into chunks of at
+  /// most [kSummaryChunkChars] (each message is condensed to 1500 chars).
+  /// A chunk carries the id of the last message of a turn it completes, so
+  /// the summary cut only ever moves to a turn boundary; null when it ends
+  /// inside a turn.
+  List<_SummaryChunk> _summaryChunks(List<AiChatMessage> messages) {
     const perMessage = 1500;
-    const total = 24000;
+    final chunks = <_SummaryChunk>[];
     final buffer = StringBuffer();
-    for (final message in messages) {
-      if (!message.isUser && !message.isAssistant && !message.isEvent) {
-        continue;
-      }
-      final content = message.content?.trim();
-      if (content == null || content.isEmpty) continue;
-      final compact = content.length <= perMessage
-          ? content
-          : '${content.substring(0, perMessage)}…';
-      final who = message.isUser
-          ? 'User'
-          : message.isEvent
-          ? 'App event'
-          : 'Coach';
-      final line = '$who: $compact\n';
-      if (buffer.length + line.length > total) {
-        buffer.write('[remaining messages omitted for length]\n');
-        break;
-      }
-      buffer.write(line);
+    String? boundaryId;
+    void flush() {
+      if (buffer.isEmpty) return;
+      chunks.add(_SummaryChunk(buffer.toString(), boundaryId));
+      buffer.clear();
+      boundaryId = null;
     }
-    return buffer.toString();
+
+    for (final turn in _groupTurns(messages)) {
+      for (final message in turn) {
+        if (!message.isUser && !message.isAssistant && !message.isEvent) {
+          continue;
+        }
+        final content = message.content?.trim();
+        if (content == null || content.isEmpty) continue;
+        final compact = content.length <= perMessage
+            ? content
+            : '${content.substring(0, perMessage)}…';
+        final who = message.isUser
+            ? 'User'
+            : message.isEvent
+            ? 'App event'
+            : 'Coach';
+        final line = '$who: $compact\n';
+        if (buffer.isNotEmpty &&
+            buffer.length + line.length > kSummaryChunkChars) {
+          flush();
+        }
+        buffer.write(line);
+      }
+      // The turn is complete: the next flush may move the cut past it.
+      if (buffer.isEmpty) {
+        chunks.add(_SummaryChunk('', turn.last.id));
+      } else {
+        boundaryId = turn.last.id;
+      }
+    }
+    flush();
+    return chunks;
   }
+
+  String _transcriptForSummary(List<AiChatMessage> messages) =>
+      _summaryChunks(messages).map((c) => c.text).join();
 
   /// A short descriptive title for a new conversation, made by the utility
   /// model when one is configured. Best effort.
@@ -733,6 +806,25 @@ extension AiChatTurn on AiChatService {
   @visibleForTesting
   String transcriptForSummaryForTest(List<AiChatMessage> messages) =>
       _transcriptForSummary(messages);
+}
+
+/// Result of folding messages into the rolling summary.
+class _SummaryFold {
+  final String? summary;
+
+  /// Last message the summary now covers (null: nothing was folded).
+  final String? endMessageId;
+
+  const _SummaryFold({required this.summary, required this.endMessageId});
+}
+
+/// One summary call's input. [endMessageId] is set when the chunk completes a
+/// turn, so the summary cut may move past it once the call succeeded.
+class _SummaryChunk {
+  final String text;
+  final String? endMessageId;
+
+  const _SummaryChunk(this.text, this.endMessageId);
 }
 
 /// Thrown inside the loop when the user stopped the turn.

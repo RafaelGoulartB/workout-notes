@@ -94,6 +94,36 @@ void main() {
     expect(find.text('Enter a base URL.'), findsOneWidget);
   });
 
+  testWidgets('plain http is refused for public hosts, allowed on the LAN', (
+    tester,
+  ) async {
+    await open(tester);
+    await tester.enterText(field('Name'), 'Remote');
+    await tester.enterText(field('Model'), 'm');
+    await tester.enterText(field('Base URL'), 'http://api.example.com/v1');
+    await tester.ensureVisible(find.text('Save'));
+    await tester.tap(find.text('Save'));
+    await tester.pump();
+    expect(
+      find.textContaining('Plain http:// is only allowed for addresses'),
+      findsOneWidget,
+    );
+    expect(notifier.settings.providers, isEmpty);
+
+    await tester.enterText(field('Base URL'), 'http://10.evil.com:11434/v1');
+    await tester.tap(find.text('Save'));
+    await tester.pump();
+    expect(notifier.settings.providers, isEmpty);
+
+    await tester.enterText(field('Base URL'), 'http://192.168.1.20:11434/v1');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(
+      notifier.settings.providers.single.baseUrl,
+      'http://192.168.1.20:11434/v1',
+    );
+  });
+
   testWidgets('saves every setting, stores the token and fetches models', (
     tester,
   ) async {

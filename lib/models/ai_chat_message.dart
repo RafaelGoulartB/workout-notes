@@ -21,6 +21,11 @@ enum AiTurnStatus {
   }
 }
 
+/// Key in [AiChatMessage.providerExtras] set by the app (never by a provider)
+/// on an answer that arrived cut off. It lives in the existing extras column
+/// so no schema change is needed, and it is never sent back to a provider.
+const String kAiCutOffExtra = 'app_cut_off';
+
 /// A single chat message, persisted in `ai_chat_messages`.
 class AiChatMessage {
   final String id;
@@ -61,6 +66,10 @@ class AiChatMessage {
   bool get isAssistant => role == AiMessageRole.assistant;
   bool get isTool => role == AiMessageRole.tool;
   bool get isEvent => role == AiMessageRole.event;
+
+  /// The answer was cut off (output limit, filter, dropped connection) and is
+  /// shown with a notice; the text is only what arrived.
+  bool get isCutOff => isAssistant && providerExtras[kAiCutOffExtra] == true;
 
   AiChatMessage copyWith({
     String? content,

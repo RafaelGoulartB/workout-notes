@@ -161,6 +161,7 @@ extension AiChatWire on AiChatService {
           for (final extra in m.providerExtras.entries) {
             // Responses reasoning items only make sense to that API.
             if (extra.key == 'responses_reasoning' && !responses) continue;
+            if (extra.key == kAiCutOffExtra) continue; // app flag, not wire
             entry[extra.key] = extra.value;
           }
         }

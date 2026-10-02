@@ -5,6 +5,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/ai_provider.dart';
 import 'package:workout_notes/services/ai_service.dart';
 import 'package:workout_notes/state/ai_settings_notifier.dart';
+import 'package:workout_notes/utils/ai_endpoint_policy.dart';
 import 'package:workout_notes/utils/ai_error_localizer.dart';
 import 'package:workout_notes/widgets/ai/ai_provider_check_view.dart';
 
@@ -108,6 +109,8 @@ class _AiProviderEditorSheetState extends State<AiProviderEditorSheet> {
         ? l10n.aiSettingsBaseUrlRequired
         : !AiService.isValidBaseUri(url)
         ? l10n.aiSettingsBaseUrlInvalid
+        : !AiEndpointPolicy.isAllowed(url)
+        ? l10n.aiSettingsBaseUrlInsecure
         : null;
     setState(() {
       _nameError = nameError;

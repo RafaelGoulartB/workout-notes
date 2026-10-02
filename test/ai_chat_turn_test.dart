@@ -34,6 +34,7 @@ void main() {
   Future<void> setUpChat({
     _Script? script,
     AiProposalService? proposals,
+    String? utilityModel,
   }) async {
     await installTestDb();
     SharedPreferences.setMockInitialValues({
@@ -45,6 +46,7 @@ void main() {
           'baseUrl': 'https://provider.test/v1',
           'availableModels': ['m'],
           'selectedModel': 'm',
+          'utilityModel': ?utilityModel,
           'createdAt': '2026-01-01T00:00:00.000',
         },
       ]),
@@ -360,7 +362,7 @@ void main() {
   );
 
   test(
-    'compaction is hysteretic: one summary call, then a stable prefix',
+    'compaction is hysteretic: one compaction, then a stable prefix',
     () async {
       var summaries = 0;
       await setUpChat(
@@ -412,13 +414,19 @@ void main() {
 
       await chat.send('nova pergunta');
       await idle();
-      expect(summaries, 1);
+      // The dropped range is long, so it is folded in successive chunks.
+      expect(summaries, greaterThanOrEqualTo(1));
+      final afterCompaction = summaries;
       final summary = await repo.getAiChatThreadSummary('t');
       expect(summary?['summary'], contains('Resumo'));
 
       await chat.send('outra pergunta');
       await idle();
-      expect(summaries, 1, reason: 'no new summary until the high-water mark');
+      expect(
+        summaries,
+        afterCompaction,
+        reason: 'no new summary until the high-water mark',
+      );
 
       final turns = provider.payloads
           .where(
@@ -523,6 +531,280 @@ void main() {
       (m) => m['role'] == 'tool' && '${m['content']}'.contains('omitted'),
     );
     expect(stubs, isNotEmpty);
+  });
+
+  /// A conversation of [turns] user/assistant pairs (`u<i>`, `a<i>`), each
+  /// answer long enough that the whole thread is far over the history budget.
+  Future<void> seedLongThread(int turns, {String id = 't'}) async {
+    final repo = DatabaseHelper.instance.aiChatRepo;
+    await repo.upsertAiChatThread(
+      id: id,
+      title: 'Long',
+      createdAt: DateTime(2026, 9, 1),
+      updatedAt: DateTime(2026, 9, 1),
+    );
+    await repo.upsertAiChatMessages(id, [
+      for (var i = 0; i < turns; i++) ...[
+        AiChatMessage(
+          id: 'u$i',
+          threadId: id,
+          role: AiMessageRole.user,
+          content: 'pergunta $i',
+          createdAt: DateTime(2026, 9, 1, 8, i, 0),
+          turnStatus: AiTurnStatus.done,
+        ).toRow(),
+        AiChatMessage(
+          id: 'a$i',
+          threadId: id,
+          role: AiMessageRole.assistant,
+          content: 'resposta longa ' * 400,
+          createdAt: DateTime(2026, 9, 1, 8, i, 1),
+        ).toRow(),
+      ],
+    ]);
+    await chat.openThread(id);
+  }
+
+  String? summaryInput(Map<String, dynamic> payload) {
+    final messages = (payload['messages'] as List).cast<Map>();
+    if (!'${messages.first['content']}'.startsWith('You maintain')) return null;
+    return '${messages.last['content']}';
+  }
+
+  test(
+    'a long dropped range is folded in chunks, nothing is cut unread',
+    () async {
+      final inputs = <String>[];
+      await setUpChat(
+        script: (p) {
+          final input = summaryInput(p);
+          if (input == null) return _Reply.text('ok');
+          inputs.add(input);
+          return _Reply.text('Resumo ${inputs.length}', stream: false);
+        },
+      );
+      await seedLongThread(40);
+
+      await chat.send('nova pergunta');
+      await idle();
+
+      expect(inputs.length, greaterThan(1), reason: 'more than one chunk');
+      expect(inputs.first, isNot(contains('Current summary')));
+      for (var i = 1; i < inputs.length; i++) {
+        expect(inputs[i], startsWith('Current summary:\nResumo $i\n'));
+      }
+      final allInput = inputs.join('\n');
+      expect(allInput, contains('User: pergunta 0\n'));
+      final saved = await DatabaseHelper.instance.aiChatRepo
+          .getAiChatThreadSummary('t');
+      expect(saved?['summary'], 'Resumo ${inputs.length}');
+      // Every question before the cut went through some chunk.
+      final cutIndex = int.parse(
+        (saved?['through_message_id'] as String).substring(1),
+      );
+      for (var i = 0; i <= cutIndex; i++) {
+        expect(allInput, contains('User: pergunta $i\n'));
+      }
+      expect(allInput, isNot(contains('omitted for length')));
+    },
+  );
+
+  test('a failed summary keeps the full history and moves no cut', () async {
+    await setUpChat(
+      script: (p) => summaryInput(p) != null
+          ? const _Reply.error(400, '{"error":{"message":"boom"}}')
+          : _Reply.text('ok'),
+    );
+    await seedLongThread(40);
+    final repo = DatabaseHelper.instance.aiChatRepo;
+    await repo.upsertAiChatMessages('t', [
+      AiChatMessage(
+        id: 'tool-old',
+        threadId: 't',
+        role: AiMessageRole.tool,
+        toolCallId: 'x',
+        toolName: 'get_sleep',
+        content: '{"ok":true,"data":{"t":"${'y' * 3000}"}}',
+        createdAt: DateTime(2026, 9, 1, 8, 0, 2),
+      ).toRow(),
+    ]);
+
+    await chat.send('nova pergunta');
+    await idle();
+
+    // The answer was still requested, with the whole history in it.
+    final turn = provider.payloads.where((p) => summaryInput(p) == null).last;
+    final wire = jsonEncode(turn['messages']);
+    expect(wire, contains('pergunta 0'));
+    expect(wire, contains('pergunta 39'));
+    expect(wire, isNot(contains('could not be summarized')));
+    expect(wire, isNot(contains('<conversation_summary>')));
+    expect(chat.state.messages.last.content, 'ok');
+    // No cut, nothing archived.
+    expect(await repo.getAiChatThreadSummary('t'), isNull);
+    final tool = await repo.getAiChatMessage('tool-old');
+    expect(tool?['content'], contains('yyyy'));
+  });
+
+  test('a failing utility model falls back to the chat model', () async {
+    final models = <String>[];
+    await setUpChat(
+      utilityModel: 'u',
+      script: (p) {
+        if (summaryInput(p) == null) return _Reply.text('ok');
+        models.add('${p['model']}');
+        return p['model'] == 'u'
+            ? const _Reply.error(404, '{"error":{"message":"no model"}}')
+            : _Reply.text('Resumo', stream: false);
+      },
+    );
+    await seedLongThread(40);
+
+    await chat.send('nova pergunta');
+    await idle();
+
+    expect(models.take(2), ['u', 'm']);
+    final saved = await DatabaseHelper.instance.aiChatRepo
+        .getAiChatThreadSummary('t');
+    expect(saved?['summary'], startsWith('Resumo'));
+  });
+
+  test('a partial summary moves the cut only past the folded turns', () async {
+    var calls = 0;
+    await setUpChat(
+      script: (p) {
+        if (summaryInput(p) == null) return _Reply.text('ok');
+        calls++;
+        return calls == 1
+            ? _Reply.text('Resumo parcial', stream: false)
+            : const _Reply.error(400, '{"error":{"message":"boom"}}');
+      },
+    );
+    await seedLongThread(40);
+
+    await chat.send('nova pergunta');
+    await idle();
+
+    final repo = DatabaseHelper.instance.aiChatRepo;
+    final saved = await repo.getAiChatThreadSummary('t');
+    final cut = saved?['through_message_id'] as String;
+    expect(cut, startsWith('a'), reason: 'a turn boundary');
+    expect(saved?['summary'], 'Resumo parcial');
+    final cutIndex = int.parse(cut.substring(1));
+    // Turns after the cut that no summary covers are still sent.
+    final turn = provider.payloads.where((p) => summaryInput(p) == null).last;
+    final wire = jsonEncode(turn['messages']);
+    expect(wire, contains('Resumo parcial'));
+    expect(wire, isNot(contains('pergunta $cutIndex"')));
+    expect(wire, contains('pergunta ${cutIndex + 1}'));
+    expect(wire, contains('pergunta 39'));
+  });
+
+  for (final (label, reply) in [
+    ('the output limit', _Reply.text('Resposta curta', finishReason: 'length')),
+    (
+      'a content filter',
+      _Reply.text('Resposta curta', finishReason: 'content_filter'),
+    ),
+    ('a stream without its end', _Reply.text('Resposta curta', cutOff: true)),
+  ]) {
+    test('an answer cut by $label is kept, flagged, not re-requested', () async {
+      await setUpChat(script: (_) => reply);
+      await chat.send('pergunta');
+      await idle();
+
+      expect(provider.payloads, hasLength(1), reason: 'no automatic re-POST');
+      final answer = chat.state.messages.last;
+      expect(answer.content, 'Resposta curta');
+      expect(answer.isCutOff, isTrue);
+      expect((await stored(chat.state.activeThreadId!)).last.isCutOff, isTrue);
+      expect(chat.state.messages.first.turnStatus, AiTurnStatus.done);
+    });
+  }
+
+  test('the cut-off flag is app-side: never sent to a provider', () async {
+    var first = true;
+    await setUpChat(
+      script: (_) {
+        final reply = first
+            ? _Reply.text('Pela metade', finishReason: 'length')
+            : _Reply.text('ok');
+        first = false;
+        return reply;
+      },
+    );
+    await chat.send('pergunta');
+    await idle();
+    await chat.send('e agora?');
+    await idle();
+    final wire = jsonEncode(provider.payloads.last['messages']);
+    expect(wire, contains('Pela metade'));
+    expect(wire, isNot(contains(kAiCutOffExtra)));
+  });
+
+  test('a complete answer is not flagged', () async {
+    await setUpChat(script: (_) => _Reply.text('Inteira'));
+    await chat.send('pergunta');
+    await idle();
+    expect(chat.state.messages.last.isCutOff, isFalse);
+  });
+
+  test('retry is refused when the turn holds an approved proposal', () async {
+    final proposals = _FakeProposals();
+    await setUpChat(
+      proposals: proposals,
+      script: (p) =>
+          _toolMessages(p).isEmpty &&
+              !jsonEncode(p['messages']).contains('<app_event>{')
+          ? _Reply.tools([
+              _call('p1', 'propose_body_measurement', {'weight': 80}),
+            ])
+          : _Reply.text('Prévia pronta.'),
+    );
+    await chat.send('Registre 80 kg');
+    await idle();
+    final threadId = chat.state.activeThreadId!;
+    await chat.approveProposal('prop-1');
+    final before = await stored(threadId);
+    final user = before.first;
+    final requests = provider.payloads.length;
+
+    await chat.retryTurn(user.id);
+
+    expect(chat.state.error, 'ai_error:retry_resolved_proposal');
+    expect(chat.state.turn, isNull);
+    expect(provider.payloads.length, requests, reason: 'nothing was sent');
+    expect(
+      (await stored(threadId)).map((m) => m.id),
+      before.map((m) => m.id),
+      reason: 'messages, tool results and the outcome event all stay',
+    );
+    expect(chat.state.proposals.single.status, AiProposalStatus.applied);
+  });
+
+  test('retry still works while the proposal awaits approval', () async {
+    final proposals = _FakeProposals();
+    var n = 0;
+    await setUpChat(
+      proposals: proposals,
+      script: (p) {
+        n++;
+        return _toolMessages(p).isEmpty && n < 3
+            ? _Reply.tools([
+                _call('p$n', 'propose_body_measurement', {'weight': 80}),
+              ])
+            : _Reply.text('Prévia pronta.');
+      },
+    );
+    await chat.send('Registre 80 kg');
+    await idle();
+    final user = (await stored(chat.state.activeThreadId!)).first;
+
+    await chat.retryTurn(user.id);
+    await idle();
+
+    expect(chat.state.error, isNull);
+    expect(chat.state.messages.first.id, user.id);
   });
 
   test('a context-length error folds history away and retries once', () async {
@@ -809,6 +1091,12 @@ class _Reply {
   final Future<void>? gate;
   final bool stream;
 
+  /// Finish reason reported instead of `stop` (`length`, `content_filter`).
+  final String? finishReason;
+
+  /// The stream ends right after the text: no finish reason and no `[DONE]`.
+  final bool cutOff;
+
   const _Reply._({
     this.status = 200,
     this.text,
@@ -817,10 +1105,23 @@ class _Reply {
     this.errorBody,
     this.gate,
     this.stream = true,
+    this.finishReason,
+    this.cutOff = false,
   });
 
-  factory _Reply.text(String text, {Future<void>? gate, bool stream = true}) =>
-      _Reply._(text: text, gate: gate, stream: stream);
+  factory _Reply.text(
+    String text, {
+    Future<void>? gate,
+    bool stream = true,
+    String? finishReason,
+    bool cutOff = false,
+  }) => _Reply._(
+    text: text,
+    gate: gate,
+    stream: stream,
+    finishReason: finishReason,
+    cutOff: cutOff,
+  );
 
   factory _Reply.tools(List<Map<String, dynamic>> calls, {String? reasoning}) =>
       _Reply._(toolCalls: calls, reasoning: reasoning);
@@ -876,7 +1177,9 @@ class _Provider extends http.BaseClient {
           if (reply.reasoning != null) 'reasoning_content': reply.reasoning,
           if (reply.toolCalls.isNotEmpty) 'tool_calls': reply.toolCalls,
         },
-        'finish_reason': reply.toolCalls.isEmpty ? 'stop' : 'tool_calls',
+        'finish_reason':
+            reply.finishReason ??
+            (reply.toolCalls.isEmpty ? 'stop' : 'tool_calls'),
       },
     ],
     'usage': {'prompt_tokens': 100, 'completion_tokens': 10},
@@ -921,11 +1224,16 @@ class _Provider extends http.BaseClient {
         ],
       });
     }
+    if (reply.cutOff) {
+      return chunks.map((c) => 'data: ${jsonEncode(c)}\n\n').join();
+    }
     chunks.add({
       'choices': [
         {
           'delta': <String, dynamic>{},
-          'finish_reason': reply.toolCalls.isEmpty ? 'stop' : 'tool_calls',
+          'finish_reason':
+              reply.finishReason ??
+              (reply.toolCalls.isEmpty ? 'stop' : 'tool_calls'),
         },
       ],
       'usage': {

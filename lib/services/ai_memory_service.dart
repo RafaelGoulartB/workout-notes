@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:workout_notes/database/database_helper.dart';
@@ -36,14 +38,33 @@ class AiMemoryService extends ChangeNotifier {
   Future<List<AiMemory>> all() async => _cache ??= await _repo.getAll();
 
   /// `<memory>` block for the stable part of the prompt; empty when there is
-  /// nothing to remember. Ids are shortened to 8 characters.
+  /// nothing to remember. Ids are shortened to 8 characters. Every entry is a
+  /// single quoted data line built from sanitized text (even for rows saved
+  /// before sanitizing existed), so an entry can never close the block, start
+  /// a new line of instructions or pose as a tag.
   Future<String> contextBlock() async {
     final memories = await all();
     if (memories.isEmpty) return '';
     return memories
-        .map((m) => '- [${_short(m.id)}] (${m.category.name}) ${m.content}')
+        .map(
+          (m) =>
+              '- [${_short(m.id)}] (${m.category.name}) '
+              '${jsonEncode(sanitizeContent(m.content))}',
+        )
         .join('\n');
   }
+
+  /// [text] as one plain line of data: control characters and line breaks
+  /// become spaces and angle brackets become typographic ones (`‹ ›`), so no
+  /// tag-like sequence (`</memory>`, `<app_event>`) survives. The model
+  /// writes these notes without approval and they are read back as system
+  /// context, so they are neutralized on save and again on render.
+  static String sanitizeContent(String text) => text
+      .replaceAll(RegExp(r'[\u0000-\u001F\u007F-\u009F\u2028\u2029]+'), ' ')
+      .replaceAll('<', '\u2039')
+      .replaceAll('>', '\u203A')
+      .replaceAll(RegExp(r' {2,}'), ' ')
+      .trim();
 
   bool handles(String toolName) => toolNames.contains(toolName);
 
@@ -110,8 +131,9 @@ class AiMemoryService extends ChangeNotifier {
   }
 
   Future<AiToolResult> _save(AiToolArgs args, String? threadId) async {
-    final content = args.string('content');
-    if (content == null) {
+    final raw = args.string('content');
+    final content = raw == null ? null : sanitizeContent(raw);
+    if (content == null || content.isEmpty) {
       return const AiToolResult(
         ok: false,
         code: 'invalid_args',
@@ -218,7 +240,7 @@ class AiMemoryService extends ChangeNotifier {
     await _repo.upsert(
       AiMemory(
         id: _uuid.v4(),
-        content: content.trim(),
+        content: sanitizeContent(content),
         category: category,
         createdAt: now,
         updatedAt: now,
@@ -228,7 +250,10 @@ class AiMemoryService extends ChangeNotifier {
   }
 
   Future<void> update(AiMemory memory) async {
-    await _repo.upsert(memory);
+    final clean = sanitizeContent(memory.content);
+    await _repo.upsert(
+      clean == memory.content ? memory : memory.copyWith(content: clean),
+    );
     _changed();
   }
 

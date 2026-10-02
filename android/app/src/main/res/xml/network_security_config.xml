@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 9+ blocks cleartext HTTP by default, which breaks a self-hosted AI
+  endpoint on the local network (Ollama, llama.cpp on http://192.168.x.x).
+  Android cannot scope cleartext to address ranges, so it is permitted here
+  and the app restricts it itself: AiEndpointPolicy accepts http:// for AI
+  providers only on loopback, private and link-local hosts, localhost and
+  *.local. Everything else stays on https://.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

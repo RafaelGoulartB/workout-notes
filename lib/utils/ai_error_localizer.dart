@@ -77,6 +77,10 @@ String localizeAiError(Object? error, AppLocalizations l10n) {
       return l10n.aiChatErrorInvalidResponse;
     case 'empty_answer':
       return l10n.aiChatErrorEmptyAnswer;
+    case 'insecure_endpoint':
+      return l10n.aiChatErrorInsecureEndpoint;
+    case 'retry_resolved_proposal':
+      return l10n.aiChatErrorRetryResolvedProposal;
     case 'vision_not_supported':
       return l10n.aiChatErrorVisionUnsupported;
     case 'http_error':

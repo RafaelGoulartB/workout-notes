@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show SocketException;
+import 'dart:typed_data' show BytesBuilder;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:workout_notes/models/ai_tool_call.dart';
+import 'package:workout_notes/utils/ai_endpoint_policy.dart';
 import 'package:workout_notes/utils/text_sanitizer.dart';
 
 /// Wire protocol spoken to a provider.
@@ -40,6 +43,12 @@ class AiChatCompletion {
   final Map<String, dynamic> providerExtras;
   final String? finishReason;
 
+  /// The answer was cut off: the provider hit its output limit
+  /// (`finish_reason: length`), filtered the content, reported an incomplete
+  /// response, or the stream ended without its terminal marker (or hit the
+  /// local safety cap). The text is what arrived; it is never re-requested.
+  final bool truncated;
+
   const AiChatCompletion({
     this.text,
     this.toolCalls = const [],
@@ -49,6 +58,7 @@ class AiChatCompletion {
     this.cachedTokens,
     this.providerExtras = const {},
     this.finishReason,
+    this.truncated = false,
   });
 
   bool get hasToolCalls => toolCalls.isNotEmpty;
@@ -154,6 +164,17 @@ class AiService {
   final Duration firstByteTimeout;
   final Duration idleTimeout;
 
+  /// Safety cap on the text (answer plus reasoning) of one streamed answer.
+  /// Far above any real answer; a runaway stream ends as truncated instead of
+  /// filling memory.
+  final int maxStreamedChars;
+
+  /// Longest error body read from a failed request.
+  static const int maxErrorBodyBytes = 64 * 1024;
+
+  /// Longest successful non-streamed body accepted.
+  static const int maxResponseBodyBytes = 16 * 1024 * 1024;
+
   final Map<String, _ModelCompatibility> _modelCompatibility = {};
   AiCompatibilityStore? _store;
 
@@ -162,6 +183,7 @@ class AiService {
     this.timeout = const Duration(seconds: 180),
     this.firstByteTimeout = const Duration(seconds: 180),
     this.idleTimeout = const Duration(seconds: 60),
+    this.maxStreamedChars = 2000000,
     Future<void> Function(Duration)? delay,
   }) : _client = client ?? http.Client(),
        _ownsClient = client == null,
@@ -232,11 +254,25 @@ class AiService {
         uri.host.isNotEmpty;
   }
 
+  /// Throws `insecure_endpoint` unless [baseUrl] is `https`, or `http` on a
+  /// local host ([AiEndpointPolicy]). Providers saved before this rule hit it
+  /// at send time.
+  static void requireAllowedEndpoint(String baseUrl) {
+    if (AiEndpointPolicy.isAllowed(baseUrl)) return;
+    throw AiServiceException(
+      'Plain http:// is only allowed for local or private-network hosts; use '
+      'https:// for this provider.',
+      code: 'insecure_endpoint',
+      endpoint: baseUrl,
+    );
+  }
+
   /// Fetches available models from `${baseUrl}/models`.
   Future<List<String>> listModels({
     required String baseUrl,
     required String token,
   }) async {
+    requireAllowedEndpoint(baseUrl);
     final uri = Uri.parse('$baseUrl/models');
     final http.Response res;
     try {
@@ -304,6 +340,7 @@ class AiService {
     String? cacheKey,
     int? maxOutputTokens,
   }) async {
+    requireAllowedEndpoint(baseUrl);
     final compatibility = _compatibilityFor(baseUrl, model);
     final responses = apiStyle == AiApiStyle.responses;
     final uri = Uri.parse(
@@ -372,7 +409,11 @@ class AiService {
         throw _cancelled(uri);
       } on http.ClientException catch (error) {
         if (abortTrigger != null && abort.isCompleted) throw _cancelled(uri);
-        if (transientRetries < _maxTransientRetries) {
+        // Repeating a POST is only safe when the request cannot have reached
+        // the server (nothing connected). A drop after the request went out
+        // may have started a billed generation: surface it instead.
+        if (_failedBeforeSending(error) &&
+            transientRetries < _maxTransientRetries) {
           await _waitBeforeRetry(transientRetries++);
           continue;
         }
@@ -387,7 +428,7 @@ class AiService {
       }
 
       if (res.statusCode >= 400) {
-        final body = await _readBody(res, abort);
+        final body = await _readBody(res, maxBytes: maxErrorBodyBytes);
         // Only a request the provider refused as invalid (400/422) teaches a
         // compatibility flag; outages and auth errors never do.
         final adjustment = res.statusCode != 400 && res.statusCode != 422
@@ -425,7 +466,11 @@ class AiService {
               ? await _readResponsesStream(res, abort, onDelta, uri)
               : await _readChatStream(res, abort, onDelta, uri);
         }
-        final body = await _readBody(res, abort).timeout(timeout);
+        final body = await _readBody(
+          res,
+          maxBytes: maxResponseBodyBytes,
+          failWhenOver: true,
+        ).timeout(timeout);
         return responses ? _parseResponses(body) : _parseChat(body);
       } on http.RequestAbortedException {
         throw _cancelled(uri);
@@ -899,6 +944,7 @@ class AiService {
     required Map<String, dynamic> extras,
     required ({int? prompt, int? completion, int? cached}) usage,
     String? finishReason,
+    bool truncated = false,
   }) {
     final text = rawText == null ? null : TextSanitizer.stripReasoning(rawText);
     return AiChatCompletion(
@@ -912,8 +958,19 @@ class AiService {
       cachedTokens: usage.cached,
       providerExtras: extras,
       finishReason: finishReason,
+      truncated: truncated || _isCutOffReason(finishReason),
     );
   }
+
+  /// Finish reasons (Chat Completions) and statuses (Responses) of an answer
+  /// that did not end on its own: output limit, content filter, incomplete.
+  static bool _isCutOffReason(String? reason) => const {
+    'length',
+    'content_filter',
+    'max_tokens',
+    'max_output_tokens',
+    'incomplete',
+  }.contains(reason);
 
   /// Every assistant-message field besides the standard ones, kept opaque.
   static Map<String, dynamic> _messageExtras(Map<dynamic, dynamic> message) {
@@ -994,6 +1051,8 @@ class AiService {
     final reasoningDetails = <int, Map<String, dynamic>>{};
     final calls = <int, _StreamedCall>{};
     String? finishReason;
+    var sawDone = false;
+    var capped = false;
     ({int? prompt, int? completion, int? cached}) usage = (
       prompt: null,
       completion: null,
@@ -1037,7 +1096,10 @@ class AiService {
 
     try {
       await for (final data in _sseData(res)) {
-        if (data == '[DONE]') break;
+        if (data == '[DONE]') {
+          sawDone = true;
+          break;
+        }
         final chunk = _decodeJson(data);
         if (chunk is! Map) continue;
         _throwEmbeddedError(chunk);
@@ -1095,6 +1157,13 @@ class AiService {
           }
         }
         emit();
+        if (text.length + reasoningContent.length + reasoningText.length >
+            maxStreamedChars) {
+          // Runaway stream: stop reading (cancelling the subscription closes
+          // the connection) and end the answer as truncated.
+          capped = true;
+          break;
+        }
       }
     } on http.RequestAbortedException {
       rethrow;
@@ -1134,10 +1203,13 @@ class AiService {
     }
     return _completion(
       rawText: rawText,
-      calls: parsedCalls,
+      // Calls of a stream cut by the safety cap are most likely incomplete.
+      calls: capped ? const [] : parsedCalls,
       extras: extras,
       usage: usage,
       finishReason: finishReason,
+      // Neither a finish reason nor [DONE]: the connection ended mid-answer.
+      truncated: capped || (finishReason == null && !sawDone),
     );
   }
 
@@ -1150,6 +1222,7 @@ class AiService {
     final text = StringBuffer();
     final names = <String>[];
     Map<dynamic, dynamic>? completed;
+    var capped = false;
     await for (final data in _sseData(res)) {
       if (data == '[DONE]') break;
       final event = _decodeJson(data);
@@ -1185,12 +1258,27 @@ class AiService {
           );
       }
       onDelta?.call(AiStreamDelta(text: text.toString(), toolNames: names));
+      if (text.length > maxStreamedChars) {
+        capped = true;
+        break;
+      }
     }
-    if (completed == null) {
-      throw AiServiceException(
-        'The stream ended without a completed response.',
-        code: 'invalid_response',
-        endpoint: uri.toString(),
+    if (completed == null || capped) {
+      // No terminal event: what arrived is the (cut off) answer. Tool calls
+      // are not rebuilt from a partial stream.
+      if (text.isEmpty) {
+        throw AiServiceException(
+          'The stream ended without a completed response.',
+          code: 'invalid_response',
+          endpoint: uri.toString(),
+        );
+      }
+      return _completion(
+        rawText: text.toString(),
+        calls: const [],
+        extras: const {},
+        usage: (prompt: null, completion: null, cached: null),
+        truncated: true,
       );
     }
     return _completionFromResponsesBody(completed);
@@ -1216,8 +1304,45 @@ class AiService {
   // ERRORS AND COMPATIBILITY
   // ===========================================================================
 
-  Future<String> _readBody(http.StreamedResponse res, Completer<void> abort) =>
-      res.stream.bytesToString();
+  /// Reads at most [maxBytes] of the body (the rest is dropped and the
+  /// connection closed); with [failWhenOver] a larger body is an error.
+  Future<String> _readBody(
+    http.StreamedResponse res, {
+    required int maxBytes,
+    bool failWhenOver = false,
+  }) async {
+    final bytes = BytesBuilder(copy: false);
+    await for (final chunk in res.stream) {
+      if (bytes.length + chunk.length > maxBytes) {
+        if (failWhenOver) {
+          throw AiServiceException(
+            'The provider response is too large.',
+            code: 'invalid_response',
+            endpoint: res.request?.url.toString(),
+          );
+        }
+        bytes.add(chunk.sublist(0, maxBytes - bytes.length));
+        break;
+      }
+      bytes.add(chunk);
+    }
+    return utf8.decode(bytes.takeBytes(), allowMalformed: true);
+  }
+
+  /// Whether [error] happened while connecting (refused, unreachable, DNS
+  /// failure), i.e. before any byte of the request left the device.
+  static bool _failedBeforeSending(http.ClientException error) {
+    if (error is! SocketException) return false;
+    final socket = error as SocketException;
+    final os = socket.osError;
+    // ECONNREFUSED 111, ENETUNREACH 101, EHOSTUNREACH 113 (Linux/Android).
+    if (os != null && const {111, 101, 113}.contains(os.errorCode)) return true;
+    final text = '${socket.message} ${os?.message ?? ''}'.toLowerCase();
+    return text.contains('failed host lookup') ||
+        text.contains('connection refused') ||
+        text.contains('network is unreachable') ||
+        text.contains('no route to host');
+  }
 
   AiServiceException _cancelled(Uri uri) => AiServiceException(
     'Request cancelled.',

@@ -158,6 +158,29 @@ class AiMessageBubble extends StatelessWidget {
             ),
           if (message.content?.isNotEmpty == true)
             AiMarkdown(text: message.content!, textColor: colors.onSurface),
+          if (message.isCutOff)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 15,
+                    color: colors.outline,
+                  ),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      l10n.aiChatAnswerCutOff,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           if (showMeta)
             _MessageMeta(
               timestamp: showTimestamp

@@ -23,6 +23,7 @@ import 'package:workout_notes/services/ai_proposal_service.dart';
 import 'package:workout_notes/services/ai_service.dart';
 import 'package:workout_notes/services/ai_tool_registry.dart';
 import 'package:workout_notes/state/ai_settings_notifier.dart';
+import 'package:workout_notes/utils/ai_endpoint_policy.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/utils/text_sanitizer.dart';
@@ -60,6 +61,10 @@ const double kCompactLowWater = 0.5;
 /// a note asking the model to narrow the query). Tools already cap their own
 /// output well below it; this is a safety net.
 const int kMaxToolResultChars = 12000;
+
+/// Largest transcript one summary call folds in; longer dropped ranges are
+/// folded in several successive calls.
+const int kSummaryChunkChars = 24000;
 
 /// Singleton orchestrator for AI chat turns. Owns the chat state.
 ///
@@ -341,7 +346,7 @@ class AiChatService extends ChangeNotifier {
       return null;
     }
     final token = await settings.getToken(provider.id) ?? '';
-    if (token.isEmpty && !_isLocalEndpoint(provider.baseUrl)) {
+    if (token.isEmpty && !AiEndpointPolicy.isLocalEndpoint(provider.baseUrl)) {
       _setError('ai_error:missing_token');
       return null;
     }
@@ -352,16 +357,6 @@ class AiChatService extends ChangeNotifier {
       languageCode: settings.appLanguageCode,
       domains: settings.effectiveDomains,
     );
-  }
-
-  static bool _isLocalEndpoint(String baseUrl) {
-    final host = Uri.tryParse(baseUrl)?.host ?? '';
-    return host == 'localhost' ||
-        host == '127.0.0.1' ||
-        host == '10.0.2.2' ||
-        host.startsWith('192.168.') ||
-        host.startsWith('10.') ||
-        host.endsWith('.local');
   }
 
   _TurnContext _startTurn(
@@ -404,6 +399,8 @@ class AiChatService extends ChangeNotifier {
 
   /// Runs the turn of [userMessageId] again: everything after it is deleted
   /// (messages and pending proposals) and the same message is answered anew.
+  /// Refused (with an explanation) when a later message holds a proposal the
+  /// user already approved or rejected.
   Future<void> retryTurn(String userMessageId) async {
     if (_turn != null || _sendInFlight) return;
     _sendInFlight = true;
@@ -421,6 +418,26 @@ class AiChatService extends ChangeNotifier {
         afterCreatedAt: row['created_at'] as String,
         afterId: userMsg.id,
       )).map(AiChatMessage.fromRow).toList();
+      // A change the user already approved or rejected cannot be taken back
+      // by deleting its messages: the model would no longer know it happened
+      // and could propose (and the user approve) the same change again.
+      final laterCallIds = {
+        for (final m in later)
+          for (final call in m.toolCalls) call.id,
+      };
+      if (laterCallIds.isNotEmpty) {
+        final proposals = await _proposals.forThread(threadId);
+        final decided = proposals.any(
+          (p) =>
+              laterCallIds.contains(p.toolCallId) &&
+              (p.status == AiProposalStatus.applied ||
+                  p.status == AiProposalStatus.rejected),
+        );
+        if (decided) {
+          _setError('ai_error:retry_resolved_proposal');
+          return;
+        }
+      }
       await _db.aiChatRepo.deleteAiChatMessages(
         threadId,
         [for (final m in later) m.id],
