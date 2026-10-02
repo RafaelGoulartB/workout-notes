@@ -49,6 +49,9 @@ android {
         baseline = file("lint-baseline.xml")
         abortOnError = true
         checkReleaseBuilds = false
+        // "A newer version is available" depends on the day lint runs;
+        // Dependabot proposes those updates instead.
+        disable += setOf("AndroidGradlePluginVersion", "GradleDependency", "NewerVersionAvailable")
     }
 
     testOptions {
