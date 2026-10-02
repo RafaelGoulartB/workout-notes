@@ -34,9 +34,15 @@ class StepperButton extends StatelessWidget {
           height: size,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: theme.colorScheme.outlineVariant.withAlpha(120)),
+            border: Border.all(
+              color: theme.colorScheme.outlineVariant.withAlpha(120),
+            ),
           ),
-          child: Icon(icon, size: small ? 18 : 24, color: theme.colorScheme.onSurface),
+          child: Icon(
+            icon,
+            size: small ? 18 : 24,
+            color: theme.colorScheme.onSurface,
+          ),
         ),
       ),
     );

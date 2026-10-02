@@ -27,7 +27,8 @@ class FoodLibraryScreen extends StatefulWidget {
   State<FoodLibraryScreen> createState() => _FoodLibraryScreenState();
 }
 
-class _FoodLibraryScreenState extends State<FoodLibraryScreen> with GuardedLoad {
+class _FoodLibraryScreenState extends State<FoodLibraryScreen>
+    with GuardedLoad {
   final TextEditingController _searchController = TextEditingController();
   List<FoodSearchResultLite> _foods = const [];
   _FoodLibraryFilter _activeFilter = _FoodLibraryFilter.all;

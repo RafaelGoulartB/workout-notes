@@ -93,25 +93,28 @@ void main() {
     expect((await repo.getDeletionImpact('squat')).isEmpty, isTrue);
   });
 
-  test('deleteExercise erases its history and the workouts it emptied', () async {
-    await repo.deleteExercise('bench');
+  test(
+    'deleteExercise erases its history and the workouts it emptied',
+    () async {
+      await repo.deleteExercise('bench');
 
-    // w1 is gone (nothing left), w3 stays for its comment, w2 keeps its row.
-    expect(await workoutIds(), ['w2', 'w3', 'w4']);
-    expect(
-      await db.query('exercise_entries', where: "workout_id = 'w3'"),
-      isEmpty,
-    );
-    expect(
-      Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM sets')),
-      2,
-    );
-    expect(await db.query('routine_exercises'), isEmpty);
-    expect(
-      await db.query('routine_days', where: "routine_id = 'r1'"),
-      hasLength(2),
-    );
-  });
+      // w1 is gone (nothing left), w3 stays for its comment, w2 keeps its row.
+      expect(await workoutIds(), ['w2', 'w3', 'w4']);
+      expect(
+        await db.query('exercise_entries', where: "workout_id = 'w3'"),
+        isEmpty,
+      );
+      expect(
+        Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM sets')),
+        2,
+      );
+      expect(await db.query('routine_exercises'), isEmpty);
+      expect(
+        await db.query('routine_days', where: "routine_id = 'r1'"),
+        hasLength(2),
+      );
+    },
+  );
 
   test('deleteExercise keeps a workout holding a feeling rating', () async {
     await db.update('workouts', {'feeling_rating': 5}, where: "id = 'w1'");

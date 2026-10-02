@@ -134,10 +134,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
         _monitorRepository.getNightSummaries(limit: _trendDays),
         _repository.getEntryCount(),
         _monitorRepository.getUnestimatedSessions(),
-        _repository.getEntries(
-          from: addDays(_weekEnd, -6),
-          to: _weekEnd,
-        ),
+        _repository.getEntries(from: addDays(_weekEnd, -6), to: _weekEnd),
         _repository.getEntries(
           from: addDays(today, -(_trendDays - 1)),
           to: today,
@@ -471,10 +468,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     try {
       final results = await Future.wait<Object>([
         _repository.getDashboardStats(referenceDate: candidate),
-        _repository.getEntries(
-          from: addDays(candidate, -6),
-          to: candidate,
-        ),
+        _repository.getEntries(from: addDays(candidate, -6), to: candidate),
       ]);
       if (!mounted) return;
       setState(() {
@@ -672,9 +666,6 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   }
 
   List<DateTime> _weeklyDays() {
-    return List.generate(
-      7,
-      (index) => addDays(_weekEnd, -(6 - index)),
-    );
+    return List.generate(7, (index) => addDays(_weekEnd, -(6 - index)));
   }
 }

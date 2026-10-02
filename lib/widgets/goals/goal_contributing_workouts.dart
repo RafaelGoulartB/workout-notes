@@ -37,9 +37,11 @@ class GoalContributingWorkouts extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
         child: Column(
           children: [
-            Icon(Icons.fitness_center,
-                size: 36,
-                color: theme.colorScheme.onSurfaceVariant.withAlpha(100)),
+            Icon(
+              Icons.fitness_center,
+              size: 36,
+              color: theme.colorScheme.onSurfaceVariant.withAlpha(100),
+            ),
             const SizedBox(height: 8),
             Text(
               loc.goalNoContributors,
@@ -58,34 +60,44 @@ class GoalContributingWorkouts extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (showHeader) Row(
-            children: [
-              Icon(Icons.list_alt, size: 18, color: theme.colorScheme.onSurface),
-              const SizedBox(width: 8),
-              Text(
-                loc.goalContributingWorkouts,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
+          if (showHeader)
+            Row(
+              children: [
+                Icon(
+                  Icons.list_alt,
+                  size: 18,
+                  color: theme.colorScheme.onSurface,
                 ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '${workouts.length}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: theme.colorScheme.onSurfaceVariant,
+                const SizedBox(width: 8),
+                Text(
+                  loc.goalContributingWorkouts,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
-            ],
-          ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest.withAlpha(
+                      120,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${workouts.length}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           if (showHeader) const SizedBox(height: 8),
           for (var i = 0; i < workouts.length; i++) ...[
             if (i > 0)
@@ -209,7 +221,10 @@ class _WorkoutTile extends StatelessWidget {
             else
               Text(
                 GoalFormatters.formatValueShort(
-                    goal.metric, workout.contributedValue, isKm: isKm),
+                  goal.metric,
+                  workout.contributedValue,
+                  isKm: isKm,
+                ),
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
@@ -217,7 +232,11 @@ class _WorkoutTile extends StatelessWidget {
                 ),
               ),
             const SizedBox(width: 4),
-            Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.chevron_right,
+              size: 18,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ],
         ),
       ),

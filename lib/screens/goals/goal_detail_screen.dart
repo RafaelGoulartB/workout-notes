@@ -47,8 +47,10 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
     try {
       _isKm = await widget.db.settingsRepo.getIsDistanceKm();
       final repo = DatabaseHelper.instance.goalRepo;
-      final (current, history) =
-          await repo.getProgressWithHistory(_goal, historyCount: 6);
+      final (current, history) = await repo.getProgressWithHistory(
+        _goal,
+        historyCount: 6,
+      );
       final contributors = await repo.getContributingWorkouts(_goal);
       if (!mounted) return;
       setState(() {
@@ -69,9 +71,11 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
   }
 
   void _openWorkout(String workoutId) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => WorkoutDetailScreen(workoutId: workoutId),
-    ));
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => WorkoutDetailScreen(workoutId: workoutId),
+      ),
+    );
   }
 
   Future<void> _edit() async {
@@ -111,9 +115,9 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
     if (confirm != true) return;
     await widget.db.goalRepo.delete(_goal.id);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(loc.goalDeleted)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(loc.goalDeleted)));
     Navigator.of(context).pop();
   }
 
@@ -260,8 +264,7 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
     final isComplete = current.isComplete;
     final isPortuguese = Localizations.localeOf(context).languageCode == 'pt';
     final accent = isComplete ? const Color(0xFF43A047) : color;
-    final totalDays =
-        daysBetween(current.periodStart, current.periodEnd) + 1;
+    final totalDays = daysBetween(current.periodStart, current.periodEnd) + 1;
     final elapsed = current.daysElapsed.clamp(1, totalDays);
     final periodLabel = _goal.period == GoalPeriod.weekly
         ? loc.goalPeriodWeekly
@@ -309,18 +312,18 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                 label: !_goal.isActive
                     ? loc.goalPausedBadge
                     : isComplete
-                        ? loc.goalStatusAchieved
-                        : loc.goalStatusInProgress,
+                    ? loc.goalStatusAchieved
+                    : loc.goalStatusInProgress,
                 color: !_goal.isActive
                     ? theme.colorScheme.onSurfaceVariant
                     : isComplete
-                        ? const Color(0xFF43A047)
-                        : color,
+                    ? const Color(0xFF43A047)
+                    : color,
                 icon: !_goal.isActive
                     ? Icons.pause_rounded
                     : isComplete
-                        ? Icons.emoji_events_rounded
-                        : Icons.schedule_rounded,
+                    ? Icons.emoji_events_rounded
+                    : Icons.schedule_rounded,
               ),
             ],
           ),
@@ -380,7 +383,8 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                     const SizedBox(height: 4),
                     _InfoRow(
                       icon: Icons.hourglass_bottom_rounded,
-                      text: '${loc.goalPeriodDayOfTotal(elapsed, totalDays)}'
+                      text:
+                          '${loc.goalPeriodDayOfTotal(elapsed, totalDays)}'
                           ' · ${loc.goalDaysRemaining(current.daysRemaining)}',
                     ),
                   ],
@@ -406,10 +410,7 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    _resolveMotivation(
-                      loc,
-                      GoalFormatters.motivation(percent),
-                    ),
+                    _resolveMotivation(loc, GoalFormatters.motivation(percent)),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurface,
                     ),
@@ -427,12 +428,15 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
   Widget _buildPaceCard(ThemeData theme, AppLocalizations loc, Color color) {
     final current = _current!;
     final isComplete = current.isComplete;
-    final remaining =
-        (current.targetValue - current.currentValue).clamp(0.0, double.infinity);
-    final surplus =
-        (current.currentValue - current.targetValue).clamp(0.0, double.infinity);
-    final totalDays =
-        daysBetween(current.periodStart, current.periodEnd) + 1;
+    final remaining = (current.targetValue - current.currentValue).clamp(
+      0.0,
+      double.infinity,
+    );
+    final surplus = (current.currentValue - current.targetValue).clamp(
+      0.0,
+      double.infinity,
+    );
+    final totalDays = daysBetween(current.periodStart, current.periodEnd) + 1;
     final elapsed = current.daysElapsed.clamp(1, totalDays);
     // Today still counts toward the goal, so it is part of the days left.
     final daysLeftInclusive = (totalDays - elapsed + 1).clamp(1, totalDays);
@@ -453,20 +457,20 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                     color: color,
                   )
                 : surplus > 0
-                    // Only worth a number when the period actually went
-                    // past the target.
-                    ? _PaceTile(
-                        icon: Icons.emoji_events_outlined,
-                        label: loc.goalSurplusLabel,
-                        value: '+${_short(surplus)}',
-                        color: const Color(0xFF43A047),
-                      )
-                    : _PaceTile(
-                        icon: Icons.emoji_events_outlined,
-                        label: loc.goalStatusAchieved,
-                        value: '100%',
-                        color: const Color(0xFF43A047),
-                      ),
+                // Only worth a number when the period actually went
+                // past the target.
+                ? _PaceTile(
+                    icon: Icons.emoji_events_outlined,
+                    label: loc.goalSurplusLabel,
+                    value: '+${_short(surplus)}',
+                    color: const Color(0xFF43A047),
+                  )
+                : _PaceTile(
+                    icon: Icons.emoji_events_outlined,
+                    label: loc.goalStatusAchieved,
+                    value: '100%',
+                    color: const Color(0xFF43A047),
+                  ),
           ),
           _PaceDivider(theme: theme),
           Expanded(
@@ -602,8 +606,9 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
     bool isPortuguese,
   ) {
     final isComplete = h.wasCompleted;
-    final iconColor =
-        isComplete ? const Color(0xFF43A047) : theme.colorScheme.onSurfaceVariant;
+    final iconColor = isComplete
+        ? const Color(0xFF43A047)
+        : theme.colorScheme.onSurfaceVariant;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 9),
       child: Row(

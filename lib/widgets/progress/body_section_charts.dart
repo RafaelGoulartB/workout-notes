@@ -301,9 +301,7 @@ class _BodyCompositionChart extends StatelessWidget {
                         v > 100
                             ? '${AppNumberFormat.decimal(v / 1000, 0)}k'
                             : AppNumberFormat.decimal(v, 0),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 8,
-                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(fontSize: 8),
                       ),
                     ),
                   ),
@@ -508,9 +506,7 @@ class _BodyWeightChart extends StatelessWidget {
                         v > 100
                             ? '${AppNumberFormat.decimal(v / 1000, 0)}k'
                             : AppNumberFormat.decimal(v, 0),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 8,
-                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(fontSize: 8),
                       ),
                     ),
                   ),

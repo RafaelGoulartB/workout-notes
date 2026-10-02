@@ -161,10 +161,7 @@ void main() {
 
   group('NutritionAdjustment', () {
     test('kind is derived from the percent sign', () {
-      expect(
-        NutritionAdjustment.kindForPercent(-15),
-        NutritionObjective.cut,
-      );
+      expect(NutritionAdjustment.kindForPercent(-15), NutritionObjective.cut);
       expect(
         NutritionAdjustment.kindForPercent(0),
         NutritionObjective.maintenance,

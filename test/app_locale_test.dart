@@ -30,10 +30,7 @@ void main() {
         'en',
       );
       expect(AppLocale.languageCode('pt', device: const Locale('en')), 'pt');
-      expect(
-        AppLocale.languageCode('pt_BR', device: const Locale('en')),
-        'pt',
-      );
+      expect(AppLocale.languageCode('pt_BR', device: const Locale('en')), 'pt');
     });
   });
 

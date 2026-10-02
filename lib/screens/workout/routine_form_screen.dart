@@ -22,7 +22,8 @@ class RoutineFormScreen extends StatefulWidget {
   State<RoutineFormScreen> createState() => _RoutineFormScreenState();
 }
 
-class _RoutineFormScreenState extends State<RoutineFormScreen> with GuardedLoad {
+class _RoutineFormScreenState extends State<RoutineFormScreen>
+    with GuardedLoad {
   final _repo = DatabaseHelper.instance.routineRepo;
   RoutineSummary? _routine;
   String? _nextDayId;
@@ -38,9 +39,8 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> with GuardedLoad 
     String? nextDayId;
     if (routine != null) {
       try {
-        final suggestion = await DatabaseHelper.instance.periodizationRepo.getRoutineSuggestion(
-          DateTime.now(),
-        );
+        final suggestion = await DatabaseHelper.instance.periodizationRepo
+            .getRoutineSuggestion(DateTime.now());
         if (suggestion?.routineId == widget.routineId) {
           nextDayId = suggestion?.routineDayId;
         }

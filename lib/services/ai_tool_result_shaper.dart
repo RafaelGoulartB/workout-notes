@@ -69,7 +69,9 @@ class AiToolResultShaper {
   /// Shapes [data] (a tool's result map).
   Map<String, dynamic> shape(Map<String, dynamic> data) {
     final cleaned = _clean(data, null);
-    final root = cleaned is Map<String, dynamic> ? cleaned : <String, dynamic>{};
+    final root = cleaned is Map<String, dynamic>
+        ? cleaned
+        : <String, dynamic>{};
     _cap(root);
     return root;
   }
@@ -188,7 +190,8 @@ class AiToolResultShaper {
     }
     if (removedTotal > 0) {
       root['has_more'] = true;
-      root['truncated_rows'] = ((root['truncated_rows'] as int?) ?? 0) + removedTotal;
+      root['truncated_rows'] =
+          ((root['truncated_rows'] as int?) ?? 0) + removedTotal;
     }
   }
 

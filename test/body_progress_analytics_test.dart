@@ -180,18 +180,24 @@ void main() {
 
       expect(analytics.weekStreak, 4);
       expect(analytics.daysSinceLast, 2);
-      expect(analytics.entriesPerWeek, closeTo(4 / analytics.weeks.length, 0.001));
-    });
-
-    test('a current week with nothing logged yet does not break the streak', () {
-      final analytics = BodyProgressAnalytics.fromRows(
-        [_row('2026-08-03', 80.0), _row('2026-08-10', 79.0)],
-        period: BodyStatsPeriod.weeks12,
-        now: _now,
+      expect(
+        analytics.entriesPerWeek,
+        closeTo(4 / analytics.weeks.length, 0.001),
       );
-
-      expect(analytics.weekStreak, 2);
     });
+
+    test(
+      'a current week with nothing logged yet does not break the streak',
+      () {
+        final analytics = BodyProgressAnalytics.fromRows(
+          [_row('2026-08-03', 80.0), _row('2026-08-10', 79.0)],
+          period: BodyStatsPeriod.weeks12,
+          now: _now,
+        );
+
+        expect(analytics.weekStreak, 2);
+      },
+    );
 
     test('a gap resets the streak', () {
       final analytics = BodyProgressAnalytics.fromRows(

@@ -236,7 +236,9 @@ class ManualFoodController extends ChangeNotifier {
   }
 
   static String formatAmount(double value) {
-    if (value == value.roundToDouble()) return AppNumberFormat.decimal(value, 0);
+    if (value == value.roundToDouble()) {
+      return AppNumberFormat.decimal(value, 0);
+    }
     return AppNumberFormat.decimal(value, 2);
   }
 

@@ -418,22 +418,25 @@ void main() {
       expect(draft.values.vitaminB12Ug, 0.6);
     });
 
-    test('rejects a missing or unreadable reference instead of using 100 g', () {
-      for (final reference in <Map<String, dynamic>>[
-        {'reference_unit': 'g'},
-        {'reference_amount': null, 'reference_unit': 'g'},
-        {'reference_amount': 'n/a', 'reference_unit': 'g'},
-        {'reference_amount': 0, 'reference_unit': 'g'},
-        {'reference_amount': 100},
-        {'reference_amount': 100, 'reference_unit': 'null'},
-      ]) {
-        expect(
-          () => AiFoodLabelDraft.fromJson({'name': 'Suco', ...reference}),
-          throwsFormatException,
-          reason: '$reference',
-        );
-      }
-    });
+    test(
+      'rejects a missing or unreadable reference instead of using 100 g',
+      () {
+        for (final reference in <Map<String, dynamic>>[
+          {'reference_unit': 'g'},
+          {'reference_amount': null, 'reference_unit': 'g'},
+          {'reference_amount': 'n/a', 'reference_unit': 'g'},
+          {'reference_amount': 0, 'reference_unit': 'g'},
+          {'reference_amount': 100},
+          {'reference_amount': 100, 'reference_unit': 'null'},
+        ]) {
+          expect(
+            () => AiFoodLabelDraft.fromJson({'name': 'Suco', ...reference}),
+            throwsFormatException,
+            reason: '$reference',
+          );
+        }
+      },
+    );
 
     test('reads the leading number of "12 g", "<1" and "~30 kcal"', () {
       final draft = AiFoodLabelDraft.fromJson({

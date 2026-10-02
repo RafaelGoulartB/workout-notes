@@ -366,9 +366,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
   /// user picks which meal types to carry over via a checkbox dialog.
   Future<void> _copyPreviousDay() async {
     final loc = AppLocalizations.of(context)!;
-    final yesterday = dateKey(
-      dayOf(addDays(_selectedDate, -1)),
-    );
+    final yesterday = dateKey(dayOf(addDays(_selectedDate, -1)));
     final source = (await _repository.getDayMeals(
       yesterday,
     )).where((m) => m.items.isNotEmpty).toList();
@@ -809,5 +807,4 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
       items: const [],
     );
   }
-
 }

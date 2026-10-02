@@ -26,7 +26,8 @@ class RunPlanWorkoutEditorScreen extends StatefulWidget {
       _RunPlanWorkoutEditorScreenState();
 }
 
-class _RunPlanWorkoutEditorScreenState extends State<RunPlanWorkoutEditorScreen> with GuardedLoad {
+class _RunPlanWorkoutEditorScreenState extends State<RunPlanWorkoutEditorScreen>
+    with GuardedLoad {
   final _repo = DatabaseHelper.instance.runPlanRepo;
   RunPlanWorkout? _workout;
 

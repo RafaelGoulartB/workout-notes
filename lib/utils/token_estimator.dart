@@ -11,5 +11,4 @@ class TokenEstimator {
   /// encoded once are not encoded again just to be measured.
   static int estimateChars(int length) =>
       length <= 0 ? 0 : (length / charsPerToken).ceil();
-
 }

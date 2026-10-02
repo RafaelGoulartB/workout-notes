@@ -157,8 +157,7 @@ class AiChatState {
       turn != null && turn!.threadId == activeThreadId;
 
   /// A turn runs in another conversation: the composer waits for it.
-  bool get isBusyElsewhere =>
-      turn != null && turn!.threadId != activeThreadId;
+  bool get isBusyElsewhere => turn != null && turn!.threadId != activeThreadId;
 
   AiProposal? proposalForToolCall(String toolCallId) {
     for (final proposal in proposals) {

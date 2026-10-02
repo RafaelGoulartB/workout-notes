@@ -37,42 +37,48 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  test('a simulated run pauses, resumes and marks laps through the service', () async {
-    final service = RunTrackingService.instance;
-    expect(service.isDebugSimulating, isFalse);
+  test(
+    'a simulated run pauses, resumes and marks laps through the service',
+    () async {
+      final service = RunTrackingService.instance;
+      expect(service.isDebugSimulating, isFalse);
 
-    expect(await service.startDebugSimulation(), isTrue);
-    expect(service.isDebugSimulating, isTrue);
-    expect(service.state.status, RunTrackingState.recording);
+      expect(await service.startDebugSimulation(), isTrue);
+      expect(service.isDebugSimulating, isTrue);
+      expect(service.state.status, RunTrackingState.recording);
 
-    await service.pause();
-    expect(service.state.status, RunTrackingState.paused);
-    await service.resume();
-    expect(service.state.status, RunTrackingState.recording);
+      await service.pause();
+      expect(service.state.status, RunTrackingState.paused);
+      await service.resume();
+      expect(service.state.status, RunTrackingState.recording);
 
-    // Laps under two moving seconds are ignored, like the native tracker.
-    expect(await service.lap(), isNull);
-  });
+      // Laps under two moving seconds are ignored, like the native tracker.
+      expect(await service.lap(), isNull);
+    },
+  );
 
-  test('stopping keeps the review in memory and returns to the native backend', () async {
-    final service = RunTrackingService.instance;
-    await service.startDebugSimulation();
+  test(
+    'stopping keeps the review in memory and returns to the native backend',
+    () async {
+      final service = RunTrackingService.instance;
+      await service.startDebugSimulation();
 
-    final draft = await service.stopForReview();
+      final draft = await service.stopForReview();
 
-    expect(draft, isNotNull);
-    expect((draft!.spool['activity'] as Map)['status'], 'pending_review');
-    expect(service.isDebugSimulating, isFalse);
-    expect(service.state.status, RunTrackingState.idle);
-    final pending = await service.listPendingReviews();
-    expect(pending.map((d) => d.id), contains(draft.id));
+      expect(draft, isNotNull);
+      expect((draft!.spool['activity'] as Map)['status'], 'pending_review');
+      expect(service.isDebugSimulating, isFalse);
+      expect(service.state.status, RunTrackingState.idle);
+      final pending = await service.listPendingReviews();
+      expect(pending.map((d) => d.id), contains(draft.id));
 
-    await service.discardReview(draft);
-    expect(
-      (await service.listPendingReviews()).map((d) => d.id),
-      isNot(contains(draft.id)),
-    );
-  });
+      await service.discardReview(draft);
+      expect(
+        (await service.listPendingReviews()).map((d) => d.id),
+        isNot(contains(draft.id)),
+      );
+    },
+  );
 
   test('discarding a simulated run resets the service', () async {
     final service = RunTrackingService.instance;

@@ -26,7 +26,8 @@ class ExercisePickerSheet extends StatefulWidget {
   State<ExercisePickerSheet> createState() => _ExercisePickerSheetState();
 }
 
-class _ExercisePickerSheetState extends State<ExercisePickerSheet> with GuardedLoad {
+class _ExercisePickerSheetState extends State<ExercisePickerSheet>
+    with GuardedLoad {
   final _exerciseRepo = DatabaseHelper.instance.exerciseRepo;
   List<Map<String, dynamic>> _categories = [];
   final Map<String, List<Map<String, dynamic>>> _exercisesByCategory = {};

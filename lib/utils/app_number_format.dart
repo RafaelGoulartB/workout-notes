@@ -35,12 +35,9 @@ class AppNumberFormat {
     int digits, {
     String fallback = '-',
     bool trimZeros = false,
-  }) => value == null
-      ? fallback
-      : decimal(value, digits, trimZeros: trimZeros);
+  }) => value == null ? fallback : decimal(value, digits, trimZeros: trimZeros);
 
   /// Whole numbers without decimals, otherwise one decimal (`12`, `12,5`).
-  static String compact(double value) => value == value.roundToDouble()
-      ? decimal(value, 0)
-      : decimal(value, 1);
+  static String compact(double value) =>
+      value == value.roundToDouble() ? decimal(value, 0) : decimal(value, 1);
 }

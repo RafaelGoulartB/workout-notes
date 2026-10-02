@@ -4,8 +4,7 @@ import 'package:workout_notes/models/alarm_wake_settings.dart';
 import 'package:workout_notes/widgets/sleep/monitor/monitor_mode_widgets.dart';
 
 /// Short label of a smart window choice: "Off" or "30 min".
-String smartWindowLabel(AppLocalizations loc, int minutes) =>
-    minutes <= 0
+String smartWindowLabel(AppLocalizations loc, int minutes) => minutes <= 0
     ? loc.sleepSmartWakeWindowOff
     : loc.commonMinutesShort(minutes);
 

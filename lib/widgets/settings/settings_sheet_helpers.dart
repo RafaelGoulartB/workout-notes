@@ -7,7 +7,11 @@ class SettingsSheetTitle extends StatelessWidget {
   final IconData icon;
   final String title;
 
-  const SettingsSheetTitle({super.key, required this.icon, required this.title});
+  const SettingsSheetTitle({
+    super.key,
+    required this.icon,
+    required this.title,
+  });
 
   @override
   Widget build(BuildContext context) {

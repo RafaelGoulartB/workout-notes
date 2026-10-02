@@ -32,7 +32,8 @@ class EditWorkoutScreen extends StatefulWidget {
   State<EditWorkoutScreen> createState() => _EditWorkoutScreenState();
 }
 
-class _EditWorkoutScreenState extends State<EditWorkoutScreen> with GuardedLoad {
+class _EditWorkoutScreenState extends State<EditWorkoutScreen>
+    with GuardedLoad {
   final _workoutRepo = DatabaseHelper.instance.workoutRepo;
   final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
   final _commentController = TextEditingController();
@@ -409,7 +410,11 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> with GuardedLoad 
     final loc = AppLocalizations.of(context)!;
     final set = exercise.sets[setIndex];
     final weightCtl = TextEditingController(
-      text: AppNumberFormat.decimalOrDash(set['weight'] as num?, 1, fallback: ''),
+      text: AppNumberFormat.decimalOrDash(
+        set['weight'] as num?,
+        1,
+        fallback: '',
+      ),
     );
     final repsCtl = TextEditingController(
       text: (set['reps'] as int?)?.toString() ?? '',
@@ -505,9 +510,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> with GuardedLoad 
       if (!mounted) return;
       _scaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(
-          content: Text(
-            AppLocalizations.of(context)!.commonReorderError,
-          ),
+          content: Text(AppLocalizations.of(context)!.commonReorderError),
           behavior: SnackBarBehavior.floating,
         ),
       );

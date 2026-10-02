@@ -134,20 +134,23 @@ void main() {
       expect(prs.where((p) => p.type == 'volume'), isEmpty);
     });
 
-    test('cardio exercises and unfinished sets never make strength records', () {
-      final prs = WorkoutSummaryService.strengthRecords(
-        loc: _loc,
-        workoutId: 'today',
-        exercises: [
-          _exercise('run', [_set(50, 5)], category: 'cardio'),
-          _exercise('bench', [_set(300, 5, done: false)]),
-        ],
-        cardioExerciseIds: const {'run'},
-        history: [_past('w1', earlier, 'bench', 100, 5)],
-        now: now,
-      );
-      expect(prs, isEmpty);
-    });
+    test(
+      'cardio exercises and unfinished sets never make strength records',
+      () {
+        final prs = WorkoutSummaryService.strengthRecords(
+          loc: _loc,
+          workoutId: 'today',
+          exercises: [
+            _exercise('run', [_set(50, 5)], category: 'cardio'),
+            _exercise('bench', [_set(300, 5, done: false)]),
+          ],
+          cardioExerciseIds: const {'run'},
+          history: [_past('w1', earlier, 'bench', 100, 5)],
+          now: now,
+        );
+        expect(prs, isEmpty);
+      },
+    );
 
     test('the session being finished is not compared with itself', () {
       final prs = WorkoutSummaryService.strengthRecords(

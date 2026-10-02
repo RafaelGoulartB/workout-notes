@@ -52,7 +52,10 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
               // ===== TREINO =====
-              AppSectionHeader(loc.settingsSectionWorkout, padding: AppSectionHeader.compactPadding),
+              AppSectionHeader(
+                loc.settingsSectionWorkout,
+                padding: AppSectionHeader.compactPadding,
+              ),
               SettingsCard(
                 children: [
                   SettingsSwitchTile(
@@ -124,7 +127,10 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
               ),
 
               // ===== NOTIFICAÇÕES =====
-              AppSectionHeader(loc.settingsSectionNotifications, padding: AppSectionHeader.compactPadding),
+              AppSectionHeader(
+                loc.settingsSectionNotifications,
+                padding: AppSectionHeader.compactPadding,
+              ),
               SettingsCard(
                 children: [
                   SettingsSwitchTile(

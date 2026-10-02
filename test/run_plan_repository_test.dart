@@ -378,7 +378,8 @@ void main() {
     test('attaching an activity marks the scheduled run completed', () async {
       final plan = await seedPlan();
       final session = await seedIntervalSession(plan.id);
-      final scheduled = await scheduleRunFixture(repository, 
+      final scheduled = await scheduleRunFixture(
+        repository,
         date: DateTime(2026, 1, 6),
         runPlanId: plan.id,
         runPlanWorkoutId: session.id,
@@ -407,7 +408,8 @@ void main() {
       'deleting the activity clears the link but keeps the schedule',
       () async {
         final plan = await seedPlan();
-        final scheduled = await scheduleRunFixture(repository, 
+        final scheduled = await scheduleRunFixture(
+          repository,
           date: DateTime(2026, 1, 6),
           runPlanId: plan.id,
         );
@@ -437,7 +439,8 @@ void main() {
 
     test('a skipped run keeps its status', () async {
       final plan = await seedPlan();
-      final scheduled = await scheduleRunFixture(repository, 
+      final scheduled = await scheduleRunFixture(
+        repository,
         date: DateTime(2026, 1, 6),
         runPlanId: plan.id,
       );
@@ -454,7 +457,8 @@ void main() {
     test('deleting a plan cascades its scheduled runs', () async {
       final plan = await seedPlan();
       final session = await seedIntervalSession(plan.id);
-      await scheduleRunFixture(repository, 
+      await scheduleRunFixture(
+        repository,
         date: DateTime(2026, 1, 6),
         runPlanId: plan.id,
         runPlanWorkoutId: session.id,
@@ -665,7 +669,8 @@ void main() {
           dayOfWeek: 2,
         );
         // Planned three weeks out: running today is a different session.
-        await scheduleRunFixture(repository, 
+        await scheduleRunFixture(
+          repository,
           date: DateTime.now().add(const Duration(days: 21)),
           runPlanId: plan.id,
           runPlanWorkoutId: session.id,

@@ -268,7 +268,6 @@ class RunPlan {
       return null;
     }
   }
-
 }
 
 const Object _sentinel = Object();

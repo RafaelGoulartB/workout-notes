@@ -71,8 +71,7 @@ class BodyBilateralSummaryCard extends StatelessWidget {
                 Expanded(
                   child: _BilateralSidePanel(
                     theme: theme,
-                    sideLabel:
-                        AppLocalizations.of(context)!.bodyTrackerLeft,
+                    sideLabel: AppLocalizations.of(context)!.bodyTrackerLeft,
                     sideAbbr: 'L',
                     value: leftValue,
                     delta: leftDelta,
@@ -87,8 +86,7 @@ class BodyBilateralSummaryCard extends StatelessWidget {
                 Expanded(
                   child: _BilateralSidePanel(
                     theme: theme,
-                    sideLabel:
-                        AppLocalizations.of(context)!.bodyTrackerRight,
+                    sideLabel: AppLocalizations.of(context)!.bodyTrackerRight,
                     sideAbbr: 'R',
                     value: rightValue,
                     delta: rightDelta,
@@ -151,10 +149,10 @@ class _BilateralSidePanel extends StatelessWidget {
     final deltaColor = delta == null
         ? Colors.transparent
         : (isGood == true
-            ? Colors.green
-            : (isGood == false
-                ? Colors.red
-                : theme.colorScheme.onSurfaceVariant));
+              ? Colors.green
+              : (isGood == false
+                    ? Colors.red
+                    : theme.colorScheme.onSurfaceVariant));
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -271,12 +269,18 @@ class _AsymmetryIndicator extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.compare_arrows,
-              size: 14, color: theme.colorScheme.onSurfaceVariant),
+          Icon(
+            Icons.compare_arrows,
+            size: 14,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(width: 6),
           Text(
             loc.bodyTrackerAsymmetry(
-                AppNumberFormat.decimal(diff, 1), larger, unit),
+              AppNumberFormat.decimal(diff, 1),
+              larger,
+              unit,
+            ),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
               fontSize: 11,

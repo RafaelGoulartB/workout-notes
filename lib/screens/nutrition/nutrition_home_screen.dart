@@ -236,7 +236,9 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   }
 
   static String _formatNum(double value) {
-    if (value == value.roundToDouble()) return AppNumberFormat.decimal(value, 0);
+    if (value == value.roundToDouble()) {
+      return AppNumberFormat.decimal(value, 0);
+    }
     return AppNumberFormat.decimal(value, 1);
   }
 
@@ -343,7 +345,10 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     final details = await _repository.getFoodWithDetails(item.foodId ?? '');
     if (details == null) {
       if (!mounted) return;
-      showAppSnack(context, AppLocalizations.of(context)!.nutritionItemFoodUnavailable);
+      showAppSnack(
+        context,
+        AppLocalizations.of(context)!.nutritionItemFoodUnavailable,
+      );
       return;
     }
     final variant = details.variants.isEmpty
@@ -697,23 +702,13 @@ class _NutritionWeekSelector extends StatelessWidget {
                 date: addDays(weekStart, index),
                 locale: locale,
                 collapseProgress: collapseProgress,
-                isSelected: isSameDay(
-                  addDays(weekStart, index),
-                  selectedDate,
-                ),
-                isToday: isSameDay(
-                  addDays(weekStart, index),
-                  today,
-                ),
+                isSelected: isSameDay(addDays(weekStart, index), selectedDate),
+                isToday: isSameDay(addDays(weekStart, index), today),
                 calorieProgress: _calorieProgress(
-                  weeklyCalories[dateKey(
-                    addDays(weekStart, index),
-                  )],
+                  weeklyCalories[dateKey(addDays(weekStart, index))],
                 ),
                 isOverCalorieGoal: _isOverCalorieGoal(
-                  weeklyCalories[dateKey(
-                    addDays(weekStart, index),
-                  )],
+                  weeklyCalories[dateKey(addDays(weekStart, index))],
                 ),
                 onTap: onSelected,
               ),

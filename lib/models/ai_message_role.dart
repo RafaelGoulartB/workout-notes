@@ -79,11 +79,11 @@ class AiToolResult {
   }
 
   Map<String, dynamic> toMap() => {
-        'ok': ok,
-        if (data != null) 'data': data,
-        if (code != null) 'code': code,
-        if (message != null) 'message': message,
-        if (hint != null) 'hint': hint,
-        if (details != null) 'details': details,
-      };
+    'ok': ok,
+    if (data != null) 'data': data,
+    if (code != null) 'code': code,
+    if (message != null) 'message': message,
+    if (hint != null) 'hint': hint,
+    if (details != null) 'details': details,
+  };
 }

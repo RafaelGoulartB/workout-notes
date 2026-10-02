@@ -143,7 +143,10 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   void _selectFood(FoodSearchResult result) {
     if (result.primaryVariant == null) {
       if (!mounted) return;
-      showAppSnack(context, AppLocalizations.of(context)!.nutritionFoodNoVariant);
+      showAppSnack(
+        context,
+        AppLocalizations.of(context)!.nutritionFoodNoVariant,
+      );
       return;
     }
     _returnSelection(

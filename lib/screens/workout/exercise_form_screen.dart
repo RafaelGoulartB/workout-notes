@@ -16,7 +16,8 @@ class ExerciseFormScreen extends StatefulWidget {
   State<ExerciseFormScreen> createState() => _ExerciseFormScreenState();
 }
 
-class _ExerciseFormScreenState extends State<ExerciseFormScreen> with GuardedLoad {
+class _ExerciseFormScreenState extends State<ExerciseFormScreen>
+    with GuardedLoad {
   final _exerciseRepo = DatabaseHelper.instance.exerciseRepo;
   final _nameCtl = TextEditingController();
   final _notesCtl = TextEditingController();

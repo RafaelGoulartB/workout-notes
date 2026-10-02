@@ -39,7 +39,8 @@ class _WorkoutEntry extends _Entry {
   const _WorkoutEntry(this.workout);
 }
 
-class _StrengthHistoryScreenState extends State<StrengthHistoryScreen> with GuardedLoad {
+class _StrengthHistoryScreenState extends State<StrengthHistoryScreen>
+    with GuardedLoad {
   static const _pageSize = 30;
 
   StrengthHistoryRepository? _repoInstance;
@@ -205,7 +206,8 @@ class _StrengthHistoryScreenState extends State<StrengthHistoryScreen> with Guar
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final isEmptyHistory = !isLoading && !_filter.isActive && _totals.count == 0;
+    final isEmptyHistory =
+        !isLoading && !_filter.isActive && _totals.count == 0;
 
     return Scaffold(
       appBar: AppBar(title: Text(loc.strengthHistoryTitle)),

@@ -115,9 +115,7 @@ abstract final class RunPlanUi {
           : '${hours}h${DurationFormat.twoDigits(rest)}';
     }
     if (minutes == 0) return '${seconds}s';
-    return seconds % 60 == 0
-        ? '$minutes min'
-        : RunFormatters.minSec(seconds);
+    return seconds % 60 == 0 ? '$minutes min' : RunFormatters.minSec(seconds);
   }
 
   /// Rounded duration for estimates — `38 min`, `1h05`. The exact form

@@ -2,12 +2,7 @@ import 'dart:math' as math;
 import 'package:workout_notes/utils/date_utils.dart';
 
 /// Lookback windows offered by the body stats screen.
-enum BodyStatsPeriod {
-  weeks4,
-  weeks12,
-  weeks26,
-  all,
-}
+enum BodyStatsPeriod { weeks4, weeks12, weeks26, all }
 
 extension BodyStatsPeriodWeeks on BodyStatsPeriod {
   /// How many Sunday-to-Saturday weeks the window spans, counting the current
@@ -420,7 +415,6 @@ class BodyProgressAnalytics {
 
   // ── Helpers ─────────────────────────────────────────────────────────
 
-
   static DateTime? _parseDate(Object? raw) {
     if (raw is! String || raw.length < 10) return null;
     try {
@@ -432,7 +426,10 @@ class BodyProgressAnalytics {
 
   /// Trailing mean over up to [window] previous points (points, not days), so
   /// the series never looks into the future.
-  static List<double> _trailingMean(List<double> values, {required int window}) {
+  static List<double> _trailingMean(
+    List<double> values, {
+    required int window,
+  }) {
     final out = <double>[];
     for (var i = 0; i < values.length; i++) {
       final start = math.max(0, i - window + 1);
@@ -488,14 +485,10 @@ class BodyProgressAnalytics {
       firstWeekStart = currentWeekStart;
     }
 
-    final weekCount =
-        (daysBetween(firstWeekStart, currentWeekStart) ~/ 7 + 1).clamp(
-          1,
-          260,
-        );
+    final weekCount = (daysBetween(firstWeekStart, currentWeekStart) ~/ 7 + 1)
+        .clamp(1, 260);
     final starts = <DateTime>[
-      for (var i = 0; i < weekCount; i++)
-        addDays(firstWeekStart, 7 * i),
+      for (var i = 0; i < weekCount; i++) addDays(firstWeekStart, 7 * i),
     ];
 
     final grouped = <DateTime, List<BodyDailyPoint>>{};
@@ -548,9 +541,7 @@ class BodyProgressAnalytics {
   static List<BodyMonthBucket> _buildMonths(List<BodyDailyPoint> daily) {
     final grouped = <DateTime, List<BodyDailyPoint>>{};
     for (final p in daily) {
-      grouped
-          .putIfAbsent(DateTime(p.date.year, p.date.month), () => [])
-          .add(p);
+      grouped.putIfAbsent(DateTime(p.date.year, p.date.month), () => []).add(p);
     }
     final months = grouped.keys.toList()..sort();
     final out = <BodyMonthBucket>[];
@@ -575,7 +566,10 @@ class BodyProgressAnalytics {
     return out;
   }
 
-  static int _weekStreak(List<BodyDailyPoint> daily, DateTime currentWeekStart) {
+  static int _weekStreak(
+    List<BodyDailyPoint> daily,
+    DateTime currentWeekStart,
+  ) {
     if (daily.isEmpty) return 0;
     final weeksWithData = <DateTime>{for (final p in daily) sundayOf(p.date)};
     var cursor = weeksWithData.contains(currentWeekStart)

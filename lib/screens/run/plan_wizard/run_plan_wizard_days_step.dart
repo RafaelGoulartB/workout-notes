@@ -205,8 +205,7 @@ class _RaceDateTile extends StatelessWidget {
     final picked = await showDatePicker(
       context: context,
       initialDate:
-          controller.raceDate ??
-          addDays(today, 7 * controller.template.weeks),
+          controller.raceDate ?? addDays(today, 7 * controller.template.weeks),
       firstDate: today,
       lastDate: addDays(today, 800),
     );

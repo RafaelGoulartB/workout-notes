@@ -94,77 +94,85 @@ void main() {
     Iterable<MethodCall> named(String method) =>
         calls.where((c) => c.method == method);
 
-    Future<void> settle() => Future<void>.delayed(
-      const Duration(milliseconds: 50),
+    Future<void> settle() =>
+        Future<void>.delayed(const Duration(milliseconds: 50));
+
+    test(
+      'start schedules an exact alert after the end plus the grace',
+      () async {
+        final before = DateTime.now();
+        RestTimerService.instance.start(60);
+        await settle();
+
+        final scheduled = named('zonedSchedule').single;
+        final args = scheduled.arguments as Map;
+        expect(args['id'], 1001);
+        expect(
+          (args['platformSpecifics'] as Map)['scheduleMode'],
+          'exactAllowWhileIdle',
+        );
+        // The channel is the alerting one, not the silent countdown channel.
+        expect(
+          (args['platformSpecifics'] as Map)['channelId'] as String,
+          startsWith('rest_alert_v'),
+        );
+        // The instant is sent as UTC wall-clock fields plus the zone name.
+        expect(args['timeZoneName'], 'Etc/UTC');
+        final raw = args['scheduledDateTime'] as String;
+        final at = DateTime.parse(raw.endsWith('Z') ? raw : '${raw}Z');
+        final expected = before.add(
+          const Duration(seconds: 60) + NotificationService.restAlertGrace,
+        );
+        expect(
+          at.difference(expected).inMilliseconds.abs(),
+          lessThan(2000),
+          reason: 'scheduled at $at, expected about $expected',
+        );
+      },
     );
 
-    test('start schedules an exact alert after the end plus the grace', () async {
-      final before = DateTime.now();
-      RestTimerService.instance.start(60);
-      await settle();
+    test(
+      'falls back to an inexact alert without the exact alarm grant',
+      () async {
+        exactAllowed = false;
 
-      final scheduled = named('zonedSchedule').single;
-      final args = scheduled.arguments as Map;
-      expect(args['id'], 1001);
-      expect(
-        (args['platformSpecifics'] as Map)['scheduleMode'],
-        'exactAllowWhileIdle',
-      );
-      // The channel is the alerting one, not the silent countdown channel.
-      expect(
-        (args['platformSpecifics'] as Map)['channelId'] as String,
-        startsWith('rest_alert_v'),
-      );
-      // The instant is sent as UTC wall-clock fields plus the zone name.
-      expect(args['timeZoneName'], 'Etc/UTC');
-      final raw = args['scheduledDateTime'] as String;
-      final at = DateTime.parse(raw.endsWith('Z') ? raw : '${raw}Z');
-      final expected = before.add(
-        const Duration(seconds: 60) + NotificationService.restAlertGrace,
-      );
-      expect(
-        at.difference(expected).inMilliseconds.abs(),
-        lessThan(2000),
-        reason: 'scheduled at $at, expected about $expected',
-      );
-    });
+        RestTimerService.instance.start(60);
+        await settle();
 
-    test('falls back to an inexact alert without the exact alarm grant', () async {
-      exactAllowed = false;
+        final args = named('zonedSchedule').single.arguments as Map;
+        expect(
+          (args['platformSpecifics'] as Map)['scheduleMode'],
+          'inexactAllowWhileIdle',
+        );
+      },
+    );
 
-      RestTimerService.instance.start(60);
-      await settle();
+    test(
+      'pause and stop cancel it, resume and a restart reschedule it',
+      () async {
+        final service = RestTimerService.instance;
+        service.start(60);
+        await settle();
+        expect(named('zonedSchedule'), hasLength(1));
 
-      final args = named('zonedSchedule').single.arguments as Map;
-      expect(
-        (args['platformSpecifics'] as Map)['scheduleMode'],
-        'inexactAllowWhileIdle',
-      );
-    });
+        service.pause();
+        await settle();
+        expect(named('cancel'), hasLength(1));
+        expect((named('cancel').single.arguments as Map)['id'], 1001);
 
-    test('pause and stop cancel it, resume and a restart reschedule it', () async {
-      final service = RestTimerService.instance;
-      service.start(60);
-      await settle();
-      expect(named('zonedSchedule'), hasLength(1));
+        service.resume();
+        await settle();
+        expect(named('zonedSchedule'), hasLength(2));
 
-      service.pause();
-      await settle();
-      expect(named('cancel'), hasLength(1));
-      expect((named('cancel').single.arguments as Map)['id'], 1001);
+        service.start(30); // adjusting replaces the alert (same id)
+        await settle();
+        expect(named('zonedSchedule'), hasLength(3));
 
-      service.resume();
-      await settle();
-      expect(named('zonedSchedule'), hasLength(2));
-
-      service.start(30); // adjusting replaces the alert (same id)
-      await settle();
-      expect(named('zonedSchedule'), hasLength(3));
-
-      service.stop();
-      await settle();
-      expect(named('cancel'), hasLength(2));
-    });
+        service.stop();
+        await settle();
+        expect(named('cancel'), hasLength(2));
+      },
+    );
 
     test('a stop right after start leaves nothing scheduled', () async {
       final service = RestTimerService.instance;

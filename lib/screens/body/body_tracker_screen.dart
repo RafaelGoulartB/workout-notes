@@ -25,7 +25,8 @@ class BodyTrackerScreen extends StatefulWidget {
   State<BodyTrackerScreen> createState() => _BodyTrackerScreenState();
 }
 
-class _BodyTrackerScreenState extends State<BodyTrackerScreen> with GuardedLoad {
+class _BodyTrackerScreenState extends State<BodyTrackerScreen>
+    with GuardedLoad {
   final _bodyRepo = DatabaseHelper.instance.bodyMeasurementRepo;
   final _settingsRepo = DatabaseHelper.instance.settingsRepo;
 
@@ -385,7 +386,9 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> with GuardedLoad 
             ),
         ],
       ),
-      floatingActionButton: isLoading || loadFailed ? null : _buildSpeedDial(theme, loc),
+      floatingActionButton: isLoading || loadFailed
+          ? null
+          : _buildSpeedDial(theme, loc),
     );
   }
 

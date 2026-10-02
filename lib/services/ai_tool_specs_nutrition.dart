@@ -20,7 +20,11 @@ List<AiToolSpec> nutritionToolSpecs(AiToolDeps d) => [
     },
     domain: AiToolDomain.nutrition,
     handler: (a) async {
-      final detail = a.enumValue('detail', _nutritionDetails, fallback: 'summary')!;
+      final detail = a.enumValue(
+        'detail',
+        _nutritionDetails,
+        fallback: 'summary',
+      )!;
       final endDate = a.date('end_date', alt: 'date');
       if (detail == 'day') {
         return aiToolOk(await d.nutrition.diaryDay(date: endDate));

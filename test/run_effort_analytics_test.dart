@@ -60,7 +60,11 @@ void main() {
     final start = DateTime.utc(2026, 6, 1, 8);
     final slow = _straightRun(meters: 2000, paceSecPerKm: 400, start: start);
     final fastStart = start.add(const Duration(seconds: 800));
-    final fast = _straightRun(meters: 2000, paceSecPerKm: 280, start: fastStart);
+    final fast = _straightRun(
+      meters: 2000,
+      paceSecPerKm: 280,
+      start: fastStart,
+    );
     // Continue latitude from end of slow (~2000m + overshoot).
     const latOffset =
         2020 / (RunPaceAnalytics.earthRadiusMeters * 3.141592653589793 / 180.0);

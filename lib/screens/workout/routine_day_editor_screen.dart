@@ -35,7 +35,8 @@ class RoutineDayEditorScreen extends StatefulWidget {
   State<RoutineDayEditorScreen> createState() => _RoutineDayEditorScreenState();
 }
 
-class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> with GuardedLoad {
+class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen>
+    with GuardedLoad {
   final _routineRepo = DatabaseHelper.instance.routineRepo;
   List<Map<String, dynamic>> _exercises = [];
   Map<String, List<Map<String, dynamic>>> _predefinedSets = {};
@@ -107,9 +108,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> with Gu
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            AppLocalizations.of(context)!.commonReorderError,
-          ),
+          content: Text(AppLocalizations.of(context)!.commonReorderError),
           behavior: SnackBarBehavior.floating,
         ),
       );

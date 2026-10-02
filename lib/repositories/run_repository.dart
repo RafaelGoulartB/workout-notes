@@ -676,11 +676,7 @@ class RunRepository extends BaseRepository {
     ).activity;
   }
 
-  ({
-    RunActivity activity,
-    List<RunTrackPoint> points,
-    RunTrackProfile profile,
-  })
+  ({RunActivity activity, List<RunTrackPoint> points, RunTrackProfile profile})
   _decodeNativeSpool(
     Map<String, dynamic> spool, {
     required String id,
@@ -807,7 +803,8 @@ class RunRepository extends BaseRepository {
 
   Future<double> _latestBodyWeightKg() async {
     try {
-      final latest = await DatabaseHelper.instance.bodyMeasurementRepo.getLatestWeightKg();
+      final latest = await DatabaseHelper.instance.bodyMeasurementRepo
+          .getLatestWeightKg();
       return latest ?? 70;
     } catch (_) {
       // Lightweight repository tests and partially recovered databases may not

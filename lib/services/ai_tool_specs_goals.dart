@@ -16,7 +16,11 @@ List<AiToolSpec> goalToolSpecs(AiToolDeps d) => [
     properties: {
       'scope': AiParam.enumOf(_scopes, 'Strength or cardio.'),
       'metric': AiParam.enumOf(_metrics, 'Goal metric.'),
-      'history_periods': AiParam.integer('Past periods (default 0).', min: 0, max: 12),
+      'history_periods': AiParam.integer(
+        'Past periods (default 0).',
+        min: 0,
+        max: 12,
+      ),
     },
     handler: (a) async => aiToolOk(
       await d.goals.listGoals(

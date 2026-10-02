@@ -186,7 +186,10 @@ void main() {
       expect(restoredSession['snore_minutes'], 14);
       expect(restoredSession['awakening_count'], 2);
       expect(restoredSession['sleep_efficiency'], 0.91);
-      expect(restoredSession['stage_algorithm_version'], 'sleep-wake-bedside-v6');
+      expect(
+        restoredSession['stage_algorithm_version'],
+        'sleep-wake-bedside-v6',
+      );
       expect(restoredSession['stage_timeline'], 'timeline-bytes');
       expect(await database.query('ai_chat_threads'), isEmpty);
       expect(await database.query('ai_chat_messages'), isEmpty);

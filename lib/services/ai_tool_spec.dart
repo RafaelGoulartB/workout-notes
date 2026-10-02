@@ -17,12 +17,8 @@ class AiToolArgException implements Exception {
   );
 
   /// A required argument is absent or blank.
-  factory AiToolArgException.missing(String param) => AiToolArgException._(
-    param,
-    'a value',
-    null,
-    '$param: required',
-  );
+  factory AiToolArgException.missing(String param) =>
+      AiToolArgException._(param, 'a value', null, '$param: required');
 
   /// An argument has the wrong type, format or value.
   factory AiToolArgException.invalid(
@@ -40,8 +36,7 @@ class AiToolArgException implements Exception {
   factory AiToolArgException.conflict(String param, String message) =>
       AiToolArgException._(param, message, null, '$param: $message');
 
-  static String _show(Object? value) =>
-      value is String ? '"$value"' : '$value';
+  static String _show(Object? value) => value is String ? '"$value"' : '$value';
 
   AiToolResult toResult() => AiToolResult(
     ok: false,
@@ -65,12 +60,8 @@ class AiToolNotFoundException implements Exception {
 
   const AiToolNotFoundException(this.message, {this.hint});
 
-  AiToolResult toResult() => AiToolResult(
-    ok: false,
-    code: 'not_found',
-    message: message,
-    hint: hint,
-  );
+  AiToolResult toResult() =>
+      AiToolResult(ok: false, code: 'not_found', message: message, hint: hint);
 
   @override
   String toString() => message;
@@ -106,7 +97,8 @@ class AiToolArgs {
   }
 
   dynamic _value(String key, [String? alt]) {
-    final value = raw[key] ?? raw[_camel(key)] ?? (alt == null ? null : raw[alt]);
+    final value =
+        raw[key] ?? raw[_camel(key)] ?? (alt == null ? null : raw[alt]);
     if (value is String && value.trim().isEmpty) return null;
     return value;
   }
@@ -169,7 +161,9 @@ class AiToolArgs {
       parsed = value.round();
     } else if (value is String) {
       final number = num.tryParse(value.trim());
-      if (number == null) throw AiToolArgException.invalid(key, 'an integer', value);
+      if (number == null) {
+        throw AiToolArgException.invalid(key, 'an integer', value);
+      }
       parsed = number.round();
     } else {
       throw AiToolArgException.invalid(key, 'an integer', value);
@@ -206,11 +200,7 @@ class AiToolArgs {
     for (final option in allowed) {
       if (option.toLowerCase() == text.toLowerCase()) return option;
     }
-    throw AiToolArgException.invalid(
-      key,
-      'one of ${allowed.join(', ')}',
-      text,
-    );
+    throw AiToolArgException.invalid(key, 'one of ${allowed.join(', ')}', text);
   }
 }
 
@@ -249,17 +239,12 @@ abstract final class AiParam {
     'description': description,
   };
 
-  static Map<String, dynamic> enumOf(
-    List<String> values,
-    String description,
-  ) => {'type': 'string', 'enum': values, 'description': description};
+  static Map<String, dynamic> enumOf(List<String> values, String description) =>
+      {'type': 'string', 'enum': values, 'description': description};
 
   /// Look-back window ending at `end_date` (or today).
-  static Map<String, dynamic> days(int fallback, int min, int max) => integer(
-    'Window in days (default $fallback).',
-    min: min,
-    max: max,
-  );
+  static Map<String, dynamic> days(int fallback, int min, int max) =>
+      integer('Window in days (default $fallback).', min: min, max: max);
 
   static Map<String, dynamic> startDate() => date('From');
 

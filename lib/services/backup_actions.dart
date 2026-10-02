@@ -41,11 +41,9 @@ class PickedBackup {
 /// dialogs and snack bars; everything that touches [ExportService] or the file
 /// picker lives here so it can run (and be tested) without a `BuildContext`.
 class BackupActions {
-  BackupActions({
-    ExportService? exportService,
-    AppDataCoordinator? coordinator,
-  }) : _service = exportService ?? ExportService(),
-       _coordinator = coordinator ?? AppDataCoordinator.instance;
+  BackupActions({ExportService? exportService, AppDataCoordinator? coordinator})
+    : _service = exportService ?? ExportService(),
+      _coordinator = coordinator ?? AppDataCoordinator.instance;
 
   final ExportService _service;
   final AppDataCoordinator _coordinator;

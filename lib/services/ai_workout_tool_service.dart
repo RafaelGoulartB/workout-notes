@@ -210,8 +210,7 @@ class AiWorkoutToolService {
         rpe,
         row['exercise_type'] as String? ?? 'weightReps',
       );
-      (entry[!complete ? 'open' : (warmup ? 'warmup' : 'sets')]
-              as List<String>)
+      (entry[!complete ? 'open' : (warmup ? 'warmup' : 'sets')] as List<String>)
           .add(text);
       if (complete && !warmup) {
         doneSets++;
@@ -417,7 +416,8 @@ class AiWorkoutToolService {
         : ExerciseLocalization.exerciseName(key, 'en');
     return {
       'name': stored,
-      'name_en': english != null && english.toLowerCase() != stored.toLowerCase()
+      'name_en':
+          english != null && english.toLowerCase() != stored.toLowerCase()
           ? english
           : null,
     };
@@ -514,11 +514,7 @@ class AiWorkoutToolService {
     final trend = _trend(sessions, type);
     return {
       ...await _exerciseProfile(exerciseId, exercise),
-      'applied': {
-        'start_date': startDate,
-        'end_date': endDate,
-        'limit': limit,
-      },
+      'applied': {'start_date': startDate, 'end_date': endDate, 'limit': limit},
       'session_count': sessions.length,
       'trend': trend,
       'sessions': [for (final session in sessions.take(limit)) session.toMap()],
@@ -639,10 +635,16 @@ class AiWorkoutToolService {
       [exerciseId],
     );
     final best = <String, _Mark>{};
-    void consider(String metric, double? value, Map<String, Object?> row, {bool lower = false}) {
+    void consider(
+      String metric,
+      double? value,
+      Map<String, Object?> row, {
+      bool lower = false,
+    }) {
       if (value == null || value <= 0) return;
       final current = best[metric];
-      if (current == null || (lower ? value < current.value : value > current.value)) {
+      if (current == null ||
+          (lower ? value < current.value : value > current.value)) {
         best[metric] = _Mark(value, row);
       }
     }
@@ -673,8 +675,7 @@ class AiWorkoutToolService {
       }
       final workoutId = row['workout_id'] as String;
       sessionVolume[workoutId] =
-          (sessionVolume[workoutId] ?? 0) +
-          (weight ?? 0) * (reps ?? 0);
+          (sessionVolume[workoutId] ?? 0) + (weight ?? 0) * (reps ?? 0);
       sessionRow[workoutId] = row;
     }
     String? bestSession;
@@ -794,9 +795,9 @@ class AiWorkoutToolService {
         'volume_change_pct': AiToolMath.percentChange(previousVolume, volume),
       },
       'top_exercises': topExercises,
-      if (groupBy == 'week')
-        'by_week': await _byWeek(rawDb, window, lastDay),
-      if (groupBy == 'category') 'by_category': await _byCategory(rawDb, window),
+      if (groupBy == 'week') 'by_week': await _byWeek(rawDb, window, lastDay),
+      if (groupBy == 'category')
+        'by_category': await _byCategory(rawDb, window),
     };
   }
 
@@ -910,8 +911,7 @@ class AiWorkoutToolService {
     while (!week.isBefore(firstWeek)) {
       final key = dateKey(week);
       final weekEnd = addDays(week, 6);
-      final partial =
-          week.isBefore(window.start) || weekEnd.isAfter(lastDay);
+      final partial = week.isBefore(window.start) || weekEnd.isAfter(lastDay);
       out.add({
         'week_start': key,
         'workouts': workoutsByWeek[key]?['workouts'] ?? 0,
@@ -951,8 +951,7 @@ class AiWorkoutToolService {
       ''',
       [window.startKey, window.endKey],
     );
-    final lastTrained = await rawDb.rawQuery(
-      '''
+    final lastTrained = await rawDb.rawQuery('''
       SELECT e.category_id, MAX(w.date) AS last_trained
       FROM sets s
       JOIN exercise_entries ee ON ee.id = s.exercise_entry_id
@@ -960,8 +959,7 @@ class AiWorkoutToolService {
       JOIN workouts w ON w.id = ee.workout_id
       WHERE w.end_time IS NOT NULL AND $_countedSet
       GROUP BY e.category_id
-      ''',
-    );
+      ''');
     final windowByCategory = {
       for (final row in inWindow) row['category_id'] as String: row,
     };
@@ -1273,7 +1271,9 @@ String _setText(
   final buffer = StringBuffer();
   switch (type) {
     case 'distanceTime':
-      buffer.write('${AiJson.formatNumber(distance ?? 0)}/${_clock(time ?? 0)}');
+      buffer.write(
+        '${AiJson.formatNumber(distance ?? 0)}/${_clock(time ?? 0)}',
+      );
     case 'timeOnly':
       buffer.write('${time ?? 0}s');
     case 'repsOnly':

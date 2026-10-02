@@ -71,9 +71,7 @@ class SleepWakeModel {
       for (var j = 0; j < stateCount; j++) {
         if (row[j] == 0) continue;
         sum +=
-            row[j] *
-            (groups == null ? 1 : groups[emissionGroup[j]]) *
-            next[j];
+            row[j] * (groups == null ? 1 : groups[emissionGroup[j]]) * next[j];
       }
       out[i] = sum;
     }

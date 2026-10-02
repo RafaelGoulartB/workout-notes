@@ -680,7 +680,8 @@ extension AiChatTurn on AiChatService {
       provider.selectedModel,
     ];
     for (final model in attempts) {
-      final isUtility = model == provider.utilityModel &&
+      final isUtility =
+          model == provider.utilityModel &&
           provider.utilityModel.isNotEmpty &&
           model != provider.selectedModel;
       try {

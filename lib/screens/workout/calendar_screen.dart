@@ -168,7 +168,9 @@ class _CalendarScreenState extends State<CalendarScreen> with GuardedLoad {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.chevron_left),
-                        tooltip: AppLocalizations.of(context)!.commonPreviousMonth,
+                        tooltip: AppLocalizations.of(
+                          context,
+                        )!.commonPreviousMonth,
                         onPressed: _previousMonth,
                       ),
                       Text(
@@ -247,7 +249,9 @@ class _CalendarScreenState extends State<CalendarScreen> with GuardedLoad {
                                   AppLocalizations.of(
                                     context,
                                   )!.calendarNoWorkouts(
-                                    DateFormat.Md(Intl.defaultLocale).format(_selectedDate),
+                                    DateFormat.Md(
+                                      Intl.defaultLocale,
+                                    ).format(_selectedDate),
                                   ),
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     color: theme.colorScheme.onSurfaceVariant,
@@ -627,9 +631,9 @@ class _CalendarScreenState extends State<CalendarScreen> with GuardedLoad {
         if (hasPlannedRun) loc.calendarLegendPlannedRun,
       ];
       final dayLabel = [
-        DateFormat.yMMMMd(dateLocale).format(
-          DateTime(_currentYear, _currentMonth, day),
-        ),
+        DateFormat.yMMMMd(
+          dateLocale,
+        ).format(DateTime(_currentYear, _currentMonth, day)),
         ...statuses,
       ].join(', ');
 

@@ -30,7 +30,8 @@ class RunInsightsScreen extends StatefulWidget {
   State<RunInsightsScreen> createState() => _RunInsightsScreenState();
 }
 
-class _RunInsightsScreenState extends State<RunInsightsScreen> with GuardedLoad {
+class _RunInsightsScreenState extends State<RunInsightsScreen>
+    with GuardedLoad {
   final _runRepo = DatabaseHelper.instance.runRepo;
   final _insightsRepo = DatabaseHelper.instance.runInsightsRepo;
 
@@ -96,7 +97,11 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> with GuardedLoad 
       _activities = rows;
       _estimate = estimate;
       _evolution = RunFitnessAnalytics.vdotByMonth(rows, now: now);
-      _load = RunTrainingLoadAnalytics.trainingLoad(rows, now: now, zones: zones);
+      _load = RunTrainingLoadAnalytics.trainingLoad(
+        rows,
+        now: now,
+        zones: zones,
+      );
       _intensity = zones == null
           ? null
           : RunTrainingLoadAnalytics.intensityDistribution(

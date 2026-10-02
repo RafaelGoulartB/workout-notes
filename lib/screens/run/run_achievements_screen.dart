@@ -22,7 +22,8 @@ class RunAchievementsScreen extends StatefulWidget {
   State<RunAchievementsScreen> createState() => _RunAchievementsScreenState();
 }
 
-class _RunAchievementsScreenState extends State<RunAchievementsScreen> with GuardedLoad {
+class _RunAchievementsScreenState extends State<RunAchievementsScreen>
+    with GuardedLoad {
   final _repository = DatabaseHelper.instance.runRepo;
   RunAchievementBoard _board = RunAchievementBoard.empty;
 
@@ -147,7 +148,11 @@ class _AchievementHero extends StatelessWidget {
         children: [
           Row(
             children: [
-              const AppIconBadge(Icons.emoji_events_rounded, size: 48, iconSize: 28),
+              const AppIconBadge(
+                Icons.emoji_events_rounded,
+                size: 48,
+                iconSize: 28,
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(

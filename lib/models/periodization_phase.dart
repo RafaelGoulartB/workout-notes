@@ -74,5 +74,4 @@ class PeriodizationPhase {
         createdAt: DateTime.parse(map['created_at'] as String),
         updatedAt: DateTime.parse(map['updated_at'] as String),
       );
-
 }

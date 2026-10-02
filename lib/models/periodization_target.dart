@@ -414,5 +414,4 @@ class PeriodizationTarget {
     final legacy = training['routine_id'];
     return legacy is String && legacy.isNotEmpty ? [legacy] : const [];
   }
-
 }

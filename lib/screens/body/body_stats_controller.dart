@@ -34,7 +34,8 @@ class BodyStatsController extends ChangeNotifier {
        _types = types.isEmpty ? kBodyMeasureTypes : types,
        _bodyRepo = bodyRepo ?? DatabaseHelper.instance.bodyMeasurementRepo,
        _settingsRepo = settingsRepo ?? DatabaseHelper.instance.settingsRepo,
-       _periodizationRepo = periodizationRepo ?? DatabaseHelper.instance.periodizationRepo;
+       _periodizationRepo =
+           periodizationRepo ?? DatabaseHelper.instance.periodizationRepo;
 
   final BodyMeasurementRepository _bodyRepo;
   final SettingsRepository _settingsRepo;

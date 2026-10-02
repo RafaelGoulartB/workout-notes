@@ -76,9 +76,7 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
       setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            AppLocalizations.of(context)!.commonReorderError,
-          ),
+          content: Text(AppLocalizations.of(context)!.commonReorderError),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -129,7 +127,9 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
   void _refreshElapsed() {
     final start = _timerStart;
     if (!mounted || start == null || _timerEnd != null) return;
-    _elapsed.value = DurationFormat.elapsed(DateTime.now().difference(start).inSeconds);
+    _elapsed.value = DurationFormat.elapsed(
+      DateTime.now().difference(start).inSeconds,
+    );
   }
 
   Future<void> _initialize() async {
@@ -241,7 +241,9 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
       return;
     }
     final end = _timerEnd ?? DateTime.now();
-    _elapsed.value = DurationFormat.elapsed(end.difference(_timerStart!).inSeconds);
+    _elapsed.value = DurationFormat.elapsed(
+      end.difference(_timerStart!).inSeconds,
+    );
   }
 
   Future<void> _createFromRoutine() async {
@@ -800,8 +802,8 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
       context,
       title: AppLocalizations.of(context)!.activeWorkoutRemoveExercise,
       message: AppLocalizations.of(context)!.activeWorkoutRemoveExerciseContent(
-            exercise.localizedName(AppLocalizations.of(context)!),
-          ),
+        exercise.localizedName(AppLocalizations.of(context)!),
+      ),
       confirmLabel: AppLocalizations.of(context)!.activeWorkoutRemove,
       cancelLabel: AppLocalizations.of(context)!.commonCancel,
       destructive: true,

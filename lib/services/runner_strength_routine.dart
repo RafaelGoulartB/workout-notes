@@ -133,5 +133,4 @@ class RunnerStrengthRoutine {
     );
     return rows.isNotEmpty;
   }
-
 }

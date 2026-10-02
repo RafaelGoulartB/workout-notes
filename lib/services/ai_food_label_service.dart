@@ -36,7 +36,7 @@ class AiFoodLabelService {
   final AiService service;
 
   AiFoodLabelService({required this.settings, AiService? service})
-      : service = service ?? AiService.shared;
+    : service = service ?? AiService.shared;
 
   /// Extraction prompt. The nutrient list is generated from the same keys the
   /// parser reads ([AiFoodLabelDraft.nutrientKeys]), so a new nutrient is added
@@ -81,10 +81,9 @@ Regras:
   Future<AiFoodLabelDraft> analyze({
     required Uint8List imageBytes,
     String mimeType = 'image/jpeg',
-  }) =>
-      analyzeImages(
-        images: [AiFoodLabelImage(bytes: imageBytes, mimeType: mimeType)],
-      );
+  }) => analyzeImages(
+    images: [AiFoodLabelImage(bytes: imageBytes, mimeType: mimeType)],
+  );
 
   /// Analyzes multiple photos of different parts of the same food label.
   Future<AiFoodLabelDraft> analyzeImages({

@@ -108,7 +108,10 @@ void main() {
     calls.clear();
     final soon = DateTime.now().add(const Duration(hours: 1));
     // A restore reused both ids; the native side still has the old times.
-    nativeStates = [nativeState(enabledId, soon), nativeState(disabledId, soon)];
+    nativeStates = [
+      nativeState(enabledId, soon),
+      nativeState(disabledId, soon),
+    ];
 
     await service.reconcile(resync: true);
 

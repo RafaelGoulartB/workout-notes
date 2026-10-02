@@ -744,7 +744,8 @@ void main() {
         ),
       );
       await tester.runAsync(
-        () => scheduleRunFixture(repo, 
+        () => scheduleRunFixture(
+          repo,
           date: DateTime.now(),
           runPlanId: plan!.id,
           runPlanWorkoutId: workout!.id,

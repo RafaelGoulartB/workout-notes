@@ -56,9 +56,7 @@ void main() {
     await open(tester);
 
     expect(
-      find.text(
-        'Deletes all workouts, sleep, nutrition and body measurements',
-      ),
+      find.text('Deletes all workouts, sleep, nutrition and body measurements'),
       findsOneWidget,
     );
   });

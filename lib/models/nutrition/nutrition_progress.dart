@@ -145,8 +145,7 @@ class NutritionProgressCalculator {
   }
 
   static int periodDays(BalancePeriod period, DateTime anchor) =>
-      daysBetween(periodStart(period, anchor), periodEnd(period, anchor)) +
-      1;
+      daysBetween(periodStart(period, anchor), periodEnd(period, anchor)) + 1;
 
   /// Anchor [delta] periods away from [anchor].
   static DateTime shiftAnchor(

@@ -170,7 +170,9 @@ class SavedMealCaloriesRow extends StatelessWidget {
   }
 
   static String _formatKcal(double value) {
-    if (value == value.roundToDouble()) return AppNumberFormat.decimal(value, 0);
+    if (value == value.roundToDouble()) {
+      return AppNumberFormat.decimal(value, 0);
+    }
     return AppNumberFormat.decimal(value, 1);
   }
 }
@@ -216,7 +218,9 @@ class SavedMealPerPortionRow extends StatelessWidget {
   }
 
   static String _formatGrams(double value) {
-    if (value == value.roundToDouble()) return AppNumberFormat.decimal(value, 0);
+    if (value == value.roundToDouble()) {
+      return AppNumberFormat.decimal(value, 0);
+    }
     return AppNumberFormat.decimal(value, 1);
   }
 }

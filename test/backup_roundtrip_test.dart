@@ -176,10 +176,8 @@ void main() {
               as Map<String, dynamic>;
       // Valid manifest (count matches), but one row points to a photo that is
       // not embedded.
-      ((data['body_measurements'] as List)[0] as Map)['photos_paths'] = jsonEncode([
-        'backup-media://media_0',
-        'backup-media://media_99',
-      ]);
+      ((data['body_measurements'] as List)[0] as Map)['photos_paths'] =
+          jsonEncode(['backup-media://media_0', 'backup-media://media_99']);
       (data['preferences'] as Map)['accent_color'] = 999;
 
       await expectLater(

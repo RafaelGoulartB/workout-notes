@@ -17,7 +17,9 @@ void main() {
     test('numbers become ids, objects fail', () {
       expect(args({'id': 7}).string('id'), '7');
       expect(
-        () => args({'id': {'a': 1}}).string('id'),
+        () => args({
+          'id': {'a': 1},
+        }).string('id'),
         throwsA(isA<AiToolArgException>()),
       );
     });
@@ -53,10 +55,7 @@ void main() {
           final result = e.toResult();
           expect(result.ok, isFalse);
           expect(result.code, 'invalid_args');
-          expect(
-            result.message,
-            'start_date: expected YYYY-MM-DD, got "$bad"',
-          );
+          expect(result.message, 'start_date: expected YYYY-MM-DD, got "$bad"');
           expect(result.details, {
             'param': 'start_date',
             'expected': 'YYYY-MM-DD',

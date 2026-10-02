@@ -104,9 +104,7 @@ abstract final class RunCalendarStats {
   }) {
     final today = dayOf(now ?? DateTime.now());
     final runs = activities.where(RunAnalyticsDates.completedRun).toList();
-    final days = <DateTime>{
-      for (final a in runs) dayOf(a.startedAt.toLocal()),
-    };
+    final days = <DateTime>{for (final a in runs) dayOf(a.startedAt.toLocal())};
     final weeks = <DateTime>{
       for (final a in runs) mondayOf(a.startedAt.toLocal()),
     };
@@ -114,9 +112,7 @@ abstract final class RunCalendarStats {
 
     // Day streaks: a day without a run yet today does not break the streak.
     var currentDays = 0;
-    var cursor = days.contains(today)
-        ? today
-        : addDays(today, -1);
+    var cursor = days.contains(today) ? today : addDays(today, -1);
     while (days.contains(cursor)) {
       currentDays++;
       cursor = addDays(cursor, -1);

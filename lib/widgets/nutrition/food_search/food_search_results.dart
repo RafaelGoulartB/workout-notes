@@ -74,13 +74,19 @@ class FoodSearchResultsView extends StatelessWidget {
         slivers: [
           if (showFavorites) ...[
             SliverToBoxAdapter(
-              child: AppSectionHeader(loc.nutritionSearchFavorites, padding: const EdgeInsets.fromLTRB(20, 16, 16, 8)),
+              child: AppSectionHeader(
+                loc.nutritionSearchFavorites,
+                padding: const EdgeInsets.fromLTRB(20, 16, 16, 8),
+              ),
             ),
             _foodList(sections.favorites),
           ],
           if (showMeal) ...[
             SliverToBoxAdapter(
-              child: AppSectionHeader(loc.nutritionSearchSuggestedFor(mealLabel), padding: const EdgeInsets.fromLTRB(20, 16, 16, 8)),
+              child: AppSectionHeader(
+                loc.nutritionSearchSuggestedFor(mealLabel),
+                padding: const EdgeInsets.fromLTRB(20, 16, 16, 8),
+              ),
             ),
             _foodList(sections.mealSuggestions),
           ],
@@ -98,7 +104,10 @@ class FoodSearchResultsView extends StatelessWidget {
           ],
           if (showAllFoods) ...[
             SliverToBoxAdapter(
-              child: AppSectionHeader(loc.nutritionSearchMyFoods, padding: const EdgeInsets.fromLTRB(20, 16, 16, 8)),
+              child: AppSectionHeader(
+                loc.nutritionSearchMyFoods,
+                padding: const EdgeInsets.fromLTRB(20, 16, 16, 8),
+              ),
             ),
             _foodList(
               sections.allFoods,
@@ -107,7 +116,10 @@ class FoodSearchResultsView extends StatelessWidget {
           ],
           if (showSavedMeals) ...[
             SliverToBoxAdapter(
-              child: AppSectionHeader(loc.nutritionSavedMeals, padding: const EdgeInsets.fromLTRB(20, 16, 16, 8)),
+              child: AppSectionHeader(
+                loc.nutritionSavedMeals,
+                padding: const EdgeInsets.fromLTRB(20, 16, 16, 8),
+              ),
             ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
@@ -192,13 +204,19 @@ class FoodSearchResultsView extends StatelessWidget {
           ),
         if (localResults.isNotEmpty) ...[
           SliverToBoxAdapter(
-            child: AppSectionHeader(loc.nutritionSearchLocalResults, padding: const EdgeInsets.fromLTRB(20, 16, 16, 8)),
+            child: AppSectionHeader(
+              loc.nutritionSearchLocalResults,
+              padding: const EdgeInsets.fromLTRB(20, 16, 16, 8),
+            ),
           ),
           _foodList(localResults),
         ],
         if (remoteResults.isNotEmpty) ...[
           SliverToBoxAdapter(
-            child: AppSectionHeader(loc.nutritionSearchRemoteResults, padding: const EdgeInsets.fromLTRB(20, 16, 16, 8)),
+            child: AppSectionHeader(
+              loc.nutritionSearchRemoteResults,
+              padding: const EdgeInsets.fromLTRB(20, 16, 16, 8),
+            ),
           ),
           _foodList(
             remoteResults,

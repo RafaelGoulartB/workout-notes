@@ -424,17 +424,20 @@ void main() {
   });
 
   group('review fixes', () {
-    test('week_streak counts all history, not only the loaded period', () async {
-      for (var week = 0; week < 10; week++) {
-        await _insertActivity(
-          db,
-          id: 'streak-$week',
-          startedAt: DateTime(2026, 9, 29 - 7 * week, 7),
-        );
-      }
-      final result = await service.progress(period: '4_weeks');
-      expect(result['week_streak'], 10);
-    });
+    test(
+      'week_streak counts all history, not only the loaded period',
+      () async {
+        for (var week = 0; week < 10; week++) {
+          await _insertActivity(
+            db,
+            id: 'streak-$week',
+            startedAt: DateTime(2026, 9, 29 - 7 * week, 7),
+          );
+        }
+        final result = await service.progress(period: '4_weeks');
+        expect(result['week_streak'], 10);
+      },
+    );
 
     test('get_run_schedule with only a past end_date looks back', () async {
       final result = await service.schedule(endDate: '2026-09-10');
@@ -599,25 +602,34 @@ void main() {
       expect(withArchived['total'], 2);
     });
 
-    test('get_run_plan: no id lists every plan and details the followed one',
-        () async {
-      final result = await service.plan();
-      final plans = (result['plans'] as List).cast<Map>();
-      expect(plans.map((p) => p['id']), containsAll(['plan-1', 'plan-old']));
-      expect(
-        plans.firstWhere((p) => p['id'] == 'plan-old')['status'],
-        'archived',
-      );
-      final detail = result['plan'] as Map;
-      expect(detail['id'], 'plan-1', reason: 'the activated plan is followed');
-      expect(result['sessions'], isNotNull);
-      final explicit = await service.plan(planId: 'plan-old');
-      expect(explicit.containsKey('plans'), isFalse,
-          reason: 'an explicit id returns only that plan');
-      expect((explicit['plan'] as Map)['id'], 'plan-old');
-      await db.delete('run_plans');
-      expect((await service.plan())['plans'], isEmpty);
-    });
+    test(
+      'get_run_plan: no id lists every plan and details the followed one',
+      () async {
+        final result = await service.plan();
+        final plans = (result['plans'] as List).cast<Map>();
+        expect(plans.map((p) => p['id']), containsAll(['plan-1', 'plan-old']));
+        expect(
+          plans.firstWhere((p) => p['id'] == 'plan-old')['status'],
+          'archived',
+        );
+        final detail = result['plan'] as Map;
+        expect(
+          detail['id'],
+          'plan-1',
+          reason: 'the activated plan is followed',
+        );
+        expect(result['sessions'], isNotNull);
+        final explicit = await service.plan(planId: 'plan-old');
+        expect(
+          explicit.containsKey('plans'),
+          isFalse,
+          reason: 'an explicit id returns only that plan',
+        );
+        expect((explicit['plan'] as Map)['id'], 'plan-old');
+        await db.delete('run_plans');
+        expect((await service.plan())['plans'], isEmpty);
+      },
+    );
 
     test('get_run_plan_detail: unknown id and out-of-range week', () async {
       await expectLater(

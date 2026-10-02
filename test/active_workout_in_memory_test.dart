@@ -40,10 +40,7 @@ void main() {
       date: '2026-09-15',
       finished: false,
       exercises: [
-        (
-          'bench',
-          [seedSet(100, 5, done: false), seedSet(100, 5, done: false)],
-        ),
+        ('bench', [seedSet(100, 5, done: false), seedSet(100, 5, done: false)]),
       ],
     );
   });
@@ -105,7 +102,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
   });
 
-  testWidgets('a deleted set can be restored from the snackbar', (tester) async {
+  testWidgets('a deleted set can be restored from the snackbar', (
+    tester,
+  ) async {
     await tester.binding.setSurfaceSize(const Size(420, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.runAsync(() async {

@@ -11,8 +11,8 @@ class RunAudioCapabilities {
   });
 
   const RunAudioCapabilities.unknown()
-      : headsetConnected = false,
-        inCall = false;
+    : headsetConnected = false,
+      inCall = false;
 }
 
 /// Android MethodChannel facade for headset / in-call gating.
@@ -27,14 +27,12 @@ class RunAudioGateService {
   Future<RunAudioCapabilities> getCapabilities() async {
     if (!_isAndroid) {
       // Desktop/tests: treat as headset present so announcements can be tested.
-      return const RunAudioCapabilities(
-        headsetConnected: true,
-        inCall: false,
-      );
+      return const RunAudioCapabilities(headsetConnected: true, inCall: false);
     }
     try {
-      final result =
-          await _methods.invokeMapMethod<String, dynamic>('getCapabilities');
+      final result = await _methods.invokeMapMethod<String, dynamic>(
+        'getCapabilities',
+      );
       if (result == null) return const RunAudioCapabilities.unknown();
       return RunAudioCapabilities(
         headsetConnected: result['headset_connected'] as bool? ?? false,

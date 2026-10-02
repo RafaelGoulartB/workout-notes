@@ -118,7 +118,9 @@ class AiNutritionToolService {
       // week): compare with the mean of the targets of the days averaged.
       final targets = <String, List<double>>{};
       for (final row in daily) {
-        final dayGoal = await effectiveGoal(DateTime.parse(row['date'] as String));
+        final dayGoal = await effectiveGoal(
+          DateTime.parse(row['date'] as String),
+        );
         if (dayGoal == null) continue;
         for (final (key, _) in _goalNutrients) {
           final value = (dayGoal[key] as num?)?.toDouble();

@@ -134,8 +134,22 @@ Future<HeavyUserFixture> seedHeavyUser(Database db, {DateTime? now}) async {
 
 /// Exercise ids of the four routine templates (6 exercises per day).
 const _routineDays = <List<String>>[
-  ['bench_press', 'incl_bench', 'ohp', 'lat_raise', 'triceps_pushdown', 'skull_crusher'],
-  ['bent_row', 'lat_pulldown', 'seated_row', 'face_pull', 'bb_curl', 'hammer_curl'],
+  [
+    'bench_press',
+    'incl_bench',
+    'ohp',
+    'lat_raise',
+    'triceps_pushdown',
+    'skull_crusher',
+  ],
+  [
+    'bent_row',
+    'lat_pulldown',
+    'seated_row',
+    'face_pull',
+    'bb_curl',
+    'hammer_curl',
+  ],
   ['squat', 'leg_press', 'romanian_dl', 'leg_curl', 'calf_raise', 'hip_thrust'],
   ['db_bench', 'db_ohp', 'cable_fly', 'pullup', 'db_row', 'cable_curl'],
 ];
@@ -253,7 +267,9 @@ Future<_WorkoutIds> _seedWorkouts(
       'end_time': finished ? _ts(start.add(const Duration(minutes: 65))) : null,
       'duration_seconds': finished ? 3900 + random.nextInt(600) : null,
       'estimated_calories': finished ? 320.0 + random.nextInt(140) : null,
-      'comment': finished && random.nextInt(6) == 0 ? 'Treino pesado, bom foco' : null,
+      'comment': finished && random.nextInt(6) == 0
+          ? 'Treino pesado, bom foco'
+          : null,
       'feeling_rating': finished ? 3 + random.nextInt(3) : null,
       'is_from_routine': routineId == null ? 0 : 1,
       'routine_id': routineId,
@@ -317,7 +333,8 @@ Future<_WorkoutIds> _seedWorkouts(
     addWorkout(
       id: id,
       date: date,
-      exercises: _routineDays[(int.parse(routine.split('-').last) + dayIndex) % 4],
+      exercises:
+          _routineDays[(int.parse(routine.split('-').last) + dayIndex) % 4],
       finished: true,
       started: true,
       progress: 1 - i / completedCount,
@@ -424,9 +441,15 @@ Future<_RunIds> _seedRuns(
       'updated_at': _ts(startedAt),
       'best_split_pace_sec_per_km': bike ? null : pace - 25,
       'best_effort_1k_sec': bike ? null : (pace - 28).round(),
-      'best_effort_3k_sec': bike || distance < 3000 ? null : ((pace - 15) * 3).round(),
-      'best_effort_5k_sec': bike || distance < 5000 ? null : ((pace - 8) * 5).round(),
-      'best_effort_10k_sec': bike || distance < 10000 ? null : (pace * 10).round(),
+      'best_effort_3k_sec': bike || distance < 3000
+          ? null
+          : ((pace - 15) * 3).round(),
+      'best_effort_5k_sec': bike || distance < 5000
+          ? null
+          : ((pace - 8) * 5).round(),
+      'best_effort_10k_sec': bike || distance < 10000
+          ? null
+          : (pace * 10).round(),
       'efforts_computed': 1,
       'elevation_gain_meters': bike ? null : 40.0 + random.nextInt(120),
       'raw_point_count': bike ? null : 900,
@@ -442,7 +465,8 @@ Future<_RunIds> _seedRuns(
           'activity_id': id,
           'split_index': s,
           'distance_meters': meters,
-          'duration_seconds': (meters / 1000 * (pace + random.nextInt(14) - 7)).round(),
+          'duration_seconds': (meters / 1000 * (pace + random.nextInt(14) - 7))
+              .round(),
           'pace_sec_per_km': pace + random.nextInt(14) - 7,
           'is_partial': partial ? 1 : 0,
         });
@@ -504,7 +528,8 @@ Future<String> _seedRunPlan(
         'kind': interval ? 'interval' : (long ? 'long' : 'easy'),
         'name': interval ? 'Tiros 6x400m' : (long ? 'Longão' : 'Rodagem leve'),
         'notes': interval ? 'Recuperação em trote' : null,
-        'target_distance_meters': (long ? 8000 + week * 500 : 5000 + week * 100).toDouble(),
+        'target_distance_meters': (long ? 8000 + week * 500 : 5000 + week * 100)
+            .toDouble(),
         'target_duration_seconds': null,
         'target_pace_sec_per_km': interval ? 290.0 : 340.0,
         'effort_zone': interval ? 'Z4' : 'Z2',
@@ -541,7 +566,8 @@ Future<String> _seedRunPlan(
           status = 'skipped';
         } else {
           status = 'completed';
-          activityId = activityIds[math.min(activityCursor++, activityIds.length - 1)];
+          activityId =
+              activityIds[math.min(activityCursor++, activityIds.length - 1)];
         }
       }
       batch.insert('scheduled_runs', {
@@ -581,7 +607,11 @@ Future<String> _seedRunPlan(
 // Sleep
 // ---------------------------------------------------------------------------
 
-Future<String> _seedSleep(Database db, DateTime today, math.Random random) async {
+Future<String> _seedSleep(
+  Database db,
+  DateTime today,
+  math.Random random,
+) async {
   final batch = db.batch();
   var detailDate = '';
   for (var i = 0; i < 90; i++) {
@@ -616,7 +646,9 @@ Future<String> _seedSleep(Database db, DateTime today, math.Random random) async
         'status': 'completed',
         'started_at': _ts(started),
         'ended_at': _ts(started.add(Duration(minutes: inBed))),
-        'alarm_at': alarm ? _ts(started.add(Duration(minutes: inBed + 10))) : null,
+        'alarm_at': alarm
+            ? _ts(started.add(Duration(minutes: inBed + 10)))
+            : null,
         'monitor_mode': alarm ? 'alarm_without_mission' : 'monitoring_only',
         'utc_offset_start_minutes': -180,
         'utc_offset_end_minutes': -180,
@@ -642,7 +674,9 @@ Future<String> _seedSleep(Database db, DateTime today, math.Random random) async
         'stage_confidence': 0.74,
         'stage_algorithm_version': 'sleep-wake-bedside-v6',
         'smart_window_minutes': alarm ? 30 : null,
-        'alarm_fired_at': alarm ? _ts(started.add(Duration(minutes: inBed - 5))) : null,
+        'alarm_fired_at': alarm
+            ? _ts(started.add(Duration(minutes: inBed - 5)))
+            : null,
         'alarm_trigger': alarm ? (i % 2 == 0 ? 'awake' : 'deadline') : null,
         'wake_feeling': alarm ? 3 + random.nextInt(3) : null,
         'end_reason': 'user',
@@ -725,7 +759,9 @@ Future<_NutritionIds> _seedNutrition(
       'reference_amount': 100.0,
       'reference_unit': 'g',
       ..._nutrientsFor(i, 1),
-      'extra_nutrients_json': i % 5 == 0 ? jsonEncode({'selenium_ug': 12.5}) : null,
+      'extra_nutrients_json': i % 5 == 0
+          ? jsonEncode({'selenium_ug': 12.5})
+          : null,
       'is_estimated': i % 6 == 0 ? 1 : 0,
     });
     batch.insert('food_servings', {
@@ -761,7 +797,9 @@ Future<_NutritionIds> _seedNutrition(
           'food_id': 'food-$foodIndex',
           'food_variant_id': 'fv-$foodIndex',
           'food_name_snapshot': foodNames[foodIndex],
-          'brand_snapshot': foodIndex % 4 == 0 ? 'Marca ${foodIndex % 7}' : null,
+          'brand_snapshot': foodIndex % 4 == 0
+              ? 'Marca ${foodIndex % 7}'
+              : null,
           'quantity': (100 * factor).roundToDouble(),
           'unit': 'g',
           ...nutrients,
@@ -857,7 +895,14 @@ Future<void> _seedBody(Database db, DateTime today, math.Random random) async {
   }
 
   for (var i = 0; i < 30; i++) {
-    add('bm-w-$i', 'weight', 84.0 - (30 - i) * -0.04 + random.nextInt(8) / 10 - 2.4, 'kg', i * 3, fasted: true);
+    add(
+      'bm-w-$i',
+      'weight',
+      84.0 - (30 - i) * -0.04 + random.nextInt(8) / 10 - 2.4,
+      'kg',
+      i * 3,
+      fasted: true,
+    );
   }
   for (var i = 0; i < 7; i++) {
     add('bm-bf-$i', 'bodyFat', 18.0 + i * 0.3, '%', i * 14);
@@ -877,7 +922,14 @@ Future<String> _seedGoals(Database db, DateTime today) async {
   final goals = <(String, String, String, String, String, double)>[
     ('goal-volume', 'Volume semanal', 'anaerobic', 'volume', 'weekly', 45000),
     ('goal-days', 'Treinar 4 dias', 'anaerobic', 'days', 'weekly', 4),
-    ('goal-distance', 'Correr 80 km no mês', 'aerobic', 'distance', 'monthly', 80),
+    (
+      'goal-distance',
+      'Correr 80 km no mês',
+      'aerobic',
+      'distance',
+      'monthly',
+      80,
+    ),
     ('goal-time', 'Cardio semanal', 'aerobic', 'time', 'weekly', 14400),
   ];
   final batch = db.batch();

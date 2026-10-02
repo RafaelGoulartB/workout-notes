@@ -183,7 +183,8 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> with GuardedLoad {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final isEmptyHistory = !isLoading && !_filter.isActive && _totals.count == 0;
+    final isEmptyHistory =
+        !isLoading && !_filter.isActive && _totals.count == 0;
 
     return Scaffold(
       appBar: AppBar(title: Text(loc.runHistoryTitle)),

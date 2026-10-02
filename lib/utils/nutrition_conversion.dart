@@ -36,7 +36,9 @@ class NutritionConversion {
       throw const NutritionConversionException('quantity_must_be_positive');
     }
     if (referenceAmount <= 0) {
-      throw const NutritionConversionException('reference_amount_must_be_positive');
+      throw const NutritionConversionException(
+        'reference_amount_must_be_positive',
+      );
     }
     if (_isInvalidNumber(quantity) || _isInvalidNumber(referenceAmount)) {
       throw const NutritionConversionException('invalid_numeric_value');

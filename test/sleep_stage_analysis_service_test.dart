@@ -115,10 +115,9 @@ void main() {
 
     test('restless sleep needs repeated movement nearby', () {
       // 60 min asleep; movement every other window from minute 20 to 30.
-      final epochs = night(
-        [(SleepStageType.sleeping, 120)],
-        moving: (i) => i >= 40 && i < 60 && i.isEven,
-      );
+      final epochs = night([
+        (SleepStageType.sleeping, 120),
+      ], moving: (i) => i >= 40 && i < 60 && i.isEven);
       final summary = service.summarize(
         sessionStart: start,
         sessionEnd: start.add(const Duration(minutes: 60)),
@@ -129,10 +128,9 @@ void main() {
       final isolated = service.summarize(
         sessionStart: start,
         sessionEnd: start.add(const Duration(minutes: 60)),
-        epochs: night(
-          [(SleepStageType.sleeping, 120)],
-          moving: (i) => i % 20 == 0,
-        ),
+        epochs: night([
+          (SleepStageType.sleeping, 120),
+        ], moving: (i) => i % 20 == 0),
       )!;
       expect(isolated.restlessSleepMinutes, 0);
     });
@@ -141,10 +139,10 @@ void main() {
       final summary = service.summarize(
         sessionStart: start,
         sessionEnd: start.add(const Duration(minutes: 30)),
-        epochs: night(
-          [(SleepStageType.awake, 20), (SleepStageType.sleeping, 40)],
-          snoring: (i) => i % 2 == 0,
-        ),
+        epochs: night([
+          (SleepStageType.awake, 20),
+          (SleepStageType.sleeping, 40),
+        ], snoring: (i) => i % 2 == 0),
       )!;
       expect(summary.snoreMinutes, 10);
     });

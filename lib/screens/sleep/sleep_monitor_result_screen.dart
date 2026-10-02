@@ -22,7 +22,8 @@ class SleepMonitorResultScreen extends StatefulWidget {
       _SleepMonitorResultScreenState();
 }
 
-class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> with GuardedLoad {
+class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen>
+    with GuardedLoad {
   final _repository = DatabaseHelper.instance.sleepMonitorRepo;
   SleepMonitorSession? _session;
   SleepEntry? _entry;

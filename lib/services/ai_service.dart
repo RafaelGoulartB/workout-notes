@@ -66,7 +66,6 @@ class AiChatCompletion {
     this.finishReason,
     this.truncated = false,
   });
-
 }
 
 /// Incremental progress of a streamed completion.

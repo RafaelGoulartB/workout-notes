@@ -36,8 +36,7 @@ class AiMemoryRepository extends BaseRepository {
 
   Future<bool> delete(String id) async {
     final db = await this.db;
-    return await db.delete('ai_memories', where: 'id = ?', whereArgs: [id]) >
-        0;
+    return await db.delete('ai_memories', where: 'id = ?', whereArgs: [id]) > 0;
   }
 
   Future<void> deleteAll() async {

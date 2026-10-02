@@ -41,7 +41,9 @@ class _NumberEditorSheetState extends State<NumberEditorSheet> {
   }
 
   static String _format(double value) {
-    if (value == value.roundToDouble()) return AppNumberFormat.decimal(value, 0);
+    if (value == value.roundToDouble()) {
+      return AppNumberFormat.decimal(value, 0);
+    }
     return AppNumberFormat.decimal(value, 1);
   }
 
@@ -201,12 +203,16 @@ class _AdjustmentPickerSheetState extends State<AdjustmentPickerSheet> {
   }
 
   static String _formatPercentForEdit(double percent) {
-    if (percent == percent.roundToDouble()) return AppNumberFormat.decimal(percent, 0);
+    if (percent == percent.roundToDouble()) {
+      return AppNumberFormat.decimal(percent, 0);
+    }
     return AppNumberFormat.decimal(percent, 1);
   }
 
   static String _formatGoal(double value) {
-    if (value == value.roundToDouble()) return AppNumberFormat.decimal(value, 0);
+    if (value == value.roundToDouble()) {
+      return AppNumberFormat.decimal(value, 0);
+    }
     return AppNumberFormat.decimal(value, 1);
   }
 

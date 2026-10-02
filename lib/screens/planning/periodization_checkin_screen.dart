@@ -28,7 +28,8 @@ class PeriodizationCheckinScreen extends StatefulWidget {
       _PeriodizationCheckinScreenState();
 }
 
-class _PeriodizationCheckinScreenState extends State<PeriodizationCheckinScreen> with GuardedLoad {
+class _PeriodizationCheckinScreenState extends State<PeriodizationCheckinScreen>
+    with GuardedLoad {
   final _repository = DatabaseHelper.instance.periodizationRepo;
   final _notes = TextEditingController();
   late final DateTime _weekStart;
@@ -103,9 +104,7 @@ class _PeriodizationCheckinScreenState extends State<PeriodizationCheckinScreen>
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            AppLocalizations.of(context)!.periodizationSaveError,
-          ),
+          content: Text(AppLocalizations.of(context)!.periodizationSaveError),
         ),
       );
     }

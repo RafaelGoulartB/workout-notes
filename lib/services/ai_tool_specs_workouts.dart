@@ -28,13 +28,12 @@ List<AiToolSpec> workoutToolSpecs(AiToolDeps d) => [
       await d.workouts.history(
         startDate: a.date('start_date'),
         endDate: a.date('end_date'),
-        status:
-            a.enumValue('status', const [
-              'completed',
-              'in_progress',
-              'planned',
-              'all',
-            ], fallback: 'completed')!,
+        status: a.enumValue('status', const [
+          'completed',
+          'in_progress',
+          'planned',
+          'all',
+        ], fallback: 'completed')!,
         limit: a.integer('limit', fallback: 10, min: 1, max: 30),
         page: a.integer('page', fallback: 1, min: 1),
       ),
@@ -46,12 +45,11 @@ List<AiToolSpec> workoutToolSpecs(AiToolDeps d) => [
         'One workout: every exercise and set, records set, comparison with the '
         'previous similar session.',
     domain: AiToolDomain.workouts,
-    properties: {
-      'workout_id': AiParam.string('Id from get_workout_history.'),
-    },
+    properties: {'workout_id': AiParam.string('Id from get_workout_history.')},
     required: const ['workout_id'],
-    handler: (a) async =>
-        aiToolOk(await d.workouts.workoutDetail(a.requiredString('workout_id'))),
+    handler: (a) async => aiToolOk(
+      await d.workouts.workoutDetail(a.requiredString('workout_id')),
+    ),
   ),
   AiToolSpec(
     name: 'list_exercises',
@@ -61,7 +59,9 @@ List<AiToolSpec> workoutToolSpecs(AiToolDeps d) => [
     domain: AiToolDomain.workouts,
     properties: {
       'name_contains': AiParam.string('Part of the name.'),
-      'category_id': AiParam.string('From get_training_summary group_by=category.'),
+      'category_id': AiParam.string(
+        'From get_training_summary group_by=category.',
+      ),
       'sort': AiParam.enumOf(const [
         'name',
         'most_recent',

@@ -304,10 +304,7 @@ void main() {
       expect(outline.schedule, hasLength(RunPlanTemplates.fiveK.weeks));
       expect(
         outline.startWeek,
-        addDays(
-          mondayOf(race),
-          -7 * (RunPlanTemplates.fiveK.weeks - 1),
-        ),
+        addDays(mondayOf(race), -7 * (RunPlanTemplates.fiveK.weeks - 1)),
       );
     });
 

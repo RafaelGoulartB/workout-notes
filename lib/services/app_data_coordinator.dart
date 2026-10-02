@@ -74,9 +74,7 @@ class AppDataCoordinator {
     final prefs = await SharedPreferences.getInstance();
     final accent = prefs.getInt('accent_color');
     WorkoutNotesApp.themeNotifier
-      ..setSeedColor(
-        accent == null ? AccentColors.defaultColor : Color(accent),
-      )
+      ..setSeedColor(accent == null ? AccentColors.defaultColor : Color(accent))
       ..setThemeMode(switch (prefs.getString('theme_mode')) {
         'light' => ThemeMode.light,
         'dark' => ThemeMode.dark,

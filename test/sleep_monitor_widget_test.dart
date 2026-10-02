@@ -59,9 +59,7 @@ void main() {
     (tester) async {
       final start = DateTime.utc(2026, 7, 29, 5);
       final session = _session(start, const Duration(hours: 4));
-      final database = (await tester.runAsync(
-        () => _resultDatabase(session),
-      ))!;
+      final database = (await tester.runAsync(() => _resultDatabase(session)))!;
       addTearDown(() async {
         DatabaseHelper.overrideDatabase = null;
         await database.close();

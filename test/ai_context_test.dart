@@ -82,7 +82,10 @@ void main() {
     });
 
     final snapshot = await context.buildSnapshot(domains: all);
-    expect(snapshot, contains('last strength workout: 2026-09-29 "Upper/Lower"'));
+    expect(
+      snapshot,
+      contains('last strength workout: 2026-09-29 "Upper/Lower"'),
+    );
     expect(snapshot, contains('strength workouts last 7 days: 1'));
     expect(snapshot, contains('next planned/in-progress workout: 2026-10-02'));
     expect(snapshot, contains('last run: 2026-09-28, 5.2 km, 29 min'));

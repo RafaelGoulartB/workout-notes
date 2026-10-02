@@ -244,7 +244,9 @@ class SavedMealCard extends StatelessWidget {
   }
 
   static String _format(double value) {
-    if (value == value.roundToDouble()) return AppNumberFormat.decimal(value, 0);
+    if (value == value.roundToDouble()) {
+      return AppNumberFormat.decimal(value, 0);
+    }
     return AppNumberFormat.decimal(value, 1);
   }
 }

@@ -17,7 +17,8 @@ class RunVoiceSettingsScreen extends StatefulWidget {
   State<RunVoiceSettingsScreen> createState() => _RunVoiceSettingsScreenState();
 }
 
-class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> with GuardedLoad {
+class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen>
+    with GuardedLoad {
   final _store = RunVoiceSettingsStore.instance;
   RunVoiceSettings _settings = const RunVoiceSettings.defaults();
 

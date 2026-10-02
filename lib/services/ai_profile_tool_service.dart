@@ -22,8 +22,7 @@ class AiProfileToolService {
     DateTime Function()? now,
   }) : db = db ?? DatabaseHelper.instance,
        nutritionRepository =
-           nutritionRepository ??
-           (db ?? DatabaseHelper.instance).nutritionRepo,
+           nutritionRepository ?? (db ?? DatabaseHelper.instance).nutritionRepo,
        periodizationRepository =
            periodizationRepository ??
            (db ?? DatabaseHelper.instance).periodizationRepo,
@@ -200,13 +199,10 @@ class AiProfileToolService {
     }
     Map<String, dynamic>? change;
     if (type != null && !latestPerType && total >= 2) {
-      final first = (await database.rawQuery(
-        '''
+      final first = (await database.rawQuery('''
         SELECT value, date FROM body_measurements $whereSql
         ORDER BY date ASC, created_at ASC LIMIT 1
-        ''',
-        values,
-      )).first;
+        ''', values)).first;
       final last = rows.first;
       final from = (first['value'] as num).toDouble();
       final to = (last['value'] as num).toDouble();

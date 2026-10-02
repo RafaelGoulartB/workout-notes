@@ -56,7 +56,9 @@ abstract final class PeriodizationCheckinFlow {
           confirmLabel: loc.planningEndPhaseConfirm,
         );
         if (confirmed == true) {
-          await DatabaseHelper.instance.periodizationRepo.endPhaseThisWeek(phase.id);
+          await DatabaseHelper.instance.periodizationRepo.endPhaseThisWeek(
+            phase.id,
+          );
         }
     }
     return true;

@@ -116,9 +116,18 @@ void main() {
       {'limit': 40},
       {'saved_meal_id': fixture.savedMealId},
     ],
-    'analyze_sleep_performance': [{}, {'days': 90}],
-    'analyze_nutrition_body_trend': [{}, {'days': 180}],
-    'get_weekly_recovery_trend': [{}, {'weeks': 12}],
+    'analyze_sleep_performance': [
+      {},
+      {'days': 90},
+    ],
+    'analyze_nutrition_body_trend': [
+      {},
+      {'days': 180},
+    ],
+    'get_weekly_recovery_trend': [
+      {},
+      {'weeks': 12},
+    ],
     'get_training_plan': [
       {},
       {'review': 'week'},

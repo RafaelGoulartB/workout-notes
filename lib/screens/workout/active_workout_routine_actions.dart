@@ -406,7 +406,10 @@ mixin _ActiveWorkoutRoutineActions
     );
   }
 
-  Future<void> _updateRestTimeAndClose(ExerciseWithSets exercise, int seconds) async {
+  Future<void> _updateRestTimeAndClose(
+    ExerciseWithSets exercise,
+    int seconds,
+  ) async {
     await _workoutRepo.updateExerciseEntryRestTime(exercise.entryId, seconds);
     await _loadExercises();
     if (mounted) setState(() {});

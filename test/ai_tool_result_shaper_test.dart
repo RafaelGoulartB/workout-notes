@@ -8,24 +8,27 @@ void main() {
 
   Map<String, dynamic> shape(Map<String, dynamic> data) => shaper.shape(data);
 
-  test('drops nulls, empty strings and empty maps but keeps zero and false', () {
-    final shaped = shape({
-      'a': null,
-      'b': '',
-      'c': 0,
-      'd': false,
-      'e': <String, dynamic>{},
-      'f': {'x': null},
-      'list': [1, null, 3],
-      'empty_list': <Object?>[],
-    });
-    expect(shaped, {
-      'c': 0,
-      'd': false,
-      'list': [1, null, 3],
-      'empty_list': <Object?>[],
-    });
-  });
+  test(
+    'drops nulls, empty strings and empty maps but keeps zero and false',
+    () {
+      final shaped = shape({
+        'a': null,
+        'b': '',
+        'c': 0,
+        'd': false,
+        'e': <String, dynamic>{},
+        'f': {'x': null},
+        'list': [1, null, 3],
+        'empty_list': <Object?>[],
+      });
+      expect(shaped, {
+        'c': 0,
+        'd': false,
+        'list': [1, null, 3],
+        'empty_list': <Object?>[],
+      });
+    },
+  );
 
   test('rounds doubles by key name and turns whole values into ints', () {
     final shaped = shape({

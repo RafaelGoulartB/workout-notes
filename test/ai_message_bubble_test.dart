@@ -47,7 +47,10 @@ void main() {
     await tester.pumpWidget(
       _testApp(AiMessageBubble(message: answer(cutOff: true))),
     );
-    expect(find.text('Esta resposta foi cortada antes do fim.'), findsOneWidget);
+    expect(
+      find.text('Esta resposta foi cortada antes do fim.'),
+      findsOneWidget,
+    );
 
     await tester.pumpWidget(
       _testApp(AiMessageBubble(message: answer(cutOff: false))),

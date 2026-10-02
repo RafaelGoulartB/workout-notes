@@ -49,7 +49,9 @@ class _EditablePhase {
   _EditablePhase(this.entry, this.kind);
 }
 
-class _PeriodizationPlanEditorScreenState extends State<PeriodizationPlanEditorScreen> with GuardedLoad {
+class _PeriodizationPlanEditorScreenState
+    extends State<PeriodizationPlanEditorScreen>
+    with GuardedLoad {
   final _repository = DatabaseHelper.instance.periodizationRepo;
   final _name = TextEditingController();
   late DateTime _start;
@@ -238,8 +240,8 @@ class _PeriodizationPlanEditorScreenState extends State<PeriodizationPlanEditorS
         context,
         title: loc.planningRemovePhasesTitle,
         message: loc.planningRemovePhasesBody(
-              removed.map((phase) => phase.name).join(', '),
-            ),
+          removed.map((phase) => phase.name).join(', '),
+        ),
         confirmLabel: loc.planningDelete,
         destructive: true,
       );

@@ -134,5 +134,4 @@ class AiProposalRepository extends BaseRepository {
       ],
     );
   }
-
 }

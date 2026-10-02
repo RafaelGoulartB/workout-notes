@@ -285,7 +285,8 @@ abstract final class StrengthInsightsCalculator {
     List<DateTime> starts, {
     required bool monthly,
   }) {
-    DateTime key(DateTime d) => monthly ? DateTime(d.year, d.month) : mondayOf(d);
+    DateTime key(DateTime d) =>
+        monthly ? DateTime(d.year, d.month) : mondayOf(d);
     final index = {for (var i = 0; i < starts.length; i++) starts[i]: i};
     final volume = List<double>.filled(starts.length, 0);
     final setCount = List<int>.filled(starts.length, 0);

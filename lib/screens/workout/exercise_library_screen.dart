@@ -23,7 +23,8 @@ class ExerciseLibraryScreen extends StatefulWidget {
   State<ExerciseLibraryScreen> createState() => _ExerciseLibraryScreenState();
 }
 
-class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> with GuardedLoad {
+class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen>
+    with GuardedLoad {
   final _exerciseRepo = DatabaseHelper.instance.exerciseRepo;
   final _searchController = TextEditingController();
   List<Map<String, dynamic>> _categories = [];
@@ -78,7 +79,8 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> with Guar
     var e1rm = const <String, double>{};
     try {
       usage = await _exerciseRepo.getExerciseUsage();
-      final records = await DatabaseHelper.instance.strengthRecordsRepo.listRecords();
+      final records = await DatabaseHelper.instance.strengthRecordsRepo
+          .listRecords();
       e1rm = {
         for (final record in records)
           if (record.bestE1rm != null) record.exerciseId: record.bestE1rm!,

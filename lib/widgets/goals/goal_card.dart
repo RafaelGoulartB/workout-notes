@@ -37,8 +37,7 @@ class GoalCard extends StatelessWidget {
   static GoalPace paceOf(Goal goal, GoalProgress progress) {
     if (!goal.isActive) return GoalPace.paused;
     if (progress.isComplete) return GoalPace.done;
-    final total =
-        daysBetween(progress.periodStart, progress.periodEnd) + 1;
+    final total = daysBetween(progress.periodStart, progress.periodEnd) + 1;
     if (total <= 0) return GoalPace.onTrack;
     final expected = (progress.daysElapsed / total).clamp(0.0, 1.0);
     return progress.percent + 0.1 >= expected

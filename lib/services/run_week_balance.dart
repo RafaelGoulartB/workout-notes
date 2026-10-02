@@ -149,9 +149,7 @@ abstract final class RunWeekBalance {
 
     // Nearest day in the same Monday–Sunday week that is clean.
     final monday = mondayOf(target);
-    final floor = earliest == null
-        ? null
-        : dayOf(earliest);
+    final floor = earliest == null ? null : dayOf(earliest);
     DateTime? better;
     var bestGap = 99;
     for (var i = 0; i < 7; i++) {

@@ -522,8 +522,7 @@ class RunProgressAnalytics {
     required DateTime thisWeekStart,
   }) {
     final starts = <DateTime>[
-      for (var i = weekCount - 1; i >= 0; i--)
-        addDays(thisWeekStart, -(7 * i)),
+      for (var i = weekCount - 1; i >= 0; i--) addDays(thisWeekStart, -(7 * i)),
     ];
     final indexByStart = <DateTime, int>{
       for (var i = 0; i < starts.length; i++) starts[i]: i,

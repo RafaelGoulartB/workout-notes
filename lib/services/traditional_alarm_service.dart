@@ -20,7 +20,8 @@ class TraditionalAlarmService extends ChangeNotifier {
     'workout_notes/traditional_alarms/methods',
   );
 
-  final TraditionalAlarmRepository _repository = DatabaseHelper.instance.traditionalAlarmRepo;
+  final TraditionalAlarmRepository _repository =
+      DatabaseHelper.instance.traditionalAlarmRepo;
   final SettingsRepository _settings = DatabaseHelper.instance.settingsRepo;
   List<TraditionalAlarm> _alarms = const [];
   List<TraditionalAlarm> get alarms => List.unmodifiable(_alarms);

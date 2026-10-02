@@ -370,8 +370,7 @@ class StrengthWeekAnalytics {
     DateTime thisWeekStart,
   ) {
     final starts = [
-      for (var i = weekCount - 1; i >= 0; i--)
-        addDays(thisWeekStart, -(7 * i)),
+      for (var i = weekCount - 1; i >= 0; i--) addDays(thisWeekStart, -(7 * i)),
     ];
     final index = {for (var i = 0; i < starts.length; i++) starts[i]: i};
     final sessions = List<int>.filled(starts.length, 0);

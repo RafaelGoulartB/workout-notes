@@ -24,12 +24,7 @@ class DerivedStat {
   final IconData icon;
   final Color color;
 
-  const DerivedStat(
-    this.label,
-    this.value,
-    this.icon,
-    this.color,
-  );
+  const DerivedStat(this.label, this.value, this.icon, this.color);
 }
 
 /// Every measurement type the app can track, in display order. Shared by the

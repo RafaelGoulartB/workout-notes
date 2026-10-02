@@ -84,13 +84,18 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
     try {
       if (enabled && !await _service.preparePermissions()) {
         if (mounted) {
-          showAppSnack(context, AppLocalizations.of(context)!.alarmPermissionRequired);
+          showAppSnack(
+            context,
+            AppLocalizations.of(context)!.alarmPermissionRequired,
+          );
         }
         return;
       }
       await _service.setEnabled(alarm, enabled);
     } catch (_) {
-      if (mounted) showAppSnack(context, AppLocalizations.of(context)!.alarmUpdateError);
+      if (mounted) {
+        showAppSnack(context, AppLocalizations.of(context)!.alarmUpdateError);
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -127,7 +132,10 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
         // Keep the original action feedback even if refresh also fails.
       }
       if (mounted) {
-        showAppSnack(context, AppLocalizations.of(context)!.alarmSnoozeActionError);
+        showAppSnack(
+          context,
+          AppLocalizations.of(context)!.alarmSnoozeActionError,
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);

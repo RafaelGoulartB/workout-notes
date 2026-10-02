@@ -1,4 +1,3 @@
-
 /// Source of a food record.
 ///
 /// - `manual`: created by the user directly in the app.

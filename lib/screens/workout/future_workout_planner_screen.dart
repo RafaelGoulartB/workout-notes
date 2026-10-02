@@ -26,7 +26,8 @@ class FutureWorkoutPlannerScreen extends StatefulWidget {
       _FutureWorkoutPlannerScreenState();
 }
 
-class _FutureWorkoutPlannerScreenState extends State<FutureWorkoutPlannerScreen> with GuardedLoad {
+class _FutureWorkoutPlannerScreenState extends State<FutureWorkoutPlannerScreen>
+    with GuardedLoad {
   final _workoutRepo = DatabaseHelper.instance.workoutRepo;
   final _routineRepo = DatabaseHelper.instance.routineRepo;
   Map<String, dynamic>? _workout;
@@ -147,7 +148,11 @@ class _FutureWorkoutPlannerScreenState extends State<FutureWorkoutPlannerScreen>
                 value: 'delete',
                 child: Row(
                   children: [
-                    const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                    const Icon(
+                      Icons.delete_outline,
+                      size: 18,
+                      color: Colors.red,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       loc.workoutDetailDelete,
@@ -377,10 +382,7 @@ class _FutureWorkoutPlannerScreenState extends State<FutureWorkoutPlannerScreen>
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 2,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(6),

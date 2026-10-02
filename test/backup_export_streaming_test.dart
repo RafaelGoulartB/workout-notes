@@ -33,11 +33,10 @@ void main() {
     await temp.delete(recursive: true);
   });
 
-  ExportService serviceWith(ExportImportRepository repository) =>
-      ExportService(
-        exportRepo: repository,
-        temporaryDirectoryProvider: () async => temp,
-      );
+  ExportService serviceWith(ExportImportRepository repository) => ExportService(
+    exportRepo: repository,
+    temporaryDirectoryProvider: () async => temp,
+  );
 
   test('exportBackupBytes goes through a temp file that is removed', () async {
     final service = serviceWith(

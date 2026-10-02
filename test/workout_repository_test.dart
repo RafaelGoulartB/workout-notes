@@ -474,38 +474,44 @@ void main() {
       return (await db.query('exercise_entries')).single['id']! as String;
     }
 
-    test('restoreSet brings back the exact row in its original position', () async {
-      final entryId = await seedThreeSets();
-      final before = await repo.getExerciseSets(entryId);
-      final middle = before[1];
+    test(
+      'restoreSet brings back the exact row in its original position',
+      () async {
+        final entryId = await seedThreeSets();
+        final before = await repo.getExerciseSets(entryId);
+        final middle = before[1];
 
-      final deleted = await repo.deleteSet(middle['id']! as String);
+        final deleted = await repo.deleteSet(middle['id']! as String);
 
-      expect(deleted, middle);
-      expect(await count('sets'), 2);
+        expect(deleted, middle);
+        expect(await count('sets'), 2);
 
-      expect(await repo.restoreSet(deleted!), isTrue);
+        expect(await repo.restoreSet(deleted!), isTrue);
 
-      expect(await repo.getExerciseSets(entryId), before);
-    });
+        expect(await repo.getExerciseSets(entryId), before);
+      },
+    );
 
     test('deleteSet returns null for an unknown set', () async {
       expect(await repo.deleteSet('missing'), isNull);
     });
 
-    test('restoreSet is a no-op when its entry is gone or it is back', () async {
-      final entryId = await seedThreeSets();
-      final first = (await repo.getExerciseSets(entryId)).first;
-      final deleted = (await repo.deleteSet(first['id']! as String))!;
+    test(
+      'restoreSet is a no-op when its entry is gone or it is back',
+      () async {
+        final entryId = await seedThreeSets();
+        final first = (await repo.getExerciseSets(entryId)).first;
+        final deleted = (await repo.deleteSet(first['id']! as String))!;
 
-      expect(await repo.restoreSet(deleted), isTrue);
-      expect(await repo.restoreSet(deleted), isFalse);
-      expect(await count('sets'), 3);
+        expect(await repo.restoreSet(deleted), isTrue);
+        expect(await repo.restoreSet(deleted), isFalse);
+        expect(await count('sets'), 3);
 
-      await repo.deleteExerciseEntry(entryId);
-      expect(await repo.restoreSet(deleted), isFalse);
-      expect(await count('sets'), 0);
-    });
+        await repo.deleteExerciseEntry(entryId);
+        expect(await repo.restoreSet(deleted), isFalse);
+        expect(await count('sets'), 0);
+      },
+    );
   });
 
   group('month queries', () {
@@ -542,10 +548,9 @@ void main() {
 
       final categories = await repo.getWorkoutCategoriesByDate(2025, 12);
       expect(categories.keys, ['2025-12-31']);
-      expect(
-        (await repo.getWorkoutCategoriesByDate(2026, 1)).keys,
-        ['2026-01-01'],
-      );
+      expect((await repo.getWorkoutCategoriesByDate(2026, 1)).keys, [
+        '2026-01-01',
+      ]);
     });
   });
 }

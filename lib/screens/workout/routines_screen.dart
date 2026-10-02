@@ -41,9 +41,8 @@ class _RoutinesScreenState extends State<RoutinesScreen> with GuardedLoad {
     String? plannedRoutineId;
     String? plannedDayId;
     try {
-      final suggestion = await DatabaseHelper.instance.periodizationRepo.getRoutineSuggestion(
-        DateTime.now(),
-      );
+      final suggestion = await DatabaseHelper.instance.periodizationRepo
+          .getRoutineSuggestion(DateTime.now());
       plannedRoutineId = suggestion?.routineId;
       plannedDayId = suggestion?.routineDayId;
     } catch (_) {

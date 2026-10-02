@@ -156,9 +156,7 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
         _safe(_repository.getDayPlan(day)),
         _safe(EffectiveNutritionGoalService.resolve(date: day)),
         _safe(
-          DatabaseHelper.instance.nutritionRepo.getDailySummary(
-            dateKey(day),
-          ),
+          DatabaseHelper.instance.nutritionRepo.getDailySummary(dateKey(day)),
         ),
         _safe(_repository.getRoutineSuggestion(day)),
         _safe(_repository.getRunSuggestion(day)),

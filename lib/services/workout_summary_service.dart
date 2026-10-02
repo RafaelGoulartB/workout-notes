@@ -25,7 +25,8 @@ class WorkoutSummaryService {
     StrengthRecordsRepository? recordsRepo,
   }) : _workoutRepo = workoutRepo ?? DatabaseHelper.instance.workoutRepo,
        _bodyRepo = bodyRepo ?? DatabaseHelper.instance.bodyMeasurementRepo,
-       _recordsRepo = recordsRepo ?? DatabaseHelper.instance.strengthRecordsRepo;
+       _recordsRepo =
+           recordsRepo ?? DatabaseHelper.instance.strengthRecordsRepo;
 
   /// Duration, volume, sets, distance/time and PRs of the running workout.
   ///

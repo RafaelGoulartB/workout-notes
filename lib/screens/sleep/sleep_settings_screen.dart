@@ -22,7 +22,8 @@ class SleepSettingsScreen extends StatefulWidget {
   State<SleepSettingsScreen> createState() => _SleepSettingsScreenState();
 }
 
-class _SleepSettingsScreenState extends State<SleepSettingsScreen> with GuardedLoad {
+class _SleepSettingsScreenState extends State<SleepSettingsScreen>
+    with GuardedLoad {
   final _missions = SleepMissionService();
   final _monitor = SleepMonitorService.instance;
   final _sleepGoalService = SleepGoalService();
@@ -66,7 +67,12 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> with GuardedL
       await _diagnostics.setEnabled(enabled);
       if (mounted) setState(() => _diagnosticsEnabled = enabled);
     } catch (_) {
-      if (mounted) showAppSnack(context, AppLocalizations.of(context)!.sleepDiagnosticError);
+      if (mounted) {
+        showAppSnack(
+          context,
+          AppLocalizations.of(context)!.sleepDiagnosticError,
+        );
+      }
     }
   }
 
@@ -117,7 +123,10 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> with GuardedL
       showAppSnack(context, AppLocalizations.of(context)!.sleepMissionSaved);
     } catch (_) {
       if (mounted) {
-        showAppSnack(context, AppLocalizations.of(context)!.sleepMissionScanError);
+        showAppSnack(
+          context,
+          AppLocalizations.of(context)!.sleepMissionScanError,
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);

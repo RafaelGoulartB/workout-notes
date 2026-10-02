@@ -506,10 +506,7 @@ void main() {
           ),
         ),
       );
-      expect(
-        await repository.getFoodWithDetails('food-b'),
-        isNull,
-      );
+      expect(await repository.getFoodWithDetails('food-b'), isNull);
     });
   });
 

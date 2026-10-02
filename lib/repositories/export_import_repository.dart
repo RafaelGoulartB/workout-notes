@@ -614,19 +614,18 @@ class ExportImportRepository extends BaseRepository {
     );
   }
 
-  Future<int> _insertSleepSessions(Transaction txn, dynamic rows) =>
-      _insertAll(
-        txn,
-        'sleep_monitor_sessions',
-        rows,
-        // Older backups may carry columns this schema no longer has (dropped
-        // by _insertAll) and lack the mode, which is derived from the alarm.
-        prepare: (row) {
-          row['monitor_mode'] ??= row['alarm_at'] == null
-              ? 'monitoring_only'
-              : 'alarm_without_mission';
-        },
-      );
+  Future<int> _insertSleepSessions(Transaction txn, dynamic rows) => _insertAll(
+    txn,
+    'sleep_monitor_sessions',
+    rows,
+    // Older backups may carry columns this schema no longer has (dropped
+    // by _insertAll) and lack the mode, which is derived from the alarm.
+    prepare: (row) {
+      row['monitor_mode'] ??= row['alarm_at'] == null
+          ? 'monitoring_only'
+          : 'alarm_without_mission';
+    },
+  );
 
   Future<int> _insertMissingSleepSettings(Transaction txn) async {
     const defaults = <String, String>{

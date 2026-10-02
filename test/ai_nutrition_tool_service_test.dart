@@ -383,8 +383,11 @@ void main() {
         startDate: '2026-09-30',
         endDate: '2026-09-30',
       );
-      expect(alone['today_excluded_from_averages'], isNull,
-          reason: 'a single logged day is all there is to average');
+      expect(
+        alone['today_excluded_from_averages'],
+        isNull,
+        reason: 'a single logged day is all there is to average',
+      );
       expect((alone['averages'] as Map)['calories'], 295);
     });
 

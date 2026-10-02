@@ -151,7 +151,10 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     final fields = await RunDataFieldsStore.instance.load();
     var weight = 70.0;
     try {
-      weight = await DatabaseHelper.instance.bodyMeasurementRepo.getLatestWeightKg() ?? 70;
+      weight =
+          await DatabaseHelper.instance.bodyMeasurementRepo
+              .getLatestWeightKg() ??
+          70;
     } catch (_) {
       // Optional table on partially migrated databases: keep the default.
     }
@@ -696,17 +699,17 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     final confirmed = !confirm
         ? true
         : await showConfirmDialog(
-          context,
-          title: bike
-                    ? loc.stationaryBikeReviewDiscardTitle
-                    : loc.runRecordDiscardConfirm,
-          message: _isIndoor
-                    ? loc.stationaryBikeReviewDiscardBody
-                    : loc.runRecordDiscardConfirmBody,
-          confirmLabel: loc.runRecordDiscard,
-          destructive: true,
-          cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
-        );
+            context,
+            title: bike
+                ? loc.stationaryBikeReviewDiscardTitle
+                : loc.runRecordDiscardConfirm,
+            message: _isIndoor
+                ? loc.stationaryBikeReviewDiscardBody
+                : loc.runRecordDiscardConfirmBody,
+            confirmLabel: loc.runRecordDiscard,
+            destructive: true,
+            cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
+          );
     if (confirmed != true || !mounted) return;
     setState(() => _busy = true);
     try {

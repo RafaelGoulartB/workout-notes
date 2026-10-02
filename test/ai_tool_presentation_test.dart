@@ -28,42 +28,49 @@ void main() {
     pt = await AppLocalizations.delegate.load(const Locale('pt'));
   });
 
-  test('every read, proposal and memory tool has its own label and icon', () async {
-    await installAiTestDb();
-    addTearDown(uninstallAiTestDb);
-    final names = [
-      ...AiToolRegistry().readToolNames,
-      ..._proposalAndMemoryTools,
-    ];
-    final generic = en.aiToolGeneric;
-    final labels = <String>{};
-    final icons = <IconData>{};
-    for (final name in names) {
-      final label = AiToolPresentation.label(name, en);
-      expect(label, isNotEmpty, reason: name);
-      expect(label, isNot(generic), reason: '$name has no label of its own');
-      expect(labels.add(label), isTrue, reason: 'duplicate label "$label"');
-      final labelPt = AiToolPresentation.label(name, pt);
-      expect(labelPt, isNotEmpty, reason: name);
-      expect(labelPt, isNot(pt.aiToolGeneric), reason: name);
-      final icon = AiToolPresentation.icon(name);
-      expect(icon, isNot(Icons.search_rounded), reason: name);
-      icons.add(icon);
-    }
-    expect(icons.length, greaterThan(names.length - 3));
-  });
+  test(
+    'every read, proposal and memory tool has its own label and icon',
+    () async {
+      await installAiTestDb();
+      addTearDown(uninstallAiTestDb);
+      final names = [
+        ...AiToolRegistry().readToolNames,
+        ..._proposalAndMemoryTools,
+      ];
+      final generic = en.aiToolGeneric;
+      final labels = <String>{};
+      final icons = <IconData>{};
+      for (final name in names) {
+        final label = AiToolPresentation.label(name, en);
+        expect(label, isNotEmpty, reason: name);
+        expect(label, isNot(generic), reason: '$name has no label of its own');
+        expect(labels.add(label), isTrue, reason: 'duplicate label "$label"');
+        final labelPt = AiToolPresentation.label(name, pt);
+        expect(labelPt, isNotEmpty, reason: name);
+        expect(labelPt, isNot(pt.aiToolGeneric), reason: name);
+        final icon = AiToolPresentation.icon(name);
+        expect(icon, isNot(Icons.search_rounded), reason: name);
+        icons.add(icon);
+      }
+      expect(icons.length, greaterThan(names.length - 3));
+    },
+  );
 
   test('an unknown tool gets the generic label and icon', () {
-    expect(AiToolPresentation.label('discover_app_capabilities', en),
-        en.aiToolGeneric);
+    expect(
+      AiToolPresentation.label('discover_app_capabilities', en),
+      en.aiToolGeneric,
+    );
     expect(AiToolPresentation.label('', pt), pt.aiToolGeneric);
     expect(AiToolPresentation.icon('whatever'), Icons.search_rounded);
   });
 
   group('argsSummary', () {
-    String? summary(String tool, Map<String, dynamic> args,
-            [AppLocalizations? l10n]) =>
-        AiToolPresentation.argsSummary(tool, args, l10n ?? en);
+    String? summary(
+      String tool,
+      Map<String, dynamic> args, [
+      AppLocalizations? l10n,
+    ]) => AiToolPresentation.argsSummary(tool, args, l10n ?? en);
 
     test('day windows, ranges and pages', () {
       expect(summary('get_sleep', {'days': 7}), 'last 7 days');
@@ -84,16 +91,22 @@ void main() {
       );
       expect(summary('list_run_activities', {'page': 2}), 'page 2');
       expect(summary('list_run_activities', {'page': 1}), isNull);
-      expect(summary('get_run_schedule', {'start_date': '2026-10-01'}),
-          'from 2026-10-01');
+      expect(
+        summary('get_run_schedule', {'start_date': '2026-10-01'}),
+        'from 2026-10-01',
+      );
     });
 
     test('periods, modes and filters', () {
-      expect(summary('get_run_progress', {'period': '12_weeks'}),
-          'last 12 weeks');
+      expect(
+        summary('get_run_progress', {'period': '12_weeks'}),
+        'last 12 weeks',
+      );
       expect(summary('get_run_progress', {'period': 'all'}), 'all time');
-      expect(summary('get_sleep', {'detail': 'nightly', 'days': 30}),
-          'last 30 days · night by night');
+      expect(
+        summary('get_sleep', {'detail': 'nightly', 'days': 30}),
+        'last 30 days · night by night',
+      );
       expect(
         summary('get_sleep', {'detail': 'night', 'end_date': '2026-09-12'}),
         '2026-09-12',
@@ -105,22 +118,27 @@ void main() {
         }),
         'least recently trained · "bench"',
       );
-      expect(summary('get_training_summary', {'group_by': 'category'}),
-          'by category');
+      expect(
+        summary('get_training_summary', {'group_by': 'category'}),
+        'by category',
+      );
       expect(summary('get_workout_history', {'status': 'planned'}), 'planned');
       expect(summary('get_training_plan', {'review': 'week'}), 'week review');
-      expect(summary('list_goals', {'history_periods': 4}),
-          '4 past periods');
-      expect(summary('list_body_measurements', {'latest_per_type': true}),
-          'latest values');
+      expect(summary('list_goals', {'history_periods': 4}), '4 past periods');
+      expect(
+        summary('list_body_measurements', {'latest_per_type': true}),
+        'latest values',
+      );
     });
 
     test('ids and empty arguments say nothing; camelCase is understood', () {
       expect(summary('get_workout_detail', {'workout_id': 'abc'}), isNull);
       expect(summary('list_routines', const {}), isNull);
       expect(summary('get_sleep', {'days': ''}), isNull);
-      expect(summary('get_sleep', {'endDate': '2026-09-12', 'detail': 'night'}),
-          '2026-09-12');
+      expect(
+        summary('get_sleep', {'endDate': '2026-09-12', 'detail': 'night'}),
+        '2026-09-12',
+      );
     });
   });
 }

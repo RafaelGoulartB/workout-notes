@@ -191,7 +191,9 @@ abstract final class RunTodayResolver {
     final rows = scheduledToday.where((s) => s.workout != null).toList();
     final ranToday =
         todayActivities
-            .where((a) => a.isCompleted && isSameDay(a.startedAt.toLocal(), day))
+            .where(
+              (a) => a.isCompleted && isSameDay(a.startedAt.toLocal(), day),
+            )
             .toList()
           ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
 
@@ -335,7 +337,9 @@ abstract final class RunTodayResolver {
         upcoming
             .where(
               (s) =>
-                  s.isPlanned && s.workout != null && dayOf(s.date).isAfter(day),
+                  s.isPlanned &&
+                  s.workout != null &&
+                  dayOf(s.date).isAfter(day),
             )
             .toList()
           ..sort((a, b) => a.date.compareTo(b.date));
@@ -476,19 +480,11 @@ class RunTodayService {
     );
     final upcoming =
         await _safe(
-          _planRepo.getScheduledRuns(
-            addDays(day, 1),
-            addDays(day, 28),
-          ),
+          _planRepo.getScheduledRuns(addDays(day, 1), addDays(day, 28)),
         ) ??
         const <ScheduledRun>[];
     final weekRows =
-        await _safe(
-          _planRepo.getScheduledRuns(
-            monday,
-            addDays(monday, 6),
-          ),
-        ) ??
+        await _safe(_planRepo.getScheduledRuns(monday, addDays(monday, 6))) ??
         const <ScheduledRun>[];
     final all =
         activities ??

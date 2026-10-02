@@ -180,14 +180,16 @@ void main() {
         (properties('list_body_measurements')['type'] as Map)['enum'],
         containsAll(['weight', 'bodyFat', 'waist', 'bloodPressure']),
       );
-      expect(
-        (properties('list_goals')['scope'] as Map)['enum'],
-        ['anaerobic', 'aerobic'],
-      );
-      expect(
-        (properties('list_goals')['metric'] as Map)['enum'],
-        ['volume', 'days', 'distance', 'time'],
-      );
+      expect((properties('list_goals')['scope'] as Map)['enum'], [
+        'anaerobic',
+        'aerobic',
+      ]);
+      expect((properties('list_goals')['metric'] as Map)['enum'], [
+        'volume',
+        'days',
+        'distance',
+        'time',
+      ]);
     });
 
     test('readToolsSchema filters by domain, is stable and cached', () {
@@ -199,17 +201,12 @@ void main() {
       ];
       expect(names, [for (final spec in registry.readSpecs) spec.name]);
 
-      final sleepOnly = registry.readToolsSchema(
-        domains: {AiToolDomain.sleep},
-      );
-      expect(
-        sleepOnly.map((tool) => (tool['function'] as Map)['name']),
-        [
-          'get_sleep',
-          'analyze_sleep_performance',
-          'get_weekly_recovery_trend',
-        ],
-      );
+      final sleepOnly = registry.readToolsSchema(domains: {AiToolDomain.sleep});
+      expect(sleepOnly.map((tool) => (tool['function'] as Map)['name']), [
+        'get_sleep',
+        'analyze_sleep_performance',
+        'get_weekly_recovery_trend',
+      ]);
       expect(
         identical(
           sleepOnly,
@@ -221,10 +218,11 @@ void main() {
       final bodyAndGoals = registry.readToolsSchema(
         domains: {AiToolDomain.goals, AiToolDomain.body},
       );
-      expect(
-        bodyAndGoals.map((tool) => (tool['function'] as Map)['name']),
-        ['list_body_measurements', 'get_profile', 'list_goals'],
-      );
+      expect(bodyAndGoals.map((tool) => (tool['function'] as Map)['name']), [
+        'list_body_measurements',
+        'get_profile',
+        'list_goals',
+      ]);
     });
 
     test('the whole compact catalog stays within 11000 characters', () {

@@ -83,11 +83,7 @@ abstract final class RunTrainingLoadAnalytics {
         : null;
 
     final last7 = sumBack(distanceByDay, today, 7);
-    final prev7 = sumBack(
-      distanceByDay,
-      addDays(today, -7),
-      7,
-    );
+    final prev7 = sumBack(distanceByDay, addDays(today, -7), 7);
     return RunTrainingLoad(
       days: series,
       acwr: acwr,
@@ -112,8 +108,7 @@ abstract final class RunTrainingLoadAnalytics {
   }) {
     final thisWeek = mondayOf(now ?? DateTime.now());
     final starts = [
-      for (var i = weeks - 1; i >= 0; i--)
-        addDays(thisWeek, -(7 * i)),
+      for (var i = weeks - 1; i >= 0; i--) addDays(thisWeek, -(7 * i)),
     ];
     final index = {for (var i = 0; i < starts.length; i++) starts[i]: i};
     final seconds = List.generate(weeks, (_) => List<double>.filled(5, 0));
@@ -160,8 +155,7 @@ abstract final class RunTrainingLoadAnalytics {
   }) {
     final thisWeek = mondayOf(now ?? DateTime.now());
     final starts = [
-      for (var i = weeks - 1; i >= 0; i--)
-        addDays(thisWeek, -(7 * i)),
+      for (var i = weeks - 1; i >= 0; i--) addDays(thisWeek, -(7 * i)),
     ];
     final index = {for (var i = 0; i < starts.length; i++) starts[i]: i};
     final rpeSum = List<double>.filled(weeks, 0);

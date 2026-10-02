@@ -572,7 +572,9 @@ class _MacroRatioControllers {
       protein: TextEditingController(
         text: AppNumberFormat.decimal(defaults.proteinPerKg, 1),
       ),
-      fat: TextEditingController(text: AppNumberFormat.decimal(defaults.fatPerKg, 1)),
+      fat: TextEditingController(
+        text: AppNumberFormat.decimal(defaults.fatPerKg, 1),
+      ),
     );
   }
 

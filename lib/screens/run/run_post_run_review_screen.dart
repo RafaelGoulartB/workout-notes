@@ -121,10 +121,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
       activityAvgPaceSecPerKm: activity.avgPaceSecPerKm,
       profile: profile,
     );
-    _elevation = RunElevationProfile.fromTrackPoints(
-      _points,
-      profile: profile,
-    );
+    _elevation = RunElevationProfile.fromTrackPoints(_points, profile: profile);
     _loadContext();
   }
 
@@ -312,11 +309,11 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
     final confirmed = await showConfirmDialog(
       context,
       title: _isStationaryBike
-              ? loc.stationaryBikeReviewDiscardTitle
-              : loc.runReviewDiscardTitle,
+          ? loc.stationaryBikeReviewDiscardTitle
+          : loc.runReviewDiscardTitle,
       message: _isStationaryBike
-              ? loc.stationaryBikeReviewDiscardBody
-              : loc.runReviewDiscardBody,
+          ? loc.stationaryBikeReviewDiscardBody
+          : loc.runReviewDiscardBody,
       confirmLabel: loc.runReviewDiscard,
       destructive: true,
       cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,

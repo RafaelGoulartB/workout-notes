@@ -215,14 +215,14 @@ class _RunDetailScreenState extends State<RunDetailScreen> with GuardedLoad {
     final confirmed = await showConfirmDialog(
       context,
       title: activity.isStationaryBike
-              ? loc.stationaryBikeDeleteConfirm
-              : loc.runDetailDeleteConfirm,
+          ? loc.stationaryBikeDeleteConfirm
+          : loc.runDetailDeleteConfirm,
       message: activity.isStationaryBike
-              ? loc.stationaryBikeDeleteConfirmBody
-              : loc.runDetailDeleteConfirmBody,
+          ? loc.stationaryBikeDeleteConfirmBody
+          : loc.runDetailDeleteConfirmBody,
       confirmLabel: activity.isStationaryBike
-                  ? loc.stationaryBikeDelete
-                  : loc.runDetailDelete,
+          ? loc.stationaryBikeDelete
+          : loc.runDetailDelete,
       destructive: true,
       cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
     );

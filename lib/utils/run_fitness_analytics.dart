@@ -84,8 +84,7 @@ abstract final class RunFitnessAnalytics {
       RunEffortSample? top;
       var topVdot = 0.0;
       for (final s in samples) {
-        if (dayOf(s.date).isBefore(from) ||
-            dayOf(s.date).isAfter(today)) {
+        if (dayOf(s.date).isBefore(from) || dayOf(s.date).isAfter(today)) {
           continue;
         }
         final v = vdotOf(s);
@@ -149,8 +148,7 @@ abstract final class RunFitnessAnalytics {
     final firstMonth = DateTime(today.year, today.month - (months - 1));
     final runs = activities.where(RunAnalyticsDates.completedRun).where((a) {
       final d = a.startedAt.toLocal();
-      return !d.isBefore(firstMonth) &&
-          !dayOf(d).isAfter(today);
+      return !d.isBefore(firstMonth) && !dayOf(d).isAfter(today);
     }).toList();
 
     var samples = [for (final a in runs) ...effortsOf(a)];

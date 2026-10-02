@@ -37,7 +37,8 @@ class _StrengthRecordsScreenState extends State<StrengthRecordsScreen> {
   Future<void> _load() async {
     try {
       final sets = await DatabaseHelper.instance.strengthRecordsRepo.loadSets();
-      final categories = await DatabaseHelper.instance.exerciseRepo.getCategories();
+      final categories = await DatabaseHelper.instance.exerciseRepo
+          .getCategories();
       if (!mounted) return;
       final records = StrengthRecordsCalculator.records(sets);
       // Oldest first from the calculator; the timeline wants newest first.

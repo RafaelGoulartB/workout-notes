@@ -332,7 +332,10 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
                 name: widget.food.name,
                 brand: widget.food.brand,
                 perLabel: loc.nutritionPer100g(
-                  AppNumberFormat.decimal(widget.primaryVariant.referenceAmount, 0),
+                  AppNumberFormat.decimal(
+                    widget.primaryVariant.referenceAmount,
+                    0,
+                  ),
                   widget.primaryVariant.referenceUnit,
                 ),
               ),
@@ -766,7 +769,9 @@ class _ServingQuickPicks extends StatelessWidget {
   }
 
   String _formatGrams(double value) {
-    if (value == value.roundToDouble()) return AppNumberFormat.decimal(value, 0);
+    if (value == value.roundToDouble()) {
+      return AppNumberFormat.decimal(value, 0);
+    }
     return AppNumberFormat.decimal(value, 1);
   }
 }
@@ -1035,7 +1040,6 @@ class _PreviewSection extends StatelessWidget {
     return '${AppNumberFormat.decimal(value, 0)} g';
   }
 }
-
 
 class _FatDetailChip extends StatelessWidget {
   final String label;

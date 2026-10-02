@@ -42,7 +42,9 @@ void main() {
 
   /// Four-week phase starting 2026-08-01, so week boundaries land on
   /// 08-01, 08-08, 08-15 and 08-22.
-  Future<String> createActivePhase({List<PeriodizationTarget>? weeklyTargets}) async {
+  Future<String> createActivePhase({
+    List<PeriodizationTarget>? weeklyTargets,
+  }) async {
     final plan = await periodization.createPlanWithPhases(
       name: 'Plan',
       startDate: DateTime(2026, 8, 1),
@@ -109,20 +111,22 @@ void main() {
       fatG: 64,
     );
     // Weeks 1 and 2 carry their own targets; 3 and 4 inherit week 2.
-    await createActivePhase(weeklyTargets: [
-      weekTarget(
-        validFrom: DateTime(2026, 8, 1),
-        calories: 2600,
-        proteinG: 170,
-      ),
-      weekTarget(
-        validFrom: DateTime(2026, 8, 8),
-        calories: 2400,
-        proteinG: 165,
-        carbsG: 240,
-        fatG: 66,
-      ),
-    ]);
+    await createActivePhase(
+      weeklyTargets: [
+        weekTarget(
+          validFrom: DateTime(2026, 8, 1),
+          calories: 2600,
+          proteinG: 170,
+        ),
+        weekTarget(
+          validFrom: DateTime(2026, 8, 8),
+          calories: 2400,
+          proteinG: 165,
+          carbsG: 240,
+          fatG: 66,
+        ),
+      ],
+    );
 
     // 2026-08-10 is week 2: the newest week override wins.
     final week2 = await EffectiveNutritionGoalService.resolve(
@@ -159,30 +163,35 @@ void main() {
     expect(week3.goal!.calories, 2400);
   });
 
-  test('fields missing on the plan target fall back to the settings goal', () async {
-    await nutrition.saveGoal(
-      tdee: 2500,
-      adjustmentKind: 'cut',
-      adjustmentPercent: -20,
-      proteinG: 160,
-      carbsG: 230,
-      fatG: 64,
-    );
-    // The phase target only defines calories.
-    await createActivePhase(weeklyTargets: [
-      weekTarget(validFrom: DateTime(2026, 8, 1), calories: 2200),
-    ]);
-    final effective = await EffectiveNutritionGoalService.resolve(
-      nutritionRepository: nutrition,
-      periodizationRepository: periodization,
-      date: DateTime(2026, 8, 10),
-    );
-    expect(effective.fromPlan, isTrue);
-    expect(effective.goal!.calories, 2200);
-    expect(effective.goal!.proteinG, 160);
-    expect(effective.goal!.carbsG, 230);
-    expect(effective.goal!.fatG, 64);
-  });
+  test(
+    'fields missing on the plan target fall back to the settings goal',
+    () async {
+      await nutrition.saveGoal(
+        tdee: 2500,
+        adjustmentKind: 'cut',
+        adjustmentPercent: -20,
+        proteinG: 160,
+        carbsG: 230,
+        fatG: 64,
+      );
+      // The phase target only defines calories.
+      await createActivePhase(
+        weeklyTargets: [
+          weekTarget(validFrom: DateTime(2026, 8, 1), calories: 2200),
+        ],
+      );
+      final effective = await EffectiveNutritionGoalService.resolve(
+        nutritionRepository: nutrition,
+        periodizationRepository: periodization,
+        date: DateTime(2026, 8, 10),
+      );
+      expect(effective.fromPlan, isTrue);
+      expect(effective.goal!.calories, 2200);
+      expect(effective.goal!.proteinG, 160);
+      expect(effective.goal!.carbsG, 230);
+      expect(effective.goal!.fatG, 64);
+    },
+  );
 
   test('a target without nutrition values is ignored', () async {
     await nutrition.saveGoal(
@@ -190,9 +199,9 @@ void main() {
       adjustmentKind: 'cut',
       adjustmentPercent: -20,
     );
-    await createActivePhase(weeklyTargets: [
-      weekTarget(validFrom: DateTime(2026, 8, 1)),
-    ]);
+    await createActivePhase(
+      weeklyTargets: [weekTarget(validFrom: DateTime(2026, 8, 1))],
+    );
     final effective = await EffectiveNutritionGoalService.resolve(
       nutritionRepository: nutrition,
       periodizationRepository: periodization,
@@ -203,10 +212,16 @@ void main() {
   });
 
   test('a date outside every phase falls back to the settings goal', () async {
-    await nutrition.saveGoal(tdee: 2500, adjustmentKind: 'cut', adjustmentPercent: -20);
-    await createActivePhase(weeklyTargets: [
-      weekTarget(validFrom: DateTime(2026, 8, 1), calories: 2400),
-    ]);
+    await nutrition.saveGoal(
+      tdee: 2500,
+      adjustmentKind: 'cut',
+      adjustmentPercent: -20,
+    );
+    await createActivePhase(
+      weeklyTargets: [
+        weekTarget(validFrom: DateTime(2026, 8, 1), calories: 2400),
+      ],
+    );
     final effective = await EffectiveNutritionGoalService.resolve(
       nutritionRepository: nutrition,
       periodizationRepository: periodization,
@@ -216,17 +231,19 @@ void main() {
     expect(effective.goal!.calories, 2000);
   });
 
-  test('a periodization failure surfaces instead of hiding behind the base goal',
-      () async {
-    await expectLater(
-      EffectiveNutritionGoalService.resolve(
-        nutritionRepository: nutrition,
-        periodizationRepository: _FailingPeriodizationRepository(),
-        date: DateTime(2026, 8, 10),
-      ),
-      throwsStateError,
-    );
-  });
+  test(
+    'a periodization failure surfaces instead of hiding behind the base goal',
+    () async {
+      await expectLater(
+        EffectiveNutritionGoalService.resolve(
+          nutritionRepository: nutrition,
+          periodizationRepository: _FailingPeriodizationRepository(),
+          date: DateTime(2026, 8, 10),
+        ),
+        throwsStateError,
+      );
+    },
+  );
 }
 
 class _FailingPeriodizationRepository extends PeriodizationRepository {

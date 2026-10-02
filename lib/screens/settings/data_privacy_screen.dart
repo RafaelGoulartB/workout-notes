@@ -295,7 +295,10 @@ class _DataPrivacyScreenState extends State<DataPrivacyScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           // ===== EXPORTAÇÕES =====
-          AppSectionHeader(loc.settingsSectionExports, padding: AppSectionHeader.compactPadding),
+          AppSectionHeader(
+            loc.settingsSectionExports,
+            padding: AppSectionHeader.compactPadding,
+          ),
           SettingsCard(
             children: [
               SettingsLinkTile(
@@ -309,7 +312,10 @@ class _DataPrivacyScreenState extends State<DataPrivacyScreen> {
           ),
 
           // ===== DADOS =====
-          AppSectionHeader(loc.settingsSectionData, padding: AppSectionHeader.compactPadding),
+          AppSectionHeader(
+            loc.settingsSectionData,
+            padding: AppSectionHeader.compactPadding,
+          ),
           SettingsCard(
             children: [
               SettingsLinkTile(

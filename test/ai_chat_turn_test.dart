@@ -708,18 +708,24 @@ void main() {
     ),
     ('a stream without its end', _Reply.text('Resposta curta', cutOff: true)),
   ]) {
-    test('an answer cut by $label is kept, flagged, not re-requested', () async {
-      await setUpChat(script: (_) => reply);
-      await chat.send('pergunta');
-      await idle();
+    test(
+      'an answer cut by $label is kept, flagged, not re-requested',
+      () async {
+        await setUpChat(script: (_) => reply);
+        await chat.send('pergunta');
+        await idle();
 
-      expect(provider.payloads, hasLength(1), reason: 'no automatic re-POST');
-      final answer = chat.state.messages.last;
-      expect(answer.content, 'Resposta curta');
-      expect(answer.isCutOff, isTrue);
-      expect((await stored(chat.state.activeThreadId!)).last.isCutOff, isTrue);
-      expect(chat.state.messages.first.turnStatus, AiTurnStatus.done);
-    });
+        expect(provider.payloads, hasLength(1), reason: 'no automatic re-POST');
+        final answer = chat.state.messages.last;
+        expect(answer.content, 'Resposta curta');
+        expect(answer.isCutOff, isTrue);
+        expect(
+          (await stored(chat.state.activeThreadId!)).last.isCutOff,
+          isTrue,
+        );
+        expect(chat.state.messages.first.turnStatus, AiTurnStatus.done);
+      },
+    );
   }
 
   test('the cut-off flag is app-side: never sent to a provider', () async {

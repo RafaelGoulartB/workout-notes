@@ -132,13 +132,18 @@ class PhaseEditorController extends ChangeNotifier {
     NutritionRepository? nutritionRepository,
     BodyMeasurementRepository? bodyRepository,
   }) async {
-    final routineRepo = routineRepository ?? DatabaseHelper.instance.routineRepo;
+    final routineRepo =
+        routineRepository ?? DatabaseHelper.instance.routineRepo;
     final results = await Future.wait<Object?>([
       routineRepo.getRoutines(),
       routineRepo.getRoutineDayNames(),
-      (runPlanRepository ?? DatabaseHelper.instance.runPlanRepo).listPlans(hydrate: true),
-      (nutritionRepository ?? DatabaseHelper.instance.nutritionRepo).getActiveGoal(),
-      (bodyRepository ?? DatabaseHelper.instance.bodyMeasurementRepo).getLatestWeightKg(),
+      (runPlanRepository ?? DatabaseHelper.instance.runPlanRepo).listPlans(
+        hydrate: true,
+      ),
+      (nutritionRepository ?? DatabaseHelper.instance.nutritionRepo)
+          .getActiveGoal(),
+      (bodyRepository ?? DatabaseHelper.instance.bodyMeasurementRepo)
+          .getLatestWeightKg(),
       _repository.getWeeklyTargets(_phase),
       _repository.getPhases(_phase.planId),
     ]);
@@ -239,8 +244,7 @@ class PhaseEditorController extends ChangeNotifier {
 
   bool isLocked(int week) => week < editableFrom;
 
-  DateTime weekStart(int week) =>
-      addDays(_phase.startDate, 7 * week);
+  DateTime weekStart(int week) => addDays(_phase.startDate, 7 * week);
 
   /// Plan week that phase week [week] maps onto, or null without a plan.
   int? runPlanWeekFor(int week) {

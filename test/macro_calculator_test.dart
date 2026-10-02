@@ -23,8 +23,8 @@ void main() {
         fatPerKg: 0.8,
         weightKg: 75,
       );
-      final expected =
-          ((2400 - macros.proteinG * 4 - macros.fatG * 9) / 4).roundToDouble();
+      final expected = ((2400 - macros.proteinG * 4 - macros.fatG * 9) / 4)
+          .roundToDouble();
       expect(macros.carbsG, expected);
       expect(macros.carbsG, greaterThan(0));
     });
@@ -36,23 +36,28 @@ void main() {
         fatPerKg: 1.0,
         weightKg: 80,
       );
-      expect(macros.proteinKcal + macros.fatKcal + macros.carbsKcal,
-          closeTo(2500, 3));
+      expect(
+        macros.proteinKcal + macros.fatKcal + macros.carbsKcal,
+        closeTo(2500, 3),
+      );
     });
 
-    test('flags the conflict and clamps carbs to zero when P+F exceed kcal', () {
-      // 3g/kg * 90 = 270g P (1080 kcal) + 1.5g/kg * 90 = 135g F (1215 kcal)
-      // = 2295 kcal for a 2000 kcal target.
-      final macros = computeMacros(
-        calories: 2000,
-        proteinPerKg: 3,
-        fatPerKg: 1.5,
-        weightKg: 90,
-      );
-      expect(macros.energyConflict, isTrue);
-      expect(macros.carbsG, 0);
-      expect(macros.carbsRounded, 0);
-    });
+    test(
+      'flags the conflict and clamps carbs to zero when P+F exceed kcal',
+      () {
+        // 3g/kg * 90 = 270g P (1080 kcal) + 1.5g/kg * 90 = 135g F (1215 kcal)
+        // = 2295 kcal for a 2000 kcal target.
+        final macros = computeMacros(
+          calories: 2000,
+          proteinPerKg: 3,
+          fatPerKg: 1.5,
+          weightKg: 90,
+        );
+        expect(macros.energyConflict, isTrue);
+        expect(macros.carbsG, 0);
+        expect(macros.carbsRounded, 0);
+      },
+    );
 
     test('carbs land exactly on zero without conflict at the boundary', () {
       // 200g P (800) + 100g F (900) = 1700; kcal 1700 → carbs = 0, no conflict.

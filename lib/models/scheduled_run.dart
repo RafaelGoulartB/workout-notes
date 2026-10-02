@@ -102,7 +102,6 @@ class ScheduledRun {
         DateTime.tryParse(map['updated_at'] as String? ?? '') ?? DateTime(2000),
     workout: workout,
   );
-
 }
 
 /// Planned-vs-actual result of one executed step.

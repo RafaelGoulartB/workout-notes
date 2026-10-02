@@ -115,7 +115,9 @@ class BodySummaryCard extends StatelessWidget {
                 Text(
                   latestMeasurement != null && type.id == 'bloodPressure'
                       ? formatMeasurementValue(latestMeasurement!, type)
-                      : (value != null ? AppNumberFormat.decimal(value!, 1) : '--'),
+                      : (value != null
+                            ? AppNumberFormat.decimal(value!, 1)
+                            : '--'),
                   style: theme.textTheme.displaySmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     letterSpacing: -2,

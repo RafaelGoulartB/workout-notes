@@ -42,7 +42,10 @@ class AiCoachSettingsScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           // ===== INTELIGÊNCIA ARTIFICIAL =====
-          AppSectionHeader(loc.aiCoachSection, padding: AppSectionHeader.compactPadding),
+          AppSectionHeader(
+            loc.aiCoachSection,
+            padding: AppSectionHeader.compactPadding,
+          ),
           SettingsCard(
             children: [
               SettingsLinkTile(

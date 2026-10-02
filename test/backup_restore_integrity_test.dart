@@ -20,10 +20,9 @@ void main() {
 
   tearDown(uninstallTestDb);
 
-  Future<int> count(String table) async =>
-      Sqflite.firstIntValue(
-        await database.rawQuery('SELECT COUNT(*) FROM $table'),
-      )!;
+  Future<int> count(String table) async => Sqflite.firstIntValue(
+    await database.rawQuery('SELECT COUNT(*) FROM $table'),
+  )!;
 
   group('restore', () {
     test('inserts many rows in chunks and counts them', () async {
@@ -129,27 +128,30 @@ void main() {
       expect(night['stage_timeline'], 'timeline');
     });
 
-    test('an older backup without analysis columns restores as legacy', () async {
-      final backup = await repository.exportAllData();
-      backup['sleep_monitor_sessions'] = [
-        {
-          'id': 'old-night',
-          'status': 'completed',
-          'started_at': '2026-08-31T23:00:00.000Z',
-          'utc_offset_start_minutes': 0,
-          'sensor_mode': 'audio',
-          'algorithm_version': 'audio-v1',
-          'created_at': '2026-09-01T07:00:00.000',
-        },
-      ];
-      (backup['record_counts'] as Map)['sleep_monitor_sessions'] = 1;
+    test(
+      'an older backup without analysis columns restores as legacy',
+      () async {
+        final backup = await repository.exportAllData();
+        backup['sleep_monitor_sessions'] = [
+          {
+            'id': 'old-night',
+            'status': 'completed',
+            'started_at': '2026-08-31T23:00:00.000Z',
+            'utc_offset_start_minutes': 0,
+            'sensor_mode': 'audio',
+            'algorithm_version': 'audio-v1',
+            'created_at': '2026-09-01T07:00:00.000',
+          },
+        ];
+        (backup['record_counts'] as Map)['sleep_monitor_sessions'] = 1;
 
-      await repository.restoreFromBackup(backup);
+        await repository.restoreFromBackup(backup);
 
-      final night = (await database.query('sleep_monitor_sessions')).single;
-      expect(night['analysis_status'], 'legacy_unavailable');
-      expect(night['stage_timeline'], isNull);
-    });
+        final night = (await database.query('sleep_monitor_sessions')).single;
+        expect(night['analysis_status'], 'legacy_unavailable');
+        expect(night['stage_timeline'], isNull);
+      },
+    );
 
     test('a bad row rolls the whole restore back', () async {
       await database.insert('app_settings', {'key': 'keep', 'value': 'me'});
@@ -227,21 +229,24 @@ void main() {
       expect(await count('meal_types'), 4);
     });
 
-    test('is atomic: a failure in the nutrition part keeps the workouts', () async {
-      await seedData();
-      await database.execute('''
+    test(
+      'is atomic: a failure in the nutrition part keeps the workouts',
+      () async {
+        await seedData();
+        await database.execute('''
         CREATE TRIGGER block_meal_type_delete BEFORE DELETE ON meal_types
         BEGIN SELECT RAISE(ABORT, 'blocked'); END
       ''');
 
-      await expectLater(
-        repository.deleteAllData(),
-        throwsA(isA<DatabaseException>()),
-      );
+        await expectLater(
+          repository.deleteAllData(),
+          throwsA(isA<DatabaseException>()),
+        );
 
-      expect(await count('sleep_entries'), 1);
-      expect(await count('traditional_alarms'), 1);
-    });
+        expect(await count('sleep_entries'), 1);
+        expect(await count('traditional_alarms'), 1);
+      },
+    );
   });
 
   group('run activity deletion', () {

@@ -553,7 +553,8 @@ class ExportService {
   // Nutrition CSV export
   // ===================================================================
 
-  final NutritionRepository _nutritionRepo = DatabaseHelper.instance.nutritionRepo;
+  final NutritionRepository _nutritionRepo =
+      DatabaseHelper.instance.nutritionRepo;
 
   /// Writes the meal log history to a CSV file in the temp directory
   /// and returns the path.

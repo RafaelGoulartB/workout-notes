@@ -53,7 +53,8 @@ class RunPlanDetailScreen extends StatefulWidget {
   State<RunPlanDetailScreen> createState() => _RunPlanDetailScreenState();
 }
 
-class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> with GuardedLoad {
+class _RunPlanDetailScreenState extends State<RunPlanDetailScreen>
+    with GuardedLoad {
   final _repo = DatabaseHelper.instance.runPlanRepo;
   final _weekStrip = ScrollController();
   RunPlan? _plan;
@@ -114,10 +115,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> with GuardedL
         ? () {
             final start = mondayOf(anchor);
             return RunnerStrengthRoutine()
-                .completedDays(
-                  start,
-                  addDays(start, 7 * plan.weeks),
-                )
+                .completedDays(start, addDays(start, 7 * plan.weeks))
                 .catchError((Object _) => <DateTime>{});
           }()
         : Future<Set<DateTime>>.value(const {});

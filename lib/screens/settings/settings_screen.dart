@@ -31,7 +31,10 @@ class AppSettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
-          AppSectionHeader(loc.settingsAppPreferencesSection, padding: AppSectionHeader.compactPadding),
+          AppSectionHeader(
+            loc.settingsAppPreferencesSection,
+            padding: AppSectionHeader.compactPadding,
+          ),
           SettingsCard(
             children: [
               SettingsLinkTile(
@@ -43,7 +46,10 @@ class AppSettingsScreen extends StatelessWidget {
               ),
             ],
           ),
-          AppSectionHeader(loc.settingsBySectionTitle, padding: AppSectionHeader.compactPadding),
+          AppSectionHeader(
+            loc.settingsBySectionTitle,
+            padding: AppSectionHeader.compactPadding,
+          ),
           SettingsCard(
             children: [
               SettingsLinkTile(
@@ -84,7 +90,10 @@ class AppSettingsScreen extends StatelessWidget {
               ),
             ],
           ),
-          AppSectionHeader(loc.settingsResourcesSection, padding: AppSectionHeader.compactPadding),
+          AppSectionHeader(
+            loc.settingsResourcesSection,
+            padding: AppSectionHeader.compactPadding,
+          ),
           SettingsCard(
             children: [
               SettingsLinkTile(

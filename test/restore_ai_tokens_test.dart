@@ -65,35 +65,38 @@ void main() {
   Future<Map<String, String>> storedTokens() =>
       const FlutterSecureStorage().readAll();
 
-  test('a restored provider with a different URL loses the local token', () async {
-    SharedPreferences.setMockInitialValues({
-      'ai_providers_v1': jsonEncode([
-        _provider('same', 'https://api.example.com/v1'),
-        _provider('moved', 'https://api.example.com/v1'),
-        _provider('gone', 'https://other.example.com/v1'),
-      ]),
-    });
-    final backup = await backupWithProviders([
-      // Same id, same URL (only spelled differently): the token stays.
-      _provider('same', 'https://api.example.com/v1/'),
-      // Same id, URL now points elsewhere: the token must not follow it.
-      _provider('moved', 'https://evil.example.net/v1'),
-      // An id this device never had.
-      _provider('fresh', 'https://api.example.com/v1'),
-    ]);
+  test(
+    'a restored provider with a different URL loses the local token',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'ai_providers_v1': jsonEncode([
+          _provider('same', 'https://api.example.com/v1'),
+          _provider('moved', 'https://api.example.com/v1'),
+          _provider('gone', 'https://other.example.com/v1'),
+        ]),
+      });
+      final backup = await backupWithProviders([
+        // Same id, same URL (only spelled differently): the token stays.
+        _provider('same', 'https://api.example.com/v1/'),
+        // Same id, URL now points elsewhere: the token must not follow it.
+        _provider('moved', 'https://evil.example.net/v1'),
+        // An id this device never had.
+        _provider('fresh', 'https://api.example.com/v1'),
+      ]);
 
-    await service.restoreFromBytes(backup);
+      await service.restoreFromBytes(backup);
 
-    final tokens = await storedTokens();
-    expect(tokens['ai_token:same'], 'secret-same');
-    expect(tokens.containsKey('ai_token:moved'), isFalse);
-    expect(tokens.containsKey('ai_token:fresh'), isFalse);
-    // Providers absent from the backup and unrelated secrets are untouched.
-    expect(tokens['ai_token:gone'], 'secret-gone');
-    expect(tokens['unrelated'], 'keep');
-    final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getString('ai_providers_v1'), contains('evil.example.net'));
-  });
+      final tokens = await storedTokens();
+      expect(tokens['ai_token:same'], 'secret-same');
+      expect(tokens.containsKey('ai_token:moved'), isFalse);
+      expect(tokens.containsKey('ai_token:fresh'), isFalse);
+      // Providers absent from the backup and unrelated secrets are untouched.
+      expect(tokens['ai_token:gone'], 'secret-gone');
+      expect(tokens['unrelated'], 'keep');
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('ai_providers_v1'), contains('evil.example.net'));
+    },
+  );
 
   test('a restore that fails keeps every token', () async {
     SharedPreferences.setMockInitialValues({

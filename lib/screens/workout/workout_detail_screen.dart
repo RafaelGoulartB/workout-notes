@@ -28,7 +28,8 @@ class WorkoutDetailScreen extends StatefulWidget {
 
 enum _DetailAction { continueWorkout, editDate, copy, delete }
 
-class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> with GuardedLoad {
+class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
+    with GuardedLoad {
   final _workoutRepo = DatabaseHelper.instance.workoutRepo;
   final _historyRepo = DatabaseHelper.instance.strengthHistoryRepo;
   StrengthWorkoutDetail? _detail;

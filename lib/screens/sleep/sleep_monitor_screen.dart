@@ -130,7 +130,10 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         actions: [
-          if (!controller.loading && !controller.loadFailed && !active && !pending)
+          if (!controller.loading &&
+              !controller.loadFailed &&
+              !active &&
+              !pending)
             IconButton(
               tooltip: loc.sleepMonitorTipsTitle,
               icon: const Icon(Icons.lightbulb_outline_rounded),
@@ -230,7 +233,10 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
   Future<void> _handlePendingAlarm() async {
     final succeeded = await _controller.handlePendingAlarm();
     if (!succeeded && mounted) {
-      showAppSnack(context, AppLocalizations.of(context)!.sleepMonitorAlarmActionError);
+      showAppSnack(
+        context,
+        AppLocalizations.of(context)!.sleepMonitorAlarmActionError,
+      );
     }
   }
 
@@ -246,7 +252,10 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     if (!mounted) return;
     switch (result) {
       case AlarmTimeResult.invalidWindow:
-        showAppSnack(context, AppLocalizations.of(context)!.sleepAlarmInvalidWindow);
+        showAppSnack(
+          context,
+          AppLocalizations.of(context)!.sleepAlarmInvalidWindow,
+        );
       case AlarmTimeResult.updateFailed:
         showAppSnack(
           context,
@@ -263,7 +272,10 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
 
   void _shiftAlarmTime(int minutes) {
     if (_controller.shiftAlarmTime(minutes) == AlarmShiftResult.invalidWindow) {
-      showAppSnack(context, AppLocalizations.of(context)!.sleepAlarmInvalidWindow);
+      showAppSnack(
+        context,
+        AppLocalizations.of(context)!.sleepAlarmInvalidWindow,
+      );
     }
   }
 

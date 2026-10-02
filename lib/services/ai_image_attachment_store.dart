@@ -126,9 +126,9 @@ class AiImageAttachmentStore {
   };
 
   static String _extensionFor(String mimeType) => switch (mimeType) {
-        'image/png' => 'png',
-        'image/webp' => 'webp',
-        'image/gif' => 'gif',
-        _ => 'jpg',
-      };
+    'image/png' => 'png',
+    'image/webp' => 'webp',
+    'image/gif' => 'gif',
+    _ => 'jpg',
+  };
 }

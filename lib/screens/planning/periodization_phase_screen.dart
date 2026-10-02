@@ -35,7 +35,8 @@ class PeriodizationPhaseScreen extends StatefulWidget {
       _PeriodizationPhaseScreenState();
 }
 
-class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> with GuardedLoad {
+class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen>
+    with GuardedLoad {
   final _repository = DatabaseHelper.instance.periodizationRepo;
   late PeriodizationPhase _phase = widget.phase;
   late PeriodizationPlan _plan = widget.plan;
@@ -83,8 +84,7 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> wit
     // can show how each went; later weeks load when opened.
     final started = [
       for (var week = 0; week < phase.totalWeeks; week++)
-        if (!addDays(phase.startDate, 7 * week).isAfter(_today))
-          week,
+        if (!addDays(phase.startDate, 7 * week).isAfter(_today)) week,
     ];
     final progress = await Future.wait([
       for (final week in {...started, currentWeek})

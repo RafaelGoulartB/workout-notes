@@ -126,10 +126,7 @@ class PhaseWeekRow extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Text(
-                          planningDateRange(
-                            start,
-                            addDays(start, 6),
-                          ),
+                          planningDateRange(start, addDays(start, 6)),
                           style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),

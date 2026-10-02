@@ -385,7 +385,10 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                   padding: const EdgeInsets.only(top: 10, bottom: 4),
                   child: PlanOverrideBanner(planInfo: effective),
                 ),
-              AppSectionHeader(loc.nutritionSettingsSectionDaily, padding: AppSectionHeader.compactPadding),
+              AppSectionHeader(
+                loc.nutritionSettingsSectionDaily,
+                padding: AppSectionHeader.compactPadding,
+              ),
               SettingsCard(
                 children: [
                   SettingsValueTile(
@@ -486,7 +489,10 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                   ),
                 ],
               ),
-              AppSectionHeader(loc.nutritionSettingsSectionTools, padding: AppSectionHeader.compactPadding),
+              AppSectionHeader(
+                loc.nutritionSettingsSectionTools,
+                padding: AppSectionHeader.compactPadding,
+              ),
               SettingsCard(
                 children: [
                   SettingsLinkTile(
@@ -498,7 +504,10 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                   ),
                 ],
               ),
-              AppSectionHeader(loc.nutritionSettingsSectionMeals, padding: AppSectionHeader.compactPadding),
+              AppSectionHeader(
+                loc.nutritionSettingsSectionMeals,
+                padding: AppSectionHeader.compactPadding,
+              ),
               SettingsCard(
                 children: [
                   if (mealTypes.isEmpty)
@@ -524,7 +533,10 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                 ],
               ),
               if (_current != null) ...[
-                AppSectionHeader(loc.nutritionSettingsSectionDanger, padding: AppSectionHeader.compactPadding),
+                AppSectionHeader(
+                  loc.nutritionSettingsSectionDanger,
+                  padding: AppSectionHeader.compactPadding,
+                ),
                 SettingsCard(
                   children: [
                     SettingsLinkTile(
