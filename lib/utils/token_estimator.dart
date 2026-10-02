@@ -12,16 +12,4 @@ class TokenEstimator {
   static int estimateChars(int length) =>
       length <= 0 ? 0 : (length / charsPerToken).ceil();
 
-  static int estimateMessage({
-    required String role,
-    String? content,
-    String? toolName,
-    String? toolCallArguments,
-  }) {
-    var total = role.length + 8;
-    total += estimateText(content);
-    if (toolName != null) total += estimateText(toolName);
-    if (toolCallArguments != null) total += estimateText(toolCallArguments);
-    return total;
-  }
 }

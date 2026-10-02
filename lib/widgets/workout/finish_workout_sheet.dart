@@ -39,16 +39,6 @@ class WorkoutSummary {
     return DurationFormat.elapsed(durationSeconds);
   }
 
-  String get formattedVolume {
-    if (totalVolume >= 1000000) {
-      return '${AppNumberFormat.decimal(totalVolume / 1000000, 1)}M';
-    }
-    if (totalVolume >= 1000) {
-      return '${AppNumberFormat.decimal(totalVolume / 1000, 1)}k';
-    }
-    return AppNumberFormat.decimal(totalVolume, 0);
-  }
-
   double? get densityKgPerMinute {
     if (durationSeconds <= 0 || totalVolume <= 0) return null;
     return totalVolume / (durationSeconds / 60.0);

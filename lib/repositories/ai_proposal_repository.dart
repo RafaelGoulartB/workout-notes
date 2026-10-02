@@ -135,20 +135,4 @@ class AiProposalRepository extends BaseRepository {
     );
   }
 
-  /// Deletes the proposals created by [toolCallIds] of a conversation (a retry
-  /// discards the abandoned attempt together with its cards).
-  Future<int> deleteForToolCalls(
-    String threadId,
-    Iterable<String> toolCallIds,
-  ) async {
-    final ids = toolCallIds.toList();
-    if (ids.isEmpty) return 0;
-    final database = await db;
-    return database.delete(
-      'ai_proposals',
-      where:
-          'thread_id = ? AND tool_call_id IN (${List.filled(ids.length, '?').join(', ')})',
-      whereArgs: [threadId, ...ids],
-    );
-  }
 }

@@ -267,22 +267,6 @@ class AiSettingsNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setUtilityModel(String providerId, String model) async {
-    final provider = _providerById(providerId);
-    if (provider == null) return;
-    _replaceProvider(provider.copyWith(utilityModel: model.trim()));
-    await _persistProviders();
-    notifyListeners();
-  }
-
-  Future<void> setApiStyle(String providerId, AiApiStyle style) async {
-    final provider = _providerById(providerId);
-    if (provider == null) return;
-    _replaceProvider(provider.copyWith(apiStyle: style, clearLastCheck: true));
-    await _persistProviders();
-    notifyListeners();
-  }
-
   Future<void> setReasoningEffort(
     String providerId,
     String model,

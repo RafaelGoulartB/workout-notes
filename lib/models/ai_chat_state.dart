@@ -160,13 +160,6 @@ class AiChatState {
   bool get isBusyElsewhere =>
       turn != null && turn!.threadId != activeThreadId;
 
-  AiProposal? proposalById(String id) {
-    for (final proposal in proposals) {
-      if (proposal.id == id) return proposal;
-    }
-    return null;
-  }
-
   AiProposal? proposalForToolCall(String toolCallId) {
     for (final proposal in proposals) {
       if (proposal.toolCallId == toolCallId) return proposal;
@@ -175,13 +168,6 @@ class AiChatState {
   }
 
   bool get isEmpty => messages.isEmpty;
-  AiChatThread? get activeThread {
-    if (activeThreadId == null) return null;
-    for (final t in threads) {
-      if (t.id == activeThreadId) return t;
-    }
-    return null;
-  }
 
   AiChatState copyWith({
     List<AiChatThread>? threads,

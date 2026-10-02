@@ -67,7 +67,6 @@ class AiChatCompletion {
     this.truncated = false,
   });
 
-  bool get hasToolCalls => toolCalls.isNotEmpty;
 }
 
 /// Incremental progress of a streamed completion.

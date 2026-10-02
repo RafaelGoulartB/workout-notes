@@ -21,13 +21,10 @@ const _uuid = Uuid();
 class AiMemoryService extends ChangeNotifier {
   static final AiMemoryService instance = AiMemoryService();
 
-  AiMemoryRepository _repo;
+  final AiMemoryRepository _repo;
 
   AiMemoryService({AiMemoryRepository? repo})
     : _repo = repo ?? DatabaseHelper.instance.aiMemoryRepo;
-
-  @visibleForTesting
-  void overrideRepositoryForTest(AiMemoryRepository repo) => _repo = repo;
 
   static const int maxEntries = 40;
   static const int maxChars = 280;

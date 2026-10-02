@@ -214,12 +214,6 @@ class AiToolArgs {
   }
 }
 
-String? nullableString(dynamic value) {
-  if (value is! String) return null;
-  final trimmed = value.trim();
-  return trimmed.isEmpty ? null : trimmed;
-}
-
 AiToolResult aiToolOk(Map<String, dynamic> data) =>
     AiToolResult(ok: true, data: data);
 

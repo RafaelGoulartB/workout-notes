@@ -152,11 +152,6 @@ class SleepMonitorSession {
   /// Decoded night chart data; null when absent or unreadable.
   SleepNightTimeline? get timeline => SleepNightTimeline.decode(stageTimeline);
 
-  bool get hasSleepStages =>
-      analysisStatus == analysisAvailable &&
-      sleepingMinutes != null &&
-      deepSleepMinutes != null;
-
   bool get isActive =>
       status == starting || status == running || status == stopping;
 

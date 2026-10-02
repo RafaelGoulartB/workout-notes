@@ -110,42 +110,6 @@ class ExerciseLocaleHelper {
     return false;
   }
 
-  /// Checks if a category row matches a search query considering localization.
-  static bool categoryMatchesSearch(
-    AppLocalizations loc,
-    Map<String, dynamic> row,
-    String query,
-  ) {
-    if (query.isEmpty) return true;
-    final q = query.toLowerCase();
-
-    // Search in stored DB name
-    final dbName = (row['name'] as String?)?.toLowerCase() ?? '';
-    if (dbName.contains(q)) return true;
-
-    // Search in localized name
-    final localeKey = row['locale_key'] as String?;
-    if (localeKey != null) {
-      final localized =
-          ExerciseLocalization.categoryName(localeKey, loc.localeName);
-      if (localized != null && localized.toLowerCase().contains(q)) {
-        return true;
-      }
-    } else {
-      // Search by category ID
-      final catId = row['id'] as String?;
-      if (catId != null) {
-        final localized =
-            ExerciseLocalization.categoryName(catId, loc.localeName);
-        if (localized != null && localized.toLowerCase().contains(q)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
   /// Returns a display string for the equipment, localized if needed.
   static String equipment(Map<String, dynamic> row) {
     return (row['equipment'] as String?) ?? '';
