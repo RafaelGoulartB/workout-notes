@@ -380,7 +380,7 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
     final now = DateTime.now();
     final today = dayOf(now);
     final date = dayOf(value);
-    return today.difference(date).inDays.clamp(0, 999999);
+    return daysBetween(date, today).clamp(0, 999999);
   }
 
   void _onQueryChanged(String value) {

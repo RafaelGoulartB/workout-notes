@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/repositories/analytics_repository.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 import 'support/ai_test_db.dart';
 
@@ -122,5 +123,19 @@ void main() {
         .getWorkoutOverviewStats();
     expect(overview['total_workouts'], 1);
     expect(overview['total_sets'], 1);
+  });
+
+  test('the workout streak survives a daylight-saving change', () async {
+    // A year of consecutive days always spans every DST change of the local
+    // zone (run with e.g. TZ=America/New_York to exercise one); a day that
+    // lasts 23 hours must not reset the streak.
+    final today = dayOf(DateTime.now());
+    for (var i = 0; i < 400; i++) {
+      await _workout(db, 'streak$i', dateKey(addDays(today, -i)));
+    }
+
+    final overview = await repo.getWorkoutOverviewStats();
+
+    expect(overview['current_streak'], 400);
   });
 }

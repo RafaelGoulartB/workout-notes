@@ -77,8 +77,8 @@ class RunPlanHistoryInsights {
     final currentWeek = mondayOf(now);
     final km = <double>[];
     for (var i = 1; i <= completeWeeks; i++) {
-      final start = currentWeek.subtract(Duration(days: 7 * i));
-      final end = start.add(const Duration(days: 7));
+      final start = addDays(currentWeek, -7 * i);
+      final end = addDays(start, 7);
       final weekKm = runs
           .where(
             (run) =>

@@ -539,6 +539,12 @@
   "activeWorkoutFeeling5": "Excellent!",
   "activeWorkoutSetLabel": "Set {number}",
   "workoutDetailSetNumber": "#",
+  "exerciseDetailDeleteBodyHistory": "\"{name}\" will be deleted together with its history: {sets, plural, =1{1 logged set} other{{sets} logged sets}} in {workouts, plural, =1{1 workout} other{{workouts} workouts}}{routines, plural, =0{} =1{, and it will be removed from 1 routine} other{, and it will be removed from {routines} routines}}. Workouts left empty are deleted too. This cannot be undone.",
+  "@exerciseDetailDeleteBodyHistory": {"placeholders": {"name": {"type": "String"}, "workouts": {"type": "int"}, "sets": {"type": "int"}, "routines": {"type": "int"}}},
+  "exerciseDetailDeleteBodyRoutines": "\"{name}\" will be deleted and removed from {routines, plural, =1{1 routine} other{{routines} routines}}. This cannot be undone.",
+  "@exerciseDetailDeleteBodyRoutines": {"placeholders": {"name": {"type": "String"}, "routines": {"type": "int"}}},
+  "workoutSetDeleted": "Set deleted",
+  "workoutDeleteSetTooltip": "Delete set",
   "workoutDetailRpe": "RPE",
 
   "notificationRestChannelName": "Rest Timer",

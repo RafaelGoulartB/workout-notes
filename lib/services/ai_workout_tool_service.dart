@@ -534,7 +534,7 @@ class AiWorkoutToolService {
     for (final session in ordered) {
       final e1rm = session.bestE1rm;
       if (e1rm == null) continue;
-      final days = DateTime.parse(session.date).difference(firstDate).inDays;
+      final days = daysBetween(firstDate, DateTime.parse(session.date));
       e1rmPoints.add((days / 7, e1rm));
     }
     _Session? bestSession;

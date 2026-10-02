@@ -114,7 +114,7 @@ class _PeriodizationCheckinScreenState extends State<PeriodizationCheckinScreen>
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final end = _weekStart.add(const Duration(days: 6));
+    final end = addDays(_weekStart, 6);
     return Scaffold(
       appBar: AppBar(
         title: Text(

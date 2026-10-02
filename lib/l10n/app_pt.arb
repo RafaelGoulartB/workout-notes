@@ -531,6 +531,12 @@
   "activeWorkoutFeeling5": "Excelente!",
   "activeWorkoutSetLabel": "Série {number}",
   "workoutDetailSetNumber": "#",
+  "exerciseDetailDeleteBodyHistory": "\"{name}\" será excluído junto com o histórico: {sets, plural, =1{1 série registrada} other{{sets} séries registradas}} em {workouts, plural, =1{1 treino} other{{workouts} treinos}}{routines, plural, =0{} =1{, e será removido de 1 rotina} other{, e será removido de {routines} rotinas}}. Treinos que ficarem vazios também serão excluídos. Esta ação não pode ser desfeita.",
+  "@exerciseDetailDeleteBodyHistory": {"placeholders": {"name": {"type": "String"}, "workouts": {"type": "int"}, "sets": {"type": "int"}, "routines": {"type": "int"}}},
+  "exerciseDetailDeleteBodyRoutines": "\"{name}\" será excluído e removido de {routines, plural, =1{1 rotina} other{{routines} rotinas}}. Esta ação não pode ser desfeita.",
+  "@exerciseDetailDeleteBodyRoutines": {"placeholders": {"name": {"type": "String"}, "routines": {"type": "int"}}},
+  "workoutSetDeleted": "Série excluída",
+  "workoutDeleteSetTooltip": "Excluir série",
   "workoutDetailRpe": "RPE",
 
   "notificationRestChannelName": "Timer de Descanso",

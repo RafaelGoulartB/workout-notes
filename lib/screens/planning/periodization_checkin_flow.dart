@@ -36,7 +36,7 @@ abstract final class PeriodizationCheckinFlow {
         final monday = mondayOf(DateTime.now());
         final next = DateFormat.MMMd(
           Intl.defaultLocale,
-        ).format(monday.add(const Duration(days: 7)));
+        ).format(addDays(monday, 7));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(loc.periodizationNextReview(next))),
         );

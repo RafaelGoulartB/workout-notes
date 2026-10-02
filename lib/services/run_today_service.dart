@@ -356,7 +356,7 @@ abstract final class RunTodayResolver {
   }) {
     if (plan == null) return null;
     for (var i = 1; i <= horizonDays; i++) {
-      final date = day.add(Duration(days: i));
+      final date = addDays(day, i);
       final session = _sessionFromPlan(date, plan);
       if (session != null) return session;
     }
@@ -399,7 +399,7 @@ abstract final class RunTodayResolver {
       for (final workout in plan.workoutsForWeek(week))
         if (workout.dayOfWeek != null)
           () {
-            final date = monday.add(Duration(days: workout.dayOfWeek! - 1));
+            final date = addDays(monday, workout.dayOfWeek! - 1);
             return RunPlannedDay(
               date: date,
               kind: workout.kind,
@@ -476,8 +476,8 @@ class RunTodayService {
     final upcoming =
         await _safe(
           _planRepo.getScheduledRuns(
-            day.add(const Duration(days: 1)),
-            day.add(const Duration(days: 28)),
+            addDays(day, 1),
+            addDays(day, 28),
           ),
         ) ??
         const <ScheduledRun>[];
@@ -485,7 +485,7 @@ class RunTodayService {
         await _safe(
           _planRepo.getScheduledRuns(
             monday,
-            monday.add(const Duration(days: 6)),
+            addDays(monday, 6),
           ),
         ) ??
         const <ScheduledRun>[];
@@ -515,7 +515,7 @@ class RunTodayService {
         followed == null && upcoming.every((s) => !s.isPlanned);
     if (needsSuggestionLookahead && suggestion != null) {
       for (var i = 1; i <= 7 && next == null; i++) {
-        final date = day.add(Duration(days: i));
+        final date = addDays(day, i);
         final future = await _safe(
           helper.periodizationRepo.getRunSuggestion(date),
         );
@@ -564,10 +564,10 @@ class RunTodayService {
       [
         for (var i = 0; i < 7; i++)
           RunDayRuns(
-            monday.add(Duration(days: i)),
+            addDays(monday, i),
             all.where((a) {
               final d = a.startedAt.toLocal();
-              final date = monday.add(Duration(days: i));
+              final date = addDays(monday, i);
               return d.year == date.year &&
                   d.month == date.month &&
                   d.day == date.day;

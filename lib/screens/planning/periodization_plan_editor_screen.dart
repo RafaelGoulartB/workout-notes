@@ -83,7 +83,7 @@ class _PeriodizationPlanEditorScreenState extends State<PeriodizationPlanEditorS
   static DateTime _nextMonday(DateTime date) {
     final day = dayOf(date);
     if (day.weekday == DateTime.monday) return day;
-    return day.add(Duration(days: 8 - day.weekday));
+    return addDays(day, 8 - day.weekday);
   }
 
   Future<void> _load() => guardedLoad(() async {

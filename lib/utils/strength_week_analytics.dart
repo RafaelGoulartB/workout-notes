@@ -209,8 +209,8 @@ class StrengthWeekAnalytics {
     final clock = now ?? DateTime.now();
     final today = dayOf(clock);
     final thisWeekStart = mondayOf(today);
-    final nextWeekStart = thisWeekStart.add(const Duration(days: 7));
-    final lastWeekStart = thisWeekStart.subtract(const Duration(days: 7));
+    final nextWeekStart = addDays(thisWeekStart, 7);
+    final lastWeekStart = addDays(thisWeekStart, -7);
 
     final finished = all.where((w) => !w.date.isAfter(today)).toList()
       ..sort((a, b) => a.date.compareTo(b.date));
@@ -220,14 +220,12 @@ class StrengthWeekAnalytics {
     int weekCount;
     if (fixedWeeks != null) {
       weekCount = fixedWeeks;
-      windowStart = thisWeekStart.subtract(
-        Duration(days: 7 * (fixedWeeks - 1)),
-      );
+      windowStart = addDays(thisWeekStart, -7 * (fixedWeeks - 1));
     } else if (finished.isEmpty) {
       weekCount = 1;
     } else {
       windowStart = mondayOf(finished.first.date);
-      weekCount = thisWeekStart.difference(windowStart).inDays ~/ 7 + 1;
+      weekCount = daysBetween(windowStart, thisWeekStart) ~/ 7 + 1;
     }
 
     final inPeriod = finished
@@ -255,7 +253,7 @@ class StrengthWeekAnalytics {
         thisSessions++;
         thisSets += w.workingSets;
         thisVolume += w.volumeKg;
-        final i = w.date.difference(thisWeekStart).inDays.clamp(0, 6);
+        final i = daysBetween(thisWeekStart, w.date).clamp(0, 6);
         daySessions[i]++;
         daySets[i] += w.workingSets;
         dayVolume[i] += w.volumeKg;
@@ -283,7 +281,7 @@ class StrengthWeekAnalytics {
         ? StrengthPeriodTotals.empty
         : _totals(
             finished,
-            start: windowStart.subtract(Duration(days: 7 * weekCount)),
+            start: addDays(windowStart, -(7 * weekCount)),
             end: windowStart,
           );
 
@@ -301,7 +299,7 @@ class StrengthWeekAnalytics {
       thisWeekDays: [
         for (var i = 0; i < 7; i++)
           StrengthDayBucket(
-            date: thisWeekStart.add(Duration(days: i)),
+            date: addDays(thisWeekStart, i),
             sessions: daySessions[i],
             workingSets: daySets[i],
             volumeKg: dayVolume[i],
@@ -357,11 +355,11 @@ class StrengthWeekAnalytics {
     if (weeks.isEmpty) return 0;
     var cursor = weeks.contains(thisWeekStart)
         ? thisWeekStart
-        : thisWeekStart.subtract(const Duration(days: 7));
+        : addDays(thisWeekStart, -7);
     var streak = 0;
     while (weeks.contains(cursor)) {
       streak++;
-      cursor = cursor.subtract(const Duration(days: 7));
+      cursor = addDays(cursor, -7);
     }
     return streak;
   }
@@ -373,7 +371,7 @@ class StrengthWeekAnalytics {
   ) {
     final starts = [
       for (var i = weekCount - 1; i >= 0; i--)
-        thisWeekStart.subtract(Duration(days: 7 * i)),
+        addDays(thisWeekStart, -(7 * i)),
     ];
     final index = {for (var i = 0; i < starts.length; i++) starts[i]: i};
     final sessions = List<int>.filled(starts.length, 0);
@@ -428,7 +426,7 @@ class StrengthWeekAnalytics {
           final next = DateTime(first.year, first.month + i + 1);
           return StrengthTrendBucket(
             start: start,
-            spanDays: next.difference(start).inDays,
+            spanDays: daysBetween(start, next),
             sessions: sessions[i],
             volumeKg: volume[i],
             workingSets: sets[i],
@@ -491,7 +489,7 @@ class WorkoutWeekOverview {
     final clock = now ?? DateTime.now();
     final today = dayOf(clock);
     final monday = mondayOf(today);
-    final nextMonday = monday.add(const Duration(days: 7));
+    final nextMonday = addDays(monday, 7);
     bool thisWeek(DateTime d) => !d.isBefore(monday) && d.isBefore(nextMonday);
 
     var strength = 0;

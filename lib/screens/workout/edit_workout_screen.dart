@@ -12,6 +12,7 @@ import 'package:workout_notes/widgets/strength/exercises/exercise_picker_sheet.d
 import 'package:workout_notes/widgets/ui/guarded_load.dart';
 import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
+import 'package:workout_notes/widgets/workout/set_deleted_snack_bar.dart';
 
 /// Screen for editing a completed (or in-progress) workout.
 ///
@@ -131,7 +132,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> with GuardedLoad 
       context: context,
       initialDate: _workoutDate,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: addDays(DateTime.now(), 365),
       helpText: loc.editWorkoutSelectDate,
     );
     if (picked == null || !mounted) return;
@@ -168,7 +169,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> with GuardedLoad 
       context: context,
       initialDate: initial,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: addDays(DateTime.now(), 365),
       helpText: loc.editWorkoutSelectDate,
     );
     if (pickedDate == null || !mounted) return;
@@ -212,7 +213,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> with GuardedLoad 
       context: context,
       initialDate: initial,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: addDays(DateTime.now(), 365),
       helpText: loc.editWorkoutSelectDate,
     );
     if (pickedDate == null || !mounted) return;
@@ -385,7 +386,21 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> with GuardedLoad 
   }
 
   Future<void> _deleteSet(String setId) async {
-    await _workoutRepo.deleteSet(setId);
+    final deleted = await _workoutRepo.deleteSet(setId);
+    await _load();
+    if (!mounted) return;
+    setState(() {});
+    if (deleted == null) return;
+    showSetDeletedSnackBar(
+      context,
+      messenger: _scaffoldMessengerKey.currentState,
+      onUndo: () => _restoreSet(deleted),
+    );
+  }
+
+  Future<void> _restoreSet(Map<String, dynamic> row) async {
+    final restored = await _workoutRepo.restoreSet(row);
+    if (!restored || !mounted) return;
     await _load();
     if (mounted) setState(() {});
   }
@@ -879,7 +894,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> with GuardedLoad 
             if (ex.sets.isNotEmpty) ...[
               Row(
                 children: [
-                  const SizedBox(width: 28),
+                  const SizedBox(width: 40),
                   Expanded(
                     flex: 3,
                     child: Text(
@@ -922,29 +937,44 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> with GuardedLoad 
                 padding: const EdgeInsets.symmetric(vertical: 3),
                 child: Row(
                   children: [
-                    InkWell(
-                      borderRadius: BorderRadius.circular(20),
-                      onTap: () => _deleteSet(s['id'] as String),
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isWarmup
-                              ? colors.tertiary.withAlpha(30)
-                              : colors.surfaceContainerHighest,
-                        ),
-                        child: Text(
-                          isWarmup ? loc.workoutDetailWarmupShort : '${i + 1}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: isWarmup ? colors.tertiary : null,
+                    Tooltip(
+                      message: loc.workoutDeleteSetTooltip,
+                      child: Semantics(
+                        button: true,
+                        label: loc.workoutDeleteSetTooltip,
+                        excludeSemantics: true,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: () => _deleteSet(s['id'] as String),
+                          child: SizedBox(
+                            width: 40,
+                            height: 40,
+                            child: Center(
+                              child: Container(
+                                width: 24,
+                                height: 24,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isWarmup
+                                      ? colors.tertiary.withAlpha(30)
+                                      : colors.surfaceContainerHighest,
+                                ),
+                                child: Text(
+                                  isWarmup
+                                      ? loc.workoutDetailWarmupShort
+                                      : '${i + 1}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: isWarmup ? colors.tertiary : null,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 4),
                     for (final value in [
                       AppNumberFormat.decimalOrDash(s['weight'] as num?, 1),
                       (s['reps'] as int?)?.toString() ?? '-',

@@ -56,11 +56,11 @@ class SleepRepository extends BaseRepository {
   }) async {
     final end = dayOf(referenceDate ?? DateTime.now());
     final entries7 = await getEntries(
-      from: end.subtract(const Duration(days: 6)),
+      from: addDays(end, -6),
       to: end,
     );
     final entries30 = await getEntries(
-      from: end.subtract(const Duration(days: 29)),
+      from: addDays(end, -29),
       to: end,
     );
     final regularityEntries = entries7

@@ -10,6 +10,7 @@ import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'support/run_plan_fixtures.dart';
 import 'support/test_db.dart';
 
@@ -556,13 +557,9 @@ void main() {
 
     test('a race plan is anchored so its last week is race week', () async {
       final today = DateTime.now();
-      final monday = DateTime(
-        today.year,
-        today.month,
-        today.day,
-      ).subtract(Duration(days: today.weekday - 1));
+      final monday = mondayOf(today);
       // Race on the Saturday eight weeks from now; the plan is three weeks.
-      final race = monday.add(const Duration(days: 7 * 8 + 5));
+      final race = addDays(monday, 7 * 8 + 5);
       final plan = await repository.createPlan(
         name: '5 km',
         goalKind: RunPlanGoalKind.fiveK,
@@ -581,7 +578,7 @@ void main() {
       }
       await repository.activatePlan(plan.id);
       final active = (await repository.getPlan(plan.id))!;
-      expect(active.activatedAt, monday.add(const Duration(days: 7 * 6)));
+      expect(active.activatedAt, addDays(monday, 7 * 6));
       expect(active.activeWeekIndexOn(race), 2);
       // Not started yet: nothing is due this week.
       expect(active.activeWeekIndexOn(today), isNull);

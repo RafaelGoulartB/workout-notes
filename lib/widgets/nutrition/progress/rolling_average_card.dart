@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/app_number_format.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/nutrition/progress/progress_shared.dart';
 
 class RollingAverageCard extends StatelessWidget {
@@ -168,7 +169,7 @@ class RollingLineChart extends StatelessWidget {
                 if (!isEdge && !isInterval) {
                   return const SizedBox.shrink();
                 }
-                final date = startDate.add(Duration(days: idx));
+                final date = addDays(startDate, idx);
                 final label = DateFormat.Md(Intl.defaultLocale).format(date);
                 return Padding(
                   padding: const EdgeInsets.only(top: 4),

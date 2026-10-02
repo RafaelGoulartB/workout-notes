@@ -91,7 +91,7 @@ class MedicationReminderService extends ChangeNotifier {
     final today = _today();
     _todayDoses = await _repository.getDoses(
       from: today,
-      to: today.add(const Duration(days: 1)),
+      to: addDays(today, 1),
     );
     notifyListeners();
   }

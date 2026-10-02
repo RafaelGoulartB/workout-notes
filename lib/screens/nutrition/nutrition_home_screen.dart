@@ -94,7 +94,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
         _repository.getDayMeals(date),
         _repository.getDailyNutritionHistoryForRange(
           startDate: weekStart,
-          endDate: weekStart.add(const Duration(days: 6)),
+          endDate: addDays(weekStart, 6),
         ),
       ]);
       if (!mounted || generation != _loadGeneration) return;
@@ -175,7 +175,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2018),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: addDays(DateTime.now(), 365),
     );
     if (picked == null || !mounted) return;
     await _selectDate(picked);
@@ -693,25 +693,25 @@ class _NutritionWeekSelector extends StatelessWidget {
           for (var index = 0; index < DateTime.daysPerWeek; index++)
             Expanded(
               child: _NutritionDayButton(
-                date: weekStart.add(Duration(days: index)),
+                date: addDays(weekStart, index),
                 locale: locale,
                 collapseProgress: collapseProgress,
                 isSelected: isSameDay(
-                  weekStart.add(Duration(days: index)),
+                  addDays(weekStart, index),
                   selectedDate,
                 ),
                 isToday: isSameDay(
-                  weekStart.add(Duration(days: index)),
+                  addDays(weekStart, index),
                   today,
                 ),
                 calorieProgress: _calorieProgress(
                   weeklyCalories[dateKey(
-                    weekStart.add(Duration(days: index)),
+                    addDays(weekStart, index),
                   )],
                 ),
                 isOverCalorieGoal: _isOverCalorieGoal(
                   weeklyCalories[dateKey(
-                    weekStart.add(Duration(days: index)),
+                    addDays(weekStart, index),
                   )],
                 ),
                 onTap: onSelected,

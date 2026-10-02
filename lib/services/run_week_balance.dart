@@ -90,7 +90,7 @@ abstract final class RunWeekBalance {
     ].fold<double>(0, (m, s) => s.km > m ? s.km : m);
     final issues = <RunBalanceIssue>[];
     for (final other in others) {
-      final gap = other.date.difference(session.date).inDays.abs();
+      final gap = daysBetween(session.date, other.date).abs();
       if (gap == 0) {
         issues.add(RunBalanceIssue(RunBalanceProblem.sameDay, other));
       } else if (gap == 1 &&
@@ -155,13 +155,13 @@ abstract final class RunWeekBalance {
     DateTime? better;
     var bestGap = 99;
     for (var i = 0; i < 7; i++) {
-      final day = monday.add(Duration(days: i));
+      final day = addDays(monday, i);
       if (day == target || day == moving.date) continue;
       if (floor != null && day.isBefore(floor)) continue;
       if (issuesFor(moving.movedTo(day), placed(moving, day)).isNotEmpty) {
         continue;
       }
-      final gap = day.difference(target).inDays.abs();
+      final gap = daysBetween(target, day).abs();
       if (gap < bestGap) {
         bestGap = gap;
         better = day;

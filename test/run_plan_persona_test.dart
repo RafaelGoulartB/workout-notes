@@ -275,7 +275,7 @@ void main() {
 
     test('a nearer race compresses the plan onto the race week', () {
       // Saturday, seven weeks out (week 1 is the start week).
-      final race = start.add(const Duration(days: 6 * 7 + 5));
+      final race = addDays(start, 6 * 7 + 5);
       final outline = RunPlanComposer.outline(
         RunPlanTemplates.fiveK,
         config(race),
@@ -296,7 +296,7 @@ void main() {
     });
 
     test('a later race delays the start instead of racing mid-build', () {
-      final race = start.add(const Duration(days: 13 * 7 + 6));
+      final race = addDays(start, 13 * 7 + 6);
       final outline = RunPlanComposer.outline(
         RunPlanTemplates.fiveK,
         config(race),
@@ -304,14 +304,15 @@ void main() {
       expect(outline.schedule, hasLength(RunPlanTemplates.fiveK.weeks));
       expect(
         outline.startWeek,
-        mondayOf(
-          race,
-        ).subtract(Duration(days: 7 * (RunPlanTemplates.fiveK.weeks - 1))),
+        addDays(
+          mondayOf(race),
+          -7 * (RunPlanTemplates.fiveK.weeks - 1),
+        ),
       );
     });
 
     test('a race too close for the plan blocks creation', () {
-      final race = start.add(const Duration(days: 2 * 7 + 6));
+      final race = addDays(start, 2 * 7 + 6);
       final readiness = RunPlanComposer.assess(
         RunPlanTemplates.marathon,
         config(race),

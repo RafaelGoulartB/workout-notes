@@ -104,4 +104,41 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 100));
   });
+
+  testWidgets('a deleted set can be restored from the snackbar', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(420, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          locale: Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: ActiveWorkoutScreen(workoutId: 'live'),
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await _settle(tester);
+    final before = await tester.runAsync(
+      () => db.query('sets', orderBy: 'order_index'),
+    );
+    expect(_setCircle, findsNWidgets(2));
+
+    await tester.tap(find.byTooltip('Delete set').first);
+    await _settle(tester);
+    expect(_setCircle, findsNWidgets(1));
+    expect(find.text('Set deleted'), findsOneWidget);
+
+    await tester.tap(find.text('Undo'));
+    await _settle(tester);
+    expect(_setCircle, findsNWidgets(2));
+    final after = await tester.runAsync(
+      () => db.query('sets', orderBy: 'order_index'),
+    );
+    expect(after, before);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 100));
+  });
 }

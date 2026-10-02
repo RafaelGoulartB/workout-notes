@@ -11,6 +11,7 @@ import 'package:workout_notes/widgets/strength/exercises/exercise_picker_sheet.d
 import 'package:workout_notes/widgets/ui/guarded_load.dart';
 import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
+import 'package:workout_notes/widgets/workout/set_deleted_snack_bar.dart';
 import 'package:workout_notes/widgets/workout/set_editor_fields.dart';
 
 /// Screen for planning/editing a future workout.
@@ -831,9 +832,20 @@ class _FutureWorkoutPlannerScreenState extends State<FutureWorkoutPlannerScreen>
     );
 
     if (result == 'delete') {
-      await _workoutRepo.deleteSet(set['id'] as String);
+      final deleted = await _workoutRepo.deleteSet(set['id'] as String);
       await _load();
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      setState(() {});
+      if (deleted == null) return;
+      showSetDeletedSnackBar(
+        context,
+        onUndo: () async {
+          final restored = await _workoutRepo.restoreSet(deleted);
+          if (!restored || !mounted) return;
+          await _load();
+          if (mounted) setState(() {});
+        },
+      );
     } else if (result == 'save') {
       await _workoutRepo.updateSet(
         set['id'] as String,

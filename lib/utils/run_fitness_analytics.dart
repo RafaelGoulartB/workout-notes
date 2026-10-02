@@ -80,7 +80,7 @@ abstract final class RunFitnessAnalytics {
     final runs = activities.where(RunAnalyticsDates.completedRun).toList();
 
     RunEffortSample? best(Iterable<RunEffortSample> samples, int days) {
-      final from = today.subtract(Duration(days: days));
+      final from = addDays(today, -days);
       RunEffortSample? top;
       var topVdot = 0.0;
       for (final s in samples) {

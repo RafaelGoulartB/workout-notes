@@ -135,11 +135,11 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
         _repository.getEntryCount(),
         _monitorRepository.getUnestimatedSessions(),
         _repository.getEntries(
-          from: _weekEnd.subtract(const Duration(days: 6)),
+          from: addDays(_weekEnd, -6),
           to: _weekEnd,
         ),
         _repository.getEntries(
-          from: today.subtract(const Duration(days: _trendDays - 1)),
+          from: addDays(today, -(_trendDays - 1)),
           to: today,
         ),
       ]);
@@ -463,7 +463,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   Future<void> _changeWeek(int direction) async {
     if (_isChangingWeek) return;
     final today = dayOf(DateTime.now());
-    var candidate = _weekEnd.add(Duration(days: direction * 7));
+    var candidate = addDays(_weekEnd, direction * 7);
     if (candidate.isAfter(today)) candidate = today;
     if (candidate == _weekEnd) return;
 
@@ -472,7 +472,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
       final results = await Future.wait<Object>([
         _repository.getDashboardStats(referenceDate: candidate),
         _repository.getEntries(
-          from: candidate.subtract(const Duration(days: 6)),
+          from: addDays(candidate, -6),
           to: candidate,
         ),
       ]);
@@ -674,7 +674,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   List<DateTime> _weeklyDays() {
     return List.generate(
       7,
-      (index) => _weekEnd.subtract(Duration(days: 6 - index)),
+      (index) => addDays(_weekEnd, -(6 - index)),
     );
   }
 }

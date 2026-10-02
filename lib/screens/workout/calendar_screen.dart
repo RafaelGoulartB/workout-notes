@@ -364,13 +364,13 @@ class _CalendarScreenState extends State<CalendarScreen> with GuardedLoad {
       context: context,
       initialDate: scheduled.date.isBefore(today) ? today : scheduled.date,
       firstDate: today,
-      lastDate: today.add(const Duration(days: 21)),
+      lastDate: addDays(today, 21),
     );
     if (picked == null || !mounted) return;
     final monday = mondayOf(picked);
     final rows = await _runPlanRepo.getScheduledRuns(
       monday,
-      monday.add(const Duration(days: 6)),
+      addDays(monday, 6),
     );
     RunBalanceSession? toSession(ScheduledRun row) {
       final workout = row.workout;

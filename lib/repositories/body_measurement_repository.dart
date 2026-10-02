@@ -186,7 +186,7 @@ class BodyMeasurementRepository extends BaseRepository {
     int months = 6,
   }) async {
     final db = await this.db;
-    final start = dateKey(DateTime.now().subtract(Duration(days: months * 30)));
+    final start = dateKey(addDays(DateTime.now(), -(months * 30)));
     return db.rawQuery(
       '''
       SELECT w.date, w.value as weight,

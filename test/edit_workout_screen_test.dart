@@ -60,4 +60,46 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Bench Press · Série 1'), findsOneWidget);
   });
+
+  testWidgets('deleting a set offers an undo that restores it', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: Locale('pt'),
+          home: EditWorkoutScreen(workoutId: 'w1'),
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      await tester.pump();
+    });
+    final before = await tester.runAsync(() => db.query('sets'));
+    expect(before, hasLength(2));
+
+    expect(find.byTooltip('Excluir série'), findsNWidgets(2));
+    expect(tester.getSize(find.byTooltip('Excluir série').first).height, 40);
+    await tester.runAsync(() async {
+      await tester.tap(find.byTooltip('Excluir série').first);
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+    });
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(await tester.runAsync(() => db.query('sets')), hasLength(1));
+    expect(find.text('Série excluída'), findsOneWidget);
+
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Desfazer'));
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+    });
+    await tester.pump();
+
+    final after = await tester.runAsync(
+      () => db.query('sets', orderBy: 'order_index'),
+    );
+    expect(after, unorderedEquals(before!));
+  });
 }

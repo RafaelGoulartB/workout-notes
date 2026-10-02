@@ -240,7 +240,7 @@ class PhaseEditorController extends ChangeNotifier {
   bool isLocked(int week) => week < editableFrom;
 
   DateTime weekStart(int week) =>
-      _phase.startDate.add(Duration(days: 7 * week));
+      addDays(_phase.startDate, 7 * week);
 
   /// Plan week that phase week [week] maps onto, or null without a plan.
   int? runPlanWeekFor(int week) {

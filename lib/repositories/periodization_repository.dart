@@ -370,7 +370,7 @@ class PeriodizationRepository extends BaseRepository {
           where: 'id = ?',
           whereArgs: [original.id],
         );
-        final shift = range.start.difference(original.startDate).inDays;
+        final shift = daysBetween(original.startDate, range.start);
         if (shift != 0) {
           await txn.rawUpdate(
             'UPDATE phase_targets SET valid_from = date(valid_from, ?) '
@@ -1447,7 +1447,7 @@ class PeriodizationRepository extends BaseRepository {
       rpeAdherenceSum += math.max(0, 1 - distance / 10);
     }
     final latestTarget = _targetForDate(targetHistory, end);
-    final elapsedDays = end.difference(start).inDays + 1;
+    final elapsedDays = daysBetween(start, end) + 1;
     final plannedWorkouts = hasPlannedWorkouts
         ? plannedWorkoutSum.round()
         : null;

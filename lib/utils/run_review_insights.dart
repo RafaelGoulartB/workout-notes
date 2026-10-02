@@ -75,7 +75,7 @@ class RunReviewInsights {
 
     final started = draft.startedAt.toLocal();
     final weekBegin = weekStart(started);
-    final weekEnd = weekBegin.add(const Duration(days: 7));
+    final weekEnd = addDays(weekBegin, 7);
     var weekMeters = meters;
     var weekRuns = 1;
     for (final activity in others) {

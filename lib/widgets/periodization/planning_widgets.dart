@@ -210,11 +210,11 @@ class PlanRoadmap extends StatelessWidget {
     final scheme = theme.colorScheme;
     final start = phases.first.startDate;
     final end = phases.last.endDate;
-    final totalDays = end.difference(start).inDays + 1;
+    final totalDays = daysBetween(start, end) + 1;
     final day = dayOf(today);
     final inside = !day.isBefore(start) && !day.isAfter(end);
     final todayFraction = inside
-        ? (day.difference(start).inDays + 0.5) / totalDays
+        ? (daysBetween(start, day) + 0.5) / totalDays
         : null;
 
     return LayoutBuilder(
@@ -654,7 +654,7 @@ String phaseStatusLabel(
   if (phase.contains(day)) {
     return loc.planningWeekOf(phase.weekAt(day), phase.totalWeeks);
   }
-  final weeks = (phase.startDate.difference(day).inDays / 7).ceil();
+  final weeks = (daysBetween(day, phase.startDate) / 7).ceil();
   return loc.planningStartsInWeeks(weeks);
 }
 

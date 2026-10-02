@@ -39,3 +39,13 @@ String dateKey(DateTime value) {
   final day = value.day.toString().padLeft(2, '0');
   return '$year-$month-$day';
 }
+
+/// Whole calendar days from [from] to [to] (negative when [to] is earlier),
+/// ignoring the time of day. Unlike `to.difference(from).inDays` this stays
+/// exact across a daylight-saving change, where a local day lasts 23 or 25
+/// hours and the difference of two local midnights is not a multiple of 24 h.
+int daysBetween(DateTime from, DateTime to) => DateTime.utc(
+  to.year,
+  to.month,
+  to.day,
+).difference(DateTime.utc(from.year, from.month, from.day)).inDays;

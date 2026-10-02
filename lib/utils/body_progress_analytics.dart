@@ -68,7 +68,7 @@ class BodyWeekBucket {
 
   bool get hasData => average != null;
 
-  DateTime get weekEnd => weekStart.add(const Duration(days: 6));
+  DateTime get weekEnd => addDays(weekStart, 6);
 }
 
 /// A calendar month of daily points, used by the monthly summary list.
@@ -117,7 +117,7 @@ class BodyWeekComparison {
   bool get referenceIsAdjacent {
     final ref = reference;
     if (ref == null) return false;
-    return current.weekStart.difference(ref.weekStart).inDays == 7;
+    return daysBetween(ref.weekStart, current.weekStart) == 7;
   }
 }
 
@@ -281,7 +281,7 @@ class BodyProgressAnalytics {
   int? get daysSinceLast {
     final last = lastDate;
     if (last == null) return null;
-    return dayOf(now).difference(last).inDays;
+    return daysBetween(last, dayOf(now));
   }
 
   /// Entries per week across the weeks covered by the period.
@@ -332,7 +332,7 @@ class BodyProgressAnalytics {
     final weekCount = period.weekCount;
     final cutoff = weekCount == null
         ? null
-        : sundayOf(today).subtract(Duration(days: 7 * (weekCount - 1)));
+        : addDays(sundayOf(today), -(7 * (weekCount - 1)));
 
     // ── Collapse raw rows into daily averages ──────────────────────────
     final sums = <DateTime, double>{};
@@ -450,7 +450,7 @@ class BodyProgressAnalytics {
   /// a wild trend.
   static double? _ratePerWeek(List<BodyDailyPoint> daily) {
     if (daily.length < 3) return null;
-    final spanDays = daily.last.date.difference(daily.first.date).inDays;
+    final spanDays = daysBetween(daily.first.date, daily.last.date);
     if (spanDays < 7) return null;
 
     final origin = daily.first.date;
@@ -459,7 +459,7 @@ class BodyProgressAnalytics {
     var sumXY = 0.0;
     var sumXX = 0.0;
     for (final p in daily) {
-      final x = p.date.difference(origin).inDays.toDouble();
+      final x = daysBetween(origin, p.date).toDouble();
       sumX += x;
       sumY += p.value;
       sumXY += x * p.value;
@@ -489,13 +489,13 @@ class BodyProgressAnalytics {
     }
 
     final weekCount =
-        (currentWeekStart.difference(firstWeekStart).inDays ~/ 7 + 1).clamp(
+        (daysBetween(firstWeekStart, currentWeekStart) ~/ 7 + 1).clamp(
           1,
           260,
         );
     final starts = <DateTime>[
       for (var i = 0; i < weekCount; i++)
-        firstWeekStart.add(Duration(days: 7 * i)),
+        addDays(firstWeekStart, 7 * i),
     ];
 
     final grouped = <DateTime, List<BodyDailyPoint>>{};
@@ -580,11 +580,11 @@ class BodyProgressAnalytics {
     final weeksWithData = <DateTime>{for (final p in daily) sundayOf(p.date)};
     var cursor = weeksWithData.contains(currentWeekStart)
         ? currentWeekStart
-        : currentWeekStart.subtract(const Duration(days: 7));
+        : addDays(currentWeekStart, -7);
     var streak = 0;
     while (weeksWithData.contains(cursor)) {
       streak++;
-      cursor = cursor.subtract(const Duration(days: 7));
+      cursor = addDays(cursor, -7);
     }
     return streak;
   }

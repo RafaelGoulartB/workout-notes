@@ -1631,7 +1631,7 @@ class NutritionRepository extends BaseRepository {
     final result = <DailyCalorieTotal>[];
     final firstDay = DateTime.parse(start);
     final lastDay = DateTime.parse(end);
-    final days = lastDay.difference(firstDay).inDays + 1;
+    final days = daysBetween(firstDay, lastDay) + 1;
     for (var i = 0; i < days; i++) {
       final d = addDays(firstDay, i);
       final key = dateKey(d);

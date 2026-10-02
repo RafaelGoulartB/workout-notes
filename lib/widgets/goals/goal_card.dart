@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/goal.dart';
 import 'package:workout_notes/utils/app_number_format.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/goals/goal_formatters.dart';
 import 'package:workout_notes/widgets/goals/goal_progress_ring.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
@@ -37,7 +38,7 @@ class GoalCard extends StatelessWidget {
     if (!goal.isActive) return GoalPace.paused;
     if (progress.isComplete) return GoalPace.done;
     final total =
-        progress.periodEnd.difference(progress.periodStart).inDays + 1;
+        daysBetween(progress.periodStart, progress.periodEnd) + 1;
     if (total <= 0) return GoalPace.onTrack;
     final expected = (progress.daysElapsed / total).clamp(0.0, 1.0);
     return progress.percent + 0.1 >= expected

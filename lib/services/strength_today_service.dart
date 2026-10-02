@@ -108,7 +108,7 @@ abstract final class StrengthTodayResolver {
     if (strengthDays.isEmpty) return null;
     final day = dayOf(today);
     for (var i = 1; i <= 7; i++) {
-      final date = day.add(Duration(days: i));
+      final date = addDays(day, i);
       if (strengthDays.contains(date.weekday)) return date;
     }
     return null;

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_phase_draft.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
@@ -214,4 +215,22 @@ void main() {
     expect(effective.fromPlan, isFalse);
     expect(effective.goal!.calories, 2000);
   });
+
+  test('a periodization failure surfaces instead of hiding behind the base goal',
+      () async {
+    await expectLater(
+      EffectiveNutritionGoalService.resolve(
+        nutritionRepository: nutrition,
+        periodizationRepository: _FailingPeriodizationRepository(),
+        date: DateTime(2026, 8, 10),
+      ),
+      throwsStateError,
+    );
+  });
+}
+
+class _FailingPeriodizationRepository extends PeriodizationRepository {
+  @override
+  Future<PeriodizationPhase?> getEffectivePhase(DateTime date) async =>
+      throw StateError('periodization is unavailable');
 }

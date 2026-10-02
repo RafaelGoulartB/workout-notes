@@ -364,15 +364,22 @@ class WorkoutRepository extends BaseRepository {
     );
   }
 
+  /// `[first day, first day of the next month)` as `yyyy-MM-dd`, so month
+  /// queries compare ranges and can use the `date` index.
+  (String, String) _monthRange(int year, int month) => (
+    dateKey(DateTime(year, month, 1)),
+    dateKey(DateTime(year, month + 1, 1)),
+  );
+
   Future<List<Map<String, dynamic>>> getWorkoutsByMonth(
     int year,
     int month,
   ) async {
     final db = await this.db;
-    final monthStr = month.toString().padLeft(2, '0');
+    final (from, to) = _monthRange(year, month);
     return db.rawQuery(
-      "SELECT * FROM workouts WHERE date LIKE ? ORDER BY date DESC",
-      ['$year-$monthStr%'],
+      'SELECT * FROM workouts WHERE date >= ? AND date < ? ORDER BY date DESC',
+      [from, to],
     );
   }
 
@@ -381,7 +388,7 @@ class WorkoutRepository extends BaseRepository {
     int month,
   ) async {
     final db = await this.db;
-    final monthStr = month.toString().padLeft(2, '0');
+    final (from, to) = _monthRange(year, month);
     final rows = await db.rawQuery(
       '''
       SELECT DISTINCT w.date, ec.id as category_id, ec.name as category_name, ec.color as category_color
@@ -389,10 +396,10 @@ class WorkoutRepository extends BaseRepository {
       JOIN exercise_entries ee ON w.id = ee.workout_id
       JOIN exercises e ON ee.exercise_id = e.id
       JOIN exercise_categories ec ON e.category_id = ec.id
-      WHERE w.date LIKE ?
+      WHERE w.date >= ? AND w.date < ?
       ORDER BY w.date, ec.name
     ''',
-      ['$year-$monthStr%'],
+      [from, to],
     );
 
     final Map<String, List<Map<String, dynamic>>> result = {};
@@ -999,9 +1006,46 @@ class WorkoutRepository extends BaseRepository {
     );
   }
 
-  Future<void> deleteSet(String setId) async {
+  /// Deletes one set and returns the row it held (null when it did not exist)
+  /// so the caller can offer [restoreSet].
+  Future<Map<String, dynamic>?> deleteSet(String setId) async {
     final db = await this.db;
-    await db.delete('sets', where: 'id = ?', whereArgs: [setId]);
+    return db.transaction((txn) async {
+      final rows = await txn.query(
+        'sets',
+        where: 'id = ?',
+        whereArgs: [setId],
+        limit: 1,
+      );
+      if (rows.isEmpty) return null;
+      await txn.delete('sets', where: 'id = ?', whereArgs: [setId]);
+      return Map<String, dynamic>.of(rows.first);
+    });
+  }
+
+  /// Re-inserts a set removed by [deleteSet] with its exact id, order and
+  /// values. Returns false when its exercise entry is gone meanwhile or the
+  /// id is already back.
+  Future<bool> restoreSet(Map<String, dynamic> row) async {
+    final db = await this.db;
+    final entryId = row['exercise_entry_id'] as String?;
+    if (entryId == null) return false;
+    return db.transaction((txn) async {
+      final entry = await txn.query(
+        'exercise_entries',
+        columns: ['id'],
+        where: 'id = ?',
+        whereArgs: [entryId],
+        limit: 1,
+      );
+      if (entry.isEmpty) return false;
+      final id = await txn.insert(
+        'sets',
+        row,
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+      return id > 0;
+    });
   }
 
   /// Removes every entry of [exerciseId] from [workoutId] with one statement;

@@ -192,9 +192,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
   ) async {
     // The week and the month of the run, with a day of slack; the pure
     // function does the exact filtering.
-    final since = RunReviewInsights.weekStart(
-      activity.startedAt,
-    ).subtract(const Duration(days: 40));
+    final since = addDays(RunReviewInsights.weekStart(activity.startedAt), -40);
     final (ranking, recent, next, gear) = await (
       activity.isRun
           ? _runRepository.listActivitiesForRanking()
@@ -230,7 +228,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
     final today = dayOf(now);
     final upcoming = await _planRepository.getScheduledRuns(
       today,
-      today.add(const Duration(days: 28)),
+      addDays(today, 28),
     );
     for (final run in upcoming) {
       if (run.id != exclude &&

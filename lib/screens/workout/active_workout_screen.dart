@@ -21,6 +21,7 @@ import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/workout/exercise_card.dart';
 import 'package:workout_notes/widgets/workout/finish_workout_sheet.dart';
+import 'package:workout_notes/widgets/workout/set_deleted_snack_bar.dart';
 import 'package:workout_notes/widgets/workout/set_editor_fields.dart';
 
 part 'active_workout_controller.dart';

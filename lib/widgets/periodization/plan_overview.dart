@@ -96,7 +96,7 @@ class PlanHeaderCard extends StatelessWidget {
     final phases = data.phases;
     final start = phases.isEmpty ? plan.startDate : phases.first.startDate;
     final end = phases.isEmpty ? plan.endDate : phases.last.endDate;
-    final totalWeeks = ((end.difference(start).inDays + 1) / 7).ceil();
+    final totalWeeks = ((daysBetween(start, end) + 1) / 7).ceil();
     final String status;
     if (today.isBefore(start)) {
       status = loc.planningPlanStartsOn(
@@ -106,7 +106,7 @@ class PlanHeaderCard extends StatelessWidget {
       status = loc.planningPlanFinished;
     } else {
       status = loc.planningPlanWeekOf(
-        today.difference(start).inDays ~/ 7 + 1,
+        daysBetween(start, today) ~/ 7 + 1,
         totalWeeks,
       );
     }

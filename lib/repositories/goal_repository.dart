@@ -419,9 +419,9 @@ class GoalRepository extends BaseRepository {
     final target = goal.targetValue;
     final percent = target > 0 ? (value / target).clamp(0.0, 1.5) : 0.0;
     final isComplete = target > 0 && value >= target;
-    final daysElapsed = now.difference(start).inDays + 1;
-    final daysTotal = end.difference(start).inDays + 1;
-    final daysRemaining = (end.difference(now).inDays).clamp(0, daysTotal);
+    final daysElapsed = daysBetween(start, now) + 1;
+    final daysTotal = daysBetween(start, end) + 1;
+    final daysRemaining = (daysBetween(now, end)).clamp(0, daysTotal);
     return GoalProgress(
       currentValue: value,
       targetValue: target,

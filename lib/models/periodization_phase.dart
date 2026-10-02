@@ -27,7 +27,7 @@ class PeriodizationPhase {
     required this.updatedAt,
   });
 
-  int get totalDays => endDate.difference(startDate).inDays + 1;
+  int get totalDays => daysBetween(startDate, endDate) + 1;
   int get totalWeeks => (totalDays / 7).ceil();
 
   bool contains(DateTime date) {
@@ -37,13 +37,13 @@ class PeriodizationPhase {
 
   int weekAt(DateTime date) {
     if (date.isBefore(startDate)) return 0;
-    return (date.difference(startDate).inDays ~/ 7 + 1).clamp(1, totalWeeks);
+    return (daysBetween(startDate, date) ~/ 7 + 1).clamp(1, totalWeeks);
   }
 
   double progressAt(DateTime date) {
     if (date.isBefore(startDate)) return 0;
     if (date.isAfter(endDate)) return 1;
-    return ((date.difference(startDate).inDays + 1) / totalDays).clamp(0, 1);
+    return ((daysBetween(startDate, date) + 1) / totalDays).clamp(0, 1);
   }
 
   Map<String, dynamic> toMap() => {

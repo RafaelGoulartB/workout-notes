@@ -139,7 +139,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
 
   Future<void> _changeDay(int delta) async {
     setState(() {
-      _selectedDate = dayOf(_selectedDate.add(Duration(days: delta)));
+      _selectedDate = dayOf(addDays(_selectedDate, delta));
     });
     await _load();
   }
@@ -154,7 +154,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2018),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: addDays(DateTime.now(), 365),
     );
     if (picked == null || !mounted) return;
     setState(() => _selectedDate = dayOf(picked));
@@ -365,7 +365,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
   Future<void> _copyPreviousDay() async {
     final loc = AppLocalizations.of(context)!;
     final yesterday = dateKey(
-      dayOf(_selectedDate.subtract(const Duration(days: 1))),
+      dayOf(addDays(_selectedDate, -1)),
     );
     final source = (await _repository.getDayMeals(
       yesterday,

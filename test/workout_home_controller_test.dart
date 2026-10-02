@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:workout_notes/screens/workout/workout_home_controller.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 void main() {
   StrengthWorkoutStamp stamp(DateTime date) =>
@@ -11,10 +12,10 @@ void main() {
     final stamps = [
       // Inside the window: this week and 11 weeks back (window start).
       stamp(monday),
-      stamp(monday.add(const Duration(days: 2))),
-      stamp(monday.subtract(const Duration(days: 7 * 11))),
+      stamp(addDays(monday, 2)),
+      stamp(addDays(monday, -7 * 11)),
       // Just before the window: ignored.
-      stamp(monday.subtract(const Duration(days: 7 * 11 + 1))),
+      stamp(addDays(monday, -(7 * 11 + 1))),
     ];
     expect(WorkoutHomeController.averageWeeklySessions(stamps, monday), 3 / 12);
     expect(WorkoutHomeController.averageWeeklySessions(const [], monday), 0);

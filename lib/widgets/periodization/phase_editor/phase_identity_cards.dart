@@ -3,6 +3,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/periodization/phase_editor_controller.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/periodization/phase_week_plan.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/periodization_palette.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 
@@ -17,7 +18,7 @@ class PhaseIdentityCard extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final start = controller.phase.startDate;
-    final end = start.add(Duration(days: 7 * controller.weeks - 1));
+    final end = addDays(start, 7 * controller.weeks - 1);
     return PlanningCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -97,9 +97,7 @@ class RunPlanCoach {
         plan: plan,
         config: config,
         proposal: proposal,
-        startWeek: mondayOf(
-          anchor,
-        ).add(Duration(days: 7 * proposal.fromWeek)),
+        startWeek: addDays(mondayOf(anchor), 7 * proposal.fromWeek),
         includeTest: config.includeTest && !testDone,
       );
       final outline = RunPlanComposer.outline(template, next);
@@ -202,8 +200,8 @@ class RunPlanCoach {
       // A week that was never on the calendar (plan activated mid-way) was
       // never the athlete's to run.
       if (rows == null || rows.isEmpty) continue;
-      final start = anchor.add(Duration(days: 7 * week));
-      final end = start.add(const Duration(days: 7));
+      final start = addDays(anchor, 7 * week);
+      final end = addDays(start, 7);
       final ran = activities
           .where(
             (a) => !a.startedAt.isBefore(start) && a.startedAt.isBefore(end),
@@ -268,7 +266,7 @@ class RunPlanCoach {
     List<RunActivity> activities,
     DateTime today,
   ) async {
-    final since = today.subtract(const Duration(days: 21));
+    final since = addDays(today, -21);
     final samples = <RunFitnessSample>[];
     for (final row in scheduled) {
       final kind = row.workout?.kind;

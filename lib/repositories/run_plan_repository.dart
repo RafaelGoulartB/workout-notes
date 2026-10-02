@@ -101,7 +101,7 @@ class RunPlanRepository extends BaseRepository {
       if (existing != null && race != null && existing.weeks > 0) {
         final raceWeek = mondayOf(race);
         if (!raceWeek.isBefore(mondayOf(today))) {
-          start = raceWeek.subtract(Duration(days: 7 * (existing.weeks - 1)));
+          start = addDays(raceWeek, -(7 * (existing.weeks - 1)));
         }
       }
     }
@@ -133,7 +133,7 @@ class RunPlanRepository extends BaseRepository {
       created += (await materializeWeek(
         planId: id,
         weekIndex: week,
-        weekStart: anchorWeek.add(Duration(days: 7 * week)),
+        weekStart: addDays(anchorWeek, 7 * week),
       )).length;
     }
     return created;
@@ -270,8 +270,8 @@ class RunPlanRepository extends BaseRepository {
       // Bounded to the same week either way: a session run a few days late
       // (or early) is the same session, but a row two weeks out belongs to a
       // different week of the plan and must not be cannibalised.
-      final from = day.subtract(const Duration(days: 6));
-      final to = day.add(const Duration(days: 6));
+      final from = addDays(day, -6);
+      final to = addDays(day, 6);
       existing = await database.query(
         'scheduled_runs',
         columns: ['id'],
@@ -812,7 +812,7 @@ class RunPlanRepository extends BaseRepository {
     await database.transaction((txn) async {
       for (final session in sessions) {
         final day = session.dayOfWeek ?? 1;
-        final date = monday.add(Duration(days: day - 1));
+        final date = addDays(monday, day - 1);
         final existing = await txn.query(
           'scheduled_runs',
           columns: ['id'],
@@ -1027,7 +1027,7 @@ class RunPlanRepository extends BaseRepository {
     if (plan == null || !plan.isActivated || anchor == null) return;
     final today = mondayOf(DateTime.now());
     for (var week = fromWeek; week < plan.weeks; week++) {
-      final start = mondayOf(anchor).add(Duration(days: 7 * week));
+      final start = addDays(mondayOf(anchor), 7 * week);
       if (start.isBefore(today)) continue;
       await materializeWeek(planId: planId, weekIndex: week, weekStart: start);
     }
@@ -1238,7 +1238,7 @@ class RunPlanRepository extends BaseRepository {
     );
     for (final row in rows) {
       final date = DateTime.parse(row['date'] as String);
-      final moved = mondayOf(date).add(Duration(days: dayOfWeek - 1));
+      final moved = addDays(mondayOf(date), dayOfWeek - 1);
       await executor.update(
         'scheduled_runs',
         {

@@ -20,7 +20,7 @@ class StrengthRange {
 
   const StrengthRange(this.from, this.to);
 
-  int get days => to.difference(from).inDays + 1;
+  int get days => daysBetween(from, to) + 1;
 
   double get weeks => days / 7;
 

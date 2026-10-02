@@ -3,6 +3,7 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/goal.dart';
 import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/goals/goal_contributing_workouts.dart';
 import 'package:workout_notes/widgets/goals/goal_form_sheet.dart';
 import 'package:workout_notes/widgets/goals/goal_formatters.dart';
@@ -260,7 +261,7 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
     final isPortuguese = Localizations.localeOf(context).languageCode == 'pt';
     final accent = isComplete ? const Color(0xFF43A047) : color;
     final totalDays =
-        current.periodEnd.difference(current.periodStart).inDays + 1;
+        daysBetween(current.periodStart, current.periodEnd) + 1;
     final elapsed = current.daysElapsed.clamp(1, totalDays);
     final periodLabel = _goal.period == GoalPeriod.weekly
         ? loc.goalPeriodWeekly
@@ -431,7 +432,7 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
     final surplus =
         (current.currentValue - current.targetValue).clamp(0.0, double.infinity);
     final totalDays =
-        current.periodEnd.difference(current.periodStart).inDays + 1;
+        daysBetween(current.periodStart, current.periodEnd) + 1;
     final elapsed = current.daysElapsed.clamp(1, totalDays);
     // Today still counts toward the goal, so it is part of the days left.
     final daysLeftInclusive = (totalDays - elapsed + 1).clamp(1, totalDays);

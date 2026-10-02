@@ -116,17 +116,17 @@ abstract final class RunCalendarStats {
     var currentDays = 0;
     var cursor = days.contains(today)
         ? today
-        : today.subtract(const Duration(days: 1));
+        : addDays(today, -1);
     while (days.contains(cursor)) {
       currentDays++;
-      cursor = cursor.subtract(const Duration(days: 1));
+      cursor = addDays(cursor, -1);
     }
     var longestDays = 0;
     final sortedDays = days.toList()..sort();
     var run = 0;
     DateTime? prev;
     for (final d in sortedDays) {
-      run = prev != null && d.difference(prev).inDays == 1 ? run + 1 : 1;
+      run = prev != null && daysBetween(prev, d) == 1 ? run + 1 : 1;
       if (run > longestDays) longestDays = run;
       prev = d;
     }
@@ -134,17 +134,17 @@ abstract final class RunCalendarStats {
     var currentWeeks = 0;
     var weekCursor = weeks.contains(thisWeek)
         ? thisWeek
-        : thisWeek.subtract(const Duration(days: 7));
+        : addDays(thisWeek, -7);
     while (weeks.contains(weekCursor)) {
       currentWeeks++;
-      weekCursor = weekCursor.subtract(const Duration(days: 7));
+      weekCursor = addDays(weekCursor, -7);
     }
     var longestWeeks = 0;
     final sortedWeeks = weeks.toList()..sort();
     run = 0;
     prev = null;
     for (final w in sortedWeeks) {
-      run = prev != null && w.difference(prev).inDays == 7 ? run + 1 : 1;
+      run = prev != null && daysBetween(prev, w) == 7 ? run + 1 : 1;
       if (run > longestWeeks) longestWeeks = run;
       prev = w;
     }
@@ -153,12 +153,12 @@ abstract final class RunCalendarStats {
     // first run ever recorded.
     var considered = windowWeeks;
     if (sortedWeeks.isNotEmpty) {
-      final sinceFirst = thisWeek.difference(sortedWeeks.first).inDays ~/ 7 + 1;
+      final sinceFirst = daysBetween(sortedWeeks.first, thisWeek) ~/ 7 + 1;
       if (sinceFirst < considered) considered = sinceFirst;
     }
     var withRuns = 0;
     for (var i = 0; i < considered; i++) {
-      if (weeks.contains(thisWeek.subtract(Duration(days: 7 * i)))) withRuns++;
+      if (weeks.contains(addDays(thisWeek, -(7 * i)))) withRuns++;
     }
     return RunConsistency(
       currentDayStreak: currentDays,

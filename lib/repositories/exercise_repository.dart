@@ -16,6 +16,26 @@ class ExerciseUsage {
   });
 }
 
+/// What deleting an exercise erases through its `ON DELETE CASCADE` keys.
+class ExerciseDeletionImpact {
+  /// Workouts (finished or not) that contain the exercise.
+  final int workouts;
+
+  /// Logged sets of the exercise across all workouts.
+  final int sets;
+
+  /// Routines that include the exercise.
+  final int routines;
+
+  const ExerciseDeletionImpact({
+    required this.workouts,
+    required this.sets,
+    required this.routines,
+  });
+
+  bool get isEmpty => workouts == 0 && sets == 0 && routines == 0;
+}
+
 /// Repository for exercise categories and exercises CRUD operations.
 class ExerciseRepository extends BaseRepository {
   // ===================================================================
@@ -161,8 +181,68 @@ class ExerciseRepository extends BaseRepository {
     }
   }
 
+  /// Counts the workouts, sets and routines [deleteExercise] would erase.
+  Future<ExerciseDeletionImpact> getDeletionImpact(String id) async {
+    final db = await this.db;
+    final history = await db.rawQuery(
+      '''
+      SELECT COUNT(DISTINCT ee.workout_id) AS workouts, COUNT(s.id) AS sets
+      FROM exercise_entries ee
+      LEFT JOIN sets s ON s.exercise_entry_id = ee.id
+      WHERE ee.exercise_id = ?
+      ''',
+      [id],
+    );
+    final routines = await db.rawQuery(
+      '''
+      SELECT COUNT(DISTINCT rd.routine_id) AS routines
+      FROM routine_exercises re
+      JOIN routine_days rd ON rd.id = re.routine_day_id
+      WHERE re.exercise_id = ?
+      ''',
+      [id],
+    );
+    return ExerciseDeletionImpact(
+      workouts: (history.first['workouts'] as num?)?.toInt() ?? 0,
+      sets: (history.first['sets'] as num?)?.toInt() ?? 0,
+      routines: (routines.first['routines'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  /// Deletes the exercise; its entries, sets and routine slots go with it
+  /// through the foreign keys. In the same transaction, workouts this left
+  /// without any exercise are removed too, unless they hold content of their
+  /// own (a comment or a feeling rating) that the user wrote.
   Future<void> deleteExercise(String id) async {
     final db = await this.db;
-    await db.delete('exercises', where: 'id = ?', whereArgs: [id]);
+    await db.transaction((txn) async {
+      final workoutIds = [
+        for (final row in await txn.query(
+          'exercise_entries',
+          distinct: true,
+          columns: ['workout_id'],
+          where: 'exercise_id = ?',
+          whereArgs: [id],
+        ))
+          row['workout_id'] as String,
+      ];
+      await txn.delete('exercises', where: 'id = ?', whereArgs: [id]);
+      for (var i = 0; i < workoutIds.length; i += 500) {
+        final chunk = workoutIds.sublist(
+          i,
+          i + 500 > workoutIds.length ? workoutIds.length : i + 500,
+        );
+        await txn.delete(
+          'workouts',
+          where:
+              'id IN (${List.filled(chunk.length, '?').join(',')}) '
+              'AND (comment IS NULL OR TRIM(comment) = \'\') '
+              'AND feeling_rating IS NULL '
+              'AND NOT EXISTS ('
+              'SELECT 1 FROM exercise_entries ee WHERE ee.workout_id = workouts.id)',
+          whereArgs: chunk,
+        );
+      }
+    });
   }
 }

@@ -116,7 +116,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> with GuardedL
             return RunnerStrengthRoutine()
                 .completedDays(
                   start,
-                  start.add(Duration(days: 7 * plan.weeks)),
+                  addDays(start, 7 * plan.weeks),
                 )
                 .catchError((Object _) => <DateTime>{});
           }()
@@ -334,7 +334,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> with GuardedL
       context: context,
       helpText: loc.runPlanScheduleWeek,
       // The plan week starts on a Monday, so default to the coming Monday.
-      initialDate: now.add(Duration(days: (8 - now.weekday) % 7)),
+      initialDate: addDays(now, (8 - now.weekday) % 7),
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 5),
     );
@@ -455,7 +455,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> with GuardedL
     final loc = AppLocalizations.of(context)!;
     // Any Monday works: the check only needs weekdays as dates.
     final monday = DateTime(2024, 1, 1);
-    DateTime dateOf(int day) => monday.add(Duration(days: day - 1));
+    DateTime dateOf(int day) => addDays(monday, day - 1);
     final week = [
       for (final w in plan.workoutsForWeek(workout.weekIndex))
         if (w.dayOfWeek != null)

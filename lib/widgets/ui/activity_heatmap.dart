@@ -80,8 +80,8 @@ class _ActivityHeatmapState extends State<ActivityHeatmap> {
     final jan1 = DateTime(widget.year);
     _gridStart = mondayOf(jan1);
     final dec31 = DateTime(widget.year, 12, 31);
-    final gridEnd = dec31.add(Duration(days: 7 - dec31.weekday));
-    _weeks = (gridEnd.difference(_gridStart).inDays + 1) ~/ 7;
+    final gridEnd = addDays(dec31, 7 - dec31.weekday);
+    _weeks = (daysBetween(_gridStart, gridEnd) + 1) ~/ 7;
     _thresholds = heatThresholds(widget.daily.values);
   }
 
@@ -92,7 +92,7 @@ class _ActivityHeatmapState extends State<ActivityHeatmap> {
       _scroll.jumpTo(position.minScrollExtent);
       return;
     }
-    final column = widget.today.difference(_gridStart).inDays ~/ 7;
+    final column = daysBetween(_gridStart, widget.today) ~/ 7;
     final target = (column + 1) * _step - position.viewportDimension + _gap;
     _scroll.jumpTo(target.clamp(0.0, position.maxScrollExtent));
   }

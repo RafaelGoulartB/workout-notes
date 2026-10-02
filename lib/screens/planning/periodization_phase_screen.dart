@@ -82,7 +82,7 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> wit
     // can show how each went; later weeks load when opened.
     final started = [
       for (var week = 0; week < phase.totalWeeks; week++)
-        if (!phase.startDate.add(Duration(days: 7 * week)).isAfter(_today))
+        if (!addDays(phase.startDate, 7 * week).isAfter(_today))
           week,
     ];
     final progress = await Future.wait([
@@ -278,7 +278,7 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> wit
                       progress: _progress[_selected],
                       checkin:
                           _checkins[_key(
-                            _phase.startDate.add(Duration(days: 7 * _selected)),
+                            addDays(_phase.startDate, 7 * _selected),
                           )],
                       today: _today,
                       strengthLabels: [
@@ -366,7 +366,7 @@ class _Header extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              loc.planningDaysLeft(phase.endDate.difference(today).inDays),
+              loc.planningDaysLeft(daysBetween(today, phase.endDate)),
               style: theme.textTheme.labelSmall?.copyWith(
                 color: scheme.onSurfaceVariant,
               ),
@@ -616,7 +616,7 @@ class _WeekStripState extends State<_WeekStrip> {
         itemCount: widget.phase.totalWeeks,
         itemExtent: _tileWidth,
         itemBuilder: (context, week) {
-          final start = widget.phase.startDate.add(Duration(days: 7 * week));
+          final start = addDays(widget.phase.startDate, 7 * week);
           final started = !start.isAfter(widget.today);
           final current =
               widget.phase.contains(widget.today) &&
@@ -730,8 +730,8 @@ class _WeekDetail extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final color = Color(phase.color);
-    final start = phase.startDate.add(Duration(days: 7 * week));
-    final end = start.add(const Duration(days: 6));
+    final start = addDays(phase.startDate, 7 * week);
+    final end = addDays(start, 6);
     final started = !start.isAfter(today);
     final current = !today.isBefore(start) && !today.isAfter(end);
     final progress = this.progress;

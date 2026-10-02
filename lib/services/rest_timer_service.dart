@@ -17,6 +17,13 @@ class RestTimerService extends ChangeNotifier {
   bool _isPaused = false;
   DateTime? _endsAt;
 
+  /// When the background alert (a scheduled system notification, see
+  /// [NotificationService.scheduleRestTimerComplete]) is due, and whether the
+  /// system accepted it. It backs the Dart timer up: with the screen off the
+  /// timer can fire late or not at all.
+  DateTime? _alertAt;
+  bool _alertScheduled = false;
+
   int get remainingSeconds => _remainingSeconds;
   int get totalSeconds => _totalSeconds;
   bool get isRunning => _isRunning;
@@ -41,8 +48,41 @@ class RestTimerService extends ChangeNotifier {
     _endsAt = DateTime.now().add(Duration(seconds: _remainingSeconds));
     notifyListeners();
     _showInitialNotification();
+    _scheduleBackgroundAlert();
 
     _startTicker();
+  }
+
+  /// Whether finishing at [now] must alert from the app: always, unless the
+  /// background alert was scheduled and its time has passed (it already rang,
+  /// for example while the screen was off, so a late timer must not ring a
+  /// second time).
+  @visibleForTesting
+  static bool alertsInApp({
+    required bool alertScheduled,
+    required DateTime? alertAt,
+    required DateTime now,
+  }) => !alertScheduled || alertAt == null || now.isBefore(alertAt);
+
+  void _scheduleBackgroundAlert() {
+    final endsAt = _endsAt;
+    if (endsAt == null) return;
+    final alertAt = endsAt.add(NotificationService.restAlertGrace);
+    _alertAt = alertAt;
+    _alertScheduled = false;
+    unawaited(
+      NotificationService.instance.scheduleRestTimerComplete(alertAt).then((
+        scheduled,
+      ) {
+        // Ignore the answer for a timer that was restarted or stopped since.
+        if (_alertAt == alertAt) _alertScheduled = scheduled;
+      }),
+    );
+  }
+
+  void _clearBackgroundAlert() {
+    _alertAt = null;
+    _alertScheduled = false;
   }
 
   /// Replaces any running ticker with one that syncs the remaining time every
@@ -53,12 +93,21 @@ class RestTimerService extends ChangeNotifier {
       _syncRemainingTime();
       if (_remainingSeconds <= 0) {
         timer.cancel();
+        final alert = alertsInApp(
+          alertScheduled: _alertScheduled,
+          alertAt: _alertAt,
+          now: DateTime.now(),
+        );
         _isRunning = false;
         _isPaused = false;
         _endsAt = null;
+        _clearBackgroundAlert();
         notifyListeners();
-        _longVibrate();
-        _showCompleteNotification();
+        if (alert) {
+          _longVibrate();
+          // Also cancels the scheduled background alert (same notification id).
+          _showCompleteNotification();
+        }
         return;
       }
       notifyListeners();
@@ -78,9 +127,10 @@ class RestTimerService extends ChangeNotifier {
     _timer?.cancel();
     _syncRemainingTime();
     _endsAt = null;
+    _clearBackgroundAlert();
     _isPaused = true;
     notifyListeners();
-    NotificationService.instance.cancelRestTimer();
+    unawaited(NotificationService.instance.cancelRestTimer());
   }
 
   void resume() {
@@ -89,6 +139,7 @@ class RestTimerService extends ChangeNotifier {
     _endsAt = DateTime.now().add(Duration(seconds: _remainingSeconds));
     notifyListeners();
     _updateNotification();
+    _scheduleBackgroundAlert();
     _startTicker();
   }
 
@@ -99,8 +150,9 @@ class RestTimerService extends ChangeNotifier {
     _isRunning = false;
     _isPaused = false;
     _endsAt = null;
+    _clearBackgroundAlert();
     notifyListeners();
-    NotificationService.instance.cancelRestTimer();
+    unawaited(NotificationService.instance.cancelRestTimer());
   }
 
   @override

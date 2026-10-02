@@ -834,11 +834,32 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
   }
 
   Future<void> _deleteSet(String setId) async {
-    await _workoutRepo.deleteSet(setId);
+    final deleted = await _workoutRepo.deleteSet(setId);
     if (!mounted) return;
     setState(() {
       for (final exercise in _exercises) {
         exercise.sets.removeWhere((s) => s['id'] == setId);
+      }
+      _refreshComparisons();
+    });
+    if (deleted == null) return;
+    showSetDeletedSnackBar(context, onUndo: () => _restoreSet(deleted));
+  }
+
+  /// Puts a deleted set back with its original id, position and values.
+  Future<void> _restoreSet(Map<String, dynamic> row) async {
+    final restored = await _workoutRepo.restoreSet(row);
+    if (!restored || !mounted) return;
+    setState(() {
+      for (final exercise in _exercises) {
+        if (exercise.entryId != row['exercise_entry_id']) continue;
+        exercise.sets
+          ..add(row)
+          ..sort(
+            (a, b) => ((a['order_index'] as int?) ?? 0).compareTo(
+              (b['order_index'] as int?) ?? 0,
+            ),
+          );
       }
       _refreshComparisons();
     });
