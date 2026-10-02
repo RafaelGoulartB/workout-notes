@@ -1,6 +1,5 @@
 package com.workoutnotes.workout_notes.medication
 
-import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
@@ -12,6 +11,8 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import com.workoutnotes.workout_notes.R
 
 /**
@@ -19,12 +20,24 @@ import com.workoutnotes.workout_notes.R
  * notification or by the escalation alarm (full screen, over the lock screen).
  * While the alarm rings the screen cannot be dismissed without an answer.
  */
-class MedicationConfirmActivity : Activity() {
+class MedicationConfirmActivity : ComponentActivity() {
     private var slotId: String? = null
     private var doseKey: String? = null
 
-    override fun onCreate(state: Bundle?) {
-        super.onCreate(state)
+    // While the alarm rings the screen cannot be left without an answer.
+    // (A dispatcher callback, because onBackPressed() is not called with
+    // predictive back.)
+    private val backCallback = object : OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() {
+            val slot = slotId?.let { MedicationReminderScheduler.read(this@MedicationConfirmActivity, it) }
+            if (slot?.state == MedicationReminderPolicy.STATE_RINGING) return
+            finish()
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        onBackPressedDispatcher.addCallback(this, backCallback)
         showOverLockScreen()
         readIntent(intent)
         render()
@@ -35,14 +48,6 @@ class MedicationConfirmActivity : Activity() {
         setIntent(intent)
         readIntent(intent)
         render()
-    }
-
-    @Deprecated("Deprecated in Android SDK")
-    override fun onBackPressed() {
-        val slot = slotId?.let { MedicationReminderScheduler.read(this, it) }
-        if (slot?.state == MedicationReminderPolicy.STATE_RINGING) return
-        @Suppress("DEPRECATION")
-        super.onBackPressed()
     }
 
     private fun readIntent(intent: Intent) {

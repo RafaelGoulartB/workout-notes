@@ -533,6 +533,23 @@ object SleepAlarmScheduler {
             }
             return
         }
+        rearmFuture(context, stored)
+    }
+
+    /**
+     * Arms the stored alarm again when the clock, the time zone or the
+     * exact-alarm permission changed. The alarm is an absolute instant (the
+     * night's own time zone), so nothing is recomputed, and nothing that is
+     * ringing or already due is touched: the system fires a due alarm, and
+     * [restore] handles the rest on the next boot or launch.
+     */
+    fun rearmPending(context: Context) {
+        val stored = read(context) ?: return
+        if (stored.state != STATE_SCHEDULED || stored.alarmAtMillis <= System.currentTimeMillis()) return
+        rearmFuture(context, stored)
+    }
+
+    private fun rearmFuture(context: Context, stored: Snapshot) {
         try {
             schedule(
                 context,

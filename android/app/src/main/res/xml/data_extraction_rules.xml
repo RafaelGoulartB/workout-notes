@@ -1,11 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Android 12+. Images attached to AI Coach messages stay on this device:
-     they are neither backed up to the cloud nor copied to a new device. -->
+     they are neither backed up to the cloud nor copied to a new device. The
+     same goes for the flutter_secure_storage preference files (AI provider
+     tokens): they are encrypted with an Android Keystore key that does not
+     exist on another device, so restoring them there would be useless. -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="file" path="ai_chat_images/" />
+        <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+        <exclude domain="sharedpref" path="FlutterSecureKeyStorage.xml" />
+        <exclude domain="sharedpref" path="FlutterSecureStorageConfiguration.xml" />
+        <exclude domain="sharedpref" path="FlutterSecureStorageConfiguration:FlutterSecureStorage.xml" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="ai_chat_images/" />
+        <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+        <exclude domain="sharedpref" path="FlutterSecureKeyStorage.xml" />
+        <exclude domain="sharedpref" path="FlutterSecureStorageConfiguration.xml" />
+        <exclude domain="sharedpref" path="FlutterSecureStorageConfiguration:FlutterSecureStorage.xml" />
     </device-transfer>
 </data-extraction-rules>

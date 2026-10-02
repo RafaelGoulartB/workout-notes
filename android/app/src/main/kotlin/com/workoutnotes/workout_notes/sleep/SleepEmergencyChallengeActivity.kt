@@ -1,6 +1,5 @@
 package com.workoutnotes.workout_notes.sleep
 
-import android.app.Activity
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
@@ -11,11 +10,13 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import com.workoutnotes.workout_notes.R
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
-class SleepEmergencyChallengeActivity : Activity() {
+class SleepEmergencyChallengeActivity : ComponentActivity() {
     private lateinit var progressBar: ProgressBar
     private lateinit var countdownView: TextView
     private lateinit var counterView: TextView
@@ -24,8 +25,17 @@ class SleepEmergencyChallengeActivity : Activity() {
     private var closing = false
     private var completed = false
 
+    // Back gives up the attempt. (A dispatcher callback, because
+    // onBackPressed() is not called with predictive back.)
+    private val backCallback = object : OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() {
+            abortChallenge()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        onBackPressedDispatcher.addCallback(this, backCallback)
         SleepAlarmUi.configureWindow(this)
         if (!SleepAlarmScheduler.beginEmergencyChallenge(this)) {
             finish()
@@ -43,11 +53,6 @@ class SleepEmergencyChallengeActivity : Activity() {
             startTimer()
             updateProgress()
         }
-    }
-
-    @Suppress("DEPRECATION")
-    override fun onBackPressed() {
-        abortChallenge()
     }
 
     override fun onStop() {

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="traditional_alarm_missed_channel_name">Alarmes perdidos</string>
+    <string name="traditional_alarm_missed_channel_description">Avisa quando um alarme tocou por um tempo sem ser desligado.</string>
+    <string name="traditional_alarm_missed_title">Alarme perdido</string>
+    <string name="traditional_alarm_missed_body">O alarme de %1$s tocou por 10 minutos e não foi desligado.</string>
+    <string name="alarm_mission_unlock_required">Desbloqueie o celular primeiro e depois leia o código.</string>
+</resources>

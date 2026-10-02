@@ -249,6 +249,15 @@ class SleepMonitoringService : Service() {
 
     private lateinit var spool: SleepSessionSpool
     private var session: MutableMap<String, Any?>? = null
+
+    // The session map is changed by the capture thread (every window), by
+    // the main thread (alarm marks, alarm moves) and by finish(), while
+    // spool.updateSession() serializes it. One lock covers every change and
+    // the serialization that follows, so a concurrent change can never
+    // surface as a ConcurrentModificationException that ends the night's
+    // recording. It is never held across processor.stop(), which joins the
+    // capture thread.
+    private val sessionLock = Any()
     private var processor: AudioSignalProcessor? = null
     private var sessionStartedAtMillis = 0L
     private var sessionStartedElapsedMillis = 0L
@@ -378,8 +387,10 @@ class SleepMonitoringService : Service() {
                 onError = { finish("audio_error", "failed") },
             )
             processor?.start()
-            session!!["status"] = "running"
-            spool.updateSession(session!!)
+            synchronized(sessionLock) {
+                session!!["status"] = "running"
+                spool.updateSession(session!!)
+            }
             publish()
         } catch (_: Throwable) {
             finish("audio_error", "failed")
@@ -402,23 +413,27 @@ class SleepMonitoringService : Service() {
                 return
             }
         }
-        latestSegment = segment
-        noiseScore = (segment["noise_score"] as? Number)?.toDouble()
-        val duration = (segment["duration_seconds"] as? Number)?.toInt() ?: 0
-        val classification = segment["classification"]?.toString()
-        if (classification == "quiet") quietSeconds += duration
-        if (classification == "noise") noisySeconds += duration
-        if (classification == "noise" && !inNoiseEvent) noiseEvents++
-        inNoiseEvent = classification == "noise"
-        validFractionSum += (segment["valid_fraction"] as? Number)?.toDouble() ?: 0.0
-        segmentCount++
-        current["quiet_minutes"] = (quietSeconds / 60.0).roundToInt()
-        current["noisy_minutes"] = (noisySeconds / 60.0).roundToInt()
-        current["noise_event_count"] = noiseEvents
-        current["signal_quality_score"] = if (segmentCount == 0) 0.0 else validFractionSum / segmentCount
-        current["time_in_bed_minutes"] = ((sessionNowMillis() - startedMillis) / 60_000.0).roundToInt()
-        spool.appendSegment(segment)
-        spool.updateSession(current)
+        synchronized(sessionLock) {
+            latestSegment = segment
+            noiseScore = (segment["noise_score"] as? Number)?.toDouble()
+            val duration = (segment["duration_seconds"] as? Number)?.toInt() ?: 0
+            val classification = segment["classification"]?.toString()
+            if (classification == "quiet") quietSeconds += duration
+            if (classification == "noise") noisySeconds += duration
+            if (classification == "noise" && !inNoiseEvent) noiseEvents++
+            inNoiseEvent = classification == "noise"
+            validFractionSum += (segment["valid_fraction"] as? Number)?.toDouble() ?: 0.0
+            segmentCount++
+            current["quiet_minutes"] = (quietSeconds / 60.0).roundToInt()
+            current["noisy_minutes"] = (noisySeconds / 60.0).roundToInt()
+            current["noise_event_count"] = noiseEvents
+            current["signal_quality_score"] =
+                if (segmentCount == 0) 0.0 else validFractionSum / segmentCount
+            current["time_in_bed_minutes"] =
+                ((sessionNowMillis() - startedMillis) / 60_000.0).roundToInt()
+            spool.appendSegment(segment)
+            spool.updateSession(current)
+        }
         publish()
     }
 
@@ -474,8 +489,10 @@ class SleepMonitoringService : Service() {
         finishing = true
         val current = session
         if (current != null && finalStatus == "completed") {
-            current["status"] = "stopping"
-            spool.updateSession(current)
+            synchronized(sessionLock) {
+                current["status"] = "stopping"
+                spool.updateSession(current)
+            }
             publish()
         }
         if (current != null) {
@@ -483,31 +500,33 @@ class SleepMonitoringService : Service() {
             // until this returns so the last seconds are durably spooled.
             try { processor?.stop() } catch (_: Throwable) {}
             processor = null
-            val endedMillis = sessionNowMillis()
-            val ended = Instant.ofEpochMilli(endedMillis)
-            val elapsedMillis =
-                endedMillis - Instant.parse(current["started_at"].toString()).toEpochMilli()
-            val completedWithoutData =
-                finalStatus == "completed" &&
-                segmentCount == 0 &&
-                elapsedMillis >= AudioSignalProcessor.NO_DATA_TIMEOUT_MILLIS
-            current["status"] = if (completedWithoutData) "failed" else finalStatus
-            current["ended_at"] = ended.toString()
-            current["battery_end"] = batterySnapshot()
-            current["end_reason"] = if (completedWithoutData) "no_audio_data" else reason
-            current["time_in_bed_minutes"] = if (elapsedMillis <= 0) {
-                0
-            } else {
-                ceil(elapsedMillis / 60_000.0).toInt()
+            synchronized(sessionLock) {
+                val endedMillis = sessionNowMillis()
+                val ended = Instant.ofEpochMilli(endedMillis)
+                val elapsedMillis =
+                    endedMillis - Instant.parse(current["started_at"].toString()).toEpochMilli()
+                val completedWithoutData =
+                    finalStatus == "completed" &&
+                    segmentCount == 0 &&
+                    elapsedMillis >= AudioSignalProcessor.NO_DATA_TIMEOUT_MILLIS
+                current["status"] = if (completedWithoutData) "failed" else finalStatus
+                current["ended_at"] = ended.toString()
+                current["battery_end"] = batterySnapshot()
+                current["end_reason"] = if (completedWithoutData) "no_audio_data" else reason
+                current["time_in_bed_minutes"] = if (elapsedMillis <= 0) {
+                    0
+                } else {
+                    ceil(elapsedMillis / 60_000.0).toInt()
+                }
+                current["quiet_minutes"] = (quietSeconds / 60.0).roundToInt()
+                current["noisy_minutes"] = (noisySeconds / 60.0).roundToInt()
+                current["noise_event_count"] = noiseEvents
+                current["signal_quality_score"] =
+                    if (segmentCount == 0) 0.0 else validFractionSum / segmentCount
+                val endOffset = ZoneId.systemDefault().rules.getOffset(ended).totalSeconds / 60
+                current["utc_offset_end_minutes"] = endOffset
+                spool.updateSession(current)
             }
-            current["quiet_minutes"] = (quietSeconds / 60.0).roundToInt()
-            current["noisy_minutes"] = (noisySeconds / 60.0).roundToInt()
-            current["noise_event_count"] = noiseEvents
-            current["signal_quality_score"] =
-                if (segmentCount == 0) 0.0 else validFractionSum / segmentCount
-            val endOffset = ZoneId.systemDefault().rules.getOffset(ended).totalSeconds / 60
-            current["utc_offset_end_minutes"] = endOffset
-            spool.updateSession(current)
         }
         finished = true
         finishing = false
@@ -565,40 +584,46 @@ class SleepMonitoringService : Service() {
         ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
 
-    private fun stateMap(): Map<String, Any?> = mapOf(
-        "supported" to true,
-        "microphone_granted" to hasMicrophonePermission(),
-        "status" to (session?.get("status") ?: "idle"),
-        "session_id" to session?.get("id"),
-        "started_at" to session?.get("started_at"),
-        "updated_at" to Instant.now().toString(),
-        "alarm_at" to session?.get("alarm_at"),
-        "smart_window_minutes" to smartWindowMinutes,
-        "live_sleep_probability" to liveSleepProbability,
-        "monitor_mode" to (session?.get("monitor_mode") ?: monitorMode),
-        "mission_status" to (session?.get("mission_status") ?: "unconfigured"),
-        "alarm_ringing" to false,
-        "emergency_taps" to 0,
-        "alarm_dismiss_method" to session?.get("alarm_dismiss_method"),
-        "exact_alarm_granted" to SleepAlarmScheduler.canScheduleExact(this),
-        "full_screen_intent_granted" to SleepAlarmScheduler.canUseFullScreenIntent(this),
-        "alarm_dismissed" to false,
-        "latest_segment" to latestSegment,
-        "current_noise_score" to noiseScore,
-        "end_reason" to session?.get("end_reason"),
-        "error_code" to if (session?.get("status") == "failed") {
-            session?.get("end_reason")
-        } else {
-            null
-        },
-    )
+    private fun stateMap(): Map<String, Any?> {
+        // A copy taken under the session lock: other threads keep changing the map.
+        val copy = synchronized(sessionLock) { session?.toMap() }
+        return mapOf(
+            "supported" to true,
+            "microphone_granted" to hasMicrophonePermission(),
+            "status" to (copy?.get("status") ?: "idle"),
+            "session_id" to copy?.get("id"),
+            "started_at" to copy?.get("started_at"),
+            "updated_at" to Instant.now().toString(),
+            "alarm_at" to copy?.get("alarm_at"),
+            "smart_window_minutes" to smartWindowMinutes,
+            "live_sleep_probability" to liveSleepProbability,
+            "monitor_mode" to (copy?.get("monitor_mode") ?: monitorMode),
+            "mission_status" to (copy?.get("mission_status") ?: "unconfigured"),
+            "alarm_ringing" to false,
+            "emergency_taps" to 0,
+            "alarm_dismiss_method" to copy?.get("alarm_dismiss_method"),
+            "exact_alarm_granted" to SleepAlarmScheduler.canScheduleExact(this),
+            "full_screen_intent_granted" to SleepAlarmScheduler.canUseFullScreenIntent(this),
+            "alarm_dismissed" to false,
+            "latest_segment" to latestSegment,
+            "current_noise_score" to noiseScore,
+            "end_reason" to copy?.get("end_reason"),
+            "error_code" to if (copy?.get("status") == "failed") {
+                copy["end_reason"]
+            } else {
+                null
+            },
+        )
+    }
 
     @Synchronized
     private fun updateAlarmInternal(alarmAtMillis: Long) {
         val current = session ?: return
         if (finished || finishing) return
-        current["alarm_at"] = Instant.ofEpochMilli(alarmAtMillis).toString()
-        spool.updateSession(current)
+        synchronized(sessionLock) {
+            current["alarm_at"] = Instant.ofEpochMilli(alarmAtMillis).toString()
+            spool.updateSession(current)
+        }
         publish()
     }
 
@@ -610,18 +635,22 @@ class SleepMonitoringService : Service() {
 
     private fun markAlarmFired(trigger: String, firedAt: String) {
         val current = session ?: return
-        if (current["alarm_fired_at"] != null) return
-        current["alarm_fired_at"] = firedAt
-        current["alarm_trigger"] = trigger
-        spool.updateSession(current)
+        synchronized(sessionLock) {
+            if (current["alarm_fired_at"] != null) return
+            current["alarm_fired_at"] = firedAt
+            current["alarm_trigger"] = trigger
+            spool.updateSession(current)
+        }
     }
 
     private fun markAlarmDismissed(method: String) {
         val current = session ?: return
-        current["alarm_dismiss_method"] = method
-        current["alarm_dismissed_at"] = Instant.now().toString()
-        current["mission_status"] = "completed"
-        spool.updateSession(current)
+        synchronized(sessionLock) {
+            current["alarm_dismiss_method"] = method
+            current["alarm_dismissed_at"] = Instant.now().toString()
+            current["mission_status"] = "completed"
+            spool.updateSession(current)
+        }
     }
 
     override fun onDestroy() {

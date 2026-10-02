@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Android 11 and older. Images attached to AI Coach messages are sent to the
-     user's AI provider only; they never go to the cloud backup. -->
+     user's AI provider only; they never go to the cloud backup. The AI provider
+     tokens are encrypted by flutter_secure_storage with an Android Keystore key
+     that cannot leave the device, so its preference files (the ciphertext, the
+     wrapped key and the plugin configuration) are never restored: on a new
+     device they would be unreadable and only make the plugin reset itself. -->
 <full-backup-content>
     <exclude domain="file" path="ai_chat_images/" />
+    <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+    <exclude domain="sharedpref" path="FlutterSecureKeyStorage.xml" />
+    <exclude domain="sharedpref" path="FlutterSecureStorageConfiguration.xml" />
+    <exclude domain="sharedpref" path="FlutterSecureStorageConfiguration:FlutterSecureStorage.xml" />
 </full-backup-content>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="traditional_alarm_missed_channel_name">Missed alarms</string>
+    <string name="traditional_alarm_missed_channel_description">Tells you when an alarm rang for a while without being turned off.</string>
+    <string name="traditional_alarm_missed_title">Missed alarm</string>
+    <string name="traditional_alarm_missed_body">The %1$s alarm rang for 10 minutes and was not turned off.</string>
+    <string name="alarm_mission_unlock_required">Unlock your phone first, then scan the code.</string>
+</resources>

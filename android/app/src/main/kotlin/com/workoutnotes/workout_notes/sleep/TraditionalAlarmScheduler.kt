@@ -8,6 +8,7 @@ import android.net.Uri
 import android.util.Log
 import java.util.Calendar
 import com.workoutnotes.workout_notes.common.AlarmRestorePolicy
+import com.workoutnotes.workout_notes.common.AlarmTimePolicy
 import com.workoutnotes.workout_notes.common.PendingIntentFlags
 
 /** Durable, multi-alarm companion to the single sleep-monitor scheduler. */
@@ -157,6 +158,41 @@ object TraditionalAlarmScheduler {
                 }
             } catch (error: Throwable) {
                 Log.w(TAG, "Could not restore alarm $id", error)
+            }
+        }
+    }
+
+    /**
+     * Arms the alarms again after a time zone or clock change, or when the
+     * exact-alarm permission was granted. With [refreshLocalTimes] each
+     * alarm's instant is derived again from its local hour and minute (see
+     * [AlarmTimePolicy]), so a 07:00 alarm still rings at local 07:00 after
+     * travel. Ringing, snoozed and already due alarms are left to the system
+     * and [restore]; nothing is rung from here.
+     */
+    fun rearmPending(context: Context, refreshLocalTimes: Boolean) {
+        val now = System.currentTimeMillis()
+        ids(context).forEach { id ->
+            try {
+                val snapshot = read(context, id) ?: return@forEach
+                if (!snapshot.enabled || snapshot.state != "scheduled" || snapshot.alarmAtMillis <= now) {
+                    return@forEach
+                }
+                val alarmAt = if (refreshLocalTimes) {
+                    AlarmTimePolicy.refreshedAt(
+                        snapshot.alarmAtMillis,
+                        now,
+                        snapshot.hour,
+                        snapshot.minute,
+                        snapshot.weekdays,
+                        snoozed = snapshot.snoozeCount > 0,
+                    )
+                } else {
+                    snapshot.alarmAtMillis
+                }
+                schedule(context, snapshot.copy(alarmAtMillis = alarmAt))
+            } catch (error: Throwable) {
+                Log.w(TAG, "Could not re-arm alarm $id", error)
             }
         }
     }
