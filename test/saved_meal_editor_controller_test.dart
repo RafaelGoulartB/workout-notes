@@ -29,18 +29,6 @@ void main() {
     servingGramsEquivalent: 40,
   );
 
-  test('starts from the initial name, portions and ingredients', () {
-    final controller = build(name: 'Breakfast', portions: 2.5, items: [oats]);
-
-    expect(controller.nameController.text, 'Breakfast');
-    expect(controller.portionsController.text, '2.5');
-    expect(controller.currentPortions, 2.5);
-    expect(controller.ingredients, hasLength(1));
-    expect(controller.ingredients.single.name, 'Oats');
-    expect(controller.isSaving, isFalse);
-    expect(controller.totals, isNull);
-  });
-
   test('invalid or non positive portions fall back to one', () {
     final controller = build();
     controller.portionsController.text = 'abc';

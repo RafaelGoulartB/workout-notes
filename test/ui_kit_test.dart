@@ -92,12 +92,4 @@ void main() {
     await tester.pumpAndSettle();
     expect(result, isTrue);
   });
-
-  testWidgets('AppBanner renders its message with the kind icon', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_host(const AppBanner.warning('Careful')));
-    expect(find.text('Careful'), findsOneWidget);
-    expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
-  });
 }

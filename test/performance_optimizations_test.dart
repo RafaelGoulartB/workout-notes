@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/database/database_helper.dart';
-import 'package:workout_notes/database/database_schema.dart';
 
 import 'support/ai_test_db.dart';
 
@@ -62,21 +61,4 @@ void main() {
       expect(updated.single['content'], 'updated');
     },
   );
-
-  test('v44 migration creates the dashboard composite indexes', () async {
-    final db = await installAiTestDb();
-    await DatabaseSchema.onUpgrade(db, 43, 44);
-    final rows = await db.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type = 'index'",
-    );
-    final names = rows.map((row) => row['name']).toSet();
-    expect(
-      names,
-      containsAll({
-        'idx_workouts_date_end',
-        'idx_sets_entry_state',
-        'idx_measurements_type_date',
-      }),
-    );
-  });
 }

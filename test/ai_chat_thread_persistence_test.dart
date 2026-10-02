@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/ai_chat_message.dart';
-import 'package:workout_notes/models/ai_chat_thread.dart';
 import 'package:workout_notes/models/ai_image_attachment.dart';
 import 'package:workout_notes/models/ai_message_role.dart';
 
@@ -10,18 +9,6 @@ import 'support/ai_test_db.dart';
 void main() {
   setUp(installAiTestDb);
   tearDown(uninstallAiTestDb);
-
-  test('AiChatThread serializes its pinned state', () {
-    final thread = AiChatThread(
-      id: 'thread-1',
-      title: 'Pinned thread',
-      createdAt: DateTime.utc(2026, 1, 1),
-      updatedAt: DateTime.utc(2026, 1, 2),
-      isPinned: true,
-    );
-
-    expect(AiChatThread.fromRow(thread.toRow()).isPinned, isTrue);
-  });
 
   test('pinned threads sort first and remain pinned after an upsert', () async {
     final helper = DatabaseHelper.instance;

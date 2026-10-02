@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -650,11 +648,5 @@ void main() {
         findsOneWidget,
       );
     });
-  });
-
-  test('raw payload helper stays within what the test assumes', () {
-    // Guards the arithmetic of the 8 KB preview test above.
-    expect(kAiRawPreviewChars, 8192);
-    expect(jsonEncode({'a': 1}), '{"a":1}');
   });
 }

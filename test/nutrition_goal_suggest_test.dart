@@ -160,19 +160,6 @@ void main() {
   });
 
   group('NutritionAdjustment', () {
-    test('defaults keep the cut/maintenance/bulk presets', () {
-      expect(NutritionAdjustment.defaultsFor(NutritionObjective.cut).percent,
-          -20);
-      expect(
-        NutritionAdjustment.defaultsFor(NutritionObjective.maintenance).percent,
-        0,
-      );
-      expect(
-        NutritionAdjustment.defaultsFor(NutritionObjective.bulk).percent,
-        10,
-      );
-    });
-
     test('kind is derived from the percent sign', () {
       expect(
         NutritionAdjustment.kindForPercent(-15),

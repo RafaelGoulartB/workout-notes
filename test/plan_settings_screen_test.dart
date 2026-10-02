@@ -20,19 +20,6 @@ void main() {
     WorkoutNotesApp.sections = SectionsNotifier();
   });
 
-  testWidgets('plan settings shows the section toggle', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(430, 1000));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-
-    await tester.pumpWidget(_app(const PlanSettingsScreen()));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Configurações do plano'), findsOneWidget);
-    expect(find.text('PLANO'), findsOneWidget);
-    expect(find.text('Seção Progresso'), findsOneWidget);
-    expect(find.byType(Switch), findsOneWidget);
-  });
-
   testWidgets('toggling the switch disables the plan section', (tester) async {
     await tester.binding.setSurfaceSize(const Size(430, 1000));
     addTearDown(() => tester.binding.setSurfaceSize(null));

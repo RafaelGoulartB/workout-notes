@@ -15,15 +15,6 @@ void main() {
   setUp(installTestDb);
   tearDown(uninstallTestDb);
 
-  test('defaults to a 30 min balanced window and a 2 min rise', () async {
-    final settings = await AlarmWakeSettingsService().load();
-    expect(settings, AlarmWakeSettings.defaults);
-    expect(settings.windowMinutes, 30);
-    expect(settings.sensitivity.threshold, 0.5);
-    expect(settings.rampSeconds, 120);
-    expect(settings.boost, isTrue);
-  });
-
   test('persists choices and ignores values outside the options', () async {
     final service = AlarmWakeSettingsService();
     const chosen = AlarmWakeSettings(

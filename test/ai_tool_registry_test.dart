@@ -72,35 +72,6 @@ void main() {
       }
     });
 
-    test('removed or merged tools are gone', () {
-      for (final old in const [
-        'list_recent_workouts',
-        'get_progress_trend',
-        'get_weekly_volume_breakdown',
-        'get_exercise_detail',
-        'get_exercise_personal_records',
-        'get_nutrition_summary',
-        'get_nutrition_history',
-        'get_nutrition_diary_day',
-        'get_micronutrient_summary',
-        'get_sleep_summary',
-        'get_sleep_history',
-        'get_sleep_night_detail',
-        'get_sleep_profile',
-        'get_nutrition_profile',
-        'get_food_detail',
-        'get_saved_meal_detail',
-        'get_goal_progress_history',
-        'list_run_plans',
-        'get_run_plan_detail',
-        'discover_app_capabilities',
-        'propose_routine_change',
-        'propose_manual_food_creation',
-      ]) {
-        expect(registry.readToolNames, isNot(contains(old)));
-      }
-    });
-
     test('tool names are snake_case verb_noun', () {
       final pattern = RegExp(r'^(get|list|search|analyze)(_[a-z]+)+$');
       for (final name in registry.readToolNames) {

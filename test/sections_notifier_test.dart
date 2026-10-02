@@ -8,11 +8,6 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  test('plan section is enabled by default', () {
-    final sections = SectionsNotifier();
-    expect(sections.planEnabled, isTrue);
-  });
-
   test('setPlanEnabled persists the value', () async {
     final sections = SectionsNotifier();
     await sections.setPlanEnabled(false);

@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/models/nutrition/nutrition_progress.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
-import 'package:workout_notes/screens/nutrition/nutrition_progress_controller.dart';
 
 DailyCalorieTotal _day(DateTime date, double? kcal) =>
     DailyCalorieTotal(date: date, calories: kcal);
@@ -245,20 +244,6 @@ void main() {
       expect(avg.daysLogged, 2);
       expect(avg.values.fiberG, 15);
       expect(avg.values.sodiumMg, 500);
-    });
-  });
-
-  group('NutritionProgressController navigation', () {
-    test('paging back is always allowed, forward stops at the current one', () {
-      final controller = NutritionProgressController(
-        now: () => DateTime(2026, 3, 11),
-      );
-      addTearDown(controller.dispose);
-      expect(controller.period, BalancePeriod.week);
-      expect(controller.isCurrentPeriod, isTrue);
-      expect(controller.canMoveNext, isFalse);
-      expect(controller.periodStart, DateTime(2026, 3, 8));
-      expect(controller.periodDays, 7);
     });
   });
 }

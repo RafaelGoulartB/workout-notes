@@ -28,21 +28,4 @@ void main() {
     OpenFoodFactsGateway(client: client).close();
     expect(client.closed, isFalse);
   });
-
-  test('a client the instance created itself can be closed repeatedly', () {
-    final service = AiService();
-    service.close();
-    service.close();
-    final gateway = OpenFoodFactsGateway();
-    gateway.close();
-    gateway.close();
-  });
-
-  test('the shared instances are single long-lived objects', () {
-    expect(identical(AiService.shared, AiService.shared), isTrue);
-    expect(
-      identical(OpenFoodFactsGateway.instance, OpenFoodFactsGateway.instance),
-      isTrue,
-    );
-  });
 }

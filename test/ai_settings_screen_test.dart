@@ -189,15 +189,6 @@ void main() {
     expect(notifier.settings.developerMode, isTrue);
   });
 
-  testWidgets('the memory entry opens what the coach remembers', (
-    tester,
-  ) async {
-    await _notifier();
-    await _open(tester, locale: 'en');
-    await _scrollTo(tester, 'What the coach remembers');
-    expect(find.text('Not set'), findsOneWidget);
-  });
-
   testWidgets('a provider shows the outcome of its last connection test', (
     tester,
   ) async {

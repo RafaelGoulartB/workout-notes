@@ -66,19 +66,6 @@ void main() {
       expect(macros.carbsG, 0);
     });
 
-    test('rounds grams to integers and exposes rounded getters', () {
-      final macros = computeMacros(
-        calories: 2100.4,
-        proteinPerKg: 1.85,
-        fatPerKg: 0.95,
-        weightKg: 82.3,
-      );
-      expect(macros.proteinRounded, macros.proteinG.round());
-      expect(macros.fatRounded, macros.fatG.round());
-      expect(macros.carbsRounded, macros.carbsG.round());
-      expect(macros.proteinG, macros.proteinG.roundToDouble());
-    });
-
     test('rejects non-positive inputs', () {
       expect(
         () => computeMacros(

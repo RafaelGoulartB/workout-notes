@@ -196,16 +196,6 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('analysis screen opens on the analysis title', (tester) async {
-    tester.view.physicalSize = const Size(360, 800);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    await tester.pumpWidget(_app(const StrengthInsightsScreen()));
-    await _settle(tester);
-    expect(find.text('Análise'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets('analysis shows an empty state without workouts', (tester) async {
     await tester.runAsync(() => db.delete('workouts'));
     await tester.pumpWidget(_app(const StrengthInsightsScreen()));

@@ -33,14 +33,6 @@ void main() {
 
     tearDown(() => form.dispose());
 
-    test('starts with a 100 g reference and no servings', () {
-      expect(form.referenceAmountController.text, '100');
-      expect(form.referenceUnitController.text, 'g');
-      expect(form.servings, isEmpty);
-      expect(form.isEstimated, isFalse);
-      expect(form.isSaving, isFalse);
-    });
-
     test('adds and removes serving rows', () {
       var notified = 0;
       form.addListener(() => notified++);

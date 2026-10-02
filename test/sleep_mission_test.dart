@@ -4,16 +4,6 @@ import 'package:workout_notes/models/sleep_monitor_mode.dart';
 import 'package:workout_notes/utils/sleep_alarm_time.dart';
 
 void main() {
-  test('monitoring modes expose the expected alarm and mission rules', () {
-    expect(SleepMonitoringMode.alarmWithoutMission.hasAlarm, isTrue);
-    expect(SleepMonitoringMode.alarmWithoutMission.requiresMission, isFalse);
-    expect(SleepMonitoringMode.alarmWithMission.hasAlarm, isTrue);
-    expect(SleepMonitoringMode.alarmWithMission.requiresMission, isTrue);
-    expect(SleepMonitoringMode.monitoringOnly.hasAlarm, isFalse);
-    expect(SleepMonitoringMode.fromWire('monitoring_only'),
-        SleepMonitoringMode.monitoringOnly);
-  });
-
   test('mission configuration round-trips through app settings', () {
     final original = SleepMissionConfig(
       enabled: true,

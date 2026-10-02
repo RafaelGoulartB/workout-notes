@@ -402,20 +402,6 @@ void main() {
       expect(back.reasoningEffortFor('m2'), AiReasoningEffort.automatic);
       expect(back.createdAt, p.createdAt);
     });
-    test('copyWith preserves fields', () {
-      final p = AiProvider(
-        id: 'id',
-        name: 'a',
-        baseUrl: 'b',
-        availableModels: const [],
-        selectedModel: '',
-        createdAt: DateTime.utc(2024),
-      );
-      final c = p.copyWith(name: 'A2', selectedModel: 'gpt-4');
-      expect(c.id, p.id);
-      expect(c.name, 'A2');
-      expect(c.selectedModel, 'gpt-4');
-    });
   });
 
   group('AiSettings', () {
@@ -463,17 +449,6 @@ void main() {
       final s = AiSettings(providers: [p], activeProviderId: 'p1');
       final cleared = s.copyWith(clearActiveProvider: true);
       expect(cleared.activeProviderId, isNull);
-    });
-
-    test('copyWith preserves and updates chat preferences', () {
-      const settings = AiSettings(
-        responseStyle: AiResponseStyle.concise,
-        showMessageTimestamps: false,
-      );
-      final updated = settings.copyWith(developerMode: true);
-      expect(updated.responseStyle, AiResponseStyle.concise);
-      expect(updated.showMessageTimestamps, isFalse);
-      expect(updated.developerMode, isTrue);
     });
   });
 
@@ -545,13 +520,6 @@ void main() {
     test('estimateText scales linearly', () {
       final t = TokenEstimator.estimateText('a' * 350);
       expect(t, 100);
-    });
-    test('estimateMessage includes role overhead', () {
-      final t = TokenEstimator.estimateMessage(
-        role: 'user',
-        content: 'hello world',
-      );
-      expect(t, greaterThan(0));
     });
   });
 

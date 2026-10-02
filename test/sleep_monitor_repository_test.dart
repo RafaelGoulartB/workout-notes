@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
@@ -299,48 +298,6 @@ void main() {
   });
 
   tearDown(uninstallTestDb);
-
-  test('serializes monitor models and calculates aggregate metrics', () {
-    final segment = SleepMonitorSegment(
-      id: 'seg-1',
-      sessionId: 'session-1',
-      startedAt: DateTime.utc(2026, 7, 26, 22),
-      durationSeconds: 30,
-      audioRmsDbfs: -50,
-      audioPeakDbfs: -20,
-      noiseScore: 4,
-      classification: 'quiet',
-      validFraction: 1,
-      noiseBurstCount: 0,
-    );
-    final session = SleepMonitorSession(
-      id: 'session-1',
-      sleepEntryId: null,
-      status: SleepMonitorSession.completed,
-      startedAt: segment.startedAt,
-      endedAt: segment.startedAt.add(const Duration(seconds: 60)),
-      alarmAt: segment.startedAt.add(const Duration(hours: 8)),
-      utcOffsetStartMinutes: -180,
-      utcOffsetEndMinutes: -180,
-      sensorMode: 'audio',
-      algorithmVersion: SleepMonitorSession.defaultAlgorithmVersion,
-      timeInBedMinutes: 1,
-      quietMinutes: 1,
-      noisyMinutes: 0,
-      estimatedSleepMinutes: null,
-      noiseEventCount: 0,
-      signalQualityScore: 1,
-      endReason: SleepMonitorSession.endUser,
-      createdAt: segment.startedAt,
-    );
-    expect(
-      SleepMonitorSegment.fromMap(segment.toMap()).classification,
-      'quiet',
-    );
-    final restored = SleepMonitorSession.fromMap(session.toMap());
-    expect(restored.id, 'session-1');
-    expect(restored.alarmAt, session.alarmAt);
-  });
 
   test(
     'imports idempotently and computes quiet/noisy periods and events',

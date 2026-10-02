@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_schedule.dart';
@@ -20,33 +19,13 @@ Widget _app(Widget home) => MaterialApp(
 );
 
 void main() {
-  late Database database;
-
   setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
-    database = await installTestDb();
+    await installTestDb();
   });
 
   tearDown(uninstallTestDb);
-
-  // ignore: unused_element
-  Future<void> seedTdeeGoal({required double tdee}) async {
-    final now = DateTime.now().toIso8601String();
-    await database.insert('nutrition_goals', {
-      'id': 'goal-tdee',
-      'calories': tdee,
-      'protein_g': null,
-      'carbs_g': null,
-      'fat_g': null,
-      'tdee': tdee,
-      'adjustment_kind': 'maintenance',
-      'adjustment_percent': 0,
-      'created_at': now,
-      'updated_at': now,
-      'is_active': 1,
-    });
-  }
 
   DateTime today() {
     final now = DateTime.now();

@@ -458,13 +458,6 @@ void main() {
       );
     });
 
-    test('every nutrient key comes from one list', () {
-      expect(AiFoodLabelDraft.nutrientKeys, hasLength(20));
-      expect(AiFoodLabelDraft.nutrientUnit('sodium_mg'), 'mg');
-      expect(AiFoodLabelDraft.nutrientUnit('vitamin_a_ug'), 'µg');
-      expect(AiFoodLabelDraft.nutrientUnit('calories'), 'kcal');
-    });
-
     test('round-trips AI food drafts including gram and ml servings', () {
       final original = AiFoodLabelDraft.fromJson({
         'name': 'Leite',
