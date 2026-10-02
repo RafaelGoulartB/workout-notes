@@ -22,7 +22,7 @@ class NutritionGatewayResult<T> {
       NutritionGatewayResult<T>._(null, error);
 }
 
-class NutritionGatewayError {
+class NutritionGatewayError implements Exception {
   final String code;
   final String message;
   const NutritionGatewayError(this.code, this.message);

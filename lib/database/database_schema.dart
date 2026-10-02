@@ -439,7 +439,7 @@ abstract final class DatabaseSchema {
   /// implicit `DELETE` of `DROP TABLE` never trips a foreign key check.
   static Future<void> _dropEverything(Database db) async {
     final rows = await db.rawQuery(
-      "SELECT name FROM sqlite_master "
+      'SELECT name FROM sqlite_master '
       "WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
     );
     final remaining = {for (final row in rows) row['name'] as String};

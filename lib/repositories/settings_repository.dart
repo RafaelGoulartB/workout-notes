@@ -26,7 +26,7 @@ class SettingsRepository extends BaseRepository {
     final db = await this.db;
     final result = await db.query('app_settings');
     return {
-      for (var row in result) row['key'] as String: row['value'] as String,
+      for (final row in result) row['key'] as String: row['value'] as String,
     };
   }
 

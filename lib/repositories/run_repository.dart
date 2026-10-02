@@ -250,7 +250,7 @@ class RunRepository extends BaseRepository {
       'run_activities',
       columns: ['id'],
       where:
-          "status = ? AND activity_type = ? AND IFNULL(efforts_computed, 0) = 0",
+          'status = ? AND activity_type = ? AND IFNULL(efforts_computed, 0) = 0',
       whereArgs: ['completed', CardioActivityType.running.databaseValue],
       orderBy: 'started_at DESC',
       limit: limit,

@@ -929,7 +929,7 @@ Future<Map<String, int>> _rowCounts(Database db) async {
 Future<Map<String, int>> _tableBytes(Database db) async {
   try {
     final rows = await db.rawQuery(
-      "SELECT name, SUM(pgsize) AS bytes FROM dbstat WHERE aggregate=TRUE GROUP BY name",
+      'SELECT name, SUM(pgsize) AS bytes FROM dbstat WHERE aggregate=TRUE GROUP BY name',
     );
     return {
       for (final r in rows) r['name'] as String: (r['bytes'] as int?) ?? 0,

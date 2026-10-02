@@ -30,3 +30,9 @@ linter:
     use_build_context_synchronously: true
     unnecessary_await_in_return: true
     avoid_void_async: true
+    prefer_single_quotes: true
+    use_super_parameters: true
+    prefer_final_in_for_each: true
+    avoid_unused_constructor_parameters: true
+    only_throw_errors: true
+    avoid_print: true

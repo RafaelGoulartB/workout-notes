@@ -17,7 +17,7 @@ class _FakeAiService extends AiService {
     latencyMs: 321,
   );
   List<String> models = ['gpt-a', 'gpt-b', 'other-model'];
-  Object? modelsError;
+  AiServiceException? modelsError;
   final List<String> fetchedFrom = [];
   final List<String> probed = [];
 
