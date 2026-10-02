@@ -46,6 +46,11 @@ void main() {
         'analysis_status': 'available',
         'deep_sleep_minutes': 120,
         'stage_confidence': 0.9,
+        'snore_minutes': 14,
+        'awakening_count': 2,
+        'sleep_efficiency': 0.91,
+        'stage_algorithm_version': 'sleep-wake-bedside-v6',
+        'stage_timeline': 'timeline-bytes',
         'created_at': now,
       });
       await database.insert('ai_chat_threads', {
@@ -142,9 +147,11 @@ void main() {
       expect(backup, isNot(contains('ai_memories')));
       final exportedSession =
           (backup['sleep_monitor_sessions'] as List).single as Map;
-      expect(exportedSession, isNot(contains('analysis_status')));
-      expect(exportedSession, isNot(contains('deep_sleep_minutes')));
-      expect(exportedSession, isNot(contains('stage_confidence')));
+      // The stage analysis travels with the night: diagnostic archives that
+      // could rebuild it only last two weeks.
+      expect(exportedSession['analysis_status'], 'available');
+      expect(exportedSession['deep_sleep_minutes'], 120);
+      expect(exportedSession['stage_timeline'], 'timeline-bytes');
       expect(
         (backup['foods'] as List).where(
           (row) => (row as Map)['id'] == 'unused-cache',
@@ -173,8 +180,14 @@ void main() {
         where: 'id = ?',
         whereArgs: ['session-1'],
       )).single;
-      expect(restoredSession['analysis_status'], 'legacy_unavailable');
-      expect(restoredSession['deep_sleep_minutes'], isNull);
+      expect(restoredSession['analysis_status'], 'available');
+      expect(restoredSession['deep_sleep_minutes'], 120);
+      expect(restoredSession['stage_confidence'], 0.9);
+      expect(restoredSession['snore_minutes'], 14);
+      expect(restoredSession['awakening_count'], 2);
+      expect(restoredSession['sleep_efficiency'], 0.91);
+      expect(restoredSession['stage_algorithm_version'], 'sleep-wake-bedside-v6');
+      expect(restoredSession['stage_timeline'], 'timeline-bytes');
       expect(await database.query('ai_chat_threads'), isEmpty);
       expect(await database.query('ai_chat_messages'), isEmpty);
       expect(await database.query('ai_proposals'), isEmpty);

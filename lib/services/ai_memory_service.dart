@@ -275,6 +275,10 @@ class AiMemoryService extends ChangeNotifier {
 
   Future<AiMemory?> byId(String id) => _repo.getById(id);
 
+  /// Forgets the in-memory list and tells listeners to reload it, after the
+  /// table was changed behind this service's back (backup restore, reset).
+  void invalidateCache() => _changed();
+
   void _changed() {
     _cache = null;
     notifyListeners();

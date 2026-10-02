@@ -33,9 +33,16 @@ class TraditionalAlarmService extends ChangeNotifier {
     await reconcile();
   }
 
-  /// Syncs native schedules created while Flutter was closed, then schedules
-  /// only database alarms that do not yet have a native snapshot.
-  Future<void> reconcile() async {
+  /// Makes Android match SQLite: syncs native schedules created while Flutter
+  /// was closed, schedules enabled database alarms that have no native
+  /// snapshot and cancels native alarms whose id is no longer in the database
+  /// (deleted, or replaced by a backup restore), which would otherwise keep
+  /// ringing.
+  ///
+  /// With [resync] every enabled alarm is rescheduled from its database row
+  /// and disabled ones are cancelled, even if a native snapshot with the same
+  /// id exists. Used after a restore, which may reuse ids with other times.
+  Future<void> reconcile({bool resync = false}) async {
     await refresh();
     if (!_isAndroid) {
       _runtimeStates = const {};
@@ -46,6 +53,7 @@ class TraditionalAlarmService extends ChangeNotifier {
           await _channel.invokeListMethod<dynamic>('states') ?? const [];
       final nativeIds = <String>{};
       final runtimeStates = <String, TraditionalAlarmRuntimeState>{};
+      final databaseIds = {for (final alarm in _alarms) alarm.id};
       for (final value in states) {
         if (value is! Map) continue;
         final map = Map<String, dynamic>.from(value);
@@ -53,7 +61,13 @@ class TraditionalAlarmService extends ChangeNotifier {
         final epoch = map['alarm_at_epoch_ms'];
         if (id == null || epoch is! num) continue;
         nativeIds.add(id);
+        if (!databaseIds.contains(id)) {
+          await _cancelBestEffort(id);
+          continue;
+        }
         runtimeStates[id] = TraditionalAlarmRuntimeState.fromMap(map);
+        // A resync is the database winning over Android, not the reverse.
+        if (resync) continue;
         await _repository.updateNativeSchedule(
           id,
           enabled: map['enabled'] == true,
@@ -62,13 +76,23 @@ class TraditionalAlarmService extends ChangeNotifier {
       }
       _runtimeStates = runtimeStates;
       await refresh();
-      for (final alarm in _alarms.where(
-        (alarm) => alarm.enabled && !nativeIds.contains(alarm.id),
-      )) {
-        await _scheduleBestEffort(alarm);
+      for (final alarm in _alarms) {
+        if (resync) {
+          if (alarm.enabled) {
+            await _scheduleBestEffort(
+              alarm.copyWith(nextTriggerAt: alarm.nextOccurrence()),
+            );
+          } else if (nativeIds.contains(alarm.id)) {
+            await _cancelBestEffort(alarm.id);
+          }
+        } else if (alarm.enabled && !nativeIds.contains(alarm.id)) {
+          await _scheduleBestEffort(alarm);
+        }
       }
       await _channel.invokeMethod<void>('restore');
       await AlarmWakeSettingsService().syncNative();
+      // Read the schedules just written back into the database and the UI.
+      if (resync) await reconcile();
     } on MissingPluginException {
       _runtimeStates = const {};
       // The alarm manager is intentionally an Android enhancement.
@@ -228,6 +252,14 @@ class TraditionalAlarmService extends ChangeNotifier {
       await _channel.invokeMethod<void>('cancel', {'id': id});
     } on MissingPluginException {
       // Android-only channel is unavailable on other platforms.
+    }
+  }
+
+  Future<void> _cancelBestEffort(String id) async {
+    try {
+      await _cancel(id);
+    } on PlatformException catch (error) {
+      debugPrint('Traditional alarm cancel failed: ${error.code}');
     }
   }
 

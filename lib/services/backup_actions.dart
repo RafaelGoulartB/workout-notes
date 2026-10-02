@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/services/app_data_coordinator.dart';
 import 'package:workout_notes/services/export_service.dart';
 
 /// Where a backup being restored comes from.
@@ -39,10 +41,14 @@ class PickedBackup {
 /// dialogs and snack bars; everything that touches [ExportService] or the file
 /// picker lives here so it can run (and be tested) without a `BuildContext`.
 class BackupActions {
-  BackupActions({ExportService? exportService})
-    : _service = exportService ?? ExportService();
+  BackupActions({
+    ExportService? exportService,
+    AppDataCoordinator? coordinator,
+  }) : _service = exportService ?? ExportService(),
+       _coordinator = coordinator ?? AppDataCoordinator.instance;
 
   final ExportService _service;
+  final AppDataCoordinator _coordinator;
 
   /// Shares the JSON backup and returns the file path that was written.
   Future<String> shareBackup() => _service.shareJsonBackup();
@@ -57,12 +63,18 @@ class BackupActions {
   Future<List<BackupFileInfo>> listLocalBackups() =>
       _service.listLocalBackups();
 
-  /// Restores [source] and returns the number of imported records.
-  Future<int> restore(BackupSource source) => switch (source) {
-    BackupFileSource(:final path) => _service.restoreFromFile(path),
-    BackupJsonSource(:final json) => _service.restoreFromJsonString(json),
-    BackupBytesSource(:final bytes) => _service.restoreFromBytes(bytes),
-  };
+  /// Restores [source] and returns the number of imported records. Once the
+  /// data is replaced, native alarms, reminders, AI state and the settings
+  /// notifiers are brought in line with it (see [AppDataCoordinator]).
+  Future<int> restore(BackupSource source) async {
+    final count = await switch (source) {
+      BackupFileSource(:final path) => _service.restoreFromFile(path),
+      BackupJsonSource(:final json) => _service.restoreFromJsonString(json),
+      BackupBytesSource(:final bytes) => _service.restoreFromBytes(bytes),
+    };
+    await _coordinator.afterDataReplaced(settingsReplaced: true);
+    return count;
+  }
 
   /// Opens the system picker for a `.json` file. Returns `null` when the user
   /// cancels, a [PickedBackup] with a `null` source when the provider exposed
@@ -74,6 +86,13 @@ class BackupActions {
     );
     if (file == null) return null;
 
+    // A real file is streamed and decoded off the UI isolate; reading its bytes
+    // here would hold the whole backup (photos included) in memory first.
+    final path = file.path;
+    if (path != null && await File(path).exists()) {
+      return PickedBackup(BackupFileSource(path));
+    }
+
     Uint8List? bytes;
     try {
       bytes = await file.readAsBytes();
@@ -81,7 +100,6 @@ class BackupActions {
       // Some native providers expose only a filesystem path.
     }
     if (bytes != null) return PickedBackup(BackupBytesSource(bytes));
-    final path = file.path;
     if (path != null) return PickedBackup(BackupFileSource(path));
     return const PickedBackup(null);
   }

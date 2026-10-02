@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/dev_tools/test_data/test_data_generator.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/services/app_data_coordinator.dart';
 import 'package:workout_notes/services/export_service.dart';
 import 'package:workout_notes/widgets/settings/backup_flows.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
@@ -151,22 +152,62 @@ class _DataPrivacyScreenState extends State<DataPrivacyScreen> {
       cancelLabel: AppLocalizations.of(context)!.commonCancel,
       destructive: true,
     );
+    if (confirm != true || !mounted) return;
 
-    if (confirm == true) {
-      final repo = DatabaseHelper.instance.exportImportRepo;
-      await repo.deleteAllWorkoutData();
-      await repo.deleteAllNutritionData();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.settingsDeleteHistorySuccess,
+    final loc = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context, rootNavigator: true);
+    unawaited(
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => PopScope(
+          canPop: false,
+          child: AlertDialog(
+            content: Row(
+              children: [
+                const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                ),
+                const SizedBox(width: 20),
+                Expanded(child: Text(loc.settingsDeleteHistoryProgress)),
+              ],
             ),
-            behavior: SnackBarBehavior.floating,
           ),
-        );
-      }
+        ),
+      ),
+    );
+    // Let Flutter paint the progress dialog before the deletes start.
+    await WidgetsBinding.instance.endOfFrame;
+
+    String? error;
+    try {
+      // One transaction: either everything is deleted or nothing is.
+      await DatabaseHelper.instance.exportImportRepo.deleteAllData();
+    } catch (e, stackTrace) {
+      debugPrint('Failed to delete all history: $e\n$stackTrace');
+      error = e.toString();
     }
+    if (error == null) {
+      await AppDataCoordinator.instance.afterDataReplaced(
+        settingsReplaced: false,
+      );
+    }
+    // The dialog sits on the root navigator, so closing it does not need this
+    // screen to still be mounted.
+    navigator.pop();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          error == null
+              ? loc.settingsDeleteHistorySuccess
+              : loc.settingsDeleteHistoryError(error),
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   void _showAbout() {
@@ -309,7 +350,7 @@ class _DataPrivacyScreenState extends State<DataPrivacyScreen> {
                 icon: Icons.delete_outline,
                 iconColor: Colors.red,
                 title: loc.settingsDeleteAllHistory,
-                subtitle: loc.settingsDeleteHistoryContent.split('\n').first,
+                subtitle: loc.settingsDeleteHistorySubtitle,
                 titleColor: Colors.red,
                 onTap: _deleteAllHistory,
               ),

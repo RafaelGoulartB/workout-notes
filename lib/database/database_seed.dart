@@ -8,7 +8,7 @@ abstract final class DatabaseSeed {
   /// and fresh databases always have a working catalog. `name` stays
   /// NULL: the UI resolves those keys to localized labels, and the user
   /// can rename them later. Idempotent via `INSERT OR IGNORE` on `key`.
-  static Future<void> seedMealTypes(Database db) async {
+  static Future<void> seedMealTypes(DatabaseExecutor db) async {
     final now = DateTime.now().toIso8601String();
     final rows = <Map<String, dynamic>>[
       {'key': 'breakfast', 'order_index': 0},

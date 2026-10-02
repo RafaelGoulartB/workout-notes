@@ -85,6 +85,18 @@ void main() {
     expect(await database.query('run_activities'), hasLength(1));
   });
 
+  test('concurrent imports of the same spool neither throw nor duplicate', () async {
+    final spool = _spool(laps: [_lap(1, 0, 5000, 1700)]);
+    final results = await Future.wait([
+      repository.importNativeSpool(spool),
+      repository.importNativeSpool(spool),
+    ]);
+
+    expect(results.map((a) => a.id).toSet(), {'run-with-laps'});
+    expect(await database.query('run_activities'), hasLength(1));
+    expect(await database.query('run_laps'), hasLength(1));
+  });
+
   test('a run without laps imports as before', () async {
     await repository.importNativeSpool(_spool());
     expect(await database.query('run_laps'), isEmpty);
