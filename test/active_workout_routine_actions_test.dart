@@ -269,24 +269,7 @@ void main() {
       });
       await open(tester);
 
-      // KNOWN ISSUE (lib): the highlighted row wraps its ListTile in a
-      // coloured DecoratedBox, which makes debug builds assert "ListTile
-      // background color or ink splashes may be invisible". Only that
-      // assertion is tolerated here.
-      final previousOnError = FlutterError.onError;
-      FlutterError.onError = (details) {
-        if (details.exceptionAsString().contains(
-          'ListTile background color or ink splashes',
-        )) {
-          return;
-        }
-        previousOnError?.call(details);
-      };
-      try {
-        await openMenu(tester, 'Import from Routine');
-      } finally {
-        FlutterError.onError = previousOnError;
-      }
+      await openMenu(tester, 'Import from Routine');
       expect(find.text('Plan target'), findsOneWidget);
       expect(find.byIcon(Icons.star_rounded), findsOneWidget);
       final names = tester

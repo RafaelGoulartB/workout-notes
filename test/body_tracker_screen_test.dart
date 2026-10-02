@@ -345,33 +345,29 @@ void main() {
       );
     });
 
-    testWidgets(
-      'hidden types stay hidden the next time the screen opens',
-      (tester) async {
-        await add(tester, 'weight', 80, sep1);
-        await tester.runAsync(
-          () => helper.settingsRepo.setSetting(
-            'body_tracker_enabled_types',
-            'weight,bodyFat',
-          ),
-        );
-        await pumpScreen(tester);
+    testWidgets('hidden types stay hidden the next time the screen opens', (
+      tester,
+    ) async {
+      await add(tester, 'weight', 80, sep1);
+      await tester.runAsync(
+        () => helper.settingsRepo.setSetting(
+          'body_tracker_enabled_types',
+          'weight,bodyFat',
+        ),
+      );
+      await pumpScreen(tester);
 
-        await tester.tap(find.byIcon(Icons.keyboard_arrow_down_rounded));
-        await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.keyboard_arrow_down_rounded));
+      await tester.pumpAndSettle();
 
-        expect(
-          find.descendant(
-            of: find.byType(BottomSheet),
-            matching: find.text('Waist'),
-          ),
-          findsNothing,
-        );
-      },
-      // Known bug: BodyTrackerScreen._loadEnabledTypes re-adds every type
-      // to the enabled set, so a saved customization is lost on reopen.
-      skip: true,
-    );
+      expect(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text('Waist'),
+        ),
+        findsNothing,
+      );
+    });
   });
 
   group('add measurement sheet', () {
@@ -441,7 +437,7 @@ void main() {
 
       final now = DateTime.now();
       await tester.tap(
-        find.text(DateFormat('d MMM yyyy', 'pt_BR').format(now)),
+        find.text(DateFormat.yMMMd(Intl.defaultLocale).format(now)),
       );
       await tester.pumpAndSettle();
       await tester.tap(find.text('1').first);
@@ -569,6 +565,22 @@ void main() {
       }
     });
 
+    testWidgets('an incomplete blood pressure explains why nothing saved', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      await tester.tap(find.widgetWithText(FilledButton, 'Quick Measure'));
+      await settleDb(tester);
+
+      await tester.enterText(quickField('Systolic'), '118');
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, 'Save Measurements'));
+      await settleDb(tester);
+
+      expect(find.text('Invalid value'), findsOneWidget);
+      expect(await stored(tester), isEmpty);
+    });
+
     testWidgets('blood pressure and right-side values are stored whole', (
       tester,
     ) async {
@@ -639,7 +651,9 @@ void main() {
       expect(
         find.descendant(
           of: sheet,
-          matching: find.text(DateFormat('d MMM yyyy', 'pt_BR').format(sep15)),
+          matching: find.text(
+            DateFormat.yMMMd(Intl.defaultLocale).format(sep15),
+          ),
         ),
         findsOneWidget,
       );

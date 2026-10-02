@@ -472,7 +472,8 @@ class _TypeGridItem extends StatelessWidget {
     final full = typeName(type.id, context);
     // Handle compound English names
     if (full.startsWith('Body ')) return full.split(' ').last;
-    if (full.startsWith('% ')) return full.split(' ').first;
+    // "% Body Fat" / "% Gordura" -> "% Fat" / "% Gordura".
+    if (full.startsWith('% ')) return '% ${full.split(' ').last}';
     // Single-word names: just use as-is (works for both languages)
     if (!full.contains(' ')) return full;
     // Multi-word: use first word (e.g. "Peso Corporal" -> "Peso")

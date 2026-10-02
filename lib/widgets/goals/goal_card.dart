@@ -32,14 +32,15 @@ class GoalCard extends StatelessWidget {
     this.onDelete,
   });
 
-  /// Behind means the goal trails the share of the period already elapsed by
-  /// more than a small margin (so day one never reads as late).
+  /// Behind means the goal trails the share of the period already completed
+  /// (days before today) by more than a small margin, so the first day of any
+  /// period, weekly included, never reads as late.
   static GoalPace paceOf(Goal goal, GoalProgress progress) {
     if (!goal.isActive) return GoalPace.paused;
     if (progress.isComplete) return GoalPace.done;
     final total = daysBetween(progress.periodStart, progress.periodEnd) + 1;
     if (total <= 0) return GoalPace.onTrack;
-    final expected = (progress.daysElapsed / total).clamp(0.0, 1.0);
+    final expected = ((progress.daysElapsed - 1) / total).clamp(0.0, 1.0);
     return progress.percent + 0.1 >= expected
         ? GoalPace.onTrack
         : GoalPace.behind;

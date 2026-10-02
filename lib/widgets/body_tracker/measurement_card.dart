@@ -59,14 +59,18 @@ class BodyMeasurementCard extends StatelessWidget {
                   child: Column(
                     children: [
                       Text(
-                        DateFormat('d', 'pt_BR').format(DateTime.parse(date)),
+                        DateFormat.d(
+                          Intl.defaultLocale,
+                        ).format(DateTime.parse(date)),
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           fontSize: 19,
                         ),
                       ),
                       Text(
-                        DateFormat('MMM', 'pt_BR').format(DateTime.parse(date)),
+                        DateFormat.MMM(
+                          Intl.defaultLocale,
+                        ).format(DateTime.parse(date)),
                         style: theme.textTheme.bodySmall?.copyWith(
                           fontSize: 10,
                           color: theme.colorScheme.onSurfaceVariant,

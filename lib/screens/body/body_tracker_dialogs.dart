@@ -21,6 +21,7 @@ Future<void> showAddMeasurementSheet(
   required MeasureType currentType,
   required String typeId,
   required VoidCallback onSaved,
+  String? initialSide,
 }) async {
   final valueCtl = TextEditingController();
   final secondaryValueCtl = TextEditingController();
@@ -28,7 +29,11 @@ Future<void> showAddMeasurementSheet(
   var date = DateTime.now();
   String? timeOfDay;
   bool isFasted = false;
-  String? side;
+  // A bilateral measurement always has a side: the one the screen is showing,
+  // otherwise left.
+  String? side = currentType.isBilateral
+      ? (initialSide == 'right' ? 'right' : 'left')
+      : null;
   final formKey = GlobalKey<FormState>();
 
   await showModalBottomSheet(
@@ -221,9 +226,8 @@ Future<void> showAddMeasurementSheet(
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    DateFormat(
-                                      'd MMM yyyy',
-                                      'pt_BR',
+                                    DateFormat.yMMMd(
+                                      Intl.defaultLocale,
                                     ).format(date),
                                     style: theme.textTheme.bodyMedium,
                                   ),
@@ -525,9 +529,8 @@ Future<void> showQuickMeasureSheet(
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
-                                      DateFormat(
-                                        'd MMM yyyy',
-                                        'pt_BR',
+                                      DateFormat.yMMMd(
+                                        Intl.defaultLocale,
                                       ).format(date),
                                       style: theme.textTheme.bodySmall,
                                       overflow: TextOverflow.ellipsis,
@@ -633,10 +636,7 @@ Future<void> showQuickMeasureSheet(
                                       'value': systolic,
                                       'secondary_value': diastolic,
                                       'unit': t.unit,
-                                      'date': date.toIso8601String().substring(
-                                        0,
-                                        10,
-                                      ),
+                                      'date': dateKey(date),
                                       'comment': commentCtl.text.isNotEmpty
                                           ? commentCtl.text
                                           : null,
@@ -676,10 +676,7 @@ Future<void> showQuickMeasureSheet(
                                       'type': t.id,
                                       'value': val,
                                       'unit': t.unit,
-                                      'date': date.toIso8601String().substring(
-                                        0,
-                                        10,
-                                      ),
+                                      'date': dateKey(date),
                                       'comment': commentCtl.text.isNotEmpty
                                           ? commentCtl.text
                                           : null,
@@ -709,6 +706,14 @@ Future<void> showQuickMeasureSheet(
                                     );
                                   }
                                   onSaved();
+                                } else if (ctx.mounted) {
+                                  // Something was typed but nothing is a
+                                  // complete, positive value (for example
+                                  // only the systolic pressure).
+                                  showAppSnack(
+                                    ctx,
+                                    loc.bodyTrackerInvalidValue,
+                                  );
                                 }
                               }
                             : null,

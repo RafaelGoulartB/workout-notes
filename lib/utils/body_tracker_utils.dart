@@ -21,11 +21,11 @@ import 'package:workout_notes/utils/app_number_format.dart';
   }
 }
 
-/// Formats a date string (yyyy-MM-dd) to Brazilian Portuguese format.
+/// Formats a date string (yyyy-MM-dd) as a medium date in the app locale.
 String formatDate(String dateStr) {
   if (dateStr.isEmpty) return '';
   try {
-    return DateFormat('d MMM yyyy', 'pt_BR').format(DateTime.parse(dateStr));
+    return DateFormat.yMMMd(Intl.defaultLocale).format(DateTime.parse(dateStr));
   } catch (_) {
     return dateStr;
   }

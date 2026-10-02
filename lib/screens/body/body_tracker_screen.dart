@@ -54,6 +54,8 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen>
 
   // ── Measurement type definitions ───────────────────────────────────
   static const _allTypes = kBodyMeasureTypes;
+  static const _enabledTypesKey = 'body_tracker_enabled_types';
+  static const _knownTypesKey = 'body_tracker_known_types';
 
   MeasureType get _currentType {
     if (_activeTypes.isEmpty) return _allTypes.first;
@@ -70,27 +72,29 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen>
   }
 
   Future<void> _loadEnabledTypes() async {
-    final raw = await _settingsRepo.getSetting('body_tracker_enabled_types');
-    if (raw != null) {
-      try {
-        final list = raw.split(',');
-        _enabledTypeIds = list.toSet();
-      } catch (_) {
-        _enabledTypeIds = {};
-      }
-    } else {
-      _enabledTypeIds = {};
+    final raw = await _settingsRepo.getSetting(_enabledTypesKey);
+    final known = await _settingsRepo.getSetting(_knownTypesKey);
+    if (raw == null) {
+      _enabledTypeIds = {for (final t in _allTypes) t.id};
+      return;
     }
-    // Ensure every type exists in the set (handles newly added types)
+    _enabledTypeIds = raw.split(',').where((id) => id.isNotEmpty).toSet();
+    // Types added to the app after the user last customized the list start
+    // enabled; types the user hid stay hidden. Without the known list (saved
+    // before it existed) every current type counts as known.
+    final knownIds = known == null
+        ? {for (final t in _allTypes) t.id}
+        : known.split(',').toSet();
     for (final t in _allTypes) {
-      _enabledTypeIds.add(t.id);
+      if (!knownIds.contains(t.id)) _enabledTypeIds.add(t.id);
     }
   }
 
   Future<void> _saveEnabledTypes() async {
+    await _settingsRepo.setSetting(_enabledTypesKey, _enabledTypeIds.join(','));
     await _settingsRepo.setSetting(
-      'body_tracker_enabled_types',
-      _enabledTypeIds.join(','),
+      _knownTypesKey,
+      _allTypes.map((t) => t.id).join(','),
     );
   }
 
@@ -174,7 +178,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen>
     final newIds = enabled.map((t) => t.id).toSet();
     if (newIds.isEmpty) return;
     _enabledTypeIds = newIds;
-    _saveEnabledTypes();
+    unawaited(_saveEnabledTypes());
     // Ensure current selection is still valid
     final activeIds = _activeTypes.map((t) => t.id).toList();
     if (!activeIds.contains(_selectedType)) {
@@ -311,6 +315,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen>
                       currentType: _currentType,
                       typeId: _selectedType,
                       onSaved: _load,
+                      initialSide: _selectedSide,
                     );
                   },
                 ),

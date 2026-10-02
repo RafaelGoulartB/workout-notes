@@ -77,7 +77,7 @@ void main() {
     });
 
     test('trailing the elapsed share by more than 10 points is behind', () {
-      // 4 of 7 days elapsed (57 %) against 20 % done.
+      // Day 4 of 7: 3 days completed (43 %) against 20 % done.
       expect(
         GoalCard.paceOf(sampleGoal(), _progress(current: 400)),
         GoalPace.behind,
@@ -85,9 +85,16 @@ void main() {
     });
 
     test('being within 10 points of the elapsed share is on track', () {
-      // 4 of 7 days elapsed (57 %) against 50 % done.
+      // Day 4 of 7: 3 days completed (43 %) against 50 % done.
       expect(
         GoalCard.paceOf(sampleGoal(), _progress(current: 1000)),
+        GoalPace.onTrack,
+      );
+    });
+
+    test('day one of a week with no progress is not late', () {
+      expect(
+        GoalCard.paceOf(sampleGoal(), _progress(current: 0, elapsed: 1)),
         GoalPace.onTrack,
       );
     });
