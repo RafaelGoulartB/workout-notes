@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="run_recovery_channel_name">Recuperação de corrida</string>
+    <string name="run_recovery_title">Corrida pausada — toque para retomar</string>
+    <string name="run_recovery_text">O Android interrompeu o GPS em segundo plano. Abra o app para continuar a corrida.</string>
+    <string name="run_placeholder_title">Corrida</string>
+    <string name="run_placeholder_text">Nada para gravar</string>
+</resources>

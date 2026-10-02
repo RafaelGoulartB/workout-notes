@@ -48,10 +48,14 @@ class RunTtsService(private val context: Context) : RunSpeechOutput, TextToSpeec
     private var tts: TextToSpeech? = null
     @Volatile private var ready = false
     @Volatile private var initializing = false
+    // Terminal: once shut down, late callbacks must not recreate the engine.
+    @Volatile private var isShutDown = false
     @Volatile private var desiredLanguage = RunVoiceLanguage.en
     private val pendingQueue = LinkedBlockingQueue<String>()
     private var audioManager: AudioManager? = null
     private val handler = Handler(Looper.getMainLooper())
+    // Tones still playing; released by their own callback or by shutdown().
+    private val playingTracks = java.util.Collections.synchronizedSet(mutableSetOf<AudioTrack>())
 
     @Volatile private var rate = 1.0f
     @Volatile private var volume = 1.0f
@@ -73,6 +77,7 @@ class RunTtsService(private val context: Context) : RunSpeechOutput, TextToSpeec
     }
 
     override fun ensureReady(language: RunVoiceLanguage) {
+        if (isShutDown) return
         desiredLanguage = language
         if (ready) {
             applyLanguage(tts ?: return)
@@ -153,7 +158,7 @@ class RunTtsService(private val context: Context) : RunSpeechOutput, TextToSpeec
 
     override fun speak(text: String) {
         val trimmed = text.trim()
-        if (trimmed.isEmpty()) return
+        if (trimmed.isEmpty() || isShutDown) return
         if (!ready) {
             pendingQueue.offer(trimmed)
             ensureReady(desiredLanguage)
@@ -163,6 +168,7 @@ class RunTtsService(private val context: Context) : RunSpeechOutput, TextToSpeec
     }
 
     private fun speakInternal(text: String) {
+        if (isShutDown) return
         val engine = tts ?: return
         try {
             outputStarted(speech = true)
@@ -181,11 +187,13 @@ class RunTtsService(private val context: Context) : RunSpeechOutput, TextToSpeec
     }
 
     override fun playEarcon(earcon: RunEarcon, then: String?) {
+        if (isShutDown) return
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             then?.let { speak(it) }
             return
         }
         onMain {
+            if (isShutDown) return@onMain
             val track = try {
                 val pcm = RunEarconSynth.pcm(earcon)
                 AudioTrack.Builder()
@@ -213,13 +221,16 @@ class RunTtsService(private val context: Context) : RunSpeechOutput, TextToSpeec
                 return@onMain
             }
             outputStarted(speech = false)
+            playingTracks.add(track)
             try {
                 track.play()
             } catch (e: Throwable) {
                 Log.w("RunTts", "earcon play failed: ${e.message}")
             }
             handler.postDelayed({
+                playingTracks.remove(track)
                 try { track.release() } catch (_: Throwable) {}
+                if (isShutDown) return@postDelayed
                 // Speak before releasing the tone's share of focus, so the
                 // music is not un-ducked between the beep and the words.
                 then?.let { speak(it) }
@@ -240,6 +251,12 @@ class RunTtsService(private val context: Context) : RunSpeechOutput, TextToSpeec
     }
 
     override fun shutdown() {
+        isShutDown = true
+        // Drop pending earcon/focus callbacks: one of them could otherwise call
+        // speak() after shutdown and recreate an engine nobody shuts down.
+        handler.removeCallbacksAndMessages(null)
+        val tracks = synchronized(playingTracks) { playingTracks.toList().also { playingTracks.clear() } }
+        tracks.forEach { try { it.release() } catch (_: Throwable) {} }
         stop()
         try {
             tts?.shutdown()

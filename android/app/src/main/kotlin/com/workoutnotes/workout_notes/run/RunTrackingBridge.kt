@@ -297,10 +297,15 @@ class RunTrackingBridge(private val context: Context) :
                 action = RunTrackingService.ACTION_START
                 putExtra(RunTrackingService.EXTRA_ACTIVITY_ID, activityId)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (error: Throwable) {
+                result.error("start_failed", error.message, null)
+                return@onSpool
             }
             result.success(
                 mapOf(

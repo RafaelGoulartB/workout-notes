@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import com.workoutnotes.workout_notes.MainActivity
+import com.workoutnotes.workout_notes.R
 import com.workoutnotes.workout_notes.common.PendingIntentFlags
 import com.workoutnotes.workout_notes.common.NotificationChannels
 import com.workoutnotes.workout_notes.common.NotificationChannels.silent
@@ -14,10 +15,13 @@ import com.workoutnotes.workout_notes.common.NotificationChannels.silent
 object RunTrackingNotification {
     const val CHANNEL_ID = "run_tracking"
     const val NOTIFICATION_ID = 1201
+    const val RECOVERY_CHANNEL_ID = "run_recovery"
+    const val RECOVERY_NOTIFICATION_ID = 1205
 
     private const val REQUEST_OPEN = 1202
     private const val REQUEST_TOGGLE_PAUSE = 1203
     private const val REQUEST_LAP = 1204
+    private const val REQUEST_RECOVERY = 1206
 
     fun ensureChannel(context: Context) {
         val pt = isPortuguese(context)
@@ -34,6 +38,77 @@ object RunTrackingNotification {
             }
             silent()
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+        }
+    }
+
+    /**
+     * Minimal notification that satisfies `startForeground` when a
+     * `startForegroundService` start has nothing to record and stops at once.
+     */
+    fun buildPlaceholder(context: Context): Notification {
+        ensureChannel(context)
+        return NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setContentTitle(context.getString(R.string.run_placeholder_title))
+            .setContentText(context.getString(R.string.run_placeholder_text))
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setOngoing(true)
+            .setSilent(true)
+            .build()
+    }
+
+    /**
+     * "Run paused, tap to resume": posted when the system restarts the service
+     * from the background and Android refuses a location foreground service.
+     * The spool stays intact; opening the app takes the recoverActive path.
+     */
+    fun buildRecoveryNotice(context: Context): Notification {
+        NotificationChannels.ensure(
+            context,
+            RECOVERY_CHANNEL_ID,
+            context.getString(R.string.run_recovery_channel_name),
+            NotificationManager.IMPORTANCE_DEFAULT,
+        )
+        val openIntent = PendingIntent.getActivity(
+            context,
+            REQUEST_RECOVERY,
+            Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            },
+            PendingIntentFlags.UPDATE_IMMUTABLE,
+        )
+        return NotificationCompat.Builder(context, RECOVERY_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setContentTitle(context.getString(R.string.run_recovery_title))
+            .setContentText(context.getString(R.string.run_recovery_text))
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText(context.getString(R.string.run_recovery_text)),
+            )
+            .setContentIntent(openIntent)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setAutoCancel(true)
+            .build()
+    }
+
+    /** Best effort: the notification permission may be denied. */
+    fun postRecoveryNotice(context: Context) {
+        try {
+            val manager = context.getSystemService(NotificationManager::class.java)
+            manager.notify(RECOVERY_NOTIFICATION_ID, buildRecoveryNotice(context))
+        } catch (_: Throwable) {
+            // No permission or no manager: the spool is intact and the app
+            // recovers the run the next time it opens.
+        }
+    }
+
+    fun cancelRecoveryNotice(context: Context) {
+        try {
+            context.getSystemService(NotificationManager::class.java)
+                .cancel(RECOVERY_NOTIFICATION_ID)
+        } catch (_: Throwable) {
+            // Nothing to cancel.
         }
     }
 
