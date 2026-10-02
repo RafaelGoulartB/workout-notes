@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/date_symbol_data_local.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/main.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
 import 'package:workout_notes/services/notification_service.dart';
+import 'package:workout_notes/utils/app_locale.dart';
 
 /// `app_settings` backed preferences of the workout settings screen (units,
 /// rest timer, notifications). The raw string map is exposed so tiles can
@@ -128,8 +127,7 @@ class AppearanceController extends ChangeNotifier {
     await prefs.setString('app_locale', localeStr);
 
     // Update date formatting
-    await initializeDateFormatting(localeStr == 'pt' ? 'pt_BR' : 'en', null);
-    Intl.defaultLocale = localeStr == 'pt' ? 'pt_BR' : 'en_US';
+    await AppLocale.apply(localeStr);
 
     WorkoutNotesApp.localeNotifier.setLocale(newLocale);
     await NotificationService.instance.loadSettings();

@@ -9,6 +9,7 @@ import 'package:workout_notes/models/ai_settings.dart';
 import 'package:workout_notes/models/ai_tool_domain.dart';
 import 'package:workout_notes/services/ai_prompts.dart';
 import 'package:workout_notes/services/ai_service.dart';
+import 'package:workout_notes/utils/app_locale.dart';
 
 const _kPrefsProviders = 'ai_providers_v1';
 const _kPrefsActiveId = 'ai_active_provider_id_v1';
@@ -54,7 +55,7 @@ class AiSettingsNotifier extends ChangeNotifier {
   /// The app language the user picked in Settings (`pt` or `en`); the same
   /// preference that drives the UI locale. It also sets the reply language.
   String get appLanguageCode =>
-      prefs.getString('app_locale') == 'pt' ? 'pt' : 'en';
+      AppLocale.languageCode(prefs.getString('app_locale'));
   bool get isLoaded => _loaded;
   bool get isConfigured => _settings.isConfigured;
   AiProvider? get activeProvider => _settings.activeProvider;

@@ -1,4 +1,5 @@
 import 'package:intl/intl.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 
 /// Shared helper functions used across progress chart widgets.
 
@@ -29,9 +30,9 @@ double niceInterval(double range) {
 }
 
 String formatVolume(double v) {
-  if (v >= 1000000) return '${(v / 1000000).toStringAsFixed(1)}M';
-  if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}k';
-  return v.toStringAsFixed(0);
+  if (v >= 1000000) return '${AppNumberFormat.decimal(v / 1000000, 1)}M';
+  if (v >= 1000) return '${AppNumberFormat.decimal(v / 1000, 1)}k';
+  return AppNumberFormat.decimal(v, 0);
 }
 
 String weekLabel(DateTime date, String prefix) {

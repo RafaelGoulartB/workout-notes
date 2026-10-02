@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 
 /// Row of mini stat cards (min, max, average, total count).
 class BodyQuickStats extends StatelessWidget {
@@ -24,11 +25,11 @@ class BodyQuickStats extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
 
     final statItems = [
-      (loc.bodyTrackerMin, minValue?.toStringAsFixed(1) ?? '--',
+      (loc.bodyTrackerMin, minValue == null ? '--' : AppNumberFormat.decimal(minValue!, 1),
           Icons.trending_down, Colors.blueGrey),
-      (loc.bodyTrackerMax, maxValue?.toStringAsFixed(1) ?? '--',
+      (loc.bodyTrackerMax, maxValue == null ? '--' : AppNumberFormat.decimal(maxValue!, 1),
           Icons.trending_up, typeColor),
-      (loc.bodyTrackerAverage, avgValue?.toStringAsFixed(1) ?? '--',
+      (loc.bodyTrackerAverage, avgValue == null ? '--' : AppNumberFormat.decimal(avgValue!, 1),
           Icons.show_chart, typeColor.withAlpha(200)),
       (loc.bodyTrackerEntries, '$totalCount', Icons.receipt_long,
           theme.colorScheme.secondary),

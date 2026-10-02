@@ -1,8 +1,8 @@
-import 'package:intl/intl.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_data_field.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
+import 'package:workout_notes/utils/clock_format.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 
 /// A formatted live value, split so the unit can be drawn smaller.
@@ -34,6 +34,7 @@ class RunDataFieldValues {
     required DateTime now,
     CardioActivityType activityType = CardioActivityType.running,
     double bodyWeightKg = 70,
+    bool use24Hour = true,
   }) {
     switch (field) {
       case RunDataField.time:
@@ -69,7 +70,9 @@ class RunDataFieldValues {
         );
         return RunDataValue(kcal <= 0 ? placeholder : '$kcal', 'kcal');
       case RunDataField.clock:
-        return RunDataValue(DateFormat.Hm(Intl.defaultLocale).format(now));
+        return RunDataValue(
+          ClockFormat.forSettings(use24Hour: use24Hour).format(now),
+        );
     }
   }
 

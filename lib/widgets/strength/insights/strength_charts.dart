@@ -292,7 +292,7 @@ class StrengthTrendChart extends StatelessWidget {
     }
     final dateFormat = maxX > 200
         ? DateFormat.yMMM(locale)
-        : DateFormat('dd/MM');
+        : DateFormat.Md(Intl.defaultLocale);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

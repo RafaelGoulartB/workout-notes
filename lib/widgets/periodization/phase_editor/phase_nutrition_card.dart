@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/periodization/phase_editor_controller.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/widgets/periodization/phase_editor/phase_editor_fields.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
@@ -25,7 +26,7 @@ class PhaseNutritionCard extends StatelessWidget {
     final weight = controller.latestWeightKg;
     String? perKg(double? grams) => grams == null || weight == null
         ? null
-        : loc.planningGramsPerKg((grams / weight).toStringAsFixed(1));
+        : loc.planningGramsPerKg(AppNumberFormat.decimal(grams / weight, 1));
     final tdeeHint = tdee == null || kcal == null
         ? null
         : loc.planningVsTdee(

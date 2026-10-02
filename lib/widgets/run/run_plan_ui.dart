@@ -7,6 +7,7 @@ import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 
 /// Shared labels, colours and formatters for the running-plan screens.
@@ -111,7 +112,7 @@ abstract final class RunPlanUi {
       final rest = minutes % 60;
       return rest == 0
           ? '${hours}h'
-          : '${hours}h${rest.toString().padLeft(2, '0')}';
+          : '${hours}h${DurationFormat.twoDigits(rest)}';
     }
     if (minutes == 0) return '${seconds}s';
     return seconds % 60 == 0
@@ -130,7 +131,7 @@ abstract final class RunPlanUi {
     final rest = minutes % 60;
     return rest == 0
         ? '${hours}h'
-        : '${hours}h${rest.toString().padLeft(2, '0')}';
+        : '${hours}h${DurationFormat.twoDigits(rest)}';
   }
 
   /// `4:35` for 275 s/km.

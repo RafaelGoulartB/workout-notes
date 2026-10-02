@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/medication.dart';
 import 'package:workout_notes/services/medication_reminder_service.dart';
+import 'package:workout_notes/utils/clock_format.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Escalation delays offered in the editor, in minutes.
@@ -230,7 +230,7 @@ class _DoseRow extends StatelessWidget {
     final (stateLabel, stateColor) = switch (item.state) {
       MedicationDoseState.taken => (
         loc.medicationStateTakenAt(
-          DateFormat.Hm().format(item.record!.recordedAt),
+          ClockFormat.format(context, item.record!.recordedAt),
         ),
         colors.primary,
       ),

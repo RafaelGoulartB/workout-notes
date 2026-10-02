@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/body_tracker_utils.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 
@@ -82,7 +83,7 @@ class BodyMeasurementsTeaserCard extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Text(
-                          '${weightKg!.toStringAsFixed(1)} $displayUnit',
+                          '${AppNumberFormat.decimal(weightKg!, 1)} $displayUnit',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.titleMedium?.copyWith(
@@ -100,7 +101,7 @@ class BodyMeasurementsTeaserCard extends StatelessWidget {
                           color: deltaColor,
                         ),
                         Text(
-                          '${deltaValue > 0 ? '+' : ''}${deltaValue.toStringAsFixed(1)}',
+                          '${deltaValue > 0 ? '+' : ''}${AppNumberFormat.decimal(deltaValue, 1)}',
                           style: theme.textTheme.labelLarge?.copyWith(
                             color: deltaColor,
                             fontWeight: FontWeight.w700,

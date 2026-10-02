@@ -4,6 +4,7 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/goal.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 
 /// Bottom sheet for creating or editing a user goal.
 /// Multi-step flow: scope → metric → period+target.
@@ -95,8 +96,8 @@ class _GoalFormSheetState extends State<GoalFormSheet> {
   }
 
   String _formatNumber(double v) {
-    if (v == v.roundToDouble()) return v.toStringAsFixed(0);
-    return v.toStringAsFixed(1);
+    if (v == v.roundToDouble()) return AppNumberFormat.decimal(v, 0);
+    return AppNumberFormat.decimal(v, 1);
   }
 
   Future<void> _loadSuggestion() async {

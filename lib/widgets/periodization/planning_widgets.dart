@@ -6,6 +6,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/periodization/phase_week_plan.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 
 /// Shared building blocks of the planning screens. They follow the running
@@ -504,7 +505,7 @@ class _DayColumn extends StatelessWidget {
     );
     if (meters <= 0) return '';
     final km = meters / 1000;
-    return '${km.toStringAsFixed(km >= 10 ? 0 : 1).replaceAll('.', ',')}k';
+    return '${AppNumberFormat.decimal(km, km >= 10 ? 0 : 1)}k';
   }
 }
 

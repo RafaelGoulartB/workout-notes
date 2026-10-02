@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:intl/date_symbol_data_local.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/screens/main_shell.dart';
@@ -14,6 +12,7 @@ import 'package:workout_notes/services/traditional_alarm_service.dart';
 import 'package:workout_notes/state/ai_chat_service.dart';
 import 'package:workout_notes/state/ai_settings_notifier.dart';
 import 'package:workout_notes/state/sections_notifier.dart';
+import 'package:workout_notes/utils/app_locale.dart';
 
 /// List of accent seed colors available in settings.
 class AccentColors {
@@ -88,13 +87,11 @@ void main() async {
   final initialThemeMode = _parseThemeMode(themeModeStr);
 
   // Load saved locale
-  final localeStr = prefs.getString('app_locale') ?? 'en';
-  final initialLocale = _parseLocale(localeStr);
+  final localeStr = AppLocale.languageCode(prefs.getString('app_locale'));
+  final initialLocale = AppLocale.flutterLocale(localeStr);
 
   // Initialize date formatting based on locale
-  final localeForDateFormat = localeStr == 'pt' ? 'pt_BR' : 'en';
-  await initializeDateFormatting(localeForDateFormat, null);
-  Intl.defaultLocale = localeForDateFormat;
+  await AppLocale.apply(localeStr);
 
   // Initialize the theme notifier with the loaded values
   WorkoutNotesApp.themeNotifier = ThemeNotifier(initialColor, initialThemeMode);
@@ -149,13 +146,6 @@ Future<void> _guarded(Future<void> Function() step) async {
   } catch (error) {
     debugPrint('Startup step failed: $error');
   }
-}
-
-Locale _parseLocale(String value) {
-  if (value == 'pt' || value == 'pt_BR') {
-    return const Locale('pt', 'BR');
-  }
-  return const Locale('en');
 }
 
 ThemeMode _parseThemeMode(String value) {
@@ -236,7 +226,6 @@ class _WorkoutNotesAppState extends State<WorkoutNotesApp> {
         centerTitle: true,
         elevation: 0,
         scrolledUnderElevation: 1,
-        backgroundColor: Colors.transparent,
       ),
       cardTheme: CardThemeData(
         elevation: 0,

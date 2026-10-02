@@ -10,6 +10,7 @@ import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/screens/workout/future_workout_planner_screen.dart';
 import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
 import 'package:workout_notes/services/run_week_balance.dart';
+import 'package:workout_notes/utils/clock_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/run/run_balance_dialog.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
@@ -237,7 +238,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   AppLocalizations.of(
                                     context,
                                   )!.calendarNoWorkouts(
-                                    DateFormat('d/M').format(_selectedDate),
+                                    DateFormat.Md(Intl.defaultLocale).format(_selectedDate),
                                   ),
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     color: theme.colorScheme.onSurfaceVariant,
@@ -300,7 +301,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   ),
                                   title: Text(
                                     w['start_time'] != null
-                                        ? DateFormat('HH:mm').format(
+                                        ? ClockFormat.format(
+                                            context,
                                             DateTime.parse(
                                               w['start_time'] as String,
                                             ),
@@ -551,7 +553,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           activity.title ??
               (activity.isStationaryBike
                   ? AppLocalizations.of(context)!.cardioActivityStationaryBike
-                  : DateFormat('HH:mm').format(activity.startedAt)),
+                  : ClockFormat.format(context, activity.startedAt)),
         ),
         subtitle: Text(
           '${RunPlanUi.distanceLabel(activity.distanceMeters)} · '
@@ -588,8 +590,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     // Day cells
     for (int day = 1; day <= daysInMonth; day++) {
-      final dateStr =
-          '$_currentYear-${_currentMonth.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
+      final dateStr = dateKey(DateTime(_currentYear, _currentMonth, day));
       final cats = _categoriesByDate[dateStr] ?? [];
       final hasWorkout = cats.isNotEmpty;
       final hasRun = (_runsByDate[dateStr] ?? const []).isNotEmpty;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/body_tracker_utils.dart';
 
 /// Hero card showing current values for both left and right sides.
@@ -184,7 +185,7 @@ class _BilateralSidePanel extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                value != null ? value!.toStringAsFixed(1) : '--',
+                value != null ? AppNumberFormat.decimal(value!, 1) : '--',
                 style: theme.textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   letterSpacing: -1,
@@ -216,7 +217,7 @@ class _BilateralSidePanel extends StatelessWidget {
                 ),
                 const SizedBox(width: 2),
                 Text(
-                  '${delta! > 0 ? '+' : ''}${delta!.toStringAsFixed(1)}',
+                  '${delta! > 0 ? '+' : ''}${AppNumberFormat.decimal(delta!, 1)}',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
@@ -275,7 +276,7 @@ class _AsymmetryIndicator extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             loc.bodyTrackerAsymmetry(
-                diff.toStringAsFixed(1), larger, unit),
+                AppNumberFormat.decimal(diff, 1), larger, unit),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
               fontSize: 11,

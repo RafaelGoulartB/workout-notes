@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 
 /// Returns icon and label for a given time-of-day identifier.
 (IconData, String) timeOfDayData(String tod, BuildContext context) {
@@ -92,9 +93,9 @@ String formatMeasurementValue(
   if (value == null) return '--';
   final secondary = (measurement['secondary_value'] as num?)?.toDouble();
   if (type.id == 'bloodPressure' && secondary != null) {
-    return '${value.toStringAsFixed(0)}/${secondary.toStringAsFixed(0)} ${type.unit}';
+    return '${AppNumberFormat.decimal(value, 0)}/${AppNumberFormat.decimal(secondary, 0)} ${type.unit}';
   }
-  return '${value.toStringAsFixed(1)} ${type.unit}';
+  return '${AppNumberFormat.decimal(value, 1)} ${type.unit}';
 }
 
 /// Whether a falling value is progress for [typeId]. Weight, body fat and the

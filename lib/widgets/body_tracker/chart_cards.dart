@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Full-size trend chart for the selected measurement type.
@@ -68,7 +69,7 @@ class BodyChartCard extends StatelessWidget {
                         showTitles: true,
                         reservedSize: 36,
                         getTitlesWidget: (v, _) => Text(
-                          v.toStringAsFixed(v >= 100 ? 0 : 1),
+                          AppNumberFormat.decimal(v, v >= 100 ? 0 : 1),
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontSize: 9,
                             color: theme.colorScheme.onSurfaceVariant,
@@ -143,7 +144,7 @@ class BodyChartCard extends StatelessWidget {
                             ? (reversed[idx]['date'] as String? ?? '')
                             : '';
                         return LineTooltipItem(
-                          '$date\n${s.y.toStringAsFixed(1)} ${type.unit}',
+                          '$date\n${AppNumberFormat.decimal(s.y, 1)} ${type.unit}',
                           TextStyle(
                             color: theme.colorScheme.onSurface,
                             fontWeight: FontWeight.bold,
@@ -252,7 +253,7 @@ class BodyBilateralChartCard extends StatelessWidget {
                         showTitles: true,
                         reservedSize: 36,
                         getTitlesWidget: (v, _) => Text(
-                          v.toStringAsFixed(v >= 100 ? 0 : 1),
+                          AppNumberFormat.decimal(v, v >= 100 ? 0 : 1),
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontSize: 9,
                             color: theme.colorScheme.onSurfaceVariant,
@@ -338,7 +339,7 @@ class BodyBilateralChartCard extends StatelessWidget {
                             ? loc.bodyTrackerLeft
                             : loc.bodyTrackerRight;
                         return LineTooltipItem(
-                          '$date\n$side: ${s.y.toStringAsFixed(1)} ${type.unit}',
+                          '$date\n$side: ${AppNumberFormat.decimal(s.y, 1)} ${type.unit}',
                           TextStyle(
                             color: theme.colorScheme.onSurface,
                             fontWeight: FontWeight.bold,

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/nutrition_progress.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/widgets/nutrition/progress/progress_shared.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
@@ -438,7 +439,7 @@ class WeekDayCell extends StatelessWidget {
   }
 
   String _formatShort(double v) {
-    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}k';
+    if (v >= 1000) return '${AppNumberFormat.decimal(v / 1000, 1)}k';
     return v.round().toString();
   }
 
@@ -476,7 +477,7 @@ class DayDeltaPill extends StatelessWidget {
     final theme = Theme.of(context);
     final abs = delta.abs();
     final label = abs >= 1000
-        ? '${delta < 0 ? '-' : '+'}${(abs / 1000).toStringAsFixed(1)}k'
+        ? '${delta < 0 ? '-' : '+'}${AppNumberFormat.decimal(abs / 1000, 1)}k'
         : '${delta < 0 ? '-' : '+'}${abs.round()}';
     return Text(
       label,

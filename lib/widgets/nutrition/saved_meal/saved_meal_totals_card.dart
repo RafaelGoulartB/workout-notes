@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
 import 'package:workout_notes/widgets/nutrition/saved_meal/saved_meal_form_widgets.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
@@ -169,8 +170,8 @@ class SavedMealCaloriesRow extends StatelessWidget {
   }
 
   static String _formatKcal(double value) {
-    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
-    return value.toStringAsFixed(1);
+    if (value == value.roundToDouble()) return AppNumberFormat.decimal(value, 0);
+    return AppNumberFormat.decimal(value, 1);
   }
 }
 
@@ -215,8 +216,8 @@ class SavedMealPerPortionRow extends StatelessWidget {
   }
 
   static String _formatGrams(double value) {
-    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
-    return value.toStringAsFixed(1);
+    if (value == value.roundToDouble()) return AppNumberFormat.decimal(value, 0);
+    return AppNumberFormat.decimal(value, 1);
   }
 }
 

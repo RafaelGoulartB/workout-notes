@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/repositories/strength_history_repository.dart';
+import 'package:workout_notes/utils/clock_format.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
@@ -81,7 +82,7 @@ class StrengthHistoryRow extends StatelessWidget {
     final caption = [
       started == null
           ? datePart
-          : '$datePart · ${DateFormat('HH:mm', locale).format(started)}',
+          : '$datePart · ${ClockFormat.format(context, started)}',
       if (workout.durationSeconds > 0)
         RunFormatters.durationHoursMinutes(workout.durationSeconds),
     ].join(' · ');

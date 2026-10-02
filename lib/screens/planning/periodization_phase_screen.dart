@@ -10,6 +10,7 @@ import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/periodization/week_progress.dart';
 import 'package:workout_notes/screens/planning/periodization_checkin_flow.dart';
 import 'package:workout_notes/screens/planning/periodization_phase_editor_screen.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
@@ -447,7 +448,7 @@ class _TargetsCard extends StatelessWidget {
             if (target.runDays.isNotEmpty)
               loc.planningRunsPerWeek(target.runDays.length),
             if (target.runWeeklyDistanceMeters != null)
-              '${(target.runWeeklyDistanceMeters! / 1000).toStringAsFixed(0)} km',
+              '${AppNumberFormat.decimal(target.runWeeklyDistanceMeters! / 1000, 0)} km',
           ].join(' · '),
         ),
       if (target.weeklyWeightChangePercent != null ||
@@ -461,7 +462,7 @@ class _TargetsCard extends StatelessWidget {
               ),
             if (target.targetWeightKg != null)
               loc.planningTargetWeightValue(
-                target.targetWeightKg!.toStringAsFixed(1),
+                AppNumberFormat.decimal(target.targetWeightKg!, 1),
               ),
           ].join(' · '),
         ),
@@ -469,9 +470,10 @@ class _TargetsCard extends StatelessWidget {
         _TargetRow(
           icon: Icons.bedtime_outlined,
           title: loc.planningSleepValue(
-            target.sleepHours!
-                .toStringAsFixed(target.sleepHours! % 1 == 0 ? 0 : 1)
-                .replaceAll('.', ','),
+            AppNumberFormat.decimal(
+              target.sleepHours!,
+              target.sleepHours! % 1 == 0 ? 0 : 1,
+            ),
           ),
         ),
     ];
@@ -512,7 +514,7 @@ class _TargetsCard extends StatelessWidget {
         : value < 0
         ? '−'
         : '';
-    return '$sign${value.abs().toString().replaceAll('.', ',')}%';
+    return '$sign${AppNumberFormat.decimal(value.abs(), 2, trimZeros: true)}%';
   }
 }
 
@@ -841,13 +843,13 @@ class _PlannedDone extends StatelessWidget {
           done: progress.plannedRunKm == null
               ? '${progress.doneRuns}'
               : '${progress.doneRuns} · '
-                    '${progress.doneRunKm.toStringAsFixed(1).replaceAll('.', ',')} km',
+                    '${AppNumberFormat.decimal(progress.doneRunKm, 1)} km',
           planned: progress.plannedRuns == 0
               ? null
               : progress.plannedRunKm == null
               ? '${progress.plannedRuns}'
               : '${progress.plannedRuns} · '
-                    '${progress.plannedRunKm!.toStringAsFixed(1).replaceAll('.', ',')} km',
+                    '${AppNumberFormat.decimal(progress.plannedRunKm!, 1)} km',
           ratio: progress.plannedRuns == 0
               ? null
               : progress.doneRuns / progress.plannedRuns,
@@ -871,10 +873,10 @@ class _PlannedDone extends StatelessWidget {
           label: loc.planningAverageSleep,
           done: metrics.averageSleepHours == null
               ? '—'
-              : '${metrics.averageSleepHours!.toStringAsFixed(1).replaceAll('.', ',')} h',
+              : '${AppNumberFormat.decimal(metrics.averageSleepHours!, 1)} h',
           planned: progress.target?.sleepHours == null
               ? null
-              : '${progress.target!.sleepHours!.toStringAsFixed(1).replaceAll('.', ',')} h',
+              : '${AppNumberFormat.decimal(progress.target!.sleepHours!, 1)} h',
           ratio: metrics.sleepAdherencePercent == null
               ? null
               : metrics.sleepAdherencePercent! / 100,
@@ -885,7 +887,7 @@ class _PlannedDone extends StatelessWidget {
           label: loc.planningWeightChange,
           done:
               '${metrics.weightChangeKg! > 0 ? '+' : ''}'
-              '${metrics.weightChangeKg!.toStringAsFixed(1).replaceAll('.', ',')} kg',
+              '${AppNumberFormat.decimal(metrics.weightChangeKg!, 1)} kg',
         ),
     ];
     if (rows.isEmpty) {

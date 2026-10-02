@@ -56,7 +56,7 @@ void main() {
     expect(find.text('Bench Press'), findsOneWidget);
     expect(find.text('1h 00min'), findsOneWidget);
 
-    await tester.tap(find.text('100.0').first);
+    await tester.tap(find.text('100,0').first);
     await tester.pumpAndSettle();
     expect(find.text('Bench Press · Série 1'), findsOneWidget);
   });

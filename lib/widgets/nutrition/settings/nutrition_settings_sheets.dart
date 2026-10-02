@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/nutrition_goal_suggest.dart';
 
 /// Bottom sheet used to edit one numeric goal value (calories, protein,
@@ -40,8 +41,8 @@ class _NumberEditorSheetState extends State<NumberEditorSheet> {
   }
 
   static String _format(double value) {
-    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
-    return value.toStringAsFixed(1);
+    if (value == value.roundToDouble()) return AppNumberFormat.decimal(value, 0);
+    return AppNumberFormat.decimal(value, 1);
   }
 
   void _submit() {
@@ -200,19 +201,19 @@ class _AdjustmentPickerSheetState extends State<AdjustmentPickerSheet> {
   }
 
   static String _formatPercentForEdit(double percent) {
-    if (percent == percent.roundToDouble()) return percent.toStringAsFixed(0);
-    return percent.toStringAsFixed(1);
+    if (percent == percent.roundToDouble()) return AppNumberFormat.decimal(percent, 0);
+    return AppNumberFormat.decimal(percent, 1);
   }
 
   static String _formatGoal(double value) {
-    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
-    return value.toStringAsFixed(1);
+    if (value == value.roundToDouble()) return AppNumberFormat.decimal(value, 0);
+    return AppNumberFormat.decimal(value, 1);
   }
 
   static String _formatPercentLabel(double percent) {
     final rounded = percent.round();
-    if (rounded > 0) return '+${rounded.toStringAsFixed(0)}%';
-    return '${rounded.toStringAsFixed(0)}%';
+    if (rounded > 0) return '+${AppNumberFormat.decimal(rounded, 0)}%';
+    return '${AppNumberFormat.decimal(rounded, 0)}%';
   }
 
   @override
@@ -366,8 +367,8 @@ class AdjustmentOptionButton extends StatelessWidget {
   static String _defaultPercent(NutritionObjective kind) {
     final adjusted = NutritionAdjustment.defaultsFor(kind);
     final rounded = adjusted.percent.round();
-    if (rounded > 0) return '+${rounded.toStringAsFixed(0)}%';
-    return '${rounded.toStringAsFixed(0)}%';
+    if (rounded > 0) return '+${AppNumberFormat.decimal(rounded, 0)}%';
+    return '${AppNumberFormat.decimal(rounded, 0)}%';
   }
 
   @override

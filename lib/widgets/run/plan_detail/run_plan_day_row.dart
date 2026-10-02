@@ -162,7 +162,7 @@ class _DayLabel extends StatelessWidget {
           ),
           if (date != null)
             Text(
-              DateFormat('dd/MM', locale).format(date!),
+              DateFormat.Md(locale).format(date!),
               style: theme.textTheme.labelSmall?.copyWith(
                 fontSize: 10,
                 color: color,

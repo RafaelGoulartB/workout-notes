@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Card showing estimated body composition (lean mass, fat mass, WHR).
@@ -43,7 +44,7 @@ class BodyDerivedStatsCard extends StatelessWidget {
     if (leanMass != null) {
       stats.add(DerivedStat(
         loc.bodyTrackerLeanMass,
-        '${leanMass.toStringAsFixed(1)} kg',
+        '${AppNumberFormat.decimal(leanMass, 1)} kg',
         Icons.fitness_center,
         Colors.green,
       ));
@@ -51,7 +52,7 @@ class BodyDerivedStatsCard extends StatelessWidget {
     if (fatMass != null) {
       stats.add(DerivedStat(
         loc.bodyTrackerFatMass,
-        '${fatMass.toStringAsFixed(1)} kg',
+        '${AppNumberFormat.decimal(fatMass, 1)} kg',
         Icons.water_drop,
         Colors.orange,
       ));
@@ -64,7 +65,7 @@ class BodyDerivedStatsCard extends StatelessWidget {
               : loc.bodyTrackerHigh;
       stats.add(DerivedStat(
         loc.bodyTrackerWHR,
-        '${whr.toStringAsFixed(2)} · $whrEval',
+        '${AppNumberFormat.decimal(whr, 2)} · $whrEval',
         Icons.monitor_weight,
         Colors.teal,
       ));

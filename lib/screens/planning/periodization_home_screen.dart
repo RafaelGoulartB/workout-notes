@@ -23,6 +23,7 @@ import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/screens/settings/settings_screen.dart';
 import 'package:workout_notes/screens/workout/active_workout_screen.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/load_generation.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
@@ -737,7 +738,7 @@ class _TodayCard extends StatelessWidget {
           icon: Icons.bedtime_outlined,
           color: color,
           title: loc.planningSleepTonight(
-            sleep.toStringAsFixed(sleep % 1 == 0 ? 0 : 1).replaceAll('.', ','),
+            AppNumberFormat.decimal(sleep, sleep % 1 == 0 ? 0 : 1),
           ),
         ),
     ];

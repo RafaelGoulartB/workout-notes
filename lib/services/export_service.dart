@@ -16,6 +16,7 @@ import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/services/backup_exception.dart';
 import 'package:workout_notes/services/backup_media_service.dart';
 import 'package:workout_notes/state/ai_chat_service.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/csv_writer.dart';
 
 typedef SaveFileCallback =
@@ -44,9 +45,9 @@ class BackupFileInfo {
   String get sizeFormatted {
     if (sizeBytes < 1024) return '$sizeBytes B';
     if (sizeBytes < 1024 * 1024) {
-      return '${(sizeBytes / 1024).toStringAsFixed(1)} KB';
+      return '${AppNumberFormat.decimal(sizeBytes / 1024, 1)} KB';
     }
-    return '${(sizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${AppNumberFormat.decimal(sizeBytes / (1024 * 1024), 1)} MB';
   }
 }
 

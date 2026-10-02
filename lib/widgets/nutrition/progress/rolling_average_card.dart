@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/widgets/nutrition/progress/progress_shared.dart';
 
 class RollingAverageCard extends StatelessWidget {
@@ -146,7 +147,7 @@ class RollingLineChart extends StatelessWidget {
               getTitlesWidget: (value, meta) {
                 return Text(
                   value >= 1000
-                      ? '${(value / 1000).toStringAsFixed(1)}k'
+                      ? '${AppNumberFormat.decimal(value / 1000, 1)}k'
                       : value.round().toString(),
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,

@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/utils/workout_card_helpers.dart';
 import 'package:workout_notes/widgets/workout/stepper_button.dart';
@@ -588,9 +589,7 @@ class WorkoutSetFieldControls extends StatelessWidget {
 
   static String _formatDecimal(double value, {int decimals = 2}) {
     final rounded = _roundDecimal(value, decimals);
-    return rounded
-        .toStringAsFixed(decimals)
-        .replaceFirst(RegExp(r'\.?0+$'), '');
+    return AppNumberFormat.decimal(rounded, decimals, trimZeros: true);
   }
 
   static String _formatDuration(int seconds) {

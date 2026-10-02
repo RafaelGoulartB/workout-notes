@@ -88,7 +88,7 @@ Future<void> openStrengthExercise(
 extension StrengthBucketLabels on StrengthVolumeBucket {
   String label(String locale) => monthly
       ? DateFormat.MMM(locale).format(start)
-      : DateFormat('dd/MM').format(start);
+      : DateFormat.Md(Intl.defaultLocale).format(start);
 }
 
 /// Localized name of an `exercise_categories` row (resolved through its

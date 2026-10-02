@@ -6,6 +6,7 @@ import 'package:workout_notes/models/periodization_checkin.dart';
 import 'package:workout_notes/models/periodization_metrics.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_target.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 
@@ -340,7 +341,7 @@ class _SummaryCard extends StatelessWidget {
             child: _Metric(
               value: metrics.weightChangeKg == null
                   ? '—'
-                  : '${metrics.weightChangeKg! >= 0 ? '+' : ''}${metrics.weightChangeKg!.toStringAsFixed(1)} kg',
+                  : '${metrics.weightChangeKg! >= 0 ? '+' : ''}${AppNumberFormat.decimal(metrics.weightChangeKg!, 1)} kg',
               label: loc.periodizationWeightChange,
             ),
           ),

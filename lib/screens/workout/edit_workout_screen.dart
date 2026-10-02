@@ -5,6 +5,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/models/exercise_with_sets.dart';
 import 'package:workout_notes/repositories/workout_repository.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/strength/exercises/exercise_picker_sheet.dart';
@@ -392,13 +393,13 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
     final loc = AppLocalizations.of(context)!;
     final set = exercise.sets[setIndex];
     final weightCtl = TextEditingController(
-      text: (set['weight'] as num?)?.toStringAsFixed(1) ?? '',
+      text: AppNumberFormat.decimalOrDash(set['weight'] as num?, 1, fallback: ''),
     );
     final repsCtl = TextEditingController(
       text: (set['reps'] as int?)?.toString() ?? '',
     );
     final rpeCtl = TextEditingController(
-      text: (set['rpe'] as num?)?.toStringAsFixed(1) ?? '',
+      text: AppNumberFormat.decimalOrDash(set['rpe'] as num?, 1, fallback: ''),
     );
 
     final result = await showDialog<bool>(
@@ -461,9 +462,9 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
     if (result == true) {
       await _workoutRepo.updateSet(
         set['id'] as String,
-        weight: double.tryParse(weightCtl.text),
+        weight: double.tryParse(weightCtl.text.replaceAll(',', '.')),
         reps: int.tryParse(repsCtl.text),
-        rpe: double.tryParse(rpeCtl.text),
+        rpe: double.tryParse(rpeCtl.text.replaceAll(',', '.')),
       );
       await _load();
       if (mounted) setState(() {});
@@ -941,9 +942,9 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
                     ),
                     const SizedBox(width: 4),
                     for (final value in [
-                      (s['weight'] as num?)?.toStringAsFixed(1) ?? '-',
+                      AppNumberFormat.decimalOrDash(s['weight'] as num?, 1),
                       (s['reps'] as int?)?.toString() ?? '-',
-                      (s['rpe'] as num?)?.toStringAsFixed(1) ?? '-',
+                      AppNumberFormat.decimalOrDash(s['rpe'] as num?, 1),
                     ])
                       Expanded(
                         flex: 3,

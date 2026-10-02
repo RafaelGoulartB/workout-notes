@@ -4,6 +4,7 @@ import 'package:workout_notes/models/exercise_with_sets.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/repositories/workout_repository.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
 import 'package:workout_notes/utils/strength_workout_records.dart';
 import 'package:workout_notes/utils/workout_estimator.dart';
@@ -265,8 +266,8 @@ class WorkoutSummaryService {
           PR(
             exerciseName: bests.name,
             type: 'distance',
-            value: '${bests.distance.toStringAsFixed(1)} km',
-            previous: '${bestDistance.toStringAsFixed(1)} km',
+            value: '${AppNumberFormat.decimal(bests.distance, 1)} km',
+            previous: '${AppNumberFormat.decimal(bestDistance, 1)} km',
           ),
         );
       }

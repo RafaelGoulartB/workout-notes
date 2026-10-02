@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/goal.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/widgets/goals/goal_formatters.dart';
 import 'package:workout_notes/widgets/goals/goal_progress_ring.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
@@ -66,7 +67,7 @@ class GoalCard extends StatelessWidget {
   }
 
   String _value(double value) => goal.metric == GoalMetric.days
-      ? value.toStringAsFixed(0)
+      ? AppNumberFormat.decimal(value, 0)
       : GoalFormatters.formatValueShort(goal.metric, value, isKm: isKm);
 
   @override

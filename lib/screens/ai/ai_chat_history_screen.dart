@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/ai_chat_thread.dart';
 import 'package:workout_notes/state/ai_chat_service.dart';
+import 'package:workout_notes/utils/clock_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/ai/ai_history_thread_card.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
@@ -571,7 +572,7 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
         ? 'pt_BR'
         : 'en';
     try {
-      if (age == 0) return DateFormat.Hm(locale).format(value);
+      if (age == 0) return ClockFormat.format(context, value);
       if (age < 7) return DateFormat.E(locale).format(value);
       return DateFormat.Md(locale).format(value);
     } on Object catch (error) {

@@ -70,6 +70,7 @@ class RunDataFieldsGrid extends StatelessWidget {
                 now: now,
                 activityType: activityType,
                 bodyWeightKg: bodyWeightKg,
+                use24Hour: MediaQuery.alwaysUse24HourFormatOf(context),
               ),
               // Two big cells per row read from an arm's length; three need
               // a smaller numeral to fit 360 dp.

@@ -5,6 +5,7 @@ import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/body_progress_analytics.dart';
 import 'package:workout_notes/utils/body_tracker_utils.dart';
 import 'package:workout_notes/utils/date_utils.dart';
@@ -151,7 +152,7 @@ class BodyStatsController extends ChangeNotifier {
   // ------------------------------------------------------------------
 
   String value(double? v, {int? decimals}) =>
-      v == null ? '--' : v.toStringAsFixed(decimals ?? this.decimals);
+      v == null ? '--' : AppNumberFormat.decimal(v, decimals ?? this.decimals);
 
   String signed(double? v, {int decimals = 1}) {
     if (v == null) return '--';
@@ -160,7 +161,7 @@ class BodyStatsController extends ChangeNotifier {
         : v < 0
         ? '-'
         : '';
-    return '$sign${v.abs().toStringAsFixed(decimals)}';
+    return '$sign${AppNumberFormat.decimal(v.abs(), decimals)}';
   }
 
   /// True when a change of [delta] moves in the direction the user wants.

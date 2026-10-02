@@ -14,6 +14,7 @@ import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 
 /// Per-week deviation from the phase targets: a label ("Deload", "Refeed")
@@ -602,6 +603,6 @@ class PhaseEditorController extends ChangeNotifier {
     if (decimals == 0 || value == value.roundToDouble()) {
       return value.round().toString();
     }
-    return value.toStringAsFixed(decimals);
+    return AppNumberFormat.decimal(value, decimals);
   }
 }

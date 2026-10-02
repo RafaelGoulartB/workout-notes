@@ -23,6 +23,7 @@ import 'package:workout_notes/screens/settings/settings_screen.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 import 'package:workout_notes/services/open_food_facts_gateway.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
@@ -234,8 +235,8 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   }
 
   static String _formatNum(double value) {
-    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
-    return value.toStringAsFixed(1);
+    if (value == value.roundToDouble()) return AppNumberFormat.decimal(value, 0);
+    return AppNumberFormat.decimal(value, 1);
   }
 
   Future<void> _openFoodSearchForMeal(

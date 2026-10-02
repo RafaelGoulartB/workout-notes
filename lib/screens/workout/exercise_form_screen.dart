@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/exercise_equipment.dart';
 import 'package:workout_notes/widgets/ui/form_section_card.dart';
 
@@ -67,7 +68,7 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
         _equipment = ex['equipment'] as String? ?? '';
         final wi = (ex['weight_increment'] as num?)?.toDouble();
         _weightIncrementCtl.text = wi != null
-            ? wi.toStringAsFixed(wi.truncateToDouble() == wi ? 0 : 1)
+            ? AppNumberFormat.decimal(wi, wi.truncateToDouble() == wi ? 0 : 1)
             : '';
         final drt = ex['default_rest_time'] as int?;
         _defaultRestCtl.text = drt?.toString() ?? '';

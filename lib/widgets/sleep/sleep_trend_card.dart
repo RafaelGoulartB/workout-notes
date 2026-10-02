@@ -197,7 +197,7 @@ class SleepTrendCard extends StatelessWidget {
                           meta: meta,
                           fitInside: SideTitleFitInsideData.fromTitleMeta(meta),
                           child: Text(
-                            DateFormat('d/M').format(date),
+                            DateFormat.Md(Intl.defaultLocale).format(date),
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: colors.onSurfaceVariant,
                             ),

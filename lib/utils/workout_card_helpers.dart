@@ -1,4 +1,5 @@
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/duration_format.dart';
 
 /// Returns a localized label for a workout set field.
@@ -42,11 +43,11 @@ List<String> getFieldsForType(String type) {
 String formatFieldValue(Map<String, dynamic> set, String key) {
   if (key == 'weight') {
     final v = (set['weight'] as num?)?.toDouble();
-    return v != null ? v.toStringAsFixed(1) : '-';
+    return v != null ? AppNumberFormat.decimal(v, 1) : '-';
   }
   if (key == 'distance') {
     final v = (set['distance'] as num?)?.toDouble();
-    return v != null ? v.toStringAsFixed(1) : '-';
+    return v != null ? AppNumberFormat.decimal(v, 1) : '-';
   }
   if (key == 'reps') {
     return (set['reps'] as int?)?.toString() ?? '-';

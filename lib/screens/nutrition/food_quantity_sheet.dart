@@ -8,6 +8,7 @@ import 'package:workout_notes/models/nutrition/food_variant.dart';
 import 'package:workout_notes/models/nutrition/meal_log_item.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/nutrition_conversion.dart';
 import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
 
@@ -96,9 +97,9 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
 
   String _formatForField(double value) {
     if (value == value.roundToDouble()) {
-      return value.toStringAsFixed(0);
+      return AppNumberFormat.decimal(value, 0);
     }
-    return value.toStringAsFixed(2);
+    return AppNumberFormat.decimal(value, 2);
   }
 
   String _defaultQuantityText() {
@@ -331,7 +332,7 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
                 name: widget.food.name,
                 brand: widget.food.brand,
                 perLabel: loc.nutritionPer100g(
-                  widget.primaryVariant.referenceAmount.toStringAsFixed(0),
+                  AppNumberFormat.decimal(widget.primaryVariant.referenceAmount, 0),
                   widget.primaryVariant.referenceUnit,
                 ),
               ),
@@ -765,8 +766,8 @@ class _ServingQuickPicks extends StatelessWidget {
   }
 
   String _formatGrams(double value) {
-    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
-    return value.toStringAsFixed(1);
+    if (value == value.roundToDouble()) return AppNumberFormat.decimal(value, 0);
+    return AppNumberFormat.decimal(value, 1);
   }
 }
 
@@ -1024,14 +1025,14 @@ class _PreviewSection extends StatelessWidget {
 
   static String _formatCalories(double? value) {
     if (value == null) return '—';
-    if (value < 10) return value.toStringAsFixed(1);
-    return value.toStringAsFixed(0);
+    if (value < 10) return AppNumberFormat.decimal(value, 1);
+    return AppNumberFormat.decimal(value, 0);
   }
 
   static String _formatMacro(double? value) {
     if (value == null) return '— g';
-    if (value < 10) return '${value.toStringAsFixed(1)} g';
-    return '${value.toStringAsFixed(0)} g';
+    if (value < 10) return '${AppNumberFormat.decimal(value, 1)} g';
+    return '${AppNumberFormat.decimal(value, 0)} g';
   }
 }
 

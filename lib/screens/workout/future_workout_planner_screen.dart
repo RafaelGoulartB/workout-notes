@@ -6,6 +6,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/models/exercise_with_sets.dart';
 import 'package:workout_notes/screens/workout/active_workout_screen.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/widgets/strength/exercises/exercise_picker_sheet.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/workout/set_editor_fields.dart';
@@ -495,7 +496,7 @@ class _FutureWorkoutPlannerScreenState
                     Expanded(
                       flex: 2,
                       child: Text(
-                        (s['weight'] as num?)?.toStringAsFixed(1) ?? '-',
+                        AppNumberFormat.decimalOrDash(s['weight'] as num?, 1),
                         style: theme.textTheme.bodyMedium,
                       ),
                     ),
@@ -509,7 +510,7 @@ class _FutureWorkoutPlannerScreenState
                     Expanded(
                       flex: 3,
                       child: Text(
-                        (s['rpe'] as num?)?.toStringAsFixed(1) ?? '-',
+                        AppNumberFormat.decimalOrDash(s['rpe'] as num?, 1),
                         style: theme.textTheme.bodyMedium,
                       ),
                     ),

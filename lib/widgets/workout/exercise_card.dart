@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/exercise_with_sets.dart';
 import 'package:workout_notes/screens/workout/exercise_detail_tabs_screen.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/workout_card_helpers.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
@@ -470,7 +471,7 @@ class ExerciseCard extends StatelessWidget {
         Expanded(
           flex: 2,
           child: Text(
-            (set['rpe'] as num?)?.toStringAsFixed(1) ?? '-',
+            AppNumberFormat.decimalOrDash(set['rpe'] as num?, 1),
             style: theme.textTheme.bodyMedium,
           ),
         ),

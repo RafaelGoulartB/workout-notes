@@ -1,5 +1,6 @@
 import 'package:intl/intl.dart';
 import 'package:workout_notes/models/goal.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 
 /// Format helpers for goal values, periods, etc.
 class GoalFormatters {
@@ -8,13 +9,13 @@ class GoalFormatters {
     switch (metric) {
       case GoalMetric.volume:
         if (value >= 1000) {
-          return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}t';
+          return '${AppNumberFormat.decimal(value / 1000, value >= 10000 ? 0 : 1)}t';
         }
-        return '${value.toStringAsFixed(0)} kg';
+        return '${AppNumberFormat.decimal(value, 0)} kg';
       case GoalMetric.days:
-        return value.toStringAsFixed(0);
+        return AppNumberFormat.decimal(value, 0);
       case GoalMetric.distance:
-        return '${value.toStringAsFixed(value >= 100 ? 0 : 1)} ${isKm ? 'km' : 'mi'}';
+        return '${AppNumberFormat.decimal(value, value >= 100 ? 0 : 1)} ${isKm ? 'km' : 'mi'}';
       case GoalMetric.time:
         return _formatDuration(value.toInt());
     }
@@ -25,13 +26,13 @@ class GoalFormatters {
     switch (metric) {
       case GoalMetric.volume:
         if (value >= 1000) {
-          return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}t';
+          return '${AppNumberFormat.decimal(value / 1000, value >= 10000 ? 0 : 1)}t';
         }
-        return '${value.toStringAsFixed(0)}kg';
+        return '${AppNumberFormat.decimal(value, 0)}kg';
       case GoalMetric.days:
-        return '${value.toStringAsFixed(0)}d';
+        return '${AppNumberFormat.decimal(value, 0)}d';
       case GoalMetric.distance:
-        return '${value.toStringAsFixed(value >= 100 ? 0 : 1)}${isKm ? 'k' : 'm'}';
+        return '${AppNumberFormat.decimal(value, value >= 100 ? 0 : 1)}${isKm ? 'k' : 'm'}';
       case GoalMetric.time:
         final totalSec = value.toInt();
         if (totalSec >= 3600) {
