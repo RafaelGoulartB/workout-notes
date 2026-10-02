@@ -14,6 +14,8 @@ import 'package:workout_notes/widgets/strength/workout/strength_workout_exercise
 import 'package:workout_notes/widgets/strength/workout/strength_workout_hero.dart';
 import 'package:workout_notes/widgets/strength/workout/strength_workout_muscle_split.dart';
 import 'package:workout_notes/widgets/strength/workout/strength_workout_records_card.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class WorkoutDetailScreen extends StatefulWidget {
@@ -26,11 +28,10 @@ class WorkoutDetailScreen extends StatefulWidget {
 
 enum _DetailAction { continueWorkout, editDate, copy, delete }
 
-class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
+class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> with GuardedLoad {
   final _workoutRepo = DatabaseHelper.instance.workoutRepo;
   final _historyRepo = DatabaseHelper.instance.strengthHistoryRepo;
   StrengthWorkoutDetail? _detail;
-  bool _isLoading = true;
 
   @override
   void initState() {
@@ -38,7 +39,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     final detail = await _historyRepo.loadDetail(widget.workoutId);
     if (!mounted) return;
     if (detail == null) {
@@ -47,9 +48,9 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     }
     setState(() {
       _detail = detail;
-      _isLoading = false;
+      isLoading = false;
     });
-  }
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +66,9 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
         title: Text(day != null ? DateFormat.MMMMd(locale).format(day) : ''),
         actions: detail == null ? null : _buildActions(loc, detail),
       ),
-      body: _isLoading || detail == null
+      body: loadFailed
+          ? LoadErrorView(onRetry: _load)
+          : isLoading || detail == null
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(onRefresh: _load, child: _buildBody(loc, detail)),
     );

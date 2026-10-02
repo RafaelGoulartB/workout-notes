@@ -20,16 +20,28 @@ class WorkoutPreferencesController extends ChangeNotifier {
 
   Map<String, String> _settings = {};
   bool _isLoading = true;
+  bool _loadFailed = false;
   bool _disposed = false;
 
   bool get isLoading => _isLoading;
+  bool get loadFailed => _loadFailed;
   Map<String, String> get settings => _settings;
 
   int get defaultRestSeconds =>
       int.tryParse(_settings['default_rest_time'] ?? '90') ?? 90;
 
   Future<void> load() async {
-    _settings = await _repo.getAllSettings();
+    if (_loadFailed) {
+      _loadFailed = false;
+      _isLoading = true;
+      _notify();
+    }
+    try {
+      _settings = await _repo.getAllSettings();
+    } catch (error, stack) {
+      debugPrint('Workout preferences failed to load: $error\n$stack');
+      _loadFailed = true;
+    }
     _isLoading = false;
     _notify();
   }

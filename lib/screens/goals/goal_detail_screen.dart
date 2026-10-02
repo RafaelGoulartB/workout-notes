@@ -7,6 +7,7 @@ import 'package:workout_notes/widgets/goals/goal_contributing_workouts.dart';
 import 'package:workout_notes/widgets/goals/goal_form_sheet.dart';
 import 'package:workout_notes/widgets/goals/goal_formatters.dart';
 import 'package:workout_notes/widgets/goals/goal_progress_ring.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Detail screen for a single goal: current period progress with pacing,
@@ -27,6 +28,7 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
   List<GoalPeriodResult> _history = [];
   List<ContributingWorkout> _contributors = [];
   bool _isLoading = true;
+  bool _loadFailed = false;
   bool _isKm = true;
 
   @override
@@ -37,7 +39,10 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _loadFailed = false;
+    });
     try {
       _isKm = await widget.db.settingsRepo.getIsDistanceKm();
       final repo = DatabaseHelper.instance.goalRepo;
@@ -51,8 +56,14 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
         _contributors = contributors;
         _isLoading = false;
       });
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
+    } catch (error, stack) {
+      debugPrint('Goal detail failed to load: $error\n$stack');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _loadFailed = true;
+        });
+      }
     }
   }
 
@@ -199,7 +210,9 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
           ),
         ],
       ),
-      body: _isLoading || _current == null
+      body: _loadFailed
+          ? LoadErrorView(onRetry: _load)
+          : _isLoading || _current == null
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _load,

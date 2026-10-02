@@ -17,6 +17,7 @@ import 'package:workout_notes/utils/workout_volume_comparison.dart';
 import 'package:workout_notes/widgets/strength/exercises/exercise_picker_sheet.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_today_card.dart';
 import 'package:workout_notes/widgets/strength/workout/active_workout_header.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/workout/exercise_card.dart';
 import 'package:workout_notes/widgets/workout/finish_workout_sheet.dart';
@@ -178,6 +179,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
         ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
+            : _loadFailed
+            ? LoadErrorView(onRetry: _initialize)
             : _exercises.isEmpty && _timerStart == null
             ? _buildEmptyState(theme)
             : _buildWorkoutView(theme),

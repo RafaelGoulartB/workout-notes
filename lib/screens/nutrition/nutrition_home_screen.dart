@@ -287,12 +287,6 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     await _openFoodSearchForMeal(type.key, type.displayName(loc));
   }
 
-  void _showSnack(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-
   Future<void> _persistAdd(
     String? mealType,
     String? mealLabel,
@@ -315,7 +309,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                   )
                   .displayName(loc));
     if (resolvedType == null || resolvedLabel == null) {
-      _showSnack(loc.nutritionSavedMealNoMealTypes);
+      showAppSnack(context, loc.nutritionSavedMealNoMealTypes);
       return;
     }
     try {
@@ -334,10 +328,11 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
         availableServings: selection.availableServings,
       );
       if (!mounted) return;
-      _showSnack(loc.nutritionItemSaved);
-    } catch (e) {
+      showAppSnack(context, loc.nutritionItemSaved);
+    } catch (e, stack) {
+      debugPrint('nutrition_home_screen: action failed: $e\n$stack');
       if (!mounted) return;
-      _showSnack(loc.commonError(e.toString()));
+      showAppSnack(context, loc.commonSomethingWentWrong);
     } finally {
       await _load();
     }
@@ -347,7 +342,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     final details = await _repository.getFoodWithDetails(item.foodId ?? '');
     if (details == null) {
       if (!mounted) return;
-      _showSnack(AppLocalizations.of(context)!.nutritionItemFoodUnavailable);
+      showAppSnack(context, AppLocalizations.of(context)!.nutritionItemFoodUnavailable);
       return;
     }
     final variant = details.variants.isEmpty
@@ -374,10 +369,11 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
         variant: variant,
       );
       if (!mounted) return;
-      _showSnack(loc.nutritionItemUpdated);
-    } catch (e) {
+      showAppSnack(context, loc.nutritionItemUpdated);
+    } catch (e, stack) {
+      debugPrint('nutrition_home_screen: action failed: $e\n$stack');
       if (!mounted) return;
-      _showSnack(loc.commonError(e.toString()));
+      showAppSnack(context, loc.commonSomethingWentWrong);
     } finally {
       await _load();
     }
@@ -411,9 +407,10 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
           ),
         ),
       );
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('nutrition_home_screen: action failed: $e\n$stack');
       if (!mounted) return;
-      _showSnack(loc.commonError(e.toString()));
+      showAppSnack(context, loc.commonSomethingWentWrong);
     }
   }
 

@@ -90,6 +90,7 @@ class _StrengthExercisesSectionState extends State<StrengthExercisesSection> {
               suffixIcon: _query.isEmpty
                   ? null
                   : IconButton(
+                      tooltip: loc.commonClearSearch,
                       icon: const Icon(Icons.close_rounded),
                       onPressed: () => setState(() {
                         _search.clear();

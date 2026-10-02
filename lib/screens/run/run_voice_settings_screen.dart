@@ -6,6 +6,8 @@ import 'package:workout_notes/services/run_voice_settings_store.dart';
 import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class RunVoiceSettingsScreen extends StatefulWidget {
@@ -15,10 +17,9 @@ class RunVoiceSettingsScreen extends StatefulWidget {
   State<RunVoiceSettingsScreen> createState() => _RunVoiceSettingsScreenState();
 }
 
-class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
+class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> with GuardedLoad {
   final _store = RunVoiceSettingsStore.instance;
   RunVoiceSettings _settings = const RunVoiceSettings.defaults();
-  bool _loading = true;
 
   @override
   void initState() {
@@ -26,14 +27,14 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     final loaded = await _store.load();
     if (!mounted) return;
     setState(() {
       _settings = loaded;
-      _loading = false;
+      isLoading = false;
     });
-  }
+  });
 
   Future<void> _persist(RunVoiceSettings next) async {
     setState(() => _settings = next);
@@ -444,6 +445,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                         children: [
                           Expanded(child: Text(loc.runIntervalRepeats)),
                           IconButton(
+                            tooltip: loc.commonDecrease,
                             onPressed: draft.repeats <= 1
                                 ? null
                                 : () => setDialogState(() {
@@ -455,6 +457,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                           ),
                           Text('${draft.repeats}'),
                           IconButton(
+                            tooltip: loc.commonIncrease,
                             onPressed: draft.repeats >= 99
                                 ? null
                                 : () => setDialogState(() {
@@ -514,8 +517,10 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
 
     return Scaffold(
       appBar: SettingsAppBar(title: loc.runVoiceSettingsTitle),
-      body: _loading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _load)
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [

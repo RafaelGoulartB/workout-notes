@@ -142,12 +142,13 @@ class _GoalsSectionState extends State<GoalsSection> {
         SnackBar(content: Text(AppLocalizations.of(context)!.goalSaved)),
       );
       await _load();
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('goals_section: action failed: $e\n$stack');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            AppLocalizations.of(context)!.commonError(e.toString()),
+            AppLocalizations.of(context)!.commonSomethingWentWrong,
           ),
         ),
       );
@@ -169,12 +170,13 @@ class _GoalsSectionState extends State<GoalsSection> {
         SnackBar(content: Text(AppLocalizations.of(context)!.goalSaved)),
       );
       await _load();
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('goals_section: action failed: $e\n$stack');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            AppLocalizations.of(context)!.commonError(e.toString()),
+            AppLocalizations.of(context)!.commonSomethingWentWrong,
           ),
         ),
       );

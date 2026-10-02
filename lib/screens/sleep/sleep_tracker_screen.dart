@@ -658,6 +658,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
       title: loc.sleepDelete,
       message: loc.sleepDeleteConfirm,
       confirmLabel: loc.commonDelete,
+      destructive: true,
     );
     if (confirmed != true) return;
     await _repository.delete(entry.id);

@@ -111,6 +111,7 @@ Future<RunPlanEditResult?> showRunPlanEditSheet(
                 trailing: raceDate == null
                     ? const Icon(Icons.event_outlined)
                     : IconButton(
+                        tooltip: loc.commonClear,
                         icon: const Icon(Icons.clear),
                         onPressed: () => setSheetState(() => raceDate = null),
                       ),

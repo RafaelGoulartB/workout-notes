@@ -143,6 +143,16 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
   }
 
   Future<void> _loadContext() async {
+    try {
+      await _readContext();
+    } catch (error, stack) {
+      // The review stays usable without its plan context and history.
+      debugPrint('Run review context failed: $error\n$stack');
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _readContext() async {
     final activity = _draft.activity;
     final scheduledId = _draft.scheduledRunId;
     final workoutId = _draft.planWorkoutId;
@@ -309,6 +319,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
               ? loc.stationaryBikeReviewDiscardBody
               : loc.runReviewDiscardBody,
       confirmLabel: loc.runReviewDiscard,
+      destructive: true,
       cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
     );
     return confirmed == true;

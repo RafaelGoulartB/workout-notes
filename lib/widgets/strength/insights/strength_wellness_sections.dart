@@ -172,7 +172,8 @@ class _StrengthBodyCardState extends State<StrengthBodyCard> {
         _weightVolume = results[2];
         _loading = false;
       });
-    } catch (_) {
+    } catch (error, stack) {
+      debugPrint('Strength body insights failed to load: $error\n$stack');
       if (mounted) setState(() => _loading = false);
     }
   }

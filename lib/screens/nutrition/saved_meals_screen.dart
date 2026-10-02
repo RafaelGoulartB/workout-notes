@@ -7,6 +7,8 @@ import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/screens/nutrition/saved_meal_editor_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Lists the user's saved meal templates and lets them log a template
@@ -20,10 +22,9 @@ class SavedMealsScreen extends StatefulWidget {
   State<SavedMealsScreen> createState() => _SavedMealsScreenState();
 }
 
-class _SavedMealsScreenState extends State<SavedMealsScreen> {
+class _SavedMealsScreenState extends State<SavedMealsScreen> with GuardedLoad {
   List<SavedMealWithItems> _meals = const [];
   List<MealTypeDefinition> _mealTypes = const [];
-  bool _isLoading = true;
   bool _isLogging = false;
 
   @override
@@ -32,25 +33,20 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final results = await Future.wait([
-        widget.repository.getSavedMeals(),
-        widget.repository.getMealTypes(),
-      ]);
-      if (!mounted) return;
-      setState(() {
-        _meals = results[0] as List<SavedMealWithItems>;
-        _mealTypes = results[1] as List<MealTypeDefinition>;
-        _isLoading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-    }
-  }
+    setState(() => isLoading = true);
+    final results = await Future.wait([
+      widget.repository.getSavedMeals(),
+      widget.repository.getMealTypes(),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _meals = results[0] as List<SavedMealWithItems>;
+      _mealTypes = results[1] as List<MealTypeDefinition>;
+      isLoading = false;
+    });
+  });
 
   Future<void> _createMeal() async {
     final created = await Navigator.of(context).push<bool>(
@@ -155,11 +151,12 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('saved_meals_screen: action failed: $e\n$stack');
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
+      ).showSnackBar(SnackBar(content: Text(loc.commonSomethingWentWrong)));
     } finally {
       if (mounted) setState(() => _isLogging = false);
     }
@@ -170,8 +167,10 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
     final loc = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(title: Text(loc.nutritionSavedMeals)),
-      body: _isLoading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _load)
           : _meals.isEmpty
           ? AppEmptyState(
               icon: Icons.restaurant_menu_outlined,

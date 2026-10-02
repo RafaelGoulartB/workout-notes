@@ -8,6 +8,8 @@ import 'package:workout_notes/models/exercise_with_sets.dart';
 import 'package:workout_notes/screens/workout/active_workout_screen.dart';
 import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/widgets/strength/exercises/exercise_picker_sheet.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/workout/set_editor_fields.dart';
 
@@ -23,13 +25,11 @@ class FutureWorkoutPlannerScreen extends StatefulWidget {
       _FutureWorkoutPlannerScreenState();
 }
 
-class _FutureWorkoutPlannerScreenState
-    extends State<FutureWorkoutPlannerScreen> {
+class _FutureWorkoutPlannerScreenState extends State<FutureWorkoutPlannerScreen> with GuardedLoad {
   final _workoutRepo = DatabaseHelper.instance.workoutRepo;
   final _routineRepo = DatabaseHelper.instance.routineRepo;
   Map<String, dynamic>? _workout;
   List<ExerciseWithSets> _exercises = [];
-  bool _isLoading = true;
 
   @override
   void initState() {
@@ -37,7 +37,7 @@ class _FutureWorkoutPlannerScreenState
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     _workout = await _workoutRepo.getWorkout(widget.workoutId);
     if (_workout == null) {
       if (mounted) Navigator.pop(context);
@@ -68,10 +68,10 @@ class _FutureWorkoutPlannerScreenState
     if (mounted) {
       setState(() {
         _exercises = exercises;
-        _isLoading = false;
+        isLoading = false;
       });
     }
-  }
+  });
 
   int get _totalSets =>
       _exercises.fold<int>(0, (sum, e) => sum + e.sets.length);
@@ -165,8 +165,10 @@ class _FutureWorkoutPlannerScreenState
           ),
         ],
       ),
-      body: _isLoading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _load)
           : Column(
               children: [
                 // Header info

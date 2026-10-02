@@ -46,6 +46,7 @@ class BodyStatsController extends ChangeNotifier {
   BodyChartTab _chartTab = BodyChartTab.weekly;
 
   bool _loading = true;
+  bool _loadFailed = false;
   bool _disposed = false;
 
   /// Every measurement row, newest first.
@@ -66,6 +67,7 @@ class BodyStatsController extends ChangeNotifier {
   BodyStatsPeriod get period => _period;
   BodyChartTab get chartTab => _chartTab;
   bool get loading => _loading;
+  bool get loadFailed => _loadFailed;
   PeriodizationPhase? get phase => _phase;
 
   MeasureType get currentType => _types.firstWhere(
@@ -94,6 +96,7 @@ class BodyStatsController extends ChangeNotifier {
 
   Future<void> load() async {
     _loading = true;
+    _loadFailed = false;
     _notify();
     try {
       final all = await _bodyRepo.getBodyMeasurements(limit: 2000);
@@ -110,9 +113,11 @@ class BodyStatsController extends ChangeNotifier {
       _phaseTargetWeightKg = phase.$2;
       _loading = false;
       _notify();
-    } catch (_) {
+    } catch (error, stack) {
+      debugPrint('Body stats failed to load: $error\n$stack');
       if (_disposed) return;
       _loading = false;
+      _loadFailed = true;
       _notify();
     }
   }

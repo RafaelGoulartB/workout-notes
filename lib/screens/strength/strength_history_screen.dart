@@ -12,6 +12,8 @@ import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
 import 'package:workout_notes/widgets/strength/history/strength_history_filter_bar.dart';
 import 'package:workout_notes/widgets/strength/history/strength_history_row.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Searchable, filterable history of finished gym workouts.
@@ -37,7 +39,7 @@ class _WorkoutEntry extends _Entry {
   const _WorkoutEntry(this.workout);
 }
 
-class _StrengthHistoryScreenState extends State<StrengthHistoryScreen> {
+class _StrengthHistoryScreenState extends State<StrengthHistoryScreen> with GuardedLoad {
   static const _pageSize = 30;
 
   StrengthHistoryRepository? _repoInstance;
@@ -53,7 +55,6 @@ class _StrengthHistoryScreenState extends State<StrengthHistoryScreen> {
   Map<String, int> _recordCounts = const {};
   List<StrengthRoutineOption> _routines = const [];
   List<StrengthCategoryOption> _categories = const [];
-  bool _loading = true;
   bool _loadingMore = false;
   bool _hasMore = false;
   bool _optionsLoaded = false;
@@ -94,9 +95,9 @@ class _StrengthHistoryScreenState extends State<StrengthHistoryScreen> {
     if (mounted) await _load();
   }
 
-  Future<void> _load({bool showSpinner = true}) async {
+  Future<void> _load({bool showSpinner = true}) => guardedLoad(() async {
     final generation = ++_generation;
-    if (showSpinner && _workouts.isEmpty) setState(() => _loading = true);
+    if (showSpinner && _workouts.isEmpty) setState(() => isLoading = true);
     final filter = _filter;
     final results = await Future.wait<Object>([
       _repo.search(filter, limit: _pageSize),
@@ -122,12 +123,12 @@ class _StrengthHistoryScreenState extends State<StrengthHistoryScreen> {
       }
       _hasMore = page.length >= _pageSize;
       _entries = _buildEntries();
-      _loading = false;
+      isLoading = false;
     });
-  }
+  });
 
   Future<void> _loadMore() async {
-    if (_loadingMore || !_hasMore || _loading) return;
+    if (_loadingMore || !_hasMore || isLoading) return;
     final generation = _generation;
     setState(() => _loadingMore = true);
     final page = await _repo.search(
@@ -204,7 +205,7 @@ class _StrengthHistoryScreenState extends State<StrengthHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final isEmptyHistory = !_loading && !_filter.isActive && _totals.count == 0;
+    final isEmptyHistory = !isLoading && !_filter.isActive && _totals.count == 0;
 
     return Scaffold(
       appBar: AppBar(title: Text(loc.strengthHistoryTitle)),
@@ -213,8 +214,10 @@ class _StrengthHistoryScreenState extends State<StrengthHistoryScreen> {
         icon: const Icon(Icons.fitness_center_rounded),
         label: Text(loc.strengthHistoryStart),
       ),
-      body: _loading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _load)
           : isEmptyHistory
           ? AppEmptyState(
               icon: Icons.fitness_center_rounded,

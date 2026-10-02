@@ -1010,14 +1010,16 @@ Future<void> showMeasurementDetailSheet(
                   Icon(
                     delta > 0 ? Icons.trending_up : Icons.trending_down,
                     size: 16,
-                    color: delta > 0 ? Colors.green : Colors.red,
+                    // Direction only: whether up is good depends on the metric
+                    // (body fat vs. muscle), so no green/red judgement.
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     '${delta > 0 ? '+' : ''}${AppNumberFormat.decimal(delta, 1)} ${type.unit}',
                     style: TextStyle(
                       fontSize: 13,
-                      color: delta > 0 ? Colors.green : Colors.red,
+                      color: theme.colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

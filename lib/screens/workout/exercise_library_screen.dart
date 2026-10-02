@@ -10,6 +10,8 @@ import 'package:workout_notes/screens/workout/exercise_form_screen.dart';
 import 'package:workout_notes/utils/exercise_equipment.dart';
 import 'package:workout_notes/utils/strength_exercise_library.dart';
 import 'package:workout_notes/widgets/strength/exercises/exercise_library_widgets.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Every exercise, dense and searchable. Grouped by muscle when "All" is
@@ -21,7 +23,7 @@ class ExerciseLibraryScreen extends StatefulWidget {
   State<ExerciseLibraryScreen> createState() => _ExerciseLibraryScreenState();
 }
 
-class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
+class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> with GuardedLoad {
   final _exerciseRepo = DatabaseHelper.instance.exerciseRepo;
   final _searchController = TextEditingController();
   List<Map<String, dynamic>> _categories = [];
@@ -30,7 +32,6 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
   Map<String, double> _bestE1rm = const {};
   String? _selectedCategoryId;
   String _search = '';
-  bool _isLoading = true;
   bool _favoritesOnly = false;
   ExerciseLibrarySort _sort = ExerciseLibrarySort.az;
   Timer? _searchDebounce;
@@ -66,7 +67,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     final categories = await _exerciseRepo.getCategories();
     // Query rows are read-only; the favorite star is toggled in place.
     final exercises = [
@@ -91,10 +92,10 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
       _exercises = exercises;
       _usage = usage;
       _bestE1rm = e1rm;
-      _isLoading = false;
+      isLoading = false;
       _recompute();
     });
-  }
+  });
 
   /// Filters and sorts the exercises into [_entries] (and [_sections] for the
   /// grouped view). Call inside `setState` whenever an input changed.
@@ -194,7 +195,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
-    final entries = _isLoading ? const <ExerciseLibraryEntry>[] : _entries;
+    final entries = isLoading ? const <ExerciseLibraryEntry>[] : _entries;
     final categoryById = {for (final c in _categories) c['id'] as String: c};
 
     return Scaffold(
@@ -226,8 +227,10 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
             }),
           ),
           Expanded(
-            child: _isLoading
+            child: isLoading
                 ? const Center(child: CircularProgressIndicator())
+                : loadFailed
+                ? LoadErrorView(onRetry: _load)
                 : entries.isEmpty
                 ? _buildEmptyState(theme, loc)
                 : RefreshIndicator(

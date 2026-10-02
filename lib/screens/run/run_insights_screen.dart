@@ -12,6 +12,8 @@ import 'package:workout_notes/utils/run_fitness_analytics.dart';
 import 'package:workout_notes/utils/run_training_load_analytics.dart';
 import 'package:workout_notes/widgets/run/insights/run_insights_fitness_sections.dart';
 import 'package:workout_notes/widgets/run/insights/run_insights_year_sections.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Which group of analysis cards is showing.
@@ -28,11 +30,10 @@ class RunInsightsScreen extends StatefulWidget {
   State<RunInsightsScreen> createState() => _RunInsightsScreenState();
 }
 
-class _RunInsightsScreenState extends State<RunInsightsScreen> {
+class _RunInsightsScreenState extends State<RunInsightsScreen> with GuardedLoad {
   final _runRepo = DatabaseHelper.instance.runRepo;
   final _insightsRepo = DatabaseHelper.instance.runInsightsRepo;
 
-  bool _loading = true;
   _InsightsTab _tab = _InsightsTab.fitness;
   List<RunActivity> _activities = const [];
   RunFitnessEstimate? _estimate;
@@ -60,7 +61,7 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
     _loadAll();
   }
 
-  Future<void> _loadAll() async {
+  Future<void> _loadAll() => guardedLoad(() async {
     final now = DateTime.now();
     final rows = await _runRepo.listActivities(
       limit: null,
@@ -110,9 +111,9 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
       _years = years;
       if (!years.contains(_year)) _year = years.first;
       _computeYear(_year);
-      _loading = false;
+      isLoading = false;
     });
-  }
+  });
 
   void _computeYear(int year) {
     _year = year;
@@ -154,7 +155,7 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final showTabs = !_loading && _activities.isNotEmpty;
+    final showTabs = !isLoading && _activities.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
@@ -178,8 +179,10 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
               )
             : null,
       ),
-      body: _loading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _loadAll)
           : _activities.isEmpty
           ? AppEmptyState(
               icon: Icons.insights_outlined,

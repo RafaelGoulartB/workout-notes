@@ -605,6 +605,7 @@ class PlanningStepper extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
+            tooltip: AppLocalizations.of(context)!.commonDecrease,
             visualDensity: VisualDensity.compact,
             onPressed: onDecrement == null
                 ? null
@@ -625,6 +626,7 @@ class PlanningStepper extends StatelessWidget {
             ),
           ),
           IconButton(
+            tooltip: AppLocalizations.of(context)!.commonIncrease,
             visualDensity: VisualDensity.compact,
             onPressed: onIncrement == null
                 ? null

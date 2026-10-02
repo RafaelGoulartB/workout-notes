@@ -8,6 +8,7 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
   final _summaryService = WorkoutSummaryService();
   final _timerService = RestTimerService.instance;
   bool _isLoading = true;
+  bool _loadFailed = false;
   String? _workoutId;
 
   /// The exercises came from a routine day (opened or picked here) and the
@@ -66,7 +67,8 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
     final orderedIds = reordered.map((e) => e.entryId).toList(growable: false);
     try {
       await _workoutRepo.reorderWorkoutExercises(_workoutId!, orderedIds);
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('active_workout_controller: action failed: $e\n$stack');
       // Roll back to the persisted order on failure.
       if (!mounted) return;
       await _loadExercises();
@@ -75,7 +77,7 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            AppLocalizations.of(context)!.commonReorderError(e.toString()),
+            AppLocalizations.of(context)!.commonReorderError,
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -131,6 +133,25 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
   }
 
   Future<void> _initialize() async {
+    if (_loadFailed) {
+      setState(() {
+        _loadFailed = false;
+        _isLoading = true;
+      });
+    }
+    try {
+      await _openWorkout();
+    } catch (error, stack) {
+      debugPrint('Active workout failed to open: $error\n$stack');
+      if (!mounted) return;
+      setState(() {
+        _loadFailed = true;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _openWorkout() async {
     // Load settings
     final settings = await _settingsRepo.getAllSettings();
     _autoStartTimer = settings['auto_start_workout_timer'] == 'true';

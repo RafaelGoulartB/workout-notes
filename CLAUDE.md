@@ -80,6 +80,7 @@ Use these instead of re-implementing them:
 - `lib/utils/date_utils.dart`: `dayOf`, `addDays`, `mondayOf`, `sundayOf`, `isSameDay`, `monthKey` and `dateKey` (`yyyy-MM-dd`). They are DST-safe (they add days through the `DateTime(y, m, d + n)` constructor, never a 24 h `Duration`). Use `dateKey(date)` for stored date strings, not `toIso8601String().substring(0, 10)`.
 - `lib/utils/duration_format.dart` (`DurationFormat`: `minSec`, `mmss`, `hms`, `clock`, `hhmm`, `twoDigits`, ...) and `RunFormatters` (`lib/utils/run_formatters.dart`, locale-aware decimals, pace and distance; it delegates its clock formats to `DurationFormat`). Never hand-roll `padLeft(2, '0')` durations.
 - Shared UI components in `lib/widgets/ui/` (`App*` widgets); reuse them before creating another card, divider, banner, empty state or confirm dialog.
+- `GuardedLoad` (`lib/widgets/ui/guarded_load.dart`): State mixin for a screen's `_load` (generation token, `isLoading`/`loadFailed`, `debugPrint`); render `LoadErrorView` with retry on failure so a failed read never leaves a spinner. `showAppSnack(context, message, {action})` (`lib/widgets/ui/snacks.dart`) is the only snack helper; never show raw `e.toString()` to users (log with `debugPrint`, show `commonSomethingWentWrong` or a specific key).
 - Visible text never goes in widgets — see Localization.
 
 ### Database & repositories

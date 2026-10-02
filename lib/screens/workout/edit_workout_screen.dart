@@ -9,6 +9,8 @@ import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/strength/exercises/exercise_picker_sheet.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Screen for editing a completed (or in-progress) workout.
@@ -29,14 +31,13 @@ class EditWorkoutScreen extends StatefulWidget {
   State<EditWorkoutScreen> createState() => _EditWorkoutScreenState();
 }
 
-class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
+class _EditWorkoutScreenState extends State<EditWorkoutScreen> with GuardedLoad {
   final _workoutRepo = DatabaseHelper.instance.workoutRepo;
   final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
   final _commentController = TextEditingController();
 
   Map<String, dynamic>? _workout;
   List<ExerciseWithSets> _exercises = [];
-  bool _isLoading = true;
 
   DateTime? _startTime;
   DateTime? _endTime;
@@ -55,7 +56,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     _workout = await _workoutRepo.getWorkout(widget.workoutId);
     if (_workout == null) {
       if (mounted) Navigator.pop(context);
@@ -89,7 +90,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
     if (mounted) {
       setState(() {
         _exercises = exercises;
-        _isLoading = false;
+        isLoading = false;
         _workoutDate = dateStr != null
             ? DateTime.parse(dateStr)
             : DateTime.now();
@@ -99,7 +100,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
         _feelingRating = (_workout!['feeling_rating'] as int?) ?? 0;
       });
     }
-  }
+  });
 
   int get _totalSets =>
       _exercises.fold<int>(0, (sum, e) => sum + e.sets.length);
@@ -482,14 +483,15 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
     final orderedIds = reordered.map((e) => e.entryId).toList();
     try {
       await _workoutRepo.reorderWorkoutExercises(widget.workoutId, orderedIds);
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('edit_workout_screen: action failed: $e\n$stack');
       if (!mounted) return;
       await _load();
       if (!mounted) return;
       _scaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(
           content: Text(
-            AppLocalizations.of(context)!.commonReorderError(e.toString()),
+            AppLocalizations.of(context)!.commonReorderError,
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -556,8 +558,10 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
             ),
           ],
         ),
-        body: _isLoading
+        body: isLoading
             ? const Center(child: CircularProgressIndicator())
+            : loadFailed
+            ? LoadErrorView(onRetry: _load)
             : Column(
                 children: [
                   Expanded(

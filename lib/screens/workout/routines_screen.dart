@@ -7,6 +7,8 @@ import 'package:workout_notes/screens/workout/routine_form_screen.dart';
 import 'package:workout_notes/utils/strength_routine_summary.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_list_cards.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_sheets.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 export 'package:workout_notes/screens/workout/routine_form_screen.dart';
@@ -20,13 +22,12 @@ class RoutinesScreen extends StatefulWidget {
   State<RoutinesScreen> createState() => _RoutinesScreenState();
 }
 
-class _RoutinesScreenState extends State<RoutinesScreen> {
+class _RoutinesScreenState extends State<RoutinesScreen> with GuardedLoad {
   final _repo = DatabaseHelper.instance.routineRepo;
   List<RoutineSummary> _routines = const [];
   String? _activeId;
   RoutineInUseReason _reason = RoutineInUseReason.recent;
   String? _nextDayId;
-  bool _loading = true;
 
   @override
   void initState() {
@@ -34,7 +35,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     final routines = await _repo.getRoutineSummaries();
     String? plannedRoutineId;
     String? plannedDayId;
@@ -63,9 +64,9 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
       _nextDayId = planned
           ? plannedDayId
           : (active == null ? null : pickNextDayId(active));
-      _loading = false;
+      isLoading = false;
     });
-  }
+  });
 
   Future<void> _openRoutine(RoutineSummary routine) async {
     await Navigator.push(
@@ -177,8 +178,10 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
               icon: const Icon(Icons.add),
               label: Text(loc.routinesNewRoutine),
             ),
-      body: _loading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _load)
           : _routines.isEmpty
           ? _buildEmpty(theme, loc)
           : RefreshIndicator(

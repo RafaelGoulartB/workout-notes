@@ -14,6 +14,8 @@ import 'package:workout_notes/utils/clock_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/run/run_balance_dialog.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class CalendarScreen extends StatefulWidget {
@@ -23,7 +25,7 @@ class CalendarScreen extends StatefulWidget {
   State<CalendarScreen> createState() => _CalendarScreenState();
 }
 
-class _CalendarScreenState extends State<CalendarScreen> {
+class _CalendarScreenState extends State<CalendarScreen> with GuardedLoad {
   final _workoutRepo = DatabaseHelper.instance.workoutRepo;
   final _routineRepo = DatabaseHelper.instance.routineRepo;
   final _runRepo = DatabaseHelper.instance.runRepo;
@@ -36,7 +38,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
   List<Map<String, dynamic>> _selectedDayWorkouts = [];
   Map<String, List<RunActivity>> _runsByDate = {};
   Map<String, List<ScheduledRun>> _plannedRunsByDate = {};
-  bool _isLoading = true;
 
   String get _selectedKey => dateKey(_selectedDate);
 
@@ -61,8 +62,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
     _loadMonth();
   }
 
-  Future<void> _loadMonth() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadMonth() => guardedLoad(() async {
+    final token = loadToken;
+    setState(() => isLoading = true);
     final workouts = await _workoutRepo.getWorkoutsByMonth(
       _currentYear,
       _currentMonth,
@@ -92,6 +94,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       plannedByDate.putIfAbsent(key, () => []).add(run);
     }
 
+    if (!mounted || !isLoadCurrent(token)) return;
     _selectedDayWorkouts = grouped[_selectedKey] ?? [];
 
     if (mounted) {
@@ -100,10 +103,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
         _categoriesByDate = categories;
         _runsByDate = runs;
         _plannedRunsByDate = plannedByDate;
-        _isLoading = false;
+        isLoading = false;
       });
     }
-  }
+  });
 
   void _previousMonth() {
     setState(() {
@@ -146,8 +149,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
         title: Text(AppLocalizations.of(context)!.calendarTitle),
         centerTitle: true,
       ),
-      body: _isLoading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _loadMonth)
           : Column(
               children: [
                 // Month selector
@@ -161,6 +166,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.chevron_left),
+                        tooltip: AppLocalizations.of(context)!.commonPreviousMonth,
                         onPressed: _previousMonth,
                       ),
                       Text(
@@ -171,6 +177,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       ),
                       IconButton(
                         icon: const Icon(Icons.chevron_right),
+                        tooltip: AppLocalizations.of(context)!.commonNextMonth,
                         onPressed: _nextMonth,
                       ),
                     ],
@@ -580,6 +587,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final daysInMonth = lastDay.day;
     final today = dateKey(DateTime.now());
     final selectedStr = dateKey(_selectedDate);
+    final loc = AppLocalizations.of(context)!;
+    final dateLocale =
+        Localizations.localeOf(context).toString().startsWith('pt')
+        ? 'pt_BR'
+        : 'en_US';
 
     final cells = <Widget>[];
 
@@ -600,52 +612,73 @@ class _CalendarScreenState extends State<CalendarScreen> {
       final isToday = dateStr == today;
       final isSelected = dateStr == selectedStr;
 
+      void selectDay() {
+        setState(() {
+          _selectedDate = DateTime(_currentYear, _currentMonth, day);
+          _selectedDayWorkouts = _workoutsByDate[dateStr] ?? [];
+        });
+      }
+
+      final statuses = [
+        if (hasWorkout) loc.calendarLegendWorkout,
+        if (hasRun) loc.calendarLegendCompletedRun,
+        if (hasPlannedRun) loc.calendarLegendPlannedRun,
+      ];
+      final dayLabel = [
+        DateFormat.yMMMMd(dateLocale).format(
+          DateTime(_currentYear, _currentMonth, day),
+        ),
+        ...statuses,
+      ].join(', ');
+
       cells.add(
-        GestureDetector(
-          onTap: () {
-            setState(() {
-              _selectedDate = DateTime(_currentYear, _currentMonth, day);
-              _selectedDayWorkouts = _workoutsByDate[dateStr] ?? [];
-            });
-          },
-          child: Container(
-            margin: const EdgeInsets.all(1),
-            decoration: BoxDecoration(
-              color: isSelected ? theme.colorScheme.primaryContainer : null,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  '$day',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                    color: isSelected
-                        ? theme.colorScheme.onPrimaryContainer
-                        : isToday
-                        ? theme.colorScheme.primary
-                        : null,
-                  ),
-                ),
-                if (hasWorkout)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: _buildCategoryDots(cats),
-                  ),
-                if (hasRun || hasPlannedRun)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Icon(
-                      Icons.directions_run,
-                      size: 10,
-                      // Hollow-ish tint marks a run that is only planned.
-                      color: hasRun
-                          ? theme.colorScheme.secondary
-                          : theme.colorScheme.secondary.withAlpha(110),
+        Semantics(
+          button: true,
+          selected: isSelected,
+          label: dayLabel,
+          excludeSemantics: true,
+          onTap: selectDay,
+          child: GestureDetector(
+            onTap: selectDay,
+            child: Container(
+              margin: const EdgeInsets.all(1),
+              decoration: BoxDecoration(
+                color: isSelected ? theme.colorScheme.primaryContainer : null,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '$day',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected
+                          ? theme.colorScheme.onPrimaryContainer
+                          : isToday
+                          ? theme.colorScheme.primary
+                          : null,
                     ),
                   ),
-              ],
+                  if (hasWorkout)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: _buildCategoryDots(cats),
+                    ),
+                  if (hasRun || hasPlannedRun)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Icon(
+                        Icons.directions_run,
+                        size: 10,
+                        // Hollow-ish tint marks a run that is only planned.
+                        color: hasRun
+                            ? theme.colorScheme.secondary
+                            : theme.colorScheme.secondary.withAlpha(110),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),

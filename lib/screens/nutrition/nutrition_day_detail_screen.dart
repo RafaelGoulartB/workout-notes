@@ -224,11 +224,12 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(loc.nutritionItemSaved)));
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('nutrition_day_detail_screen: action failed: $e\n$stack');
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
+      ).showSnackBar(SnackBar(content: Text(loc.commonSomethingWentWrong)));
     } finally {
       if (mounted) setState(() => _isMutating = false);
       await _load();
@@ -278,11 +279,12 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(loc.nutritionItemUpdated)));
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('nutrition_day_detail_screen: action failed: $e\n$stack');
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
+      ).showSnackBar(SnackBar(content: Text(loc.commonSomethingWentWrong)));
     } finally {
       if (mounted) setState(() => _isMutating = false);
       await _load();
@@ -464,11 +466,12 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(loc.nutritionReplicatedDays(count))),
       );
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('nutrition_day_detail_screen: action failed: $e\n$stack');
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
+      ).showSnackBar(SnackBar(content: Text(loc.commonSomethingWentWrong)));
     } finally {
       if (mounted) setState(() => _isMutating = false);
       await _load();

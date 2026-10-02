@@ -12,5 +12,6 @@ export 'package:workout_notes/widgets/ui/headers.dart';
 export 'package:workout_notes/widgets/ui/motion.dart';
 export 'package:workout_notes/widgets/ui/painters.dart';
 export 'package:workout_notes/widgets/ui/pills.dart';
+export 'package:workout_notes/widgets/ui/snacks.dart';
 export 'package:workout_notes/widgets/ui/tiles.dart';
 export 'package:workout_notes/widgets/ui/week_strip.dart';

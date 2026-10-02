@@ -13,6 +13,8 @@ import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/periodization/plan_overview.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Creates or re-plans a plan: its name, the Monday it starts and the
@@ -46,8 +48,7 @@ class _EditablePhase {
   _EditablePhase(this.entry, this.kind);
 }
 
-class _PeriodizationPlanEditorScreenState
-    extends State<PeriodizationPlanEditorScreen> {
+class _PeriodizationPlanEditorScreenState extends State<PeriodizationPlanEditorScreen> with GuardedLoad {
   final _repository = DatabaseHelper.instance.periodizationRepo;
   final _name = TextEditingController();
   late DateTime _start;
@@ -56,7 +57,6 @@ class _PeriodizationPlanEditorScreenState
   PlanBlueprint? _blueprint;
   bool _activate = true;
   bool _hasActivePlan = false;
-  bool _loading = true;
   bool _saving = false;
   double? _tdee;
   double? _weightKg;
@@ -86,7 +86,8 @@ class _PeriodizationPlanEditorScreenState
     return day.add(Duration(days: 8 - day.weekday));
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
+    _phases.clear();
     final results = await Future.wait<Object?>([
       DatabaseHelper.instance.nutritionRepo.getActiveGoal(),
       DatabaseHelper.instance.bodyMeasurementRepo.getLatestWeightKg(),
@@ -127,8 +128,8 @@ class _PeriodizationPlanEditorScreenState
     }
     if (!mounted) return;
     if (_creating) _applyBlueprint(widget.blueprint);
-    setState(() => _loading = false);
-  }
+    setState(() => isLoading = false);
+  });
 
   void _applyBlueprint(PlanBlueprint blueprint) {
     final loc = AppLocalizations.of(context)!;
@@ -221,11 +222,11 @@ class _PeriodizationPlanEditorScreenState
   Future<void> _save() async {
     final loc = AppLocalizations.of(context)!;
     if (_name.text.trim().isEmpty) {
-      _snack(loc.planningNameRequired);
+      showAppSnack(context, loc.planningNameRequired);
       return;
     }
     if (_phases.isEmpty) {
-      _snack(loc.planningPlanNeedsPhase);
+      showAppSnack(context, loc.planningPlanNeedsPhase);
       return;
     }
     final removed = _originalPhases
@@ -239,6 +240,7 @@ class _PeriodizationPlanEditorScreenState
               removed.map((phase) => phase.name).join(', '),
             ),
         confirmLabel: loc.planningDelete,
+        destructive: true,
       );
       if (confirmed != true || !mounted) return;
     }
@@ -268,13 +270,9 @@ class _PeriodizationPlanEditorScreenState
     } on PeriodizationValidationException catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
-      _snack(planningErrorMessage(loc, error.code));
+      showAppSnack(context, planningErrorMessage(loc, error.code));
     }
   }
-
-  void _snack(String message) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(message)));
 
   /// Phases as they will be saved, for the roadmap preview.
   List<PeriodizationPhase> get _preview {
@@ -305,15 +303,17 @@ class _PeriodizationPlanEditorScreenState
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final preview = _loading ? const <PeriodizationPhase>[] : _preview;
+    final preview = isLoading ? const <PeriodizationPhase>[] : _preview;
     final totalWeeks = _phases.fold<int>(0, (sum, p) => sum + p.entry.weeks);
     final dateFormat = DateFormat('EEE, d MMM y', Intl.defaultLocale);
     return Scaffold(
       appBar: AppBar(
         title: Text(_creating ? loc.planningNewPlan : loc.planningEditPlan),
       ),
-      body: _loading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _load)
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
@@ -449,7 +449,7 @@ class _PeriodizationPlanEditorScreenState
                 ],
               ],
             ),
-      bottomNavigationBar: _loading
+      bottomNavigationBar: isLoading || loadFailed
           ? null
           : SafeArea(
               minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),

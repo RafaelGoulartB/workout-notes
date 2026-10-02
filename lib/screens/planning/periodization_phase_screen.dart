@@ -13,6 +13,8 @@ import 'package:workout_notes/screens/planning/periodization_phase_editor_screen
 import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// A phase at a glance: what it plans (targets and template week) and how
@@ -32,7 +34,7 @@ class PeriodizationPhaseScreen extends StatefulWidget {
       _PeriodizationPhaseScreenState();
 }
 
-class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
+class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> with GuardedLoad {
   final _repository = DatabaseHelper.instance.periodizationRepo;
   late PeriodizationPhase _phase = widget.phase;
   late PeriodizationPlan _plan = widget.plan;
@@ -43,7 +45,6 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
   Map<String, String> _routineNames = const {};
   Map<String, List<String>> _routineDays = const {};
   int _selected = 0;
-  bool _loading = true;
   bool _changed = false;
 
   DateTime get _today {
@@ -57,7 +58,7 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     final phase = await _repository.getPhase(widget.phase.id);
     if (phase == null) {
       if (mounted) Navigator.pop(context, true);
@@ -106,10 +107,10 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
       _progress
         ..clear()
         ..addEntries(progress.map((item) => MapEntry(item.weekIndex, item)));
-      if (_loading) _selected = currentWeek;
-      _loading = false;
+      if (isLoading) _selected = currentWeek;
+      isLoading = false;
     });
-  }
+  });
 
   Future<void> _select(int week) async {
     setState(() => _selected = week);
@@ -167,6 +168,7 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
       title: loc.planningDeletePhaseTitle,
       message: loc.planningDeletePhaseBody(_phase.name),
       confirmLabel: loc.planningDelete,
+      destructive: true,
     );
     if (confirmed != true) return;
     final remaining = _planPhases.where((p) => p.id != _phase.id).toList();
@@ -209,7 +211,7 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
             IconButton(
               key: const Key('phaseScreenEdit'),
               tooltip: loc.planningEditPhase,
-              onPressed: _loading ? null : _edit,
+              onPressed: isLoading || loadFailed ? null : _edit,
               icon: const Icon(Icons.edit_outlined),
             ),
             PopupMenuButton<String>(
@@ -234,8 +236,10 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
             ),
           ],
         ),
-        body: _loading
+        body: isLoading
             ? const Center(child: CircularProgressIndicator())
+            : loadFailed
+            ? LoadErrorView(onRetry: _load)
             : RefreshIndicator(
                 onRefresh: _load,
                 child: ListView(

@@ -54,7 +54,7 @@ class _PeriodizationPhaseEditorScreenState
   Future<void> _save() async {
     final loc = AppLocalizations.of(context)!;
     if (_controller.name.text.trim().isEmpty) {
-      _snack(loc.planningNameRequired);
+      showAppSnack(context, loc.planningNameRequired);
       return;
     }
     try {
@@ -63,13 +63,9 @@ class _PeriodizationPhaseEditorScreenState
       Navigator.pop(context, true);
     } on PeriodizationValidationException catch (error) {
       if (!mounted) return;
-      _snack(planningErrorMessage(loc, error.code));
+      showAppSnack(context, planningErrorMessage(loc, error.code));
     }
   }
-
-  void _snack(String message) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(message)));
 
   Future<bool> _confirmDiscard() async {
     if (!_controller.dirty) return true;
@@ -79,6 +75,7 @@ class _PeriodizationPhaseEditorScreenState
       title: loc.planningDiscardTitle,
       message: loc.planningDiscardBody,
       confirmLabel: loc.planningDiscard,
+      destructive: true,
       cancelLabel: loc.planningKeepEditing,
     );
     return discard;
@@ -115,7 +112,10 @@ class _PeriodizationPhaseEditorScreenState
                         loc.planningNutrition,
                         icon: Icons.restaurant_outlined,
                       ),
-                      PhaseNutritionCard(controller: _controller, onSnack: _snack),
+                      PhaseNutritionCard(
+                        controller: _controller,
+                        onSnack: (message) => showAppSnack(context, message),
+                      ),
                       PlanningSectionLabel(
                         loc.planningTraining,
                         icon: Icons.fitness_center_outlined,

@@ -904,6 +904,7 @@ class _TodayRow extends StatelessWidget {
           ),
           if (onStart != null && !done)
             IconButton.filledTonal(
+              tooltip: AppLocalizations.of(context)!.commonStart,
               key: startKey,
               onPressed: onStart,
               icon: const Icon(Icons.play_arrow_rounded),

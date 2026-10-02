@@ -9,6 +9,8 @@ import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 
 class PeriodizationCheckinScreen extends StatefulWidget {
   final PeriodizationPhase phase;
@@ -25,8 +27,7 @@ class PeriodizationCheckinScreen extends StatefulWidget {
       _PeriodizationCheckinScreenState();
 }
 
-class _PeriodizationCheckinScreenState
-    extends State<PeriodizationCheckinScreen> {
+class _PeriodizationCheckinScreenState extends State<PeriodizationCheckinScreen> with GuardedLoad {
   final _repository = DatabaseHelper.instance.periodizationRepo;
   final _notes = TextEditingController();
   late final DateTime _weekStart;
@@ -38,7 +39,6 @@ class _PeriodizationCheckinScreenState
   int _recovery = 3;
   String _performance = 'stable';
   PeriodizationDecision _decision = PeriodizationDecision.maintain;
-  bool _loading = true;
   bool _saving = false;
 
   @override
@@ -55,7 +55,7 @@ class _PeriodizationCheckinScreenState
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     final results = await Future.wait([
       _repository.getWeekMetrics(widget.phase, _weekStart),
       _repository.getEffectiveTarget(widget.phase.id, date: _weekStart),
@@ -74,8 +74,8 @@ class _PeriodizationCheckinScreenState
       _decision = existing.decision;
       _notes.text = existing.notes ?? '';
     }
-    setState(() => _loading = false);
-  }
+    setState(() => isLoading = false);
+  });
 
   Future<void> _save() async {
     setState(() => _saving = true);
@@ -96,13 +96,14 @@ class _PeriodizationCheckinScreenState
       );
       await _repository.saveCheckin(checkin);
       if (mounted) Navigator.pop(context, _decision);
-    } catch (error) {
+    } catch (error, stack) {
+      debugPrint('periodization_checkin_screen: action failed: $error\n$stack');
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            AppLocalizations.of(context)!.periodizationSaveError('$error'),
+            AppLocalizations.of(context)!.periodizationSaveError,
           ),
         ),
       );
@@ -123,7 +124,7 @@ class _PeriodizationCheckinScreenState
           ),
         ),
       ),
-      bottomNavigationBar: _loading
+      bottomNavigationBar: isLoading || loadFailed
           ? null
           : SafeArea(
               minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -141,8 +142,10 @@ class _PeriodizationCheckinScreenState
                 label: Text(loc.periodizationSaveReview),
               ),
             ),
-      body: _loading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _load)
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               children: [

@@ -34,6 +34,7 @@ class NutritionProgressController extends ChangeNotifier {
   NutritionGoal? _goal;
   MacroSummary? _macros;
   bool _isLoading = true;
+  bool _loadFailed = false;
   bool _nutrientsExpanded = false;
   bool _isLoadingNutrients = false;
   bool _nutrientLoadFailed = false;
@@ -51,6 +52,7 @@ class NutritionProgressController extends ChangeNotifier {
   NutritionGoal? get goal => _goal;
   MacroSummary? get macros => _macros;
   bool get isLoading => _isLoading;
+  bool get loadFailed => _loadFailed;
   bool get nutrientsExpanded => _nutrientsExpanded;
   bool get isLoadingNutrients => _isLoadingNutrients;
   bool get nutrientLoadFailed => _nutrientLoadFailed;
@@ -135,6 +137,7 @@ class NutritionProgressController extends ChangeNotifier {
     final start = periodStart;
     final end = periodEnd;
     _isLoading = true;
+    _loadFailed = false;
     _resetLazyNutrients();
     _notify();
     try {
@@ -178,9 +181,11 @@ class NutritionProgressController extends ChangeNotifier {
       _macros = MacroSummary.fromRows(results[4] as List<Map<String, dynamic>>);
       _isLoading = false;
       _notify();
-    } catch (_) {
+    } catch (error, stack) {
+      debugPrint('Nutrition progress failed to load: $error\n$stack');
       if (_disposed || requestId != _loadRequestId) return;
       _isLoading = false;
+      _loadFailed = true;
       _notify();
     }
   }

@@ -320,6 +320,7 @@ class _FieldsEditorState extends State<_FieldsEditor> {
                     ),
                     title: Text(runDataFieldLabel(loc, _fields[i])),
                     trailing: IconButton(
+                      tooltip: loc.commonRemove,
                       icon: const Icon(Icons.remove_circle_outline_rounded),
                       onPressed: () => _remove(_fields[i]),
                     ),

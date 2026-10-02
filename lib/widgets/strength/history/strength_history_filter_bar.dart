@@ -69,6 +69,7 @@ class StrengthHistoryFilterBar extends StatelessWidget {
               suffixIcon: searchController.text.isEmpty
                   ? null
                   : IconButton(
+                      tooltip: loc.commonClearSearch,
                       icon: const Icon(Icons.close_rounded),
                       onPressed: () {
                         searchController.clear();

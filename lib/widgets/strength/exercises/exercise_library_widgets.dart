@@ -77,6 +77,7 @@ class ExerciseLibraryFilterBar extends StatelessWidget {
                 builder: (context, _) => searchController.text.isEmpty
                     ? const SizedBox.shrink()
                     : IconButton(
+                        tooltip: loc.commonClearSearch,
                         icon: const Icon(Icons.close_rounded),
                         onPressed: () {
                           searchController.clear();

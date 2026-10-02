@@ -4,6 +4,8 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_gear.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Shoe list with mileage, wear bar and replacement hints.
@@ -14,10 +16,9 @@ class RunGearScreen extends StatefulWidget {
   State<RunGearScreen> createState() => _RunGearScreenState();
 }
 
-class _RunGearScreenState extends State<RunGearScreen> {
+class _RunGearScreenState extends State<RunGearScreen> with GuardedLoad {
   final _repo = DatabaseHelper.instance.runGearRepo;
   List<RunGearUsage> _items = const [];
-  bool _loading = true;
 
   @override
   void initState() {
@@ -25,14 +26,14 @@ class _RunGearScreenState extends State<RunGearScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     final items = await _repo.listGearUsage();
     if (!mounted) return;
     setState(() {
       _items = items;
-      _loading = false;
+      isLoading = false;
     });
-  }
+  });
 
   Future<void> _edit([RunGear? gear]) async {
     final saved = await showRunGearEditor(context, gear: gear);
@@ -86,6 +87,7 @@ class _RunGearScreenState extends State<RunGearScreen> {
           context,
           message: loc.runGearDeleteConfirm,
           confirmLabel: loc.runGearDelete,
+          destructive: true,
         );
         if (confirmed == true) {
           await _repo.deleteGear(gear.id);
@@ -103,15 +105,17 @@ class _RunGearScreenState extends State<RunGearScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(loc.runGearTitle)),
       // The empty state already has its own "add" button.
-      floatingActionButton: _loading || _items.isEmpty
+      floatingActionButton: isLoading || _items.isEmpty
           ? null
           : FloatingActionButton.extended(
               onPressed: _edit,
               icon: const Icon(Icons.add),
               label: Text(loc.runGearAdd),
             ),
-      body: _loading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _load)
           : _items.isEmpty
           ? AppEmptyState(
               icon: Icons.directions_walk_rounded,

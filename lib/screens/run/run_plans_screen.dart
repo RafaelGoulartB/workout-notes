@@ -7,6 +7,8 @@ import 'package:workout_notes/screens/run/plans/run_plan_creation_flow.dart';
 import 'package:workout_notes/screens/run/run_plan_detail_screen.dart';
 import 'package:workout_notes/services/run_plan_week_view.dart';
 import 'package:workout_notes/widgets/run/plans/run_plan_library_cards.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// The running counterpart of [RoutinesScreen]: a library of structured plans.
@@ -19,7 +21,7 @@ class RunPlansScreen extends StatefulWidget {
   State<RunPlansScreen> createState() => _RunPlansScreenState();
 }
 
-class _RunPlansScreenState extends State<RunPlansScreen> {
+class _RunPlansScreenState extends State<RunPlansScreen> with GuardedLoad {
   final _repo = DatabaseHelper.instance.runPlanRepo;
   List<RunPlan> _plans = const [];
   Map<String, RunPlanProgress> _progress = const {};
@@ -30,7 +32,6 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
 
   /// Today's / next session of the followed plan.
   RunPlanSessionView? _next;
-  bool _loading = true;
   bool _showArchived = false;
 
   @override
@@ -39,7 +40,7 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     final plans = await _repo.listPlans(
       includeArchived: _showArchived,
       hydrate: true,
@@ -59,9 +60,9 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
       _progress = progress;
       _linkedToPlanning = linked;
       _next = next;
-      _loading = false;
+      isLoading = false;
     });
-  }
+  });
 
   Future<void> _activate(RunPlan plan) async {
     if (await followRunPlan(context, _repo, plan) && mounted) await _load();
@@ -170,8 +171,10 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
               icon: const Icon(Icons.add),
               label: Text(loc.runPlansNew),
             ),
-      body: _loading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _load)
           : _plans.isEmpty
           ? _buildEmpty(theme, loc)
           : RefreshIndicator(

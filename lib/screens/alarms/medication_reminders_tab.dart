@@ -4,16 +4,20 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/medication.dart';
 import 'package:workout_notes/services/medication_reminder_service.dart';
 import 'package:workout_notes/utils/clock_format.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Escalation delays offered in the editor, in minutes.
 const medicationEscalationChoices = [5, 10, 15, 20, 30, 45, 60, 90, 120];
 
-String formatEscalation(int minutes) {
-  if (minutes < 60) return '$minutes min';
+String formatEscalation(AppLocalizations loc, int minutes) {
+  if (minutes < 60) return loc.commonMinutesShort(minutes);
   final hours = minutes ~/ 60;
   final rest = minutes % 60;
-  return rest == 0 ? '$hours h' : '$hours h $rest min';
+  return rest == 0
+      ? loc.commonHoursShort(hours)
+      : loc.commonHoursMinutesShort(hours, rest);
 }
 
 List<String> _weekdayNames(AppLocalizations loc) => [
@@ -35,9 +39,9 @@ class MedicationRemindersTab extends StatefulWidget {
   State<MedicationRemindersTab> createState() => _MedicationRemindersTabState();
 }
 
-class _MedicationRemindersTabState extends State<MedicationRemindersTab> {
+class _MedicationRemindersTabState extends State<MedicationRemindersTab>
+    with GuardedLoad {
   final _service = MedicationReminderService.instance;
-  bool _loading = true;
   bool _busy = false;
 
   @override
@@ -53,13 +57,9 @@ class _MedicationRemindersTabState extends State<MedicationRemindersTab> {
     super.dispose();
   }
 
-  Future<void> _load() async {
-    try {
-      await _service.reconcile();
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
+  Future<void> _load() => guardedLoad(() async {
+    await _service.reconcile();
+  });
 
   void _changed() {
     if (mounted) setState(() {});
@@ -91,12 +91,13 @@ class _MedicationRemindersTabState extends State<MedicationRemindersTab> {
     setState(() => _busy = true);
     try {
       if (enabled && !await _service.preparePermissions()) {
-        _message(loc.alarmPermissionRequired);
+        if (mounted) showAppSnack(context, loc.alarmPermissionRequired);
         return;
       }
       await _service.setEnabled(medication, enabled);
-    } catch (_) {
-      _message(loc.medicationSaveError);
+    } catch (error, stack) {
+      debugPrint('Medication toggle failed: $error\n$stack');
+      if (mounted) showAppSnack(context, loc.medicationSaveError);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -109,6 +110,7 @@ class _MedicationRemindersTabState extends State<MedicationRemindersTab> {
       title: loc.medicationDeleteTitle,
       message: loc.medicationDeleteBody,
       confirmLabel: loc.medicationDelete,
+      destructive: true,
     );
     if (confirmed == true) await _service.delete(medication);
   }
@@ -120,15 +122,11 @@ class _MedicationRemindersTabState extends State<MedicationRemindersTab> {
     ),
   );
 
-  void _message(String text) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-  }
-
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (isLoading) return const Center(child: CircularProgressIndicator());
+    if (loadFailed) return LoadErrorView(onRetry: _load);
     final medications = _service.medications;
     if (medications.isEmpty) {
       return AppEmptyState(
@@ -415,7 +413,7 @@ class _MedicationCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '$days · ${loc.medicationEscalationChip(formatEscalation(medication.escalationMinutes))}',
+                    '$days · ${loc.medicationEscalationChip(formatEscalation(loc, medication.escalationMinutes))}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colors.onSurfaceVariant,
                     ),
@@ -679,7 +677,7 @@ class _MedicationEditorScreenState extends State<MedicationEditorScreen> {
                 for (final minutes in medicationEscalationChoices)
                   DropdownMenuItem(
                     value: minutes,
-                    child: Text(formatEscalation(minutes)),
+                    child: Text(formatEscalation(loc, minutes)),
                   ),
               ],
               onChanged: (value) {

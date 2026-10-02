@@ -16,17 +16,24 @@ class NutritionSettingsController extends ChangeNotifier {
   final NutritionRepository repository;
 
   bool _isLoading = true;
+  bool _loadFailed = false;
   NutritionGoal? _current;
   EffectiveNutritionGoal _effective = const EffectiveNutritionGoal();
   List<MealTypeDefinition> _mealTypes = const [];
   bool _disposed = false;
 
   bool get isLoading => _isLoading;
+  bool get loadFailed => _loadFailed;
   NutritionGoal? get current => _current;
   EffectiveNutritionGoal get effective => _effective;
   List<MealTypeDefinition> get mealTypes => _mealTypes;
 
   Future<void> load() async {
+    if (_loadFailed) {
+      _loadFailed = false;
+      _isLoading = true;
+      notifyListeners();
+    }
     try {
       final results = await Future.wait([
         repository.getActiveGoal(),
@@ -40,9 +47,11 @@ class NutritionSettingsController extends ChangeNotifier {
       _effective = results[2] as EffectiveNutritionGoal;
       _isLoading = false;
       notifyListeners();
-    } catch (_) {
+    } catch (error, stack) {
+      debugPrint('Nutrition settings failed to load: $error\n$stack');
       if (_disposed) return;
       _isLoading = false;
+      _loadFailed = true;
       notifyListeners();
     }
   }

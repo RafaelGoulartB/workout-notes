@@ -3,6 +3,8 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/utils/exercise_equipment.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// A bottom sheet that lets the user add/remove exercises to a workout or routine.
@@ -24,13 +26,12 @@ class ExercisePickerSheet extends StatefulWidget {
   State<ExercisePickerSheet> createState() => _ExercisePickerSheetState();
 }
 
-class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
+class _ExercisePickerSheetState extends State<ExercisePickerSheet> with GuardedLoad {
   final _exerciseRepo = DatabaseHelper.instance.exerciseRepo;
   List<Map<String, dynamic>> _categories = [];
   final Map<String, List<Map<String, dynamic>>> _exercisesByCategory = {};
   String? _selectedCategoryId;
   String _search = '';
-  bool _isLoading = true;
   late Set<String> _selectedIds;
 
   @override
@@ -40,7 +41,7 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     _categories = await _exerciseRepo.getCategories();
 
     // Load all exercises grouped by category
@@ -53,8 +54,8 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
     }
 
     if (!mounted) return;
-    setState(() => _isLoading = false);
-  }
+    setState(() => isLoading = false);
+  });
 
   List<Map<String, dynamic>> get _filteredExercises {
     if (_selectedCategoryId == null) return [];
@@ -147,8 +148,10 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
             ),
             const SizedBox(height: 12),
 
-            if (_isLoading)
+            if (isLoading)
               const Expanded(child: Center(child: CircularProgressIndicator()))
+            else if (loadFailed)
+              Expanded(child: LoadErrorView(onRetry: _load))
             else if (_selectedCategoryId == null)
               // Show categories
               Expanded(

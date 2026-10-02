@@ -14,6 +14,8 @@ import 'package:workout_notes/widgets/body_tracker/derived_stats_card.dart';
 import 'package:workout_notes/widgets/body_tracker/measurement_card.dart';
 import 'package:workout_notes/widgets/body_tracker/quick_stats.dart';
 import 'package:workout_notes/widgets/body_tracker/summary_card.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class BodyTrackerScreen extends StatefulWidget {
@@ -23,7 +25,7 @@ class BodyTrackerScreen extends StatefulWidget {
   State<BodyTrackerScreen> createState() => _BodyTrackerScreenState();
 }
 
-class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
+class _BodyTrackerScreenState extends State<BodyTrackerScreen> with GuardedLoad {
   final _bodyRepo = DatabaseHelper.instance.bodyMeasurementRepo;
   final _settingsRepo = DatabaseHelper.instance.settingsRepo;
 
@@ -32,7 +34,6 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
   List<Map<String, dynamic>> _measurements = [];
   List<Map<String, dynamic>> _allMeasurements = [];
   Map<String, Map<String, dynamic>?> _latestByType = {};
-  bool _isLoading = true;
   bool _fabOpen = false;
 
   // ── Bilateral state ───────────────────────────────────────────────
@@ -92,40 +93,36 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
     );
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     setState(() {
-      _isLoading = true;
+      isLoading = true;
       _historyDisplayCount = 5;
     });
-    try {
-      final all = await _bodyRepo.getBodyMeasurements(limit: 500);
-      final summary = await _bodyRepo.getBodyMeasurementsSummary();
-      final latestMap = <String, Map<String, dynamic>?>{};
-      for (final t in _allTypes) {
-        try {
-          latestMap[t.id] = summary.firstWhere((s) => s['type'] == t.id);
-        } catch (_) {
-          latestMap[t.id] = null;
-        }
+    final all = await _bodyRepo.getBodyMeasurements(limit: 500);
+    final summary = await _bodyRepo.getBodyMeasurementsSummary();
+    final latestMap = <String, Map<String, dynamic>?>{};
+    for (final t in _allTypes) {
+      try {
+        latestMap[t.id] = summary.firstWhere((s) => s['type'] == t.id);
+      } catch (_) {
+        latestMap[t.id] = null;
       }
-      // Ensure selected type is still enabled
-      final activeIds = _activeTypes.map((t) => t.id).toList();
-      if (!activeIds.contains(_selectedType)) {
-        _selectedType = activeIds.isNotEmpty ? activeIds.first : 'weight';
-      }
-      final filtered = all.where((m) => m['type'] == _selectedType).toList();
-      if (!mounted) return;
-      setState(() {
-        _allMeasurements = all;
-        _latestByType = latestMap;
-        _measurements = filtered;
-        _updateBilateralData(filtered);
-        _isLoading = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
     }
-  }
+    // Ensure selected type is still enabled
+    final activeIds = _activeTypes.map((t) => t.id).toList();
+    if (!activeIds.contains(_selectedType)) {
+      _selectedType = activeIds.isNotEmpty ? activeIds.first : 'weight';
+    }
+    final filtered = all.where((m) => m['type'] == _selectedType).toList();
+    if (!mounted) return;
+    setState(() {
+      _allMeasurements = all;
+      _latestByType = latestMap;
+      _measurements = filtered;
+      _updateBilateralData(filtered);
+      isLoading = false;
+    });
+  });
 
   void _updateBilateralData(List<Map<String, dynamic>> filtered) {
     if (_currentType.isBilateral) {
@@ -369,8 +366,10 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
       ),
       body: Stack(
         children: [
-          _isLoading
+          isLoading
               ? const Center(child: CircularProgressIndicator())
+              : loadFailed
+              ? LoadErrorView(onRetry: _load)
               : RefreshIndicator(
                   onRefresh: _load,
                   displacement: 40,
@@ -386,7 +385,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
             ),
         ],
       ),
-      floatingActionButton: _isLoading ? null : _buildSpeedDial(theme, loc),
+      floatingActionButton: isLoading || loadFailed ? null : _buildSpeedDial(theme, loc),
     );
   }
 

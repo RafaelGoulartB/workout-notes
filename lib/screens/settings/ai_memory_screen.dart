@@ -87,17 +87,11 @@ class _AiMemoryScreenState extends State<AiMemoryScreen> {
     }
   }
 
-  void _snack(String message, {SnackBarAction? action}) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message), action: action));
-  }
-
   Future<void> _edit(AiMemory? existing) async {
     final l10n = AppLocalizations.of(context)!;
     if (existing == null &&
         (_memories?.length ?? 0) >= AiMemoryService.maxEntries) {
-      _snack(l10n.aiMemoryFull);
+      showAppSnack(context, l10n.aiMemoryFull);
       return;
     }
     final result = await showModalBottomSheet<_MemoryDraft>(
@@ -122,7 +116,7 @@ class _AiMemoryScreenState extends State<AiMemoryScreen> {
       }
     } catch (error) {
       debugPrint('Saving an AI memory failed: $error');
-      if (mounted) _snack(l10n.aiMemorySaveError);
+      if (mounted) showAppSnack(context, l10n.aiMemorySaveError);
     }
   }
 
@@ -132,11 +126,12 @@ class _AiMemoryScreenState extends State<AiMemoryScreen> {
       await _service.remove(memory.id);
     } catch (error) {
       debugPrint('Deleting an AI memory failed: $error');
-      if (mounted) _snack(l10n.aiMemorySaveError);
+      if (mounted) showAppSnack(context, l10n.aiMemorySaveError);
       return;
     }
     if (!mounted) return;
-    _snack(
+    showAppSnack(
+      context,
       l10n.aiMemoryDeleted,
       action: SnackBarAction(
         label: l10n.commonUndo,
@@ -162,7 +157,7 @@ class _AiMemoryScreenState extends State<AiMemoryScreen> {
       await _service.clear();
     } catch (error) {
       debugPrint('Clearing the AI memories failed: $error');
-      if (mounted) _snack(l10n.aiMemorySaveError);
+      if (mounted) showAppSnack(context, l10n.aiMemorySaveError);
     }
   }
 

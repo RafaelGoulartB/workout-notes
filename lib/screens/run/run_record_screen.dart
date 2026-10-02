@@ -702,6 +702,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                     ? loc.stationaryBikeReviewDiscardBody
                     : loc.runRecordDiscardConfirmBody,
           confirmLabel: loc.runRecordDiscard,
+          destructive: true,
           cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
         );
     if (confirmed != true || !mounted) return;

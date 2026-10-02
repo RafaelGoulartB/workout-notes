@@ -8,6 +8,7 @@ import 'package:workout_notes/widgets/nutrition/progress/macro_balance_card.dart
 import 'package:workout_notes/widgets/nutrition/progress/meal_and_contributors_cards.dart';
 import 'package:workout_notes/widgets/nutrition/progress/rolling_average_card.dart';
 import 'package:workout_notes/widgets/nutrition/progress/week_sequence_card.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 
 /// Calorie-tracking analytics. The whole screen is purpose-built for
 /// the "am I in a surplus or a deficit?" question that drives weight
@@ -99,6 +100,8 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
           ),
           body: c.isLoading
               ? const Center(child: CircularProgressIndicator())
+              : c.loadFailed
+              ? LoadErrorView(onRetry: c.load)
               : RefreshIndicator(
                   onRefresh: c.load,
                   child: ListView(

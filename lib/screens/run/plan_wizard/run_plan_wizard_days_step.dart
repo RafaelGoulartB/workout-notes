@@ -229,10 +229,12 @@ class _RaceDateTile extends StatelessWidget {
         children: [
           if (raceDate != null)
             IconButton(
+              tooltip: loc.commonClear,
               icon: const Icon(Icons.clear),
               onPressed: () => controller.setRaceDate(null),
             ),
           IconButton(
+            tooltip: loc.commonPickDate,
             icon: Icon(
               raceDate == null ? Icons.event_outlined : Icons.event_available,
             ),

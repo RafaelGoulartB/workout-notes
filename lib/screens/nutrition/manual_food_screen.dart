@@ -60,12 +60,13 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
       final food = await _form.save();
       if (!mounted) return;
       Navigator.of(context).pop(food);
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('manual_food_screen: action failed: $e\n$stack');
       if (!mounted) return;
       final loc = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
+      ).showSnackBar(SnackBar(content: Text(loc.commonSomethingWentWrong)));
     }
   }
 

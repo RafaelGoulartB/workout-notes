@@ -6,6 +6,8 @@ import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/screens/nutrition/food_label_photo_screen.dart';
 import 'package:workout_notes/screens/nutrition/manual_food_screen.dart';
 import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 enum _FoodLibraryAction { edit, delete }
@@ -24,11 +26,10 @@ class FoodLibraryScreen extends StatefulWidget {
   State<FoodLibraryScreen> createState() => _FoodLibraryScreenState();
 }
 
-class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
+class _FoodLibraryScreenState extends State<FoodLibraryScreen> with GuardedLoad {
   final TextEditingController _searchController = TextEditingController();
   List<FoodSearchResultLite> _foods = const [];
   _FoodLibraryFilter _activeFilter = _FoodLibraryFilter.all;
-  bool _isLoading = true;
 
   @override
   void initState() {
@@ -46,14 +47,14 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
 
   void _onSearchChanged() => setState(() {});
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     final foods = await widget.repository.getAllFoods();
     if (!mounted) return;
     setState(() {
       _foods = foods;
-      _isLoading = false;
+      isLoading = false;
     });
-  }
+  });
 
   Future<void> _createFood() async {
     final created = await Navigator.of(context).push<Food>(
@@ -106,6 +107,7 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
       title: loc.nutritionFoodDelete,
       message: loc.nutritionFoodDeleteConfirm(entry.food.name),
       confirmLabel: loc.commonDelete,
+      destructive: true,
     );
     if (confirmed != true || !mounted) return;
     try {
@@ -116,11 +118,12 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(loc.nutritionFoodDeleted)));
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('food_library_screen: action failed: $e\n$stack');
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
+      ).showSnackBar(SnackBar(content: Text(loc.commonSomethingWentWrong)));
     }
   }
 
@@ -194,8 +197,10 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
           ),
         ],
       ),
-      body: _isLoading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _load)
           : _foods.isEmpty
           ? AppEmptyState(
               icon: Icons.restaurant_menu_outlined,

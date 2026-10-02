@@ -157,11 +157,12 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text(loc.nutritionSavedMealSaved)));
       Navigator.of(context).pop(true);
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('saved_meal_editor_screen: action failed: $e\n$stack');
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
+      ).showSnackBar(SnackBar(content: Text(loc.commonSomethingWentWrong)));
     }
   }
 
