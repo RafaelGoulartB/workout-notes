@@ -503,20 +503,7 @@ class RunTrackingService extends ChangeNotifier {
 
   static List<Map<String, dynamic>> _stepResultsJson(
     List<RunStepResult> results,
-  ) => [
-    for (final result in results)
-      {
-        'sequence': result.sequence,
-        'role': result.role.value,
-        'repIndex': result.repIndex,
-        'plannedMetric': result.plannedMetric.name,
-        'plannedValue': result.plannedValue,
-        'plannedPaceSecPerKm': result.plannedPaceSecPerKm,
-        'distanceMeters': result.distanceMeters,
-        'durationSeconds': result.durationSeconds,
-        'actualPaceSecPerKm': result.actualPaceSecPerKm,
-      },
-  ];
+  ) => [for (final result in results) result.toMap()];
 
   Future<void> discard() async {
     await _backend.discard();

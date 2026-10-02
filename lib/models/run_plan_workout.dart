@@ -155,6 +155,46 @@ class RunPlanWorkout {
   List<Map<String, dynamic>> stepsJson() =>
       executionSteps.map((step) => step.toJson()).toList();
 
+  /// Pace assumed for a treadmill distance step that has no target pace.
+  static const double treadmillFallbackPaceSecPerKm = 360;
+
+  /// Steps for a treadmill session, which is timed without distance: each
+  /// distance step becomes the time it takes at its target pace (the step's
+  /// band midpoint, else the workout pace, else 6:00/km). Pace targets stay,
+  /// so the coach can still say the speed to set.
+  List<Map<String, dynamic>> treadmillStepsJson() => [
+    for (final step in executionSteps)
+      if (step.metric == RunIntervalMetric.time)
+        step.toJson()
+      else
+        step
+            .copyWith(
+              metric: RunIntervalMetric.time,
+              value: (step.value / 1000 * _treadmillPace(step)).round().clamp(
+                1,
+                86400,
+              ),
+            )
+            .toJson(),
+  ];
+
+  double _treadmillPace(RunWorkoutStep step) {
+    final min = step.targetPaceMinSecPerKm;
+    final max = step.targetPaceMaxSecPerKm;
+    if (min != null && max != null) return (min + max) / 2;
+    return min ?? max ?? targetPaceSecPerKm ?? treadmillFallbackPaceSecPerKm;
+  }
+
+  /// Kind and headline targets for the native voice coach: picks its
+  /// vocabulary ("Hill 3", "Surge 3"), whether pace warnings are one-sided
+  /// (easy days) and race projections.
+  Map<String, dynamic> voiceProfile() => {
+    'kind': kind.value,
+    'targetDistanceMeters': targetDistanceMeters?.round(),
+    'targetDurationSeconds': targetDurationSeconds,
+    'targetPaceSecPerKm': targetPaceSecPerKm,
+  };
+
   static List<RunExpandedStep> expand(List<RunWorkoutStep> steps) {
     final ordered = [...steps]
       ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));

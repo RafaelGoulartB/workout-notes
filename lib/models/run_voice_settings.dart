@@ -25,6 +25,47 @@ enum RunVoiceLanguage {
   };
 }
 
+/// How much the voice coach talks.
+enum RunVoiceVerbosity {
+  minimal,
+  standard,
+  detailed;
+
+  String get storageValue => name;
+
+  static RunVoiceVerbosity fromJson(Object? raw) => switch (raw) {
+    'minimal' => RunVoiceVerbosity.minimal,
+    'detailed' => RunVoiceVerbosity.detailed,
+    _ => RunVoiceVerbosity.standard,
+  };
+}
+
+/// What happens to the user's media while the coach speaks.
+enum RunVoiceMediaBehavior {
+  duck,
+  pause;
+
+  String get storageValue => name;
+
+  static RunVoiceMediaBehavior fromJson(Object? raw) => switch (raw) {
+    'pause' => RunVoiceMediaBehavior.pause,
+    _ => RunVoiceMediaBehavior.duck,
+  };
+}
+
+/// How an auto-pause is announced.
+enum RunVoiceAutoPauseStyle {
+  voice,
+  beep;
+
+  String get storageValue => name;
+
+  static RunVoiceAutoPauseStyle fromJson(Object? raw) => switch (raw) {
+    'beep' => RunVoiceAutoPauseStyle.beep,
+    _ => RunVoiceAutoPauseStyle.voice,
+  };
+}
+
 class RunIntervalPreset {
   final RunIntervalMetric workMetric;
   final int workValue;
@@ -131,6 +172,40 @@ class RunVoiceSettings {
 
   static const countdownOptions = [0, 3, 5, 10];
 
+  /// How much the coach talks.
+  final RunVoiceVerbosity verbosity;
+
+  /// Lower (duck) or pause the user's media while the coach speaks.
+  final RunVoiceMediaBehavior mediaBehavior;
+
+  /// Short beeps for step changes and a 3-2-1 countdown before each change.
+  final bool earcons;
+
+  /// Vibrate on step changes.
+  final bool haptics;
+
+  /// Voice speed: one of [speechRateOptions].
+  final double speechRate;
+
+  /// Voice volume relative to media: one of [voiceVolumeOptions].
+  final double voiceVolume;
+
+  /// Time-based cue every N minutes (0 = off): one of [announceTimeOptions].
+  final int announceTimeEveryMin;
+
+  /// The distance cue includes the total elapsed time.
+  final bool kmIncludeTime;
+
+  /// The distance cue includes the average pace.
+  final bool kmIncludeAvgPace;
+
+  /// Auto-pause announced by voice or by a short beep.
+  final RunVoiceAutoPauseStyle autoPauseStyle;
+
+  static const speechRateOptions = [0.9, 1.0, 1.1, 1.25];
+  static const voiceVolumeOptions = [0.5, 0.75, 1.0];
+  static const announceTimeOptions = [0, 5, 10, 15];
+
   const RunVoiceSettings({
     required this.enabled,
     required this.language,
@@ -150,6 +225,16 @@ class RunVoiceSettings {
     this.announceAutoPause = true,
     this.announceLaps = true,
     this.countdownSeconds = 3,
+    this.verbosity = RunVoiceVerbosity.standard,
+    this.mediaBehavior = RunVoiceMediaBehavior.duck,
+    this.earcons = true,
+    this.haptics = true,
+    this.speechRate = 1.0,
+    this.voiceVolume = 1.0,
+    this.announceTimeEveryMin = 0,
+    this.kmIncludeTime = true,
+    this.kmIncludeAvgPace = false,
+    this.autoPauseStyle = RunVoiceAutoPauseStyle.voice,
   });
 
   const RunVoiceSettings.defaults()
@@ -190,6 +275,16 @@ class RunVoiceSettings {
     bool? announceAutoPause,
     bool? announceLaps,
     int? countdownSeconds,
+    RunVoiceVerbosity? verbosity,
+    RunVoiceMediaBehavior? mediaBehavior,
+    bool? earcons,
+    bool? haptics,
+    double? speechRate,
+    double? voiceVolume,
+    int? announceTimeEveryMin,
+    bool? kmIncludeTime,
+    bool? kmIncludeAvgPace,
+    RunVoiceAutoPauseStyle? autoPauseStyle,
   }) {
     return RunVoiceSettings(
       enabled: enabled ?? this.enabled,
@@ -213,6 +308,16 @@ class RunVoiceSettings {
       announceAutoPause: announceAutoPause ?? this.announceAutoPause,
       announceLaps: announceLaps ?? this.announceLaps,
       countdownSeconds: countdownSeconds ?? this.countdownSeconds,
+      verbosity: verbosity ?? this.verbosity,
+      mediaBehavior: mediaBehavior ?? this.mediaBehavior,
+      earcons: earcons ?? this.earcons,
+      haptics: haptics ?? this.haptics,
+      speechRate: speechRate ?? this.speechRate,
+      voiceVolume: voiceVolume ?? this.voiceVolume,
+      announceTimeEveryMin: announceTimeEveryMin ?? this.announceTimeEveryMin,
+      kmIncludeTime: kmIncludeTime ?? this.kmIncludeTime,
+      kmIncludeAvgPace: kmIncludeAvgPace ?? this.kmIncludeAvgPace,
+      autoPauseStyle: autoPauseStyle ?? this.autoPauseStyle,
     );
   }
 
@@ -235,6 +340,16 @@ class RunVoiceSettings {
     'announceAutoPause': announceAutoPause,
     'announceLaps': announceLaps,
     'countdownSeconds': countdownSeconds,
+    'verbosity': verbosity.storageValue,
+    'mediaBehavior': mediaBehavior.storageValue,
+    'earcons': earcons,
+    'haptics': haptics,
+    'speechRate': speechRate,
+    'voiceVolume': voiceVolume,
+    'announceTimeEveryMin': announceTimeEveryMin,
+    'kmIncludeTime': kmIncludeTime,
+    'kmIncludeAvgPace': kmIncludeAvgPace,
+    'autoPauseStyle': autoPauseStyle.storageValue,
   };
 
   factory RunVoiceSettings.fromJson(Map<String, dynamic>? json) {
@@ -265,11 +380,38 @@ class RunVoiceSettings {
       announceAutoPause: json['announceAutoPause'] as bool? ?? true,
       announceLaps: json['announceLaps'] as bool? ?? true,
       countdownSeconds: _countdown(json['countdownSeconds']),
+      verbosity: RunVoiceVerbosity.fromJson(json['verbosity']),
+      mediaBehavior: RunVoiceMediaBehavior.fromJson(json['mediaBehavior']),
+      earcons: _bool(json['earcons'], true),
+      haptics: _bool(json['haptics'], true),
+      speechRate: _nearest(json['speechRate'], speechRateOptions, 1.0),
+      voiceVolume: _nearest(json['voiceVolume'], voiceVolumeOptions, 1.0),
+      announceTimeEveryMin: _announceTime(json['announceTimeEveryMin']),
+      kmIncludeTime: _bool(json['kmIncludeTime'], true),
+      kmIncludeAvgPace: _bool(json['kmIncludeAvgPace'], false),
+      autoPauseStyle: RunVoiceAutoPauseStyle.fromJson(json['autoPauseStyle']),
     );
   }
 
   static int _countdown(Object? raw) {
     final value = (raw as num?)?.toInt();
     return countdownOptions.contains(value) ? value! : 3;
+  }
+
+  static bool _bool(Object? raw, bool fallback) => raw is bool ? raw : fallback;
+
+  static int _announceTime(Object? raw) {
+    final value = (raw as num?)?.toInt();
+    return announceTimeOptions.contains(value) ? value! : 0;
+  }
+
+  /// The allowed option closest to [raw]; [fallback] when it is not a finite
+  /// number.
+  static double _nearest(Object? raw, List<double> options, double fallback) {
+    if (raw is! num || !raw.isFinite) return fallback;
+    final value = raw.toDouble();
+    return options.reduce(
+      (a, b) => (a - value).abs() <= (b - value).abs() ? a : b,
+    );
   }
 }

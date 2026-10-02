@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coach por voz — o que mudou e por quê</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface-1: #fcfcfb;
+    --surface-2: #f0efec;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --series-1: #2a78d6; /* troca de passo */
+    --series-2: #eb6834; /* alerta de ritmo */
+    --series-3: #1baf7a; /* progresso / próximo */
+    --series-4: #eda100; /* bipe */
+    --series-5: #e87ba4; /* split por km */
+    --neutral-bar: #b9b7ae;
+    --good: #006300;
+    --bad: #b42b2b;
+    --band: #eef3fb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface-1: #1a1a19;
+      --surface-2: #232321;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --grid: #2c2c2a;
+      --axis: #383835;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --series-4: #c98500;
+      --series-5: #d55181;
+      --neutral-bar: #5c5b56;
+      --good: #0ca30c;
+      --bad: #e66767;
+      --band: #1d2633;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--text-primary);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 1040px; margin: 0 auto; padding: 40px 20px 80px; }
+  h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 8px; }
+  h2 { font-size: 1.35rem; margin: 56px 0 6px; }
+  h3 { font-size: 1.02rem; margin: 0 0 6px; }
+  p { margin: 0 0 12px; }
+  .lead { color: var(--text-secondary); font-size: 1.08rem; max-width: 760px; }
+  .sub { color: var(--text-secondary); margin-bottom: 18px; max-width: 760px; }
+  .muted { color: var(--text-muted); font-size: .86rem; }
+  code, .say {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .88em;
+  }
+  .say {
+    display: inline-block;
+    background: var(--surface-2);
+    border-radius: 6px;
+    padding: 1px 7px;
+  }
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--grid);
+    border-radius: 14px;
+    padding: 20px;
+  }
+
+  /* Stat tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-top: 24px; }
+  .tile .num { font-size: 1.9rem; font-weight: 750; line-height: 1.1; }
+  .tile .num small { font-size: 1rem; font-weight: 600; color: var(--text-secondary); }
+  .tile .label { color: var(--text-secondary); font-size: .92rem; margin-top: 6px; }
+
+  /* Legend */
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 4px 0 12px; font-size: .88rem; color: var(--text-secondary); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  /* Charts */
+  .chart { position: relative; }
+  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .chart text { fill: var(--text-muted); font-size: 12px; }
+  .chart .row-label { fill: var(--text-primary); font-size: 13px; font-weight: 650; }
+  .chart .value { fill: var(--text-secondary); font-size: 12px; }
+  .tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--surface-1);
+    color: var(--text-primary);
+    border: 1px solid var(--axis);
+    border-radius: 10px;
+    padding: 8px 11px;
+    font-size: .84rem;
+    max-width: 320px;
+    box-shadow: 0 6px 22px rgba(0,0,0,.14);
+    opacity: 0;
+    transition: opacity .08s;
+    z-index: 5;
+  }
+  .tooltip b { display: block; margin-bottom: 2px; }
+  .tooltip .t-say { font-family: ui-monospace, Menlo, monospace; font-size: .82rem; display: block; margin: 4px 0; }
+  .tooltip .t-note { color: var(--text-secondary); }
+  .totals { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 10px; font-size: .92rem; color: var(--text-secondary); }
+  .totals b { color: var(--text-primary); }
+
+  details { margin-top: 14px; }
+  summary { cursor: pointer; color: var(--text-secondary); font-size: .9rem; }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; margin-top: 10px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  th { color: var(--text-secondary); font-weight: 600; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* Pipeline diagram */
+  .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; align-items: stretch; margin-top: 16px; }
+  .flow .step { position: relative; background: var(--surface-1); border: 1px solid var(--grid); border-radius: 12px; padding: 14px; font-size: .88rem; }
+  .flow .step h3 { font-size: .95rem; }
+  .flow .step:not(:last-child)::after {
+    content: "→"; position: absolute; right: -14px; top: 50%; transform: translateY(-50%);
+    color: var(--text-muted); font-size: 1.1rem; background: var(--page); line-height: 1;
+  }
+  .flow ul { margin: 6px 0 0; padding-left: 16px; color: var(--text-secondary); }
+  .rule-chip { display: inline-block; font-size: .75rem; font-weight: 650; padding: 1px 7px; border-radius: 999px; background: var(--surface-2); color: var(--text-secondary); margin-bottom: 6px; }
+  @media (max-width: 820px) {
+    .flow { grid-template-columns: 1fr; }
+    .flow .step:not(:last-child)::after { content: "↓"; right: auto; left: 50%; top: auto; bottom: -15px; transform: translateX(-50%); }
+  }
+
+  /* Before / after cards */
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-top: 16px; }
+  .ba { display: grid; gap: 10px; }
+  .ba .row { display: grid; grid-template-columns: 74px 1fr; gap: 10px; font-size: .92rem; }
+  .ba .tag { font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding-top: 2px; }
+  .tag.before { color: var(--bad); }
+  .tag.after { color: var(--good); }
+  .tag.why { color: var(--text-muted); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip { background: var(--surface-1); border: 1px solid var(--grid); border-radius: 999px; padding: 6px 12px; font-size: .88rem; }
+  .chip b { font-weight: 650; }
+
+  .two-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px) { .two-charts { grid-template-columns: 1fr; } }
+  .callout { border-left: 3px solid var(--axis); padding: 4px 0 4px 14px; color: var(--text-secondary); margin-top: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="muted">Workout Notes · branch <code>feat/run-voice-coach-v2</code></p>
+    <h1>Coach por voz: o que mudou e por quê</h1>
+    <p class="lead">
+      O coach falava mais do que devia, em frases longas, às vezes no momento errado, e às vezes
+      perdia uma fala sem avisar. Agora ele fala menos, mais curto e na hora certa, conhece o tipo de treino
+      e funciona também na esteira.
+    </p>
+    <div class="tiles">
+      <div class="card tile"><div class="num" id="tile-saving">−47%</div><div class="label">tempo de fala num intervalado de 6×400 m (linha do tempo abaixo)</div></div>
+      <div class="card tile"><div class="num" id="tile-km">6,9 s <small>→</small> 2,5 s</div><div class="label">duração do aviso de quilômetro</div></div>
+      <div class="card tile"><div class="num">0 <small>falas perdidas</small></div><div class="label">uma fala que colide espera a vez em vez de sumir</div></div>
+      <div class="card tile"><div class="num">esteira</div><div class="label">ganhou coach com passos, bipes e voz, mesmo com a tela desligada</div></div>
+    </div>
+    <p class="muted" style="margin-top:10px">Durações estimadas com a mesma fórmula que o agendador usa (~0,37 s por palavra + 0,3 s de início do motor de voz). As frases mostradas são as reais do código, em inglês, que é o idioma principal do coach.</p>
+  </header>
+
+  <!-- ============ Timeline ============ -->
+  <section>
+    <h2>Um intervalado, antes e depois</h2>
+    <p class="sub">
+      Os primeiros 7 minutos de um 6×400 m (ritmo 4:00/km, 1 minuto de trote). Cada bloco é uma fala e sua largura é o tempo
+      que ela ocupa nos fones. Passe o mouse para ler o que foi dito.
+    </p>
+    <div class="legend" id="tl-legend"></div>
+    <div class="card chart" id="timeline"></div>
+    <div class="totals" id="tl-totals"></div>
+    <div class="callout">
+      <b>O que mudou na prática:</b> sumiram os alarmes falsos de ritmo no começo de cada tiro (a média ainda incluía a aceleração)
+      e o split de km no meio do tiro, que misturava ritmo de tiro e de trote. Entraram o resultado do tiro, o aviso de qual é o próximo
+      e os bipes 3-2-1, que dizem "vai" sem precisar de palavras.
+    </div>
+    <details>
+      <summary>Ver como tabela (todas as falas)</summary>
+      <table id="tl-table"><thead><tr><th>Versão</th><th>Tempo</th><th>Tipo</th><th>Fala</th><th>Duração</th></tr></thead><tbody></tbody></table>
+    </details>
+  </section>
+
+  <!-- ============ Phrase lengths ============ -->
+  <section>
+    <h2>Frases mais curtas</h2>
+    <p class="sub">
+      O maior custo era o ritmo falado por extenso: "5 minutes 30 seconds per kilometer" ocupa 3 segundos sozinho.
+      Agora o ritmo sai como os corredores dizem ("5:30"), os valores são arredondados e cada fala carrega uma ideia só.
+    </p>
+    <div class="legend">
+      <span><i style="background:var(--neutral-bar)"></i>Antes</span>
+      <span><i style="background:var(--series-1)"></i>Depois</span>
+    </div>
+    <div class="card chart" id="phrases"></div>
+  </section>
+
+  <!-- ============ Scheduler ============ -->
+  <section>
+    <h2>Uma fila decide o que falar, e quando</h2>
+    <p class="sub">
+      Antes, a cada atualização (~1 por segundo) o coach montava uma lista de frases, falava <b>só a primeira e descartava as outras</b>,
+      já marcadas como "faladas". Ou seja, uma fala que coincidisse com outra sumia para sempre. Exemplo real: com meta de 10 km,
+      aos 5 km o aviso de 50% ganhava e o split do km 5 nunca era falado. Agora toda fala passa por um agendador.
+    </p>
+    <div class="flow">
+      <div class="step">
+        <span class="rule-chip">1 · eventos</span>
+        <h3>O que aconteceu</h3>
+        <ul><li>troca de passo</li><li>fim de tiro</li><li>km, tempo, meta</li><li>ritmo fora da faixa</li><li>GPS, pausa</li></ul>
+      </div>
+      <div class="step">
+        <span class="rule-chip">2 · prioridade</span>
+        <h3>Quatro níveis</h3>
+        <ul><li><b>crítica</b>: o que fazer agora</li><li><b>alta</b>: ritmo, "faltam…"</li><li><b>normal</b>: km, resultados</li><li><b>baixa</b>: GPS</li></ul>
+      </div>
+      <div class="step">
+        <span class="rule-chip">3 · fila</span>
+        <h3>Espera, não some</h3>
+        <ul><li>cada fala tem validade (8–30 s)</li><li>uma mais nova do mesmo tipo substitui a velha</li><li>vencida = descartada</li></ul>
+      </div>
+      <div class="step">
+        <span class="rule-chip">4 · regras</span>
+        <h3>Sem enxurrada</h3>
+        <ul><li>crítica sai na hora, junta com outra crítica</li><li>intervalo mínimo entre falas</li><li>máx. 2/4/6 falas de progresso a cada 2 min</li><li>silêncio 12 s antes de troca de passo</li></ul>
+      </div>
+      <div class="step">
+        <span class="rule-chip">5 · saída</span>
+        <h3>Voz, bipe, vibração</h3>
+        <ul><li>bipe antes da troca de passo</li><li>vibração quando não há fone</li><li>foco de áudio por bloco de falas</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Audio focus ============ -->
+  <section>
+    <h2>A música abaixa uma vez, não fica subindo e descendo</h2>
+    <p class="sub">
+      Duas falas seguidas, como o resultado do tiro e depois "faltam 30 segundos". Antes, o fim da primeira fala devolvia o volume
+      da música enquanto a segunda ainda tocava: a voz saía por cima da música alta. Agora o volume só volta 0,4 s depois que
+      <b>tudo</b> na fila terminou.
+    </p>
+    <div class="legend">
+      <span><i style="background:var(--series-1)"></i>Volume da música</span>
+      <span><i style="background:var(--surface-2); border:1px solid var(--axis)"></i>Coach falando</span>
+    </div>
+    <div class="two-charts">
+      <div class="card chart" id="duck-before"></div>
+      <div class="card chart" id="duck-after"></div>
+    </div>
+    <div class="callout">
+      Para <b>podcast e audiolivro</b> há a opção "Pausar mídia": em vez de duas vozes falando ao mesmo tempo, o podcast pausa
+      durante a fala. Os bipes sempre só abaixam o volume, porque pausar um podcast por causa de um bipe seria pior.
+    </div>
+  </section>
+
+  <!-- ============ Before / after cards ============ -->
+  <section>
+    <h2>Cada melhoria: problema, mudança e motivo</h2>
+    <div class="grid2" id="cards"></div>
+  </section>
+
+  <!-- ============ Workout types ============ -->
+  <section>
+    <h2>O coach agora conhece o tipo de treino</h2>
+    <p class="sub">O app passou a enviar o tipo do treino planejado ao coach. Isso muda o vocabulário e quais falas valem a pena.</p>
+    <div class="card" style="padding:6px 14px">
+      <table>
+        <thead><tr><th>Treino</th><th>Exemplo do que ele diz</th><th>Por que assim</th></tr></thead>
+        <tbody id="kinds"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ Settings ============ -->
+  <section>
+    <h2>Configurações novas</h2>
+    <p class="sub">Os padrões já funcionam bem. Quem quiser ajusta:</p>
+    <div class="chips">
+      <span class="chip"><b>Nível de detalhe</b> · mínimo / padrão / detalhado</span>
+      <span class="chip"><b>Ao falar</b> · abaixar ou pausar a mídia</span>
+      <span class="chip"><b>Bipes</b> · trocas de passo e 3-2-1</span>
+      <span class="chip"><b>Vibração</b> · nas trocas de passo</span>
+      <span class="chip"><b>Velocidade da voz</b> · 0,9× a 1,25×</span>
+      <span class="chip"><b>Volume da voz</b> · 50 / 75 / 100%</span>
+      <span class="chip"><b>Avisos por tempo</b> · a cada 5 / 10 / 15 min</span>
+      <span class="chip"><b>No aviso de km</b> · tempo, pace, média</span>
+      <span class="chip"><b>Pausa automática</b> · voz ou bipe</span>
+    </div>
+    <div class="card" style="margin-top:16px; padding:6px 14px">
+      <table>
+        <thead><tr><th>Nível</th><th>O que o coach fala</th></tr></thead>
+        <tbody>
+          <tr><td><b>Mínimo</b></td><td>Só trocas de passo, correções de ritmo e o fim do treino ou da meta.</td></tr>
+          <tr><td><b>Padrão</b></td><td>Também resultado dos tiros, "próximo tiro em 10 s", km e tempo, progresso da meta, GPS fraco e "Back on pace".</td></tr>
+          <tr><td><b>Detalhado</b></td><td>Também ritmo médio, projeção de tempo final, "On pace" a cada km e o ritmo alvo em todos os tiros.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ Status ============ -->
+  <section>
+    <h2>Status</h2>
+    <div class="grid2">
+      <div class="card">
+        <h3>Verificado</h3>
+        <p class="muted" style="font-size:.92rem">
+          <code>flutter analyze</code> limpo, 1783 testes Dart e toda a suíte Kotlin passando, incluindo testes novos
+          para o agendador, frases, motor de passos, controlador e esteira.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Falta testar em aparelho</h3>
+        <p class="muted" style="font-size:.92rem">
+          Voz real, abaixar ou pausar a música, bipes, vibração e o serviço da esteira com a tela desligada.
+          Os testes usam saídas de áudio simuladas.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Ficou de fora</h3>
+        <p class="muted" style="font-size:.92rem">
+          Lembrete de hidratação/gel no longão, intervalos rápidos (sem plano) na esteira, coach na bicicleta e a frase de direção
+          no progressivo ("sobe para 5:10").
+        </p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="tooltip" id="tip"></div>
+
+<script>
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const NS = 'http://www.w3.org/2000/svg';
+const el = (tag, attrs = {}, parent) => {
+  const node = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  if (parent) parent.appendChild(node);
+  return node;
+};
+/** Same estimate as RunCueScheduler.estimatedDurationMillis. */
+const speechSeconds = (text, rate = 1) =>
+  text.trim().split(/\s+/).length * 0.37 / rate + 0.3;
+const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+const fmt1 = (n) => n.toFixed(1).replace('.', ',');
+
+// ---------- Tooltip ----------
+const tip = document.getElementById('tip');
+function showTip(evt, html) {
+  tip.innerHTML = html;
+  tip.style.opacity = 1;
+  const pad = 14;
+  let x = evt.pageX + pad, y = evt.pageY + pad;
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  if (x + w > window.scrollX + window.innerWidth - 8) x = evt.pageX - w - pad;
+  if (y + h > window.scrollY + window.innerHeight - 8) y = evt.pageY - h - pad;
+  tip.style.left = x + 'px';
+  tip.style.top = y + 'px';
+}
+const hideTip = () => { tip.style.opacity = 0; };
+
+// ---------- Timeline data ----------
+const TYPES = {
+  step:   { label: 'Troca de passo', color: '--series-1' },
+  pace:   { label: 'Alerta de ritmo', color: '--series-2' },
+  info:   { label: 'Faltam / próximo tiro', color: '--series-3' },
+  beep:   { label: 'Bipe', color: '--series-4' },
+  km:     { label: 'Split por km', color: '--series-5' },
+};
+const OLD_REP = 'Rep {n} of 6. 400 meters. Target pace 3 minutes 50 seconds per kilometer.';
+const before = [
+  [0,   'step', OLD_REP.replace('{n}', 1)],
+  [20,  'pace', 'Pick it up. Current pace 4 minutes 40 seconds per kilometer.', 'Alarme falso: a média do passo ainda incluía a aceleração dos primeiros segundos.'],
+  [96,  'step', 'Recover. 1 minute.', 'Sem o tempo do tiro, que é a informação que mais importa no intervalado.'],
+  [146, 'info', '10 seconds left.', 'Não diz o que vem depois.'],
+  [156, 'step', OLD_REP.replace('{n}', 2), 'O ritmo alvo é repetido em todo tiro.'],
+  [176, 'pace', 'Pick it up. Current pace 4 minutes 35 seconds per kilometer.', 'Alarme falso de novo, no início do tiro.'],
+  [200, 'km',   'Kilometer 2. Pace 4 minutes 52 seconds per kilometer. Average pace 5 minutes 6 seconds per kilometer.', 'Ritmo que mistura tiro e trote, no meio do tiro.'],
+  [252, 'step', 'Recover. 1 minute.'],
+  [302, 'info', '10 seconds left.'],
+  [312, 'step', OLD_REP.replace('{n}', 3)],
+  [332, 'pace', 'Pick it up. Current pace 4 minutes 38 seconds per kilometer.', 'Alarme falso.'],
+  [408, 'step', 'Recover. 1 minute.'],
+].map(([t, type, text, note]) => ({ t, type, text, note, d: speechSeconds(text, 0.96) }));
+
+const beep = (t, kind, d = 0.15) => ({ t, type: 'beep', text: kind, d, note: null });
+const after = [
+  beep(0, 'bipe "vai"', 0.32),
+  [0.4, 'step', 'Rep 1 of 6. 400 meters at 4 flat.', 'Ritmo alvo só no primeiro tiro.'],
+  beep(96, 'bipe "solta"', 0.43),
+  [96.5, 'step', '1:36, on target. Recover, 1 minute.', 'Resultado do tiro e trote numa fala só (duas falas críticas juntas).'],
+  [146, 'info', 'Rep 2 in 10 seconds.', 'Diz o que vem a seguir.'],
+  beep(153, 'bipe 3'), beep(154, 'bipe 2'), beep(155, 'bipe 1'),
+  beep(156, 'bipe "vai"', 0.32),
+  [156.4, 'step', 'Rep 2 of 6. 400 meters.'],
+  beep(252, 'bipe "solta"', 0.43),
+  [252.5, 'step', '1:38, on target. Recover, 1 minute.'],
+  [302, 'info', 'Rep 3 in 10 seconds.'],
+  beep(309, 'bipe 3'), beep(310, 'bipe 2'), beep(311, 'bipe 1'),
+  beep(312, 'bipe "vai"', 0.32),
+  [312.4, 'step', 'Rep 3 of 6. 400 meters.'],
+  beep(408, 'bipe "solta"', 0.43),
+  [408.5, 'step', '1:35, on target. Recover, 1 minute.'],
+].map((e) => Array.isArray(e) ? { t: e[0], type: e[1], text: e[2], note: e[3], d: speechSeconds(e[2]) } : e);
+
+const phases = [
+  [0, 96, 'Tiro 1'], [96, 156, 'Trote'], [156, 252, 'Tiro 2'],
+  [252, 312, 'Trote'], [312, 408, 'Tiro 3'], [408, 430, 'Trote'],
+];
+
+function drawTimeline() {
+  const host = document.getElementById('timeline');
+  host.innerHTML = '';
+  const W = 960, left = 74, right = 12, top = 30, rowH = 34, gap = 30;
+  const axisY = top + rowH * 2 + gap + 26;
+  const H = axisY + 30;
+  const maxT = 430;
+  const x = (t) => left + (t / maxT) * (W - left - right);
+  const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Linha do tempo das falas antes e depois' }, host);
+
+  // phase bands
+  for (const [a, b, label] of phases) {
+    if (label.startsWith('Tiro')) {
+      el('rect', { x: x(a), y: top - 6, width: x(b) - x(a), height: axisY - top + 6, fill: css('--band'), rx: 6 }, svg);
+    }
+    const t = el('text', { x: (x(a) + x(b)) / 2, y: top - 12, 'text-anchor': 'middle' }, svg);
+    t.textContent = label;
+  }
+  // axis
+  el('line', { x1: left, x2: W - right, y1: axisY, y2: axisY, stroke: css('--axis') }, svg);
+  for (let s = 0; s <= maxT; s += 60) {
+    el('line', { x1: x(s), x2: x(s), y1: axisY, y2: axisY + 6, stroke: css('--axis') }, svg);
+    const t = el('text', { x: x(s), y: axisY + 20, 'text-anchor': 'middle' }, svg);
+    t.textContent = mmss(s);
+  }
+
+  const rows = [['Antes', before, top], ['Depois', after, top + rowH + gap]];
+  for (const [name, events, y] of rows) {
+    const lbl = el('text', { x: 0, y: y + rowH / 2 + 5, class: 'row-label' }, svg);
+    lbl.textContent = name;
+    el('line', { x1: left, x2: W - right, y1: y + rowH / 2, y2: y + rowH / 2, stroke: css('--grid') }, svg);
+    for (const e of events) {
+      const isBeep = e.type === 'beep';
+      const w = Math.max(isBeep ? 3 : 4, x(e.t + e.d) - x(e.t));
+      const h = isBeep ? 14 : rowH - 8;
+      const rect = el('rect', {
+        x: x(e.t), y: y + (rowH - h) / 2, width: w, height: h, rx: isBeep ? 1.5 : 4,
+        fill: css(TYPES[e.type].color), stroke: css('--surface-1'), 'stroke-width': 1,
+      }, svg);
+      // generous hit target
+      const hit = el('rect', { x: x(e.t) - 4, y, width: w + 8, height: rowH, fill: 'transparent' }, svg);
+      const html = `<b>${name} · ${mmss(e.t)} · ${TYPES[e.type].label}</b>` +
+        (isBeep ? `<span class="t-note">${e.text}, ${fmt1(e.d)} s</span>`
+                : `<span class="t-say">"${e.text}"</span><span class="t-note">≈ ${fmt1(e.d)} s${e.note ? ' · ' + e.note : ''}</span>`);
+      for (const n of [rect, hit]) {
+        n.addEventListener('mousemove', (evt) => { showTip(evt, html); rect.setAttribute('stroke', css('--text-primary')); });
+        n.addEventListener('mouseleave', () => { hideTip(); rect.setAttribute('stroke', css('--surface-1')); });
+      }
+    }
+  }
+  // annotation: suppressed split
+  const ay = top + rowH + gap + rowH;
+  const ann = el('text', { x: x(200) + 6, y: ay + 14, 'font-size': 11 }, svg);
+  ann.textContent = '← split de km suprimido dentro dos tiros';
+  el('line', { x1: x(200), x2: x(200), y1: top + rowH + gap + 4, y2: ay + 18, stroke: css('--axis'), 'stroke-dasharray': '2 3' }, svg);
+
+  // legend
+  const legend = document.getElementById('tl-legend');
+  legend.innerHTML = Object.values(TYPES).map((t) => `<span><i style="background:var(${t.color})"></i>${t.label}</span>`).join('');
+
+  // totals
+  const sum = (list) => list.reduce((a, e) => a + e.d, 0);
+  const sb = sum(before), sa = sum(after);
+  const nSpeechB = before.length, nSpeechA = after.filter((e) => e.type !== 'beep').length;
+  document.getElementById('tl-totals').innerHTML =
+    `<span>Antes: <b>${fmt1(sb)} s</b> de fala em ${nSpeechB} falas</span>` +
+    `<span>Depois: <b>${fmt1(sa)} s</b> em ${nSpeechA} falas + ${after.length - nSpeechA} bipes</span>` +
+    `<span><b>${Math.round((1 - sa / sb) * 100)}% menos</b> tempo com voz por cima da música</span>`;
+  document.getElementById('tile-saving').textContent = `−${Math.round((1 - sa / sb) * 100)}%`;
+
+  // table view
+  const tbody = document.querySelector('#tl-table tbody');
+  tbody.innerHTML = '';
+  for (const [name, events] of [['Antes', before], ['Depois', after]]) {
+    for (const e of events) {
+      tbody.insertAdjacentHTML('beforeend',
+        `<tr><td>${name}</td><td class="num">${mmss(e.t)}</td><td>${TYPES[e.type].label}</td>` +
+        `<td>${e.type === 'beep' ? e.text : '<span class="say">' + e.text + '</span>'}</td><td class="num">${fmt1(e.d)} s</td></tr>`);
+    }
+  }
+}
+
+// ---------- Phrase lengths ----------
+const phrases = [
+  ['Aviso de km',
+    'Kilometer 3. Pace 5 minutes 30 seconds per kilometer. Average pace 5 minutes 42 seconds per kilometer.',
+    'Kilometer 3. Time 15:20. Pace 5:30.'],
+  ['Volta manual',
+    'Lap 2. 1 kilometer and 200 meters. 6 minutes 12 seconds. Pace 5 minutes 10 seconds per kilometer.',
+    'Lap 2. 1.2 kilometers in 6:12. Pace 5:10.'],
+  ['Início do tiro',
+    'Rep 3 of 8. 400 meters. Target pace 3 minutes 50 seconds per kilometer.',
+    'Rep 3 of 8. 400 meters.'],
+  ['Alerta de ritmo',
+    'Pick it up. Current pace 6 minutes 10 seconds per kilometer.',
+    'Pick it up. 6:10.'],
+  ['Teste de voz',
+    'Voice coach ready. Pace 5 minutes 30 seconds per kilometer.',
+    'Voice coach ready. Pace 5:30.'],
+  ['Meta restante',
+    '2 kilometers and 487 meters left.',
+    '2.5 kilometers to go.'],
+].map(([label, b, a]) => ({ label, b, a, db: speechSeconds(b, 0.96), da: speechSeconds(a) }));
+
+function drawPhrases() {
+  const km = phrases[0];
+  document.getElementById('tile-km').innerHTML = `${fmt1(km.db)} s <small>→</small> ${fmt1(km.da)} s`;
+  const host = document.getElementById('phrases');
+  host.innerHTML = '';
+  const W = 960, left = 132, right = 70, top = 8, groupH = 46, barH = 15;
+  const H = top + phrases.length * groupH + 26;
+  const max = 8;
+  const x = (s) => left + (s / max) * (W - left - right);
+  const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Duração das frases antes e depois' }, host);
+  for (let s = 0; s <= max; s += 2) {
+    el('line', { x1: x(s), x2: x(s), y1: top, y2: H - 22, stroke: css('--grid') }, svg);
+    const t = el('text', { x: x(s), y: H - 6, 'text-anchor': 'middle' }, svg);
+    t.textContent = `${s} s`;
+  }
+  phrases.forEach((p, i) => {
+    const y = top + i * groupH + 6;
+    const lbl = el('text', { x: 0, y: y + barH + 4, class: 'row-label' }, svg);
+    lbl.textContent = p.label;
+    const bars = [[p.db, '--neutral-bar', p.b, 'Antes'], [p.da, '--series-1', p.a, 'Depois']];
+    bars.forEach(([d, color, text, name], j) => {
+      const by = y + j * (barH + 2);
+      const r = el('rect', { x: left, y: by, width: x(d) - left, height: barH, rx: 4, fill: css(color) }, svg);
+      // square off the baseline end
+      el('rect', { x: left, y: by, width: 4, height: barH, fill: css(color) }, svg);
+      const v = el('text', { x: x(d) + 6, y: by + barH - 3, class: 'value' }, svg);
+      v.textContent = `${fmt1(d)} s`;
+      const hit = el('rect', { x: left, y: by - 1, width: Math.max(x(d) - left + 40, 60), height: barH + 2, fill: 'transparent' }, svg);
+      const html = `<b>${p.label} · ${name} · ≈ ${fmt1(d)} s</b><span class="t-say">"${text}"</span>`;
+      hit.addEventListener('mousemove', (evt) => showTip(evt, html));
+      hit.addEventListener('mouseleave', hideTip);
+    });
+  });
+}
+
+// ---------- Music ducking ----------
+function drawDuck(id, title, points, speech, note) {
+  const host = document.getElementById(id);
+  host.innerHTML = `<h3>${title}</h3><p class="muted" style="margin-bottom:6px">${note}</p>`;
+  const W = 460, H = 190, left = 44, right = 10, top = 14, bottom = 28;
+  const maxT = 9;
+  const x = (t) => left + (t / maxT) * (W - left - right);
+  const y = (v) => top + (1 - v) * (H - top - bottom);
+  const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': title }, host);
+  for (const [a, b, label] of speech) {
+    el('rect', { x: x(a), y: top, width: x(b) - x(a), height: H - top - bottom, fill: css('--surface-2'), stroke: css('--axis'), 'stroke-dasharray': '3 3' }, svg);
+    const t = el('text', { x: (x(a) + x(b)) / 2, y: top + 14, 'text-anchor': 'middle', 'font-size': 11 }, svg);
+    t.textContent = label;
+  }
+  for (const v of [0.2, 1]) {
+    el('line', { x1: left, x2: W - right, y1: y(v), y2: y(v), stroke: css('--grid') }, svg);
+    const t = el('text', { x: left - 6, y: y(v) + 4, 'text-anchor': 'end' }, svg);
+    t.textContent = `${Math.round(v * 100)}%`;
+  }
+  el('line', { x1: left, x2: W - right, y1: H - bottom, y2: H - bottom, stroke: css('--axis') }, svg);
+  for (let s = 0; s <= maxT; s += 3) {
+    const t = el('text', { x: x(s), y: H - 8, 'text-anchor': 'middle' }, svg);
+    t.textContent = `${s} s`;
+  }
+  let d = '';
+  points.forEach(([t, v], i) => {
+    d += (i === 0 ? 'M' : 'L') + x(t) + ',' + y(v);
+    if (i < points.length - 1) d += 'L' + x(points[i + 1][0]) + ',' + y(v);
+  });
+  el('path', { d, fill: 'none', stroke: css('--series-1'), 'stroke-width': 2, 'stroke-linejoin': 'round' }, svg);
+}
+
+function drawAll() {
+  drawTimeline();
+  drawPhrases();
+  drawDuck('duck-before', 'Antes',
+    [[0, 1], [1, 0.2], [4, 1], [9, 1]],
+    [[1, 4, 'fala 1'], [4, 6.5, 'fala 2']],
+    'O volume voltava ao fim da fala 1, com a fala 2 ainda tocando.');
+  drawDuck('duck-after', 'Depois',
+    [[0, 1], [1, 0.2], [6.9, 1], [9, 1]],
+    [[1, 4, 'fala 1'], [4, 6.5, 'fala 2']],
+    'Um único "abaixa" para o bloco inteiro; volta 0,4 s depois.');
+}
+
+// ---------- Cards ----------
+const cards = [
+  ['Falas que sumiam',
+    'Uma fala por atualização; as outras eram descartadas e marcadas como ditas. O split do km 5 sumia sob o aviso de 50% da meta.',
+    'Fila com prioridade e validade. Progresso que coincide é fundido: <span class="say">Kilometer 5. … Halfway. 5 kilometers to go.</span>',
+    'Nada importante se perde, e duas informações relacionadas viram uma fala só.'],
+  ['Falar demais',
+    'Cada tipo de aviso decidia sozinho quando falar. Num intervalado com km ligado, o coach falava a cada ~30 s.',
+    'Intervalo mínimo entre falas, limite de falas de progresso a cada 2 min por nível de detalhe e silêncio antes da troca de passo.',
+    'O corredor ouve o que importa e a música não fica sendo interrompida.'],
+  ['Alarme falso de ritmo',
+    'Um aviso por passo, aos 20 s, usando a média desde o início do tiro (com a aceleração). Num tempo run de 20 min, só uma correção possível.',
+    'Janela móvel de 20 s, carência no início, desvio por 6 s antes de avisar, nova tentativa depois de um intervalo e "Back on pace" quando corrige.',
+    'Corrige quem realmente está fora do ritmo, não quem está acelerando, e continua útil num bloco longo.'],
+  ['Resultado do tiro',
+    'No fim do tiro só vinha "Recover. 1 minute."',
+    '<span class="say">1:36, on target. Recover, 1 minute.</span> ou <span class="say">1:31, 3 seconds fast.</span>',
+    'É a informação que o atleta mais quer num intervalado, dita no momento em que ele começa o trote.'],
+  ['Hora de voltar a correr',
+    '"10 seconds left", sem dizer o que vem depois.',
+    '<span class="say">Rep 4 in 10 seconds.</span> e bipes 3-2-1, depois um bipe agudo de "vai". Último: <span class="say">Last rep.</span>',
+    'O bipe é entendido sem palavras e dura 0,1 s, então quase não interrompe a música.'],
+  ['Corridas leves',
+    '"Pick it up" quando o corredor estava mais devagar que o alvo, justamente o que um treino leve pede.',
+    'Em rodagem leve, longão e regenerativo só existe <span class="say">Keep it easy. 5:05.</span> Avisos persistentes repetem com intervalo crescente (2, 4, 8 min).',
+    'O erro comum do treino leve é correr rápido demais. Insistir a cada 2 min seria chato.'],
+  ['Esteira',
+    'O coach só existia dentro do serviço de GPS. Na esteira ficava mudo, até no treino de subidas.',
+    'Serviço nativo próprio: relógio, passos e voz com a tela desligada. Passos por distância viram tempo pelo ritmo alvo. Cartão do passo e "pular" na tela.',
+    'Treinar na esteira não exige mais olhar o celular.'],
+  ['Música e podcast',
+    'Pedido e liberação de foco de áudio a cada frase, abaixando e subindo a música no meio de duas falas seguidas.',
+    'Foco de áudio por bloco de falas, opção de pausar a mídia, velocidade e volume da voz ajustáveis.',
+    'Uma única interrupção curta, e podcasts não ficam com duas vozes falando ao mesmo tempo.'],
+  ['Treino reiniciava sozinho',
+    'Abrir as configurações de voz no meio de um treino estruturado reenviava o plano e o treino voltava ao aquecimento.',
+    'O plano só é recarregado se realmente mudou.',
+    'Bug antigo achado na revisão final, agora com teste.'],
+];
+document.getElementById('cards').innerHTML = cards.map(([title, b, a, why]) => `
+  <div class="card ba">
+    <h3>${title}</h3>
+    <div class="row"><span class="tag before">Antes</span><span>${b}</span></div>
+    <div class="row"><span class="tag after">Agora</span><span>${a}</span></div>
+    <div class="row"><span class="tag why">Por quê</span><span class="muted" style="font-size:.9rem">${why}</span></div>
+  </div>`).join('');
+
+// ---------- Workout kinds ----------
+const kinds = [
+  ['Intervalado', 'Rep 1 of 6. 800 meters at 3:50. → 3:04, on target. Recover, 2 minutes.', 'Resultado e próximo tiro; sem km no meio dos tiros.'],
+  ['Subidas', 'Hill 3 of 8. 1 minute. → Easy back down, 96 seconds.', 'Sem ritmo: subida é por esforço.'],
+  ['Fartlek', 'Surge 4 of 10. 1 minute. → Float, 1 minute.', 'Bipes fazem a maior parte; voz curta.'],
+  ['Strides', 'Stride 1 of 6. 20 seconds. → Easy, 1 minute.', 'Curto demais para ritmo de GPS e para "10 seconds".'],
+  ['Corrida/caminhada', 'Run, 3 minutes. → Walk, 2 minutes. → Last run, 3 minutes.', 'Verbos claros para iniciantes.'],
+  ['Tempo run', 'Steady, 20 minutes at 4:50. → Halfway. → 1 minute left.', 'Alerta de ritmo que volta se preciso; "On pace" no modo detalhado.'],
+  ['Rodagem / longão', 'Steady, 8 kilometers at 6 flat. → Keep it easy. 5:20.', 'Só avisa se estiver rápido demais; longão anuncia a cada 2 km.'],
+  ['Prova', 'Race, 10 kilometers at 5 flat. Go! → Kilometer 4. … On track for 49:10. 50 seconds ahead.', 'Projeção do tempo final contra a meta.'],
+  ['Teste (time trial)', 'Time trial, 3 kilometers. Go! → Time trial done. 3 kilometers in 13:42.', 'Corrido por esforço; no fim, o tempo do teste.'],
+];
+document.getElementById('kinds').innerHTML = kinds.map(([k, say, why]) =>
+  `<tr><td><b>${k}</b></td><td><span class="say">${say}</span></td><td class="muted" style="font-size:.88rem">${why}</td></tr>`).join('');
+
+drawAll();
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawAll);
+</script>
+</body>
+</html>

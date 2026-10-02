@@ -720,7 +720,8 @@ void main() {
         find.textContaining('Informe a distância mostrada na esteira'),
         findsOneWidget,
       );
-      // Indoor: no GPS settings/chip, no goal / interval rows.
+      // Indoor: no GPS settings/chip and no quick intervals, but the
+      // treadmill keeps its goal and voice coach rows.
       expect(find.byIcon(Icons.settings_outlined), findsNothing);
       expect(find.text('Intervalos'), findsNothing);
       expect(tester.takeException(), isNull);

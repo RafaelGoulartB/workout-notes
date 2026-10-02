@@ -29,6 +29,9 @@ class RunRecordSessionCard extends StatelessWidget {
   final bool headsetConnected;
   final VoidCallback onOpenVoiceSettings;
 
+  /// False indoors: the quick interval preset needs a GPS clock and distance.
+  final bool allowQuickIntervals;
+
   const RunRecordSessionCard({
     super.key,
     required this.goal,
@@ -45,6 +48,7 @@ class RunRecordSessionCard extends StatelessWidget {
     required this.headphonesOnly,
     required this.headsetConnected,
     required this.onOpenVoiceSettings,
+    this.allowQuickIntervals = true,
   });
 
   static String _amount(RunIntervalMetric metric, int value) =>
@@ -95,7 +99,7 @@ class RunRecordSessionCard extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
     final plan = planWorkout;
     final showGoal = !active || goal.hasAnyGoal;
-    final showQuickIntervals = plan == null && !active;
+    final showQuickIntervals = allowQuickIntervals && plan == null && !active;
     final voiceSubtitle = !voiceEnabled
         ? loc.runRecordVoiceOff
         : headphonesOnly && !headsetConnected

@@ -56,6 +56,21 @@ data class RunIntervalPreset(
     }
 }
 
+/** How much the coach talks; see [RunVoiceController] for what each level adds. */
+enum class RunVoiceVerbosity {
+    minimal,
+    standard,
+    detailed;
+
+    companion object {
+        fun from(raw: Any?): RunVoiceVerbosity = when (raw?.toString()) {
+            "minimal" -> minimal
+            "detailed" -> detailed
+            else -> standard
+        }
+    }
+}
+
 data class RunVoiceSettings(
     val enabled: Boolean = true,
     val language: RunVoiceLanguage = RunVoiceLanguage.app,
@@ -75,6 +90,23 @@ data class RunVoiceSettings(
     val autoPause: Boolean = true,
     val announceAutoPause: Boolean = true,
     val announceLaps: Boolean = true,
+    val verbosity: RunVoiceVerbosity = RunVoiceVerbosity.standard,
+    /** Pause other media while speaking instead of lowering its volume (podcasts). */
+    val pauseMedia: Boolean = false,
+    /** Beeps for step changes and the 3-2-1 countdown before them. */
+    val earcons: Boolean = true,
+    /** Vibration on step changes. */
+    val haptics: Boolean = true,
+    val speechRate: Float = 1.0f,
+    val voiceVolume: Float = 1.0f,
+    /** Time cue every N minutes of moving time; 0 = off. */
+    val announceTimeEveryMin: Int = 0,
+    /** The distance cue includes total elapsed time. */
+    val kmIncludeTime: Boolean = true,
+    /** The distance cue includes average pace. */
+    val kmIncludeAvgPace: Boolean = false,
+    /** Auto-pause is signalled by a beep instead of words. */
+    val autoPauseBeep: Boolean = false,
 ) {
     companion object {
         const val STORAGE_KEY = "run_voice_settings_v1"
@@ -118,6 +150,16 @@ data class RunVoiceSettings(
                 autoPause = json.optBoolean("autoPause", true),
                 announceAutoPause = json.optBoolean("announceAutoPause", true),
                 announceLaps = json.optBoolean("announceLaps", true),
+                verbosity = RunVoiceVerbosity.from(json.opt("verbosity")),
+                pauseMedia = json.optString("mediaBehavior") == "pause",
+                earcons = json.optBoolean("earcons", true),
+                haptics = json.optBoolean("haptics", true),
+                speechRate = speechRateOf(json.opt("speechRate")),
+                voiceVolume = voiceVolumeOf(json.opt("voiceVolume")),
+                announceTimeEveryMin = timeEveryOf(json.opt("announceTimeEveryMin")),
+                kmIncludeTime = json.optBoolean("kmIncludeTime", true),
+                kmIncludeAvgPace = json.optBoolean("kmIncludeAvgPace", false),
+                autoPauseBeep = json.optString("autoPauseStyle") == "beep",
             )
         }
 
@@ -147,7 +189,33 @@ data class RunVoiceSettings(
                 autoPause = map["autoPause"] as? Boolean ?: true,
                 announceAutoPause = map["announceAutoPause"] as? Boolean ?: true,
                 announceLaps = map["announceLaps"] as? Boolean ?: true,
+                verbosity = RunVoiceVerbosity.from(map["verbosity"]),
+                pauseMedia = map["mediaBehavior"] == "pause",
+                earcons = map["earcons"] as? Boolean ?: true,
+                haptics = map["haptics"] as? Boolean ?: true,
+                speechRate = speechRateOf(map["speechRate"]),
+                voiceVolume = voiceVolumeOf(map["voiceVolume"]),
+                announceTimeEveryMin = timeEveryOf(map["announceTimeEveryMin"]),
+                kmIncludeTime = map["kmIncludeTime"] as? Boolean ?: true,
+                kmIncludeAvgPace = map["kmIncludeAvgPace"] as? Boolean ?: false,
+                autoPauseBeep = map["autoPauseStyle"] == "beep",
             )
+        }
+
+        private val speechRates = listOf(0.9f, 1.0f, 1.1f, 1.25f)
+        private val voiceVolumes = listOf(0.5f, 0.75f, 1.0f)
+
+        private fun nearest(raw: Any?, options: List<Float>, fallback: Float): Float {
+            val value = (raw as? Number)?.toFloat() ?: return fallback
+            if (!value.isFinite()) return fallback
+            return options.minByOrNull { kotlin.math.abs(it - value) } ?: fallback
+        }
+
+        private fun speechRateOf(raw: Any?) = nearest(raw, speechRates, 1.0f)
+        private fun voiceVolumeOf(raw: Any?) = nearest(raw, voiceVolumes, 1.0f)
+        private fun timeEveryOf(raw: Any?): Int {
+            val value = (raw as? Number)?.toInt() ?: return 0
+            return if (value in listOf(5, 10, 15)) value else 0
         }
     }
 
@@ -169,6 +237,16 @@ data class RunVoiceSettings(
         put("autoPause", autoPause)
         put("announceAutoPause", announceAutoPause)
         put("announceLaps", announceLaps)
+        put("verbosity", verbosity.name)
+        put("mediaBehavior", if (pauseMedia) "pause" else "duck")
+        put("earcons", earcons)
+        put("haptics", haptics)
+        put("speechRate", speechRate.toDouble())
+        put("voiceVolume", voiceVolume.toDouble())
+        put("announceTimeEveryMin", announceTimeEveryMin)
+        put("kmIncludeTime", kmIncludeTime)
+        put("kmIncludeAvgPace", kmIncludeAvgPace)
+        put("autoPauseStyle", if (autoPauseBeep) "beep" else "voice")
     }
 }
 

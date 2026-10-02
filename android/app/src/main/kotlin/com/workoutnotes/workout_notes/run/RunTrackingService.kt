@@ -370,7 +370,13 @@ class RunTrackingService : Service(), LocationListener {
             val pendingS = RunVoiceBridge.pendingSettings
             val pendingG = RunVoiceBridge.pendingGoal
             val pendingI = RunVoiceBridge.pendingIntervalsOn
-            voiceController.begin(pendingS, pendingG, pendingI, RunVoiceBridge.pendingPlan)
+            voiceController.begin(
+                pendingS,
+                pendingG,
+                pendingI,
+                RunVoiceBridge.pendingPlan,
+                RunVoiceBridge.pendingWorkout,
+            )
             persistVoicePlan()
         } catch (_: Throwable) {
             voiceController.begin(null, null, null)
@@ -475,6 +481,7 @@ class RunTrackingService : Service(), LocationListener {
             // Rehydrate the goal, structured plan and execution cursor so a
             // killed process keeps cueing the remaining reps.
             voiceController.restoreGoalJson(session["voice_goal_json"] as? String)
+            voiceController.restoreWorkoutJson(session["voice_workout_json"] as? String)
             val restoredPlan = session["voice_plan_json"] as? String
             voiceController.begin(
                 null,
@@ -816,6 +823,7 @@ class RunTrackingService : Service(), LocationListener {
         try {
             session["voice_plan_json"] = voiceController.planStepsJson()
             session["voice_goal_json"] = voiceController.goalJson()
+            session["voice_workout_json"] = voiceController.workoutJson()
             session["voice_intervals_on"] = voiceController.intervalsEnabled
             session["voice_engine_snapshot_json"] = voiceController.engineSnapshotJson()
             session["voice_step_results"] = voiceController.stepResults()

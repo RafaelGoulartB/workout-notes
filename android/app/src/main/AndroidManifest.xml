@@ -73,6 +73,10 @@
             android:exported="false"
             android:foregroundServiceType="location|mediaPlayback" />
         <service
+            android:name=".run.RunIndoorVoiceService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+        <service
             android:name=".sleep.SleepAlarmRingingService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />

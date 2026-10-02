@@ -176,7 +176,9 @@ class RunRecordSheet extends StatelessWidget {
         ),
         const SizedBox(height: 12),
       ],
-      if (_indoor) ...[
+      // The stationary bike has no plan, goal or voice coach; the treadmill
+      // gets the full session card (timed steps, goal, voice).
+      if (_indoor && activityType != CardioActivityType.treadmill) ...[
         if (planWorkout != null) ...[
           AppSectionCard(
             padding: EdgeInsets.zero,
@@ -212,6 +214,7 @@ class RunRecordSheet extends StatelessWidget {
           intervalsOn: intervalsOn,
           intervalPreset: intervalPreset,
           onIntervalsChanged: onIntervalsChanged,
+          allowQuickIntervals: !_indoor,
           onEditGoal: onEditGoal,
           onClearGoal: onClearGoal,
           voiceEnabled: voiceEnabled,
@@ -219,6 +222,10 @@ class RunRecordSheet extends StatelessWidget {
           headsetConnected: headsetConnected,
           onOpenVoiceSettings: onOpenVoiceSettings,
         ),
+        if (_indoor && !active) ...[
+          const SizedBox(height: 12),
+          RunIndoorInfoCard(type: activityType),
+        ],
       ],
     ];
 

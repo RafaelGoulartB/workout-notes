@@ -15,6 +15,9 @@ class RunVoiceBridge(private val context: Context) : MethodChannel.MethodCallHan
 
         /** Structured plan steps waiting for the tracking service to start. */
         @Volatile var pendingPlan: Any? = null
+
+        /** Kind and headline targets of the planned workout (RunWorkoutProfile). */
+        @Volatile var pendingWorkout: Map<String, Any?>? = null
     }
 
     private fun voiceController(): RunVoiceController {
@@ -63,15 +66,19 @@ class RunVoiceBridge(private val context: Context) : MethodChannel.MethodCallHan
                 val goalMap = args["goal"] as? Map<String, Any?>
                 val intervalsOn = args["intervalsOn"] as? Boolean
                 val plan = args["plan"]
+                @Suppress("UNCHECKED_CAST")
+                val workout = args["workout"] as? Map<String, Any?>
                 pendingSettings = settingsMap
                 pendingGoal = goalMap
                 pendingIntervalsOn = intervalsOn
                 if (args.containsKey("plan")) pendingPlan = plan
+                if (args.containsKey("workout")) pendingWorkout = workout
                 // If service already running, push immediately
                 val svc = RunTrackingService.activeInstanceForVoice()
                 if (svc != null) {
-                    svc.voiceController.syncFromFlutter(settingsMap, goalMap, intervalsOn, plan)
+                    svc.voiceController.syncFromFlutter(settingsMap, goalMap, intervalsOn, plan, workout)
                 }
+                RunIndoorVoiceService.activeController()?.syncFromFlutter(settingsMap, goalMap, null, null, null)
                 Log.i("RunVoiceBridge", "syncSettings intervalsOn=$intervalsOn")
                 result.success(null)
             }
@@ -84,18 +91,21 @@ class RunVoiceBridge(private val context: Context) : MethodChannel.MethodCallHan
                 val goalMap = args["goal"] as? Map<String, Any?>
                 val intervalsOn = args["intervalsOn"] as? Boolean
                 val plan = args["plan"]
+                @Suppress("UNCHECKED_CAST")
+                val workout = args["workout"] as? Map<String, Any?>
                 val svc = RunTrackingService.activeInstanceForVoice()
                 if (svc != null) {
-                    svc.voiceController.begin(settingsMap, goalMap, intervalsOn, plan)
+                    svc.voiceController.begin(settingsMap, goalMap, intervalsOn, plan, workout)
                     svc.persistVoicePlan()
                 } else {
                     // No service yet — store pending, will be consumed on startRun
                     pendingSettings = settingsMap
                     pendingGoal = goalMap
                     pendingIntervalsOn = intervalsOn
-                        pendingPlan = plan
+                    pendingPlan = plan
+                    pendingWorkout = workout
                     // Also init ephemeral to allow test-like warm-up
-                    ephemeralController().begin(settingsMap, goalMap, intervalsOn, plan)
+                    ephemeralController().begin(settingsMap, goalMap, intervalsOn, plan, workout)
                 }
                 result.success(null)
             }
@@ -107,17 +117,35 @@ class RunVoiceBridge(private val context: Context) : MethodChannel.MethodCallHan
                 pendingGoal = null
                 pendingIntervalsOn = null
                 pendingPlan = null
+                pendingWorkout = null
                 result.success(null)
             }
             "skipStep" -> {
                 val svc = RunTrackingService.activeInstanceForVoice()
-                result.success(svc?.skipStep() ?: false)
+                result.success(svc?.skipStep() ?: RunIndoorVoiceService.skipStep())
             }
+            "indoorStart" -> {
+                @Suppress("UNCHECKED_CAST")
+                val args = call.arguments as? Map<String, Any?> ?: emptyMap()
+                result.success(RunIndoorVoiceService.start(context, args))
+            }
+            "indoorPause" -> {
+                RunIndoorVoiceService.pause()
+                result.success(null)
+            }
+            "indoorResume" -> {
+                RunIndoorVoiceService.resume()
+                result.success(null)
+            }
+            "indoorState" -> result.success(RunIndoorVoiceService.state())
+            "indoorStop" -> result.success(RunIndoorVoiceService.stop(context))
             "stepResults" -> {
                 // Native is the source of truth for a structured session: it keeps
                 // cueing (and measuring) while the Flutter engine is dead.
                 val svc = RunTrackingService.activeInstanceForVoice()
-                val controller = svc?.voiceController ?: ephemeral
+                val controller = svc?.voiceController
+                    ?: RunIndoorVoiceService.activeController()
+                    ?: ephemeral
                 result.success(controller?.stepResults() ?: emptyList<Map<String, Any?>>())
             }
             "speakTest" -> {

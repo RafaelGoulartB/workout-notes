@@ -6,8 +6,10 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/models/run_session_context.dart';
+import 'package:workout_notes/models/run_step_snapshot.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
+import 'package:workout_notes/services/run_native_voice_service.dart';
 
 /// In-app timer for indoor sessions: stationary bike and treadmill.
 ///
@@ -16,7 +18,10 @@ import 'package:workout_notes/repositories/run_repository.dart';
 /// correct when Flutter pauses periodic timers while the app is backgrounded.
 /// The distance is typed on the review screen.
 ///
-/// It serves every indoor activity (`CardioActivityType.isIndoor`).
+/// It serves every indoor activity (`CardioActivityType.isIndoor`). A
+/// treadmill run also gets the native voice coach (`RunIndoorVoiceService`),
+/// which keeps talking with the screen off and reports the step snapshot the
+/// record screen shows.
 class IndoorTrackingService extends ChangeNotifier {
   static final IndoorTrackingService instance = IndoorTrackingService._();
 
@@ -25,6 +30,10 @@ class IndoorTrackingService extends ChangeNotifier {
   IndoorTrackingService._();
 
   final RunRepository _repository = DatabaseHelper.instance.runRepo;
+  final RunNativeVoiceService _voice = RunNativeVoiceService.instance;
+
+  /// The native treadmill coach is running for this session.
+  bool _voiceActive = false;
   RunTrackingState _state = const RunTrackingState.initial(supported: true);
   CardioActivityType _activityType = CardioActivityType.stationaryBike;
 
@@ -43,9 +52,11 @@ class IndoorTrackingService extends ChangeNotifier {
 
   /// Starts timing. [context] links a planned workout: a treadmill run then
   /// completes that plan session when the review is saved, like an outdoor run.
+  /// [voice] starts the treadmill voice coach (ignored for the bike).
   Future<bool> start({
     CardioActivityType type = CardioActivityType.stationaryBike,
     RunSessionContext? context,
+    RunIndoorVoiceSetup? voice,
   }) async {
     assert(type.isIndoor, 'Only indoor activities use the timer service');
     if (_state.isActive) return true;
@@ -78,6 +89,16 @@ class IndoorTrackingService extends ChangeNotifier {
     );
     _startTicker();
     notifyListeners();
+    if (voice != null &&
+        voice.settings.enabled &&
+        _activityType == CardioActivityType.treadmill) {
+      _voiceActive = await _voice.indoorStart(
+        settings: voice.settings,
+        goal: voice.goal,
+        plan: voice.plan,
+        workout: voice.workout,
+      );
+    }
     return true;
   }
 
@@ -91,6 +112,7 @@ class IndoorTrackingService extends ChangeNotifier {
       updatedAt: DateTime.now(),
     );
     notifyListeners();
+    if (_voiceActive) await _voice.indoorPause();
   }
 
   Future<void> resume() async {
@@ -102,6 +124,7 @@ class IndoorTrackingService extends ChangeNotifier {
     );
     _startTicker();
     notifyListeners();
+    if (_voiceActive) await _voice.indoorResume();
   }
 
   Future<RunReviewDraft?> stopForReview() async {
@@ -111,6 +134,10 @@ class IndoorTrackingService extends ChangeNotifier {
     final endedAt = DateTime.now();
     final activityId = snapshot.activityId ?? _uuid.v4();
     _stopTicker();
+    final stepResults = _voiceActive
+        ? await _voice.indoorStop()
+        : const <RunStepResult>[];
+    _voiceActive = false;
 
     final payload = <String, dynamic>{
       'schema_version': 1,
@@ -127,6 +154,10 @@ class IndoorTrackingService extends ChangeNotifier {
           'plan_workout_id': _sessionContext!.planWorkoutId,
         if (_sessionContext?.scheduledRunId != null)
           'scheduled_run_id': _sessionContext!.scheduledRunId,
+        if (stepResults.isNotEmpty)
+          'voice_step_results': [
+            for (final result in stepResults) result.toMap(),
+          ],
       },
       'points': <Map<String, dynamic>>[],
     };
@@ -139,6 +170,8 @@ class IndoorTrackingService extends ChangeNotifier {
 
   Future<void> discard() async {
     _stopTicker();
+    if (_voiceActive) await _voice.indoorStop();
+    _voiceActive = false;
     _reset();
   }
 
@@ -148,7 +181,19 @@ class IndoorTrackingService extends ChangeNotifier {
       if (!_state.isActive) return;
       _updateClock();
       notifyListeners();
+      if (_voiceActive) unawaited(_refreshVoiceState());
     });
+  }
+
+  /// Mirrors the native coach's step progress into the state for the UI.
+  Future<void> _refreshVoiceState() async {
+    final voiceState = await _voice.indoorState();
+    if (voiceState == null || !_voiceActive || !_state.isActive) return;
+    _state = _state.copyWith(
+      stepSnapshot: voiceState.stepSnapshot,
+      intervalSnapshot: voiceState.intervalSnapshot,
+    );
+    notifyListeners();
   }
 
   void _updateClock() {
