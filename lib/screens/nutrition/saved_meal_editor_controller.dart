@@ -6,6 +6,7 @@ import 'package:workout_notes/models/nutrition/food_serving.dart';
 import 'package:workout_notes/models/nutrition/food_variant.dart';
 import 'package:workout_notes/models/nutrition/meal_log_item.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
+import 'package:workout_notes/models/nutrition/saved_meal_item_draft.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/utils/app_number_format.dart';
 

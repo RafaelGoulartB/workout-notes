@@ -4,6 +4,7 @@ import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
+import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/utils/date_utils.dart';

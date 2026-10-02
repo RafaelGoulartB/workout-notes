@@ -3,6 +3,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/saved_meal.dart';
+import 'package:workout_notes/models/nutrition/saved_meal_item_draft.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/screens/nutrition/saved_meal_editor_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';

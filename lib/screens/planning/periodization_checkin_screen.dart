@@ -6,6 +6,7 @@ import 'package:workout_notes/models/periodization_checkin.dart';
 import 'package:workout_notes/models/periodization_metrics.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_target.dart';
+import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';

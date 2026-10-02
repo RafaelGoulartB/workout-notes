@@ -9,6 +9,7 @@ import 'package:workout_notes/models/periodization_schedule.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/periodization/phase_seed.dart';
+import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/periodization/plan_overview.dart';

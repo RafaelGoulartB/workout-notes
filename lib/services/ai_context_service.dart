@@ -3,6 +3,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/ai_tool_domain.dart';
+import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/duration_format.dart';

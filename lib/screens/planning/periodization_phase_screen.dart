@@ -8,6 +8,7 @@ import 'package:workout_notes/models/periodization_schedule.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/periodization/week_progress.dart';
+import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/screens/planning/periodization_checkin_flow.dart';
 import 'package:workout_notes/screens/planning/periodization_phase_editor_screen.dart';
 import 'package:workout_notes/utils/app_number_format.dart';

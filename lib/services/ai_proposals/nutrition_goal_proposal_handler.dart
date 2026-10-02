@@ -5,6 +5,8 @@ import 'package:workout_notes/models/ai_tool_domain.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_target.dart';
+import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/services/ai_proposals/ai_proposal_handler.dart';
 import 'package:workout_notes/services/ai_proposals/ai_proposal_schema.dart';
 import 'package:workout_notes/services/ai_tool_spec.dart';

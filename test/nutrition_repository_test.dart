@@ -1,11 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-
 import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/food_variant.dart';
+import 'package:workout_notes/models/nutrition/manual_serving_input.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/utils/nutrition_conversion.dart';
+
 import 'support/test_db.dart';
 
 void main() {

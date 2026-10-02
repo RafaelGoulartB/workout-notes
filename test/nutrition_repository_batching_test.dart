@@ -2,7 +2,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite/sqflite.dart' show Sqflite;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:workout_notes/models/nutrition/food.dart';
+import 'package:workout_notes/models/nutrition/manual_serving_input.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
+import 'package:workout_notes/models/nutrition/saved_meal_item_draft.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/utils/nutrition_conversion.dart';
 

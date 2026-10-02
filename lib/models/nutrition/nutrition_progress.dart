@@ -1,6 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
+import 'package:workout_notes/models/nutrition/calorie_analytics.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
-import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 

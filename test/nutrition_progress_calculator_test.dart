@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:workout_notes/models/nutrition/calorie_analytics.dart';
 import 'package:workout_notes/models/nutrition/nutrition_progress.dart';
-import 'package:workout_notes/repositories/nutrition_repository.dart';
 
 DailyCalorieTotal _day(DateTime date, double? kcal) =>
     DailyCalorieTotal(date: date, calories: kcal);

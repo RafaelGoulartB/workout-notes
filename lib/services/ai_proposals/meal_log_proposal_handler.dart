@@ -4,6 +4,7 @@ import 'package:workout_notes/models/ai_proposal.dart';
 import 'package:workout_notes/models/ai_tool_domain.dart';
 import 'package:workout_notes/models/nutrition/food_serving.dart';
 import 'package:workout_notes/models/nutrition/food_variant.dart';
+import 'package:workout_notes/models/nutrition/meal_log_with_items.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/models/nutrition/saved_meal.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';

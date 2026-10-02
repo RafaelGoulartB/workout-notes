@@ -8,6 +8,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/daily_nutrition_summary.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/meal_log_item.dart';
+import 'package:workout_notes/models/nutrition/meal_log_with_items.dart';
 import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';

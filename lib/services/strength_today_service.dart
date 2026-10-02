@@ -1,6 +1,7 @@
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
+import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/strength_repository.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 

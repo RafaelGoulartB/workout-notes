@@ -8,6 +8,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/models/exercise_with_sets.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
+import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/screens/workout/rest_timer_screen.dart';
 import 'package:workout_notes/services/notification_service.dart';
 import 'package:workout_notes/services/rest_timer_service.dart';

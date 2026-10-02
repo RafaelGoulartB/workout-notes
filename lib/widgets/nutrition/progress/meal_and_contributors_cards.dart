@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/models/nutrition/calorie_analytics.dart';
 import 'package:workout_notes/widgets/nutrition/progress/progress_shared.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
