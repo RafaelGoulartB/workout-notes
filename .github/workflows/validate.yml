@@ -1,5 +1,8 @@
 name: Validate
 
+# Runs once per pull request (no separate push run for the same commit).
+# Pushes to main are covered by release-android.yml, which runs the
+# analysis and both test suites again before building.
 on:
   pull_request:
     paths:
@@ -11,42 +14,58 @@ on:
       - "l10n.yaml"
       - "analysis_options.yaml"
       - ".github/workflows/**"
-  push:
-    branches:
-      - "**"
-    paths:
-      - "lib/**"
-      - "test/**"
-      - "tool/**"
-      - "android/**"
-      - "pubspec.*"
-      - "l10n.yaml"
-      - "analysis_options.yaml"
-      - ".github/workflows/**"
+  workflow_dispatch:
 
 concurrency:
-  group: validate-${{ github.ref }}
+  group: validate-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
-  validate:
-    name: Analyze and test
+  # Decides which of the two suites the change can affect, so an
+  # Android-only change skips the Dart tests and vice versa.
+  changes:
+    name: Detect changes
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 5
+    outputs:
+      dart: ${{ steps.filter.outputs.dart }}
+      android: ${{ steps.filter.outputs.android }}
+    steps:
+      - name: Filter changed paths
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            dart:
+              - "lib/**"
+              - "test/**"
+              - "tool/**"
+              - "pubspec.*"
+              - "l10n.yaml"
+              - "analysis_options.yaml"
+              - ".github/workflows/validate.yml"
+            android:
+              - "android/**"
+              - "pubspec.*"
+              # SleepWakeFilterParityTest reads the Dart fixtures.
+              - "test/fixtures/**"
+              - ".github/workflows/validate.yml"
+
+  dart:
+    name: Dart analyze and test
+    needs: changes
+    if: needs.changes.outputs.dart == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
-
-      - name: Set up Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "17"
-          cache: gradle
+        uses: actions/checkout@v7
 
       # Keep the Flutter version in sync with release-android.yml; bump both
       # in an explicit change.
@@ -78,12 +97,37 @@ jobs:
         env:
           AI_EVAL_DRY: "1"
 
-      - name: Run Android unit tests
-        working-directory: android
-        run: ./gradlew :app:testDebugUnitTest
+  android:
+    name: Android unit tests and lint
+    needs: changes
+    if: needs.changes.outputs.android == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
 
-      # New findings fail the build; existing ones are in
-      # android/app/lint-baseline.xml.
-      - name: Run Android lint
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      # The Gradle build needs the Flutter SDK and the resolved plugins.
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.47.5"
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get --enforce-lockfile
+
+      # One Gradle invocation so configuration runs once. New lint findings
+      # fail the build; existing ones are in android/app/lint-baseline.xml.
+      - name: Run Android unit tests and lint
         working-directory: android
-        run: ./gradlew :app:lintDebug
+        run: ./gradlew :app:testDebugUnitTest :app:lintDebug
