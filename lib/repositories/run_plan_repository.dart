@@ -1073,54 +1073,164 @@ class RunPlanRepository extends BaseRepository {
   /// different intervals. Used to adjust plans that cannot be re-composed.
   Future<void> scaleWeek(String planId, int weekIndex, double factor) async {
     if (factor <= 0 || factor == 1) return;
-    final plan = await getPlan(planId);
-    if (plan == null) return;
     final database = await db;
+    await database.transaction(
+      (txn) => scaleWeekIn(txn, planId, weekIndex, factor),
+    );
+  }
+
+  /// The session as [scaleWeek] leaves it. Pure, so a preview can show the
+  /// exact result before anything is written.
+  static RunPlanWorkout scaledWorkout(RunPlanWorkout workout, double factor) {
     int round10(num meters) => ((meters * factor) / 10).round() * 10;
-    await database.transaction((txn) async {
-      for (final workout in plan.workoutsForWeek(weekIndex)) {
-        if (!workout.hasSteps) {
-          final distance = workout.targetDistanceMeters;
-          final duration = workout.targetDurationSeconds;
-          await txn.update(
+    if (!workout.hasSteps) {
+      final distance = workout.targetDistanceMeters;
+      final duration = workout.targetDurationSeconds;
+      if (distance != null) {
+        return workout.copyWith(
+          targetDistanceMeters: round10(distance).toDouble(),
+        );
+      }
+      if (duration != null) {
+        return workout.copyWith(
+          targetDurationSeconds: (duration * factor).round(),
+        );
+      }
+      return workout;
+    }
+    return workout.copyWith(
+      steps: [
+        for (final step in workout.steps)
+          if (step.role == RunStepRole.work ||
+              step.role == RunStepRole.recovery)
+            step
+          else
+            step.copyWith(
+              value: step.isDistance
+                  ? round10(step.value)
+                  : (step.value * factor).round(),
+            ),
+      ],
+    );
+  }
+
+  /// [scaleWeek] on an explicit executor (callers fold it into their own
+  /// transaction). Only values that change are written.
+  Future<void> scaleWeekIn(
+    DatabaseExecutor executor,
+    String planId,
+    int weekIndex,
+    double factor,
+  ) async {
+    if (factor <= 0 || factor == 1) return;
+    final plan = await getPlanIn(executor, planId);
+    if (plan == null) return;
+    for (final workout in plan.workoutsForWeek(weekIndex)) {
+      final scaled = scaledWorkout(workout, factor);
+      if (!workout.hasSteps) {
+        final updates = <String, Object?>{
+          if (scaled.targetDistanceMeters != workout.targetDistanceMeters)
+            'target_distance_meters': scaled.targetDistanceMeters,
+          if (scaled.targetDurationSeconds != workout.targetDurationSeconds)
+            'target_duration_seconds': scaled.targetDurationSeconds,
+        };
+        if (updates.isNotEmpty) {
+          await executor.update(
             'run_plan_workouts',
-            {
-              if (distance != null) 'target_distance_meters': round10(distance),
-              if (distance == null && duration != null)
-                'target_duration_seconds': (duration * factor).round(),
-            },
+            updates,
             where: 'id = ?',
             whereArgs: [workout.id],
           );
-          continue;
         }
-        for (final step in workout.steps) {
-          if (step.role == RunStepRole.work ||
-              step.role == RunStepRole.recovery) {
-            continue;
-          }
-          await txn.update(
-            'run_workout_steps',
-            {
-              'value': step.isDistance
-                  ? round10(step.value)
-                  : (step.value * factor).round(),
-            },
-            where: 'id = ?',
-            whereArgs: [step.id],
-          );
-        }
+        continue;
       }
+      for (var i = 0; i < workout.steps.length; i++) {
+        final before = workout.steps[i];
+        final after = scaled.steps[i];
+        if (before.value == after.value) continue;
+        await executor.update(
+          'run_workout_steps',
+          {'value': after.value},
+          where: 'id = ?',
+          whereArgs: [before.id],
+        );
+      }
+    }
+    await _touchPlan(executor, planId);
+  }
+
+  /// [getPlan] on an explicit executor.
+  Future<RunPlan?> getPlanIn(DatabaseExecutor executor, String id) async {
+    final rows = await executor.query(
+      'run_plans',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    final byPlan = await _loadWorkoutsByPlan(executor, [id]);
+    return RunPlan.fromMap(rows.first, workouts: byPlan[id] ?? const []);
+  }
+
+  /// `(run_plan_workout_id, status, date)` of every calendar row of
+  /// [planId]: what is already run, skipped or still planned.
+  Future<List<Map<String, Object?>>> scheduledRowsIn(
+    DatabaseExecutor executor,
+    String planId,
+  ) => executor.query(
+    'scheduled_runs',
+    columns: ['id', 'run_plan_workout_id', 'status', 'date'],
+    where: 'run_plan_id = ?',
+    whereArgs: [planId],
+    orderBy: 'date ASC, id ASC',
+  );
+
+  /// [recordAdaptation] on an explicit executor with a caller-chosen [id].
+  Future<void> recordAdaptationIn(
+    DatabaseExecutor executor, {
+    required String id,
+    required String planId,
+    required int weekIndex,
+    required String kind,
+    required String status,
+    Map<String, dynamic>? payload,
+  }) async {
+    await executor.insert('run_plan_adaptations', {
+      'id': id,
+      'run_plan_id': planId,
+      'week_index': weekIndex,
+      'kind': kind,
+      'status': status,
+      'payload_json': payload == null ? null : jsonEncode(payload),
+      'created_at': DateTime.now().toIso8601String(),
     });
-    await _touchPlan(database, planId);
   }
 
   /// Moves a session to another weekday and takes its still-planned
   /// calendar rows along (same week), so the plan and the calendar agree.
   Future<void> moveWorkoutToDay(String workoutId, int dayOfWeek) async {
-    await updateWorkout(workoutId, dayOfWeek: dayOfWeek);
     final database = await db;
-    final rows = await database.query(
+    await database.transaction(
+      (txn) => moveWorkoutToDayIn(txn, workoutId, dayOfWeek),
+    );
+  }
+
+  /// [moveWorkoutToDay] on an explicit executor. Throws [StateError] when the
+  /// session does not exist.
+  Future<void> moveWorkoutToDayIn(
+    DatabaseExecutor executor,
+    String workoutId,
+    int dayOfWeek,
+  ) async {
+    final changed = await executor.update(
+      'run_plan_workouts',
+      {'day_of_week': dayOfWeek},
+      where: 'id = ?',
+      whereArgs: [workoutId],
+    );
+    if (changed != 1) throw StateError('run plan workout $workoutId not found');
+    await _touchPlanForWorkout(executor, workoutId);
+    final rows = await executor.query(
       'scheduled_runs',
       columns: ['id', 'date'],
       where: 'run_plan_workout_id = ? AND status = ?',
@@ -1129,7 +1239,7 @@ class RunPlanRepository extends BaseRepository {
     for (final row in rows) {
       final date = DateTime.parse(row['date'] as String);
       final moved = mondayOf(date).add(Duration(days: dayOfWeek - 1));
-      await database.update(
+      await executor.update(
         'scheduled_runs',
         {
           'date': dateKey(moved),

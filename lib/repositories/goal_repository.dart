@@ -62,6 +62,47 @@ class GoalRepository extends BaseRepository {
     );
   }
 
+  // Transaction-aware variants (AI proposals fold them into their approval
+  // transaction). Each write must hit exactly one row.
+
+  Future<Goal?> getByIdIn(DatabaseExecutor executor, String id) async {
+    final rows = await executor.query(
+      'user_goals',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : Goal.fromMap(rows.first);
+  }
+
+  /// Plain insert (no replace): a repeated insert of the same id fails.
+  Future<void> insertIn(DatabaseExecutor executor, Goal goal) =>
+      executor.insert('user_goals', goal.toMap());
+
+  Future<void> updateIn(DatabaseExecutor executor, Goal goal) async {
+    final changed = await executor.update(
+      'user_goals',
+      goal.toMap(),
+      where: 'id = ?',
+      whereArgs: [goal.id],
+    );
+    if (changed != 1) throw StateError('goal ${goal.id} not found');
+  }
+
+  Future<void> toggleActiveIn(
+    DatabaseExecutor executor,
+    String id,
+    bool isActive,
+  ) async {
+    final changed = await executor.update(
+      'user_goals',
+      {'is_active': isActive ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (changed != 1) throw StateError('goal $id not found');
+  }
+
   // ===================================================================
   // PERIOD COMPUTATION
   // ===================================================================

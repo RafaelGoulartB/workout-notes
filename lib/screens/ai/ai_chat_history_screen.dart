@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/ai_chat_thread.dart';
 import 'package:workout_notes/state/ai_chat_service.dart';
@@ -561,14 +562,23 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
     ).showSnackBar(SnackBar(content: Text(l10n.aiHistoryActionError)));
   }
 
+  /// Time today, "yesterday", the weekday this week, otherwise day/month, all
+  /// in the app language (`pt_BR` for Portuguese).
   String _formatTimestamp(DateTime value, AppLocalizations l10n) {
     final age = _ageInDays(value);
-    if (age == 0) {
-      return '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
-    }
     if (age == 1) return l10n.aiHistoryYesterday;
-    if (age < 7) return '${age}d';
-    return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}';
+    final locale = Localizations.localeOf(context).languageCode == 'pt'
+        ? 'pt_BR'
+        : 'en';
+    try {
+      if (age == 0) return DateFormat.Hm(locale).format(value);
+      if (age < 7) return DateFormat.E(locale).format(value);
+      return DateFormat.Md(locale).format(value);
+    } on Object catch (error) {
+      // Date symbols of this locale are not loaded: show a plain date.
+      debugPrint('History date format failed: $error');
+      return dateKey(value);
+    }
   }
 }
 

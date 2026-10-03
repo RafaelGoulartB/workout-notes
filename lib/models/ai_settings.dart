@@ -1,23 +1,38 @@
 import 'package:workout_notes/models/ai_provider.dart';
+import 'package:workout_notes/models/ai_tool_domain.dart';
 
-/// Persisted AI configuration: providers, active id, system prompt, context mode.
+/// Persisted AI configuration: providers, active id, the user's custom
+/// instructions, answer style, which data domains the coach may read, and
+/// whether the user accepted sending data to the provider.
 class AiSettings {
   final List<AiProvider> providers;
   final String? activeProviderId;
-  final String systemPrompt;
-  final AiContextMode contextMode;
+
+  /// Tone / focus / persona added on top of the product prompt. Empty means
+  /// no personalisation.
+  final String customInstructions;
   final AiResponseStyle responseStyle;
   final bool showMessageTimestamps;
-  final bool autoExpandToolDetails;
+
+  /// Domains the coach may read and propose changes to.
+  final Set<AiToolDomain> enabledDomains;
+
+  /// The user acknowledged that messages and the data the coach reads are
+  /// sent to the configured provider.
+  final bool dataSharingAccepted;
+
+  /// Shows raw tool payloads and per-turn diagnostics (developer option).
+  final bool developerMode;
 
   const AiSettings({
     this.providers = const [],
     this.activeProviderId,
-    this.systemPrompt = '',
-    this.contextMode = AiContextMode.standard,
+    this.customInstructions = '',
     this.responseStyle = AiResponseStyle.balanced,
     this.showMessageTimestamps = true,
-    this.autoExpandToolDetails = false,
+    this.enabledDomains = const {...AiToolDomain.values},
+    this.dataSharingAccepted = false,
+    this.developerMode = false,
   });
 
   bool get isConfigured =>
@@ -41,28 +56,35 @@ class AiSettings {
     return providers.first;
   }
 
+  /// [enabledDomains] plus the always-on core domain.
+  Set<AiToolDomain> get effectiveDomains => {
+    AiToolDomain.core,
+    ...enabledDomains,
+  };
+
   AiSettings copyWith({
     List<AiProvider>? providers,
     String? activeProviderId,
     bool clearActiveProvider = false,
-    String? systemPrompt,
-    AiContextMode? contextMode,
+    String? customInstructions,
     AiResponseStyle? responseStyle,
     bool? showMessageTimestamps,
-    bool? autoExpandToolDetails,
+    Set<AiToolDomain>? enabledDomains,
+    bool? dataSharingAccepted,
+    bool? developerMode,
   }) {
     return AiSettings(
       providers: providers ?? this.providers,
       activeProviderId: clearActiveProvider
           ? null
           : (activeProviderId ?? this.activeProviderId),
-      systemPrompt: systemPrompt ?? this.systemPrompt,
-      contextMode: contextMode ?? this.contextMode,
+      customInstructions: customInstructions ?? this.customInstructions,
       responseStyle: responseStyle ?? this.responseStyle,
       showMessageTimestamps:
           showMessageTimestamps ?? this.showMessageTimestamps,
-      autoExpandToolDetails:
-          autoExpandToolDetails ?? this.autoExpandToolDetails,
+      enabledDomains: enabledDomains ?? this.enabledDomains,
+      dataSharingAccepted: dataSharingAccepted ?? this.dataSharingAccepted,
+      developerMode: developerMode ?? this.developerMode,
     );
   }
 }
@@ -72,22 +94,6 @@ enum AiResponseStyle { concise, balanced, detailed }
 
 extension AiResponseStyleX on AiResponseStyle {
   String get storageKey => name;
-
-  String get systemInstruction {
-    switch (this) {
-      case AiResponseStyle.concise:
-        return 'Preferência de resposta: seja conciso. Responda diretamente, '
-            'use poucos parágrafos e inclua apenas os dados e próximos passos '
-            'essenciais, sem omitir alertas importantes.';
-      case AiResponseStyle.balanced:
-        return 'Preferência de resposta: use um nível equilibrado de detalhe, '
-            'com explicação breve dos dados e próximos passos práticos.';
-      case AiResponseStyle.detailed:
-        return 'Preferência de resposta: seja detalhado. Explique as evidências, '
-            'limitações, relações entre os dados e recomendações práticas com '
-            'clareza, mantendo a leitura confortável no celular.';
-    }
-  }
 
   static AiResponseStyle fromStorageKey(String? value) {
     return AiResponseStyle.values.firstWhere(

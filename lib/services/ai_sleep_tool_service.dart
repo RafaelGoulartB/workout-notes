@@ -1,16 +1,191 @@
 // Read-only queries built for the AI Coach may run SQL directly (a documented
 // exception to the repository-only rule); writes never happen in this file.
+import 'dart:math' as math;
+
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/services/ai_tool_math.dart';
+import 'package:workout_notes/services/ai_tool_spec.dart';
 import 'package:workout_notes/services/sleep_goal_service.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 
-/// Read-only sleep queries exposed to the AI Coach.
+/// Where a night's sleep duration came from, best source first.
+abstract final class AiSleepDurationSource {
+  static const actual = 'actual';
+  static const monitorEstimate = 'monitor_estimate';
+  static const entryEstimate = 'entry_estimate';
+  static const recorded = 'recorded';
+}
+
+/// One recorded night with its duration and efficiency resolved ONCE, so every
+/// sleep tool and the wellness analytics show the same numbers for it.
 ///
-/// The service exposes bounded, useful aggregates instead of raw microphone,
-/// spectral or motion samples. Missing measurements remain null so the model
-/// cannot confuse unavailable data with a measured zero.
+/// Duration: `actual_sleep_minutes`, then the monitor session's
+/// `estimated_sleep_minutes`, then the entry's `estimated_sleep_minutes`, then
+/// the recorded `sleep_minutes`. Efficiency: the monitor session's
+/// `sleep_efficiency` when present, else duration / time in bed (0-100).
+class AiSleepNight {
+  final Map<String, Object?> row;
+
+  const AiSleepNight(this.row);
+
+  /// SELECT that joins every entry with its latest monitor session in ONE
+  /// query. Session columns are prefixed with `s_`.
+  static const String selectSql = '''
+    SELECT se.id, se.date, se.sleep_minutes, se.actual_sleep_minutes,
+      se.bedtime_minutes, se.wake_time_minutes, se.comment, se.source,
+      se.time_in_bed_minutes, se.estimated_sleep_minutes,
+      sms.id AS s_id, sms.status AS s_status,
+      sms.monitor_mode AS s_monitor_mode, sms.started_at AS s_started_at,
+      sms.ended_at AS s_ended_at, sms.alarm_at AS s_alarm_at,
+      sms.time_in_bed_minutes AS s_time_in_bed_minutes,
+      sms.estimated_sleep_minutes AS s_estimated_sleep_minutes,
+      sms.quiet_minutes AS s_quiet_minutes,
+      sms.noisy_minutes AS s_noisy_minutes,
+      sms.noise_event_count AS s_noise_event_count,
+      sms.signal_quality_score AS s_signal_quality_score,
+      sms.analysis_status AS s_analysis_status,
+      sms.sleep_onset_at AS s_sleep_onset_at,
+      sms.final_wake_at AS s_final_wake_at,
+      sms.sleep_latency_minutes AS s_sleep_latency_minutes,
+      sms.awake_minutes AS s_awake_minutes,
+      sms.sleeping_minutes AS s_sleeping_minutes,
+      sms.unknown_minutes AS s_unknown_minutes,
+      sms.restless_sleep_minutes AS s_restless_sleep_minutes,
+      sms.snore_minutes AS s_snore_minutes,
+      sms.awakening_count AS s_awakening_count,
+      sms.sleep_efficiency AS s_sleep_efficiency,
+      sms.stage_confidence AS s_stage_confidence,
+      sms.stage_algorithm_version AS s_stage_algorithm_version,
+      sms.smart_window_minutes AS s_smart_window_minutes,
+      sms.alarm_fired_at AS s_alarm_fired_at,
+      sms.alarm_trigger AS s_alarm_trigger,
+      sms.wake_feeling AS s_wake_feeling
+    FROM sleep_entries se
+    LEFT JOIN sleep_monitor_sessions sms ON sms.id = (
+      SELECT s2.id FROM sleep_monitor_sessions s2
+      WHERE s2.sleep_entry_id = se.id
+      ORDER BY s2.started_at DESC, s2.id DESC LIMIT 1
+    )
+  ''';
+
+  /// Nights dated [startKey]..[endKey] (inclusive), newest first, with a
+  /// single query (no per-night lookups).
+  static Future<List<AiSleepNight>> load(
+    DatabaseHelper db, {
+    required String startKey,
+    required String endKey,
+    int? limit,
+  }) async {
+    final database = await db.database;
+    final rows = await database.rawQuery(
+      '$selectSql WHERE se.date >= ? AND se.date <= ? '
+      'ORDER BY se.date DESC${limit == null ? '' : ' LIMIT $limit'}',
+      [startKey, endKey],
+    );
+    return [for (final row in rows) AiSleepNight(row)];
+  }
+
+  /// The night of [date], or null.
+  static Future<AiSleepNight?> loadDate(DatabaseHelper db, String date) async {
+    final nights = await load(db, startKey: date, endKey: date, limit: 1);
+    return nights.isEmpty ? null : nights.first;
+  }
+
+  int? _int(String key) => (row[key] as num?)?.toInt();
+  double? _double(String key) => (row[key] as num?)?.toDouble();
+  String? _text(String key) => row[key] as String?;
+
+  String get date => row['date']! as String;
+  String get entryId => row['id']! as String;
+  String? get source => _text('source');
+  String? get comment => _text('comment');
+  bool get hasSession => row['s_id'] != null;
+
+  int? get recordedMinutes => _int('sleep_minutes');
+  int? get actualMinutes => _int('actual_sleep_minutes');
+  int? get entryEstimateMinutes => _int('estimated_sleep_minutes');
+  int? get monitorEstimateMinutes => _int('s_estimated_sleep_minutes');
+
+  int? get minutes =>
+      actualMinutes ??
+      monitorEstimateMinutes ??
+      entryEstimateMinutes ??
+      recordedMinutes;
+
+  String? get durationSource {
+    if (actualMinutes != null) return AiSleepDurationSource.actual;
+    if (monitorEstimateMinutes != null) {
+      return AiSleepDurationSource.monitorEstimate;
+    }
+    if (entryEstimateMinutes != null) {
+      return AiSleepDurationSource.entryEstimate;
+    }
+    if (recordedMinutes != null) return AiSleepDurationSource.recorded;
+    return null;
+  }
+
+  int? get timeInBedMinutes =>
+      _int('time_in_bed_minutes') ?? _int('s_time_in_bed_minutes');
+
+  /// 0-100. Prefers the monitor session's own value.
+  double? get efficiencyPct {
+    final session = _double('s_sleep_efficiency');
+    if (session != null) return session.clamp(0, 100).toDouble();
+    final asleep = minutes;
+    final inBed = timeInBedMinutes;
+    if (asleep == null || inBed == null || inBed <= 0) return null;
+    return (asleep / inBed * 100).clamp(0, 100).toDouble();
+  }
+
+  int? get bedtimeMinutes => _int('bedtime_minutes');
+  int? get wakeMinutes => _int('wake_time_minutes');
+  String? get bedtime => AiToolMath.clock(bedtimeMinutes);
+  String? get wake => AiToolMath.clock(wakeMinutes);
+
+  int? get awakenings => _int('s_awakening_count');
+  int? get snoreMinutes => _int('s_snore_minutes');
+  String? get alarmTrigger => _text('s_alarm_trigger');
+  int? get wakeFeeling => _int('s_wake_feeling');
+  int? get smartWindowMinutes => _int('s_smart_window_minutes');
+
+  /// The session had an alarm set or an alarm that rang.
+  bool get hadAlarm =>
+      _text('s_alarm_at') != null || _text('s_alarm_fired_at') != null;
+
+  bool get stagesAvailable =>
+      _text('s_analysis_status') == SleepMonitorSession.analysisAvailable;
+
+  /// Schedule regularity 0-100: how close bedtimes and wake times stay to
+  /// their circular means (3 h of average drift scores 0). Null with fewer
+  /// than two nights of either.
+  static double? regularityScore(
+    List<double> bedtimes,
+    List<double> wakeTimes,
+  ) {
+    if (bedtimes.length < 2 || wakeTimes.length < 2) return null;
+    double score(List<double> values) {
+      final center = AiToolMath.circularMeanMinutes(values);
+      final deviation = AiToolMath.average(
+        values.map((v) => AiToolMath.circularDistanceMinutes(v, center)),
+      )!;
+      return (100 * (1 - math.min(deviation, 180) / 180)).clamp(0, 100);
+    }
+
+    return (score(bedtimes) + score(wakeTimes)) / 2;
+  }
+
+  /// The user's nightly sleep goal in minutes (setting or app default).
+  static Future<int> goalMinutes(DatabaseHelper db) =>
+      SleepGoalService(settings: db.settingsRepo).load();
+}
+
+/// Read-only sleep queries exposed to the AI Coach (`get_sleep`,
+/// `get_sleep` with `detail: night`).
+///
+/// Durations and efficiencies come from [AiSleepNight], the only resolver, so
+/// they match the wellness analytics. Raw microphone, spectral or motion data
+/// never leaves the device; missing measurements stay absent.
 class AiSleepToolService {
   final DatabaseHelper db;
   final DateTime Function() _now;
@@ -19,365 +194,267 @@ class AiSleepToolService {
     : db = db ?? DatabaseHelper.instance,
       _now = now ?? DateTime.now;
 
-  Future<Map<String, dynamic>> nightDetail({String? date}) async {
-    final resolvedDate = AiToolMath.validatedIsoDate(
-      date ?? dateKey(_now()),
-    );
-    final database = await db.database;
-    final entries = await database.query(
-      'sleep_entries',
-      where: 'date = ?',
-      whereArgs: [resolvedDate],
-      orderBy: 'created_at DESC',
-      limit: 1,
-    );
-    if (entries.isEmpty) {
-      return {
-        'date': resolvedDate,
-        'found': false,
-        'message': 'No sleep entry was recorded for this local date.',
-      };
-    }
+  static const summaryDetail = 'summary';
+  static const nightlyDetail = 'nightly';
+  static const nightDetailMode = 'night';
+  static const details = [summaryDetail, nightlyDetail];
 
-    final entry = entries.first;
-    final session = await _sessionForEntry(entry['id'] as String);
-    final duration = _duration(entry, session);
-    final timeInBed =
-        (entry['time_in_bed_minutes'] ?? session?['time_in_bed_minutes'])
-            as num?;
-    final computedEfficiency = _efficiency(
-      duration.effectiveMinutes,
-      timeInBed?.toDouble(),
-    );
+  /// Every `detail` value of the `get_sleep` tool; `night` is served by
+  /// [nightDetail].
+  static const detailModes = [summaryDetail, nightlyDetail, nightDetailMode];
 
-    return {
-      'date': resolvedDate,
-      'found': true,
-      'entryId': entry['id'],
-      'source': entry['source'],
-      'comment': entry['comment'],
-      'duration': duration.toMap(),
-      'schedule': {
-        'bedtimeMinutesAfterMidnight': entry['bedtime_minutes'],
-        'bedtimeLocal': _clock(entry['bedtime_minutes']),
-        'wakeTimeMinutesAfterMidnight': entry['wake_time_minutes'],
-        'wakeTimeLocal': _clock(entry['wake_time_minutes']),
-        'timeInBedMinutes': timeInBed?.toInt(),
-        'sleepOnsetAt': session?['sleep_onset_at'],
-        'finalWakeAt': session?['final_wake_at'],
-        'sleepLatencyMinutes': session?['sleep_latency_minutes'],
-      },
-      'stages': {
-        'available':
-            session?['analysis_status'] ==
-            SleepMonitorSession.analysisAvailable,
-        'analysisStatus': session?['analysis_status'],
-        'awakeMinutes': session?['awake_minutes'],
-        'sleepingMinutes': session?['sleeping_minutes'],
-        'deepSleepMinutes': session?['deep_sleep_minutes'],
-        'unknownMinutes': session?['unknown_minutes'],
-        'restlessSleepMinutes': session?['restless_sleep_minutes'],
-        'snoreMinutes': session?['snore_minutes'],
-        'awakeningCount': session?['awakening_count'],
-        'efficiencyPct': AiToolMath.round1OrNull(
-          (session?['sleep_efficiency'] as num?)?.toDouble() ??
-              computedEfficiency,
-        ),
-        'efficiencySource': session?['sleep_efficiency'] != null
-            ? 'sleep_stage_analysis'
-            : computedEfficiency != null
-            ? 'effective_sleep_divided_by_time_in_bed'
-            : null,
-        'confidence': session?['stage_confidence'],
-        'algorithmVersion': session?['stage_algorithm_version'],
-      },
-      'monitoring': session == null
-          ? null
-          : {
-              'sessionId': session['id'],
-              'status': session['status'],
-              'monitorMode': session['monitor_mode'],
-              'sensorMode': session['sensor_mode'],
-              'startedAt': session['started_at'],
-              'endedAt': session['ended_at'],
-              'endReason': session['end_reason'],
-              'analysisStatus': session['analysis_status'],
-              'signalQualityScore': session['signal_quality_score'],
-              'noise': {
-                'quietMinutes': session['quiet_minutes'],
-                'noisyMinutes': session['noisy_minutes'],
-                'eventCount': session['noise_event_count'],
-              },
-            },
-      'createdAt': entry['created_at'],
-      'dataSemantics': {
-        'null': 'measurement unavailable or not reported',
-        'durationPriority': const [
-          'actual_sleep_minutes',
-          'monitor_estimated_sleep_minutes',
-          'estimated_sleep_minutes',
-          'recorded_sleep_minutes',
-        ],
-        'monitoringLimitations':
-            'noise and acoustic sleep stages are non-clinical estimates; they do not diagnose snoring, apnea or another condition',
-      },
-    };
-  }
-
-  Future<Map<String, dynamic>> history({int days = 30, String? endDate}) async {
-    days = days.clamp(1, 31);
-    final database = await db.database;
-    final end = AiToolMath.validatedIsoDate(
-      endDate ?? dateKey(_now()),
-    );
-    final endDay = DateTime.parse(end);
-    final start = dateKey(endDay.subtract(Duration(days: days - 1)));
-    final entries = await database.query(
-      'sleep_entries',
-      where: 'date BETWEEN ? AND ?',
-      whereArgs: [start, end],
-      orderBy: 'date DESC, created_at DESC',
-    );
-
-    final nights = <Map<String, dynamic>>[];
-    for (final entry in entries.reversed) {
-      final session = await _sessionForEntry(entry['id'] as String);
-      nights.add(_historyNight(entry, session));
-    }
-
-    return {
-      'startDate': start,
-      'endDate': end,
-      'windowDays': days,
-      'recordedNights': nights.length,
-      'coveragePct': AiToolMath.round1(nights.length / days * 100),
-      'nights': nights,
-      'previousEndDate': dateKey(
-        DateTime.parse(start).subtract(const Duration(days: 1)),
-      ),
-      'dataSemantics':
-          'missing dates are absent; null means a measurement was unavailable, not zero',
-    };
-  }
-
-  Future<Map<String, dynamic>> profile() async {
-    final database = await db.database;
-    final settingsRows = await database.query(
-      'app_settings',
-      where: 'key IN (?, ?)',
-      whereArgs: const ['sleep_goal_minutes', 'sleep_monitor_default_mode'],
-    );
-    final settings = {
-      for (final row in settingsRows)
-        row['key'] as String: row['value'] as String?,
-    };
-    final rawGoal = int.tryParse(settings['sleep_goal_minutes'] ?? '');
-    final goalMinutes = SleepGoalService.normalize(
-      rawGoal ?? SleepGoalService.defaultGoalMinutes,
-    );
-    final start30 = dateKey(
-      _now().subtract(const Duration(days: 29)),
-    );
-
-    return {
-      'dailyGoalMinutes': goalMinutes,
-      'goalSource': rawGoal == null ? 'app_default' : 'user_setting',
-      'defaultMonitorMode':
-          settings['sleep_monitor_default_mode'] ?? 'alarm_without_mission',
-      'allTime': await _profilePeriod(goalMinutes: goalMinutes),
-      'last30Days': await _profilePeriod(
-        goalMinutes: goalMinutes,
-        fromDate: start30,
-      ),
-      'privacy':
-          'alarm mission secrets, barcode hashes and salts are never exposed to the AI Coach',
-    };
-  }
-
-  Future<Map<String, dynamic>?> _sessionForEntry(String entryId) async {
-    final database = await db.database;
-    final rows = await database.query(
-      'sleep_monitor_sessions',
-      where: 'sleep_entry_id = ?',
-      whereArgs: [entryId],
-      orderBy: 'started_at DESC',
-      limit: 1,
-    );
-    return rows.isEmpty ? null : rows.first;
-  }
-
-  Map<String, dynamic> _historyNight(
-    Map<String, dynamic> entry,
-    Map<String, dynamic>? session,
-  ) {
-    final duration = _duration(entry, session);
-    final timeInBed =
-        (entry['time_in_bed_minutes'] ?? session?['time_in_bed_minutes'])
-            as num?;
-    return {
-      'date': entry['date'],
-      'entryId': entry['id'],
-      'source': entry['source'],
-      'duration': duration.toMap(),
-      'bedtimeMinutesAfterMidnight': entry['bedtime_minutes'],
-      'bedtimeLocal': _clock(entry['bedtime_minutes']),
-      'wakeTimeMinutesAfterMidnight': entry['wake_time_minutes'],
-      'wakeTimeLocal': _clock(entry['wake_time_minutes']),
-      'timeInBedMinutes': timeInBed?.toInt(),
-      'efficiencyPct': AiToolMath.round1OrNull(
-        (session?['sleep_efficiency'] as num?)?.toDouble() ??
-            _efficiency(duration.effectiveMinutes, timeInBed?.toDouble()),
-      ),
-      'hasSleepStages':
-          session?['analysis_status'] == SleepMonitorSession.analysisAvailable,
-      'analysisStatus': session?['analysis_status'],
-      'deepSleepMinutes': session?['deep_sleep_minutes'],
-      'awakeningCount': session?['awakening_count'],
-    };
-  }
-
-  Future<Map<String, dynamic>> _profilePeriod({
-    required int goalMinutes,
-    String? fromDate,
+  /// `get_sleep`: [detail] is `summary` or `nightly`; the window ends at
+  /// [endDate] (default today).
+  Future<Map<String, dynamic>> sleep({
+    int days = 14,
+    String? endDate,
+    String detail = summaryDetail,
   }) async {
-    final database = await db.database;
-    final where = fromDate == null ? '' : 'WHERE se.date >= ?';
-    final args = fromDate == null ? const <Object?>[] : <Object?>[fromDate];
-    final entryRows = await database.rawQuery(
-      '''
-      SELECT
-        COUNT(*) recorded_nights,
-        SUM(CASE WHEN se.source = 'manual' THEN 1 ELSE 0 END) manual_nights,
-        SUM(CASE WHEN se.source != 'manual' THEN 1 ELSE 0 END) monitored_nights,
-        AVG(COALESCE(se.actual_sleep_minutes, se.estimated_sleep_minutes, se.sleep_minutes)) average_sleep_minutes,
-        SUM(CASE WHEN COALESCE(se.actual_sleep_minutes, se.estimated_sleep_minutes, se.sleep_minutes) >= ? THEN 1 ELSE 0 END) nights_meeting_goal
-      FROM sleep_entries se
-      $where
-      ''',
-      [goalMinutes, ...args],
+    if (!details.contains(detail)) {
+      throw AiToolArgException.invalid(
+        'detail',
+        'one of ${details.join(', ')}',
+        detail,
+      );
+    }
+    final today = dayOf(_now());
+    final requested = AiToolMath.window(
+      today: today,
+      days: days,
+      endDate: _date('end_date', endDate),
+      defaultDays: 14,
+      maxDays: 90,
     );
-    final stageWhere = fromDate == null ? '' : 'AND se.date >= ?';
-    final stageRows = await database.rawQuery(
-      '''
-      SELECT COUNT(DISTINCT CASE WHEN sms.analysis_status = ? THEN se.id END) stage_available_nights
-      FROM sleep_entries se
-      LEFT JOIN sleep_monitor_sessions sms ON sms.sleep_entry_id = se.id
-      WHERE 1 = 1 $stageWhere
-      ''',
-      [SleepMonitorSession.analysisAvailable, ...args],
+    // Nights after today cannot exist: never let them deflate the coverage.
+    final window = requested.end.isAfter(today)
+        ? AiDateWindow(
+            requested.start.isAfter(today) ? today : requested.start,
+            today,
+            capped: true,
+          )
+        : requested;
+    final nights = await AiSleepNight.load(
+      db,
+      startKey: window.startKey,
+      endKey: window.endKey,
     );
-    final row = entryRows.first;
-    final recorded = (row['recorded_nights'] as num?)?.toInt() ?? 0;
-    final monitored = (row['monitored_nights'] as num?)?.toInt() ?? 0;
-    final average = (row['average_sleep_minutes'] as num?)?.toDouble();
-    final stageAvailable =
-        (stageRows.first['stage_available_nights'] as num?)?.toInt() ?? 0;
+    final result = <String, dynamic>{
+      'applied': {...window.toApplied(), 'detail': detail},
+      'recorded_nights': nights.length,
+      'coverage_pct': nights.length / window.days * 100,
+    };
+    if (detail == nightlyDetail) {
+      result['nights'] = [for (final night in nights) _nightlyRow(night)];
+      final database = await db.database;
+      final older = await database.query(
+        'sleep_entries',
+        columns: ['date'],
+        where: 'date < ?',
+        whereArgs: [window.startKey],
+        orderBy: 'date DESC',
+        limit: 1,
+      );
+      if (older.isNotEmpty) {
+        result['has_more'] = true;
+        result['next_end_date'] = dateKey(addDays(window.start, -1));
+      }
+      return result;
+    }
+    result.addAll(await _summary(nights));
+    return result;
+  }
+
+  Map<String, dynamic> _nightlyRow(AiSleepNight night) => {
+    'date': night.date,
+    'duration_min': night.minutes,
+    'efficiency_pct': night.efficiencyPct,
+    'bedtime': night.bedtime,
+    'wake': night.wake,
+    'time_in_bed_min': night.timeInBedMinutes,
+    'awakenings': night.awakenings,
+    'source': night.source,
+  };
+
+  Future<Map<String, dynamic>> _summary(List<AiSleepNight> nights) async {
+    if (nights.isEmpty) return const {};
+    final durations = [
+      for (final n in nights)
+        if (n.minutes != null) n.minutes!.toDouble(),
+    ];
+    final efficiencies = [
+      for (final n in nights)
+        if (n.efficiencyPct != null) n.efficiencyPct!,
+    ];
+    final bedtimes = [
+      for (final n in nights)
+        if (n.bedtimeMinutes != null) n.bedtimeMinutes!.toDouble(),
+    ];
+    final wakes = [
+      for (final n in nights)
+        if (n.wakeMinutes != null) n.wakeMinutes!.toDouble(),
+    ];
+    final awakenings = [
+      for (final n in nights)
+        if (n.awakenings != null) n.awakenings!.toDouble(),
+    ];
+    final snoring = [
+      for (final n in nights)
+        if (n.snoreMinutes != null) n.snoreMinutes!.toDouble(),
+    ];
+    final goal = await AiSleepNight.goalMinutes(db);
+    final average = AiToolMath.average(durations);
+
+    final sources = <String, int>{};
+    for (final night in nights) {
+      final source = night.durationSource;
+      if (source != null) sources[source] = (sources[source] ?? 0) + 1;
+    }
+    final manual = nights.where((n) => n.source == 'manual').length;
+
     return {
-      'recordedNights': recorded,
-      'manualNights': (row['manual_nights'] as num?)?.toInt() ?? 0,
-      'monitoredNights': monitored,
-      'stageAvailableNights': stageAvailable,
-      'stageCoveragePct': monitored == 0
-          ? 0.0
-          : AiToolMath.round1(stageAvailable / monitored * 100),
-      'averageSleepMinutes': AiToolMath.round1OrNull(average),
-      'differenceFromGoalMinutes': average == null
+      'avg_sleep_min': average,
+      'min_sleep_min': AiToolMath.minimum(durations),
+      'max_sleep_min': AiToolMath.maximum(durations),
+      'avg_efficiency_pct': AiToolMath.average(efficiencies),
+      'regularity_score': AiSleepNight.regularityScore(bedtimes, wakes),
+      'avg_bedtime': bedtimes.isEmpty
           ? null
-          : AiToolMath.round1(average - goalMinutes),
-      'goalAchievementPct': average == null
+          : AiToolMath.clock(AiToolMath.circularMeanMinutes(bedtimes).round()),
+      'avg_wake': wakes.isEmpty
           ? null
-          : AiToolMath.round1(average / goalMinutes * 100),
-      'nightsMeetingGoal': (row['nights_meeting_goal'] as num?)?.toInt() ?? 0,
+          : AiToolMath.clock(AiToolMath.circularMeanMinutes(wakes).round()),
+      'goal_min': goal,
+      'avg_vs_goal_min': average == null ? null : average - goal,
+      'goal_achievement_pct': average == null ? null : average / goal * 100,
+      'nights_meeting_goal': durations.where((m) => m >= goal).length,
+      'manual_nights': manual,
+      'monitored_nights': nights.length - manual,
+      'avg_awakenings': AiToolMath.average(awakenings),
+      'avg_snoring_min': AiToolMath.average(snoring),
+      'duration_sources': sources,
+      'alarm': _alarmStats(nights),
     };
   }
 
-  static _ResolvedDuration _duration(
-    Map<String, dynamic> entry,
-    Map<String, dynamic>? session,
-  ) {
-    final recorded = (entry['sleep_minutes'] as num?)?.toInt();
-    final actual = (entry['actual_sleep_minutes'] as num?)?.toInt();
-    final estimated = (entry['estimated_sleep_minutes'] as num?)?.toInt();
-    final monitorEstimated = (session?['estimated_sleep_minutes'] as num?)
-        ?.toInt();
-    if (actual != null) {
-      return _ResolvedDuration(
-        recordedMinutes: recorded,
-        actualMinutes: actual,
-        estimatedMinutes: estimated,
-        monitorEstimatedMinutes: monitorEstimated,
-        effectiveMinutes: actual,
-        effectiveSource: 'actual_sleep_minutes',
-      );
+  /// Smart-alarm usage; null when no night in the window had an alarm.
+  Map<String, dynamic>? _alarmStats(List<AiSleepNight> nights) {
+    final alarmNights = nights.where((n) => n.hadAlarm).toList();
+    if (alarmNights.isEmpty) return null;
+    int count(bool Function(AiSleepNight) test) =>
+        alarmNights.where(test).length;
+    final feelings = <int, int>{};
+    for (final night in alarmNights) {
+      final feeling = night.wakeFeeling;
+      if (feeling != null) feelings[feeling] = (feelings[feeling] ?? 0) + 1;
     }
-    if (monitorEstimated != null) {
-      return _ResolvedDuration(
-        recordedMinutes: recorded,
-        actualMinutes: null,
-        estimatedMinutes: estimated,
-        monitorEstimatedMinutes: monitorEstimated,
-        effectiveMinutes: monitorEstimated,
-        effectiveSource: 'monitor_estimated_sleep_minutes',
-      );
-    }
-    if (estimated != null) {
-      return _ResolvedDuration(
-        recordedMinutes: recorded,
-        actualMinutes: null,
-        estimatedMinutes: estimated,
-        monitorEstimatedMinutes: null,
-        effectiveMinutes: estimated,
-        effectiveSource: 'estimated_sleep_minutes',
-      );
-    }
-    return _ResolvedDuration(
-      recordedMinutes: recorded,
-      actualMinutes: null,
-      estimatedMinutes: null,
-      monitorEstimatedMinutes: null,
-      effectiveMinutes: recorded,
-      effectiveSource: 'recorded_sleep_minutes',
-    );
+    return {
+      'nights': alarmNights.length,
+      'smart_window_nights': count((n) => (n.smartWindowMinutes ?? 0) > 0),
+      'triggered_awake': count(
+        (n) => n.alarmTrigger == SleepMonitorSession.triggerAwake,
+      ),
+      'triggered_stirring': count(
+        (n) => n.alarmTrigger == SleepMonitorSession.triggerStirring,
+      ),
+      'triggered_deadline': count(
+        (n) => n.alarmTrigger == SleepMonitorSession.triggerDeadline,
+      ),
+      if (feelings.isNotEmpty)
+        'wake_feeling_nights': {
+          'tired': feelings[SleepMonitorSession.feelingTired],
+          'okay': feelings[SleepMonitorSession.feelingOkay],
+          'refreshed': feelings[SleepMonitorSession.feelingRefreshed],
+        },
+    };
   }
 
-  static double? _efficiency(num? asleep, num? inBed) {
-    if (asleep == null || inBed == null || inBed <= 0) return null;
-    return (asleep / inBed * 100).clamp(0, 100).toDouble();
+  /// `get_sleep` with `detail: night`: the night recorded for local [date] (default
+  /// today).
+  Future<Map<String, dynamic>> nightDetail({String? date}) async {
+    final day = _date('date', date) ?? dateKey(dayOf(_now()));
+    final night = await AiSleepNight.loadDate(db, day);
+    if (night == null) {
+      throw AiToolNotFoundException(
+        'no sleep recorded for $day',
+        hint: 'call get_sleep with detail=nightly to see recorded dates',
+      );
+    }
+    final minutes = night.minutes;
+    int? distinct(int? value) => value == minutes ? null : value;
+    final row = night.row;
+    int? n(String key) => (row[key] as num?)?.toInt();
+    double? d(String key) => (row[key] as num?)?.toDouble();
+    String? t(String key) => row[key] as String?;
+    final signal = d('s_signal_quality_score');
+    final confidence = d('s_stage_confidence');
+    final feeling = night.wakeFeeling;
+
+    return {
+      'date': night.date,
+      'id': night.entryId,
+      'source': night.source,
+      'comment': night.comment,
+      'duration': {
+        'minutes': minutes,
+        'source': night.durationSource,
+        'recorded_min': distinct(night.recordedMinutes),
+        'actual_min': distinct(night.actualMinutes),
+        'monitor_estimate_min': distinct(night.monitorEstimateMinutes),
+        'entry_estimate_min': distinct(night.entryEstimateMinutes),
+      },
+      'efficiency_pct': night.efficiencyPct,
+      'bedtime': night.bedtime,
+      'wake': night.wake,
+      'time_in_bed_min': night.timeInBedMinutes,
+      'sleep_latency_min': n('s_sleep_latency_minutes'),
+      'sleep_onset_at': t('s_sleep_onset_at'),
+      'final_wake_at': t('s_final_wake_at'),
+      'stages': night.stagesAvailable
+          ? {
+              'awake_min': n('s_awake_minutes'),
+              'sleeping_min': n('s_sleeping_minutes'),
+              'unknown_min': n('s_unknown_minutes'),
+              'restless_min': n('s_restless_sleep_minutes'),
+              'snore_min': n('s_snore_minutes'),
+              'awakenings': n('s_awakening_count'),
+              'confidence_pct': confidence == null ? null : confidence * 100,
+              'algorithm_version': t('s_stage_algorithm_version'),
+            }
+          : null,
+      'monitoring': night.hasSession
+          ? {
+              'session_id': t('s_id'),
+              'status': t('s_status'),
+              'mode': t('s_monitor_mode'),
+              'started_at': t('s_started_at'),
+              'ended_at': t('s_ended_at'),
+              'signal_quality_pct': signal == null ? null : signal * 100,
+              'quiet_min': n('s_quiet_minutes'),
+              'noisy_min': n('s_noisy_minutes'),
+              'noise_events': n('s_noise_event_count'),
+            }
+          : null,
+      'alarm':
+          night.hadAlarm ||
+              night.smartWindowMinutes != null ||
+              night.alarmTrigger != null
+          ? {
+              'alarm_at': t('s_alarm_at'),
+              'smart_window_minutes': night.smartWindowMinutes,
+              'alarm_fired_at': t('s_alarm_fired_at'),
+              'alarm_trigger': night.alarmTrigger,
+              'wake_feeling': switch (feeling) {
+                SleepMonitorSession.feelingTired => 'tired',
+                SleepMonitorSession.feelingOkay => 'okay',
+                SleepMonitorSession.feelingRefreshed => 'refreshed',
+                _ => null,
+              },
+            }
+          : null,
+    };
   }
 
-  static String? _clock(Object? raw) {
-    final minutes = (raw as num?)?.toInt();
-    if (minutes == null) return null;
-    final normalized = minutes % 1440;
-    final hour = normalized ~/ 60;
-    final minute = normalized % 60;
-    return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
-  }
-}
-
-class _ResolvedDuration {
-  final int? recordedMinutes;
-  final int? actualMinutes;
-  final int? estimatedMinutes;
-  final int? monitorEstimatedMinutes;
-  final int? effectiveMinutes;
-  final String effectiveSource;
-
-  const _ResolvedDuration({
-    required this.recordedMinutes,
-    required this.actualMinutes,
-    required this.estimatedMinutes,
-    required this.monitorEstimatedMinutes,
-    required this.effectiveMinutes,
-    required this.effectiveSource,
-  });
-
-  Map<String, dynamic> toMap() => {
-    'recordedMinutes': recordedMinutes,
-    'actualMinutes': actualMinutes,
-    'estimatedMinutes': estimatedMinutes,
-    'monitorEstimatedMinutes': monitorEstimatedMinutes,
-    'effectiveMinutes': effectiveMinutes,
-    'effectiveSource': effectiveSource,
-  };
+  /// Strict `yyyy-MM-dd` (throws `invalid_args`), null when absent.
+  static String? _date(String param, String? value) =>
+      AiToolArgs({param: value}).date(param);
 }

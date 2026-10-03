@@ -32,7 +32,7 @@ void main() {
         });
       }
 
-      final latest = await helper.aiChatRepo.getAiChatMessagesThreadPage(
+      final latest = await helper.aiChatRepo.getAiChatMessagesPage(
         'thread',
         limit: 3,
       );

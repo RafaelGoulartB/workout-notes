@@ -67,15 +67,22 @@ void main() {
         'through_message_id': 'message-1',
         'updated_at': now,
       });
-      await database.insert('ai_routine_proposals', {
+      await database.insert('ai_proposals', {
         'id': 'proposal-1',
         'thread_id': 'thread-1',
         'tool_call_id': 'tool-1',
-        'action': 'create',
-        'target_json': '{}',
-        'diff_json': '{}',
+        'kind': 'routine',
+        'payload_json': '{}',
+        'preview_json': '{}',
         'status': 'rejected',
         'created_at': now,
+      });
+      await database.insert('ai_memories', {
+        'id': 'memory-1',
+        'content': 'Treina em casa com halteres.',
+        'category': 'equipment',
+        'created_at': now,
+        'updated_at': now,
       });
       await database.insert('foods', {
         'id': 'unused-cache',
@@ -131,7 +138,8 @@ void main() {
       expect(backup, isNot(contains('ai_chat_threads')));
       expect(backup, isNot(contains('ai_chat_messages')));
       expect(backup, isNot(contains('ai_chat_thread_summaries')));
-      expect(backup, isNot(contains('ai_routine_proposals')));
+      expect(backup, isNot(contains('ai_proposals')));
+      expect(backup, isNot(contains('ai_memories')));
       final exportedSession =
           (backup['sleep_monitor_sessions'] as List).single as Map;
       expect(exportedSession, isNot(contains('analysis_status')));
@@ -169,7 +177,9 @@ void main() {
       expect(restoredSession['deep_sleep_minutes'], isNull);
       expect(await database.query('ai_chat_threads'), isEmpty);
       expect(await database.query('ai_chat_messages'), isEmpty);
-      expect(await database.query('ai_routine_proposals'), isEmpty);
+      expect(await database.query('ai_proposals'), isEmpty);
+      // Memories are facts about the user, not about the restored records.
+      expect(await database.query('ai_memories'), hasLength(1));
       expect(await database.query('ai_chat_thread_summaries'), isEmpty);
       expect(
         await database.query(

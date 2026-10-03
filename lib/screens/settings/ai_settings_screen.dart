@@ -3,9 +3,11 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/main.dart';
 import 'package:workout_notes/models/ai_provider.dart';
 import 'package:workout_notes/models/ai_settings.dart';
-import 'package:workout_notes/services/ai_service.dart';
+import 'package:workout_notes/models/ai_tool_domain.dart';
+import 'package:workout_notes/screens/settings/ai_memory_screen.dart';
 import 'package:workout_notes/state/ai_settings_notifier.dart';
-import 'package:workout_notes/utils/ai_error_localizer.dart';
+import 'package:workout_notes/widgets/ai/ai_custom_instructions_sheet.dart';
+import 'package:workout_notes/widgets/ai/ai_provider_editor_sheet.dart';
 import 'package:workout_notes/widgets/ai/ai_provider_picker_sheet.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
@@ -47,15 +49,36 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           _buildConnectionStatus(settings),
-          AppSectionHeader(l10n.aiSettingsSectionConnection, padding: AppSectionHeader.compactPadding),
+          AppSectionHeader(
+            l10n.aiSettingsSectionConnection,
+            padding: AppSectionHeader.compactPadding,
+          ),
           _buildProvidersCard(settings),
-          AppSectionHeader(l10n.aiSettingsSectionBehavior, padding: AppSectionHeader.compactPadding),
+          AppSectionHeader(
+            l10n.aiSettingsSectionData,
+            padding: AppSectionHeader.compactPadding,
+          ),
+          _buildDataCard(settings),
+          AppSectionHeader(
+            l10n.aiSettingsSectionPersonalize,
+            padding: AppSectionHeader.compactPadding,
+          ),
+          _buildPersonalizeCard(settings),
+          AppSectionHeader(
+            l10n.aiSettingsSectionBehavior,
+            padding: AppSectionHeader.compactPadding,
+          ),
           _buildResponseStyleCard(settings),
-          _buildContextModeCard(settings),
-          AppSectionHeader(l10n.aiSettingsSectionAppearance, padding: AppSectionHeader.compactPadding),
+          AppSectionHeader(
+            l10n.aiSettingsSectionAppearance,
+            padding: AppSectionHeader.compactPadding,
+          ),
           _buildAppearanceCard(settings),
-          AppSectionHeader(l10n.aiSettingsSectionAdvanced, padding: AppSectionHeader.compactPadding),
-          _buildAdvancedCard(),
+          AppSectionHeader(
+            l10n.aiSettingsSectionAdvanced,
+            padding: AppSectionHeader.compactPadding,
+          ),
+          _buildAdvancedCard(settings),
           _buildAboutCard(),
         ],
       ),
@@ -318,6 +341,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
                     ),
                   ),
                 ),
+                if (p.lastCheck != null) _CheckSummary(check: p.lastCheck!),
               ],
             ),
           ),
@@ -404,68 +428,6 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
     }
   }
 
-  Widget _buildContextModeCard(AiSettings settings) {
-    final l10n = AppLocalizations.of(context)!;
-    return SettingsCard(
-      title: l10n.aiSettingsContextMode,
-      icon: Icons.tune_rounded,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: Text(
-            l10n.aiSettingsContextModeHelp,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-        for (var i = 0; i < AiContextMode.values.length; i++) ...[
-          SettingsRadioOption(
-            icon: _modeIcon(AiContextMode.values[i]),
-            label: _modeLabel(AiContextMode.values[i], l10n),
-            subtitle: _modeSubtitle(AiContextMode.values[i], l10n),
-            selected: settings.contextMode == AiContextMode.values[i],
-            onTap: () => _notifier.setContextMode(AiContextMode.values[i]),
-          ),
-          if (i < AiContextMode.values.length - 1) const SettingsCardDivider(),
-        ],
-      ],
-    );
-  }
-
-  IconData _modeIcon(AiContextMode mode) {
-    switch (mode) {
-      case AiContextMode.minimal:
-        return Icons.eco_outlined;
-      case AiContextMode.standard:
-        return Icons.balance_outlined;
-      case AiContextMode.full:
-        return Icons.dashboard_outlined;
-    }
-  }
-
-  String _modeLabel(AiContextMode mode, AppLocalizations l10n) {
-    switch (mode) {
-      case AiContextMode.minimal:
-        return l10n.aiSettingsContextModeMinimal;
-      case AiContextMode.standard:
-        return l10n.aiSettingsContextModeStandard;
-      case AiContextMode.full:
-        return l10n.aiSettingsContextModeFull;
-    }
-  }
-
-  String _modeSubtitle(AiContextMode mode, AppLocalizations l10n) {
-    switch (mode) {
-      case AiContextMode.minimal:
-        return l10n.aiSettingsContextModeMinimalSubtitle;
-      case AiContextMode.standard:
-        return l10n.aiSettingsContextModeStandardSubtitle;
-      case AiContextMode.full:
-        return l10n.aiSettingsContextModeFullSubtitle;
-    }
-  }
-
   Widget _buildAppearanceCard(AiSettings settings) {
     final l10n = AppLocalizations.of(context)!;
     return SettingsCard(
@@ -477,27 +439,146 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
           value: settings.showMessageTimestamps,
           onChanged: _notifier.setShowMessageTimestamps,
         ),
-        const SettingsCardDivider(),
+      ],
+    );
+  }
+
+  Widget _buildAdvancedCard(AiSettings settings) {
+    final l10n = AppLocalizations.of(context)!;
+    return SettingsCard(
+      children: [
         SettingsSwitchTile(
-          icon: Icons.data_object_rounded,
-          title: l10n.aiSettingsExpandTools,
-          subtitle: l10n.aiSettingsExpandToolsSubtitle,
-          value: settings.autoExpandToolDetails,
-          onChanged: _notifier.setAutoExpandToolDetails,
+          icon: Icons.bug_report_outlined,
+          title: l10n.aiSettingsDeveloperMode,
+          subtitle: l10n.aiSettingsDeveloperModeSubtitle,
+          value: settings.developerMode,
+          onChanged: _notifier.setDeveloperMode,
         ),
       ],
     );
   }
 
-  Widget _buildAdvancedCard() {
+  Widget _buildDataCard(AiSettings settings) {
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    return SettingsCard(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+          child: Text(
+            l10n.aiSettingsDomainsHelp,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        for (final domain in AiToolDomain.optional) ...[
+          SettingsSwitchTile(
+            icon: _domainIcon(domain),
+            title: _domainTitle(domain, l10n),
+            subtitle: _domainSubtitle(domain, l10n),
+            value: settings.enabledDomains.contains(domain),
+            onChanged: (value) => _notifier.setDomainEnabled(domain, value),
+          ),
+          const SettingsCardDivider(),
+        ],
+        SettingsSwitchTile(
+          icon: Icons.shield_outlined,
+          title: l10n.aiSettingsDataSharing,
+          subtitle: l10n.aiSettingsDataSharingSubtitle,
+          value: settings.dataSharingAccepted,
+          onChanged: _notifier.setDataSharingAccepted,
+        ),
+      ],
+    );
+  }
+
+  IconData _domainIcon(AiToolDomain domain) {
+    switch (domain) {
+      case AiToolDomain.workouts:
+        return Icons.fitness_center_rounded;
+      case AiToolDomain.running:
+        return Icons.directions_run_rounded;
+      case AiToolDomain.sleep:
+        return Icons.bedtime_outlined;
+      case AiToolDomain.nutrition:
+        return Icons.restaurant_outlined;
+      case AiToolDomain.body:
+        return Icons.monitor_weight_outlined;
+      case AiToolDomain.goals:
+        return Icons.flag_outlined;
+      case AiToolDomain.planning:
+        return Icons.event_note_rounded;
+      case AiToolDomain.core:
+        return Icons.psychology_alt_outlined;
+    }
+  }
+
+  String _domainTitle(AiToolDomain domain, AppLocalizations l10n) {
+    switch (domain) {
+      case AiToolDomain.workouts:
+        return l10n.aiSettingsDomainWorkouts;
+      case AiToolDomain.running:
+        return l10n.aiSettingsDomainRunning;
+      case AiToolDomain.sleep:
+        return l10n.aiSettingsDomainSleep;
+      case AiToolDomain.nutrition:
+        return l10n.aiSettingsDomainNutrition;
+      case AiToolDomain.body:
+        return l10n.aiSettingsDomainBody;
+      case AiToolDomain.goals:
+        return l10n.aiSettingsDomainGoals;
+      case AiToolDomain.planning:
+        return l10n.aiSettingsDomainPlanning;
+      case AiToolDomain.core:
+        return l10n.aiSettingsMemory;
+    }
+  }
+
+  String _domainSubtitle(AiToolDomain domain, AppLocalizations l10n) {
+    switch (domain) {
+      case AiToolDomain.workouts:
+        return l10n.aiSettingsDomainWorkoutsSubtitle;
+      case AiToolDomain.running:
+        return l10n.aiSettingsDomainRunningSubtitle;
+      case AiToolDomain.sleep:
+        return l10n.aiSettingsDomainSleepSubtitle;
+      case AiToolDomain.nutrition:
+        return l10n.aiSettingsDomainNutritionSubtitle;
+      case AiToolDomain.body:
+        return l10n.aiSettingsDomainBodySubtitle;
+      case AiToolDomain.goals:
+        return l10n.aiSettingsDomainGoalsSubtitle;
+      case AiToolDomain.planning:
+        return l10n.aiSettingsDomainPlanningSubtitle;
+      case AiToolDomain.core:
+        return l10n.aiSettingsMemorySubtitle;
+    }
+  }
+
+  Widget _buildPersonalizeCard(AiSettings settings) {
+    final l10n = AppLocalizations.of(context)!;
+    final hasInstructions = settings.customInstructions.isNotEmpty;
     return SettingsCard(
       children: [
         SettingsLinkTile(
           icon: Icons.edit_note_rounded,
-          title: l10n.aiSettingsSystemPrompt,
-          subtitle: l10n.aiSettingsSystemPromptSubtitle,
-          onTap: _showSystemPromptEditor,
+          title: l10n.aiSettingsCustomInstructions,
+          subtitle: hasInstructions
+              ? settings.customInstructions.replaceAll(RegExp(r'\s+'), ' ')
+              : l10n.aiSettingsCustomInstructionsNotSet,
+          onTap: _showCustomInstructionsEditor,
+        ),
+        const SettingsCardDivider(),
+        SettingsLinkTile(
+          icon: Icons.psychology_alt_outlined,
+          title: l10n.aiSettingsMemory,
+          subtitle: l10n.aiSettingsMemorySubtitle,
+          onTap: () {
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const AiMemoryScreen()));
+          },
         ),
       ],
     );
@@ -543,320 +624,75 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => Padding(
+      builder: (sheetContext) => Padding(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
+          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
         ),
-        child: _ProviderEditorSheet(notifier: _notifier, existing: existing),
+        child: AiProviderEditorSheet(notifier: _notifier, existing: existing),
       ),
     );
   }
 
-  void _showSystemPromptEditor() {
+  void _showCustomInstructionsEditor() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => Padding(
+      builder: (sheetContext) => Padding(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
+          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
         ),
-        child: _SystemPromptEditorSheet(notifier: _notifier),
+        child: AiCustomInstructionsSheet(notifier: _notifier),
       ),
     );
   }
 }
 
-class _ProviderEditorSheet extends StatefulWidget {
-  final AiSettingsNotifier notifier;
-  final AiProvider? existing;
-  const _ProviderEditorSheet({required this.notifier, this.existing});
-
-  @override
-  State<_ProviderEditorSheet> createState() => _ProviderEditorSheetState();
-}
-
-class _ProviderEditorSheetState extends State<_ProviderEditorSheet> {
-  late TextEditingController _name;
-  late TextEditingController _baseUrl;
-  late TextEditingController _token;
-  bool _saving = false;
-  bool _showToken = false;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _name = TextEditingController(text: widget.existing?.name ?? '');
-    _baseUrl = TextEditingController(
-      text: widget.existing?.baseUrl ?? 'https://api.openai.com/v1',
-    );
-    _token = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _baseUrl.dispose();
-    _token.dispose();
-    super.dispose();
-  }
+/// One line under a provider: the outcome of its last connection test.
+class _CheckSummary extends StatelessWidget {
+  final AiProviderCheck check;
+  const _CheckSummary({required this.check});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final ok = check.ok;
+    final warn = ok && !check.toolsSupported;
+    final color = !ok
+        ? colors.error
+        : warn
+        ? colors.tertiary
+        : colors.primary;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 2, 0, 0),
+      child: Row(
         children: [
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 18),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
+          Icon(
+            !ok
+                ? Icons.error_outline_rounded
+                : warn
+                ? Icons.warning_amber_rounded
+                : Icons.check_circle_outline_rounded,
+            size: 16,
+            color: color,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              !ok
+                  ? l10n.aiSettingsCheckFailed
+                  : warn
+                  ? l10n.aiSettingsCheckNoTools
+                  : '${l10n.aiSettingsCheckOk} · '
+                        '${l10n.aiSettingsCheckLatency(check.latencyMs)}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(color: color),
             ),
-          ),
-          Text(
-            widget.existing == null
-                ? l10n.aiSettingsNewProvider
-                : l10n.aiSettingsEditProvider,
-            style: theme.textTheme.titleLarge,
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _name,
-            decoration: InputDecoration(
-              labelText: l10n.aiSettingsProviderName,
-              hintText: l10n.aiSettingsNameHint,
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _baseUrl,
-            decoration: InputDecoration(
-              labelText: l10n.aiSettingsBaseUrl,
-              hintText: l10n.aiSettingsBaseUrlHint,
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _token,
-            obscureText: !_showToken,
-            enableSuggestions: false,
-            autocorrect: false,
-            decoration: InputDecoration(
-              labelText: widget.existing == null
-                  ? l10n.aiSettingsToken
-                  : l10n.aiSettingsTokenHint,
-              suffixIcon: IconButton(
-                onPressed: () => setState(() => _showToken = !_showToken),
-                icon: Icon(
-                  _showToken
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined,
-                ),
-              ),
-            ),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 8),
-            Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
-          ],
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: _saving ? null : () => Navigator.of(context).pop(),
-                child: Text(l10n.commonCancel),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(
-                onPressed: _saving ? null : _onSave,
-                child: _saving
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(l10n.commonSave),
-              ),
-            ],
           ),
         ],
-      ),
-    );
-  }
-
-  Future<void> _onSave() async {
-    final name = _name.text.trim();
-    final baseUrl = AiService.normalizeBaseUri(_baseUrl.text.trim());
-    final token = _token.text.trim();
-    if (name.isEmpty) {
-      setState(
-        () => _error = AppLocalizations.of(context)!.aiSettingsNameRequired,
-      );
-      return;
-    }
-    if (baseUrl.isEmpty) {
-      setState(
-        () => _error = AppLocalizations.of(context)!.aiSettingsBaseUrlRequired,
-      );
-      return;
-    }
-    setState(() {
-      _saving = true;
-      _error = null;
-    });
-    try {
-      if (widget.existing == null) {
-        await widget.notifier.addProvider(
-          name: name,
-          baseUrl: baseUrl,
-          token: token.isEmpty ? null : token,
-        );
-      } else {
-        final updated = widget.existing!.copyWith(name: name, baseUrl: baseUrl);
-        await widget.notifier.updateProvider(
-          updated,
-          token: token.isEmpty ? null : token,
-        );
-      }
-      if (mounted) Navigator.of(context).pop();
-    } catch (e) {
-      setState(() {
-        _saving = false;
-        _error = localizeAiError(e, AppLocalizations.of(context)!);
-      });
-    }
-  }
-}
-
-class _SystemPromptEditorSheet extends StatefulWidget {
-  final AiSettingsNotifier notifier;
-  const _SystemPromptEditorSheet({required this.notifier});
-
-  @override
-  State<_SystemPromptEditorSheet> createState() =>
-      _SystemPromptEditorSheetState();
-}
-
-class _SystemPromptEditorSheetState extends State<_SystemPromptEditorSheet> {
-  late TextEditingController _controller;
-  bool _dirty = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.notifier.systemPrompt);
-    _controller.addListener(() {
-      if (!_dirty) setState(() => _dirty = true);
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    return FractionallySizedBox(
-      heightFactor: .9,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 18),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.outlineVariant,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            Text(
-              l10n.aiSettingsSystemPrompt,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              l10n.aiSettingsSystemPromptHelp,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: TextField(
-                controller: _controller,
-                expands: true,
-                maxLines: null,
-                minLines: null,
-                textAlignVertical: TextAlignVertical.top,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  alignLabelWithHint: true,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () async {
-                  await widget.notifier.resetSystemPrompt();
-                  if (!mounted) return;
-                  _controller.text = widget.notifier.systemPrompt;
-                  setState(() => _dirty = false);
-                },
-                icon: const Icon(Icons.restart_alt_rounded, size: 18),
-                label: Text(l10n.aiSettingsRestoreDefault),
-              ),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(l10n.commonCancel),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: !_dirty
-                      ? null
-                      : () async {
-                          await widget.notifier.setSystemPrompt(
-                            _controller.text,
-                          );
-                          if (!context.mounted) return;
-                          Navigator.of(context).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(l10n.aiSettingsSaved)),
-                          );
-                        },
-                  child: Text(l10n.commonSave),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }

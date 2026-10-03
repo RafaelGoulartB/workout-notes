@@ -12,34 +12,39 @@ import 'package:workout_notes/models/ai_message_role.dart';
 import 'package:workout_notes/models/ai_provider.dart';
 import 'package:workout_notes/models/ai_settings.dart';
 import 'package:workout_notes/models/ai_tool_call.dart';
+import 'package:workout_notes/models/ai_tool_domain.dart';
+import 'package:workout_notes/services/ai_prompts.dart';
 import 'package:workout_notes/services/ai_service.dart';
+import 'package:workout_notes/state/ai_chat_service.dart';
 import 'package:workout_notes/state/ai_settings_notifier.dart';
 import 'package:workout_notes/utils/text_sanitizer.dart';
 import 'package:workout_notes/utils/token_estimator.dart';
 
 void main() {
-  test('AiChatState retains and clears technical error details atomically', () {
+  test('AiChatState sets and clears an error with its action atomically', () {
     const details = AiChatErrorDetails(
-      code: 'http_error',
-      stage: 'initial_provider_request',
+      code: 'bad_request',
+      stage: 'round_1',
       httpStatus: 400,
       model: 'gpt-5.6-luna',
       requestCharacters: 4200,
-      tools: ['get_nutrition_diary_day'],
     );
     final failed = const AiChatState().copyWith(
-      phase: AiTurnPhase.failed,
-      error: 'ai_error:http_error',
+      error: 'ai_error:bad_request',
       errorDetails: details,
+      errorAction: AiErrorAction.retryTurn,
     );
 
     expect(failed.errorDetails, same(details));
-    final recovered = failed.copyWith(
-      phase: AiTurnPhase.idle,
-      clearError: true,
-    );
+    expect(failed.errorAction, AiErrorAction.retryTurn);
+    final recovered = failed.copyWith(clearError: true);
     expect(recovered.error, isNull);
     expect(recovered.errorDetails, isNull);
+    expect(recovered.errorAction, AiErrorAction.none);
+    // Unrelated updates keep the error untouched.
+    final other = failed.copyWith(hasOlderMessages: true);
+    expect(other.errorAction, AiErrorAction.retryTurn);
+    expect(other.errorDetails, same(details));
   });
 
   group('AiService vision protocol', () {
@@ -241,15 +246,13 @@ void main() {
     });
   });
 
-  group('AiContextMode', () {
-    test('round-trips through storageKey', () {
-      for (final m in AiContextMode.values) {
-        expect(AiContextModeX.fromStorageKey(m.storageKey), m);
+  group('AiToolDomain', () {
+    test('round-trips through storageKey; core is not optional', () {
+      for (final d in AiToolDomain.values) {
+        expect(AiToolDomain.fromStorageKey(d.storageKey), d);
       }
-    });
-    test('unknown values fall back to standard', () {
-      expect(AiContextModeX.fromStorageKey(null), AiContextMode.standard);
-      expect(AiContextModeX.fromStorageKey('weird'), AiContextMode.standard);
+      expect(AiToolDomain.fromStorageKey('weird'), isNull);
+      expect(AiToolDomain.optional, isNot(contains(AiToolDomain.core)));
     });
   });
 
@@ -265,40 +268,115 @@ void main() {
     });
 
     test(
-      'effective prompt applies style without changing editable prompt',
+      'system message = product prompt + language + style + custom instructions',
       () async {
-        SharedPreferences.setMockInitialValues({});
+        SharedPreferences.setMockInitialValues({'app_locale': 'pt'});
         final prefs = await SharedPreferences.getInstance();
         final notifier = AiSettingsNotifier(prefs: prefs);
         await notifier.load();
-        await notifier.setSystemPrompt('Meu prompt personalizado');
+        await notifier.setCustomInstructions('Fale como um técnico de remo.');
         await notifier.setResponseStyle(AiResponseStyle.concise);
 
-        expect(notifier.systemPrompt, 'Meu prompt personalizado');
-        expect(notifier.effectiveSystemPrompt, contains('seja conciso'));
-        expect(
-          notifier.effectiveSystemPrompt,
-          startsWith(notifier.systemPrompt),
-        );
+        final system = notifier.systemMessage;
+        expect(system, startsWith(AiPrompts.product));
+        expect(system, contains('Reply in Brazilian Portuguese'));
+        expect(system, contains('Answer length: concise'));
+        expect(system, endsWith('Fale como um técnico de remo.'));
       },
     );
 
+    test('english app language replies in English', () async {
+      SharedPreferences.setMockInitialValues({'app_locale': 'en'});
+      final prefs = await SharedPreferences.getInstance();
+      final notifier = AiSettingsNotifier(prefs: prefs);
+      await notifier.load();
+      expect(notifier.systemMessage, contains('Reply in English'));
+      expect(notifier.systemMessage, isNot(contains('# The user')));
+    });
+
     test(
-      'chat appearance preferences persist across notifier reloads',
+      'consent: decided once on first launch and never re-derived',
+      () async {
+        // New user: no provider on first launch, adds one, restarts.
+        SharedPreferences.setMockInitialValues({});
+        var prefs = await SharedPreferences.getInstance();
+        var notifier = AiSettingsNotifier(prefs: prefs);
+        await notifier.load();
+        expect(notifier.settings.dataSharingAccepted, isFalse);
+        await notifier.addProvider(name: 'P', baseUrl: 'https://p.test');
+        notifier = AiSettingsNotifier(prefs: prefs);
+        await notifier.load();
+        expect(notifier.settings.dataSharingAccepted, isFalse);
+
+        // Upgrade from the previous coach with a provider already configured.
+        SharedPreferences.setMockInitialValues({
+          'ai_providers_v1':
+              '[{"id":"a","name":"A","baseUrl":"https://a.test/v1",'
+              '"availableModels":[],"selectedModel":"m",'
+              '"createdAt":"2026-01-01T00:00:00.000"}]',
+        });
+        prefs = await SharedPreferences.getInstance();
+        notifier = AiSettingsNotifier(prefs: prefs);
+        await notifier.load();
+        expect(notifier.settings.dataSharingAccepted, isTrue);
+        expect(prefs.getBool('ai_data_sharing_accepted_v1'), isTrue);
+      },
+    );
+
+    test('a short custom prompt survives reloads', () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final notifier = AiSettingsNotifier(prefs: prefs);
+      await notifier.load();
+      await notifier.setCustomInstructions('Seja breve.');
+      final reloaded = AiSettingsNotifier(prefs: prefs);
+      await reloaded.load();
+      expect(reloaded.customInstructions, 'Seja breve.');
+    });
+
+    test('legacy prompt: shipped default is dropped, custom one kept', () async {
+      SharedPreferences.setMockInitialValues({
+        'ai_system_prompt_v1':
+            '# Identidade e missão\n\nVocê é o **Treinador do Workout Notes**…',
+        'ai_context_mode_v1': 'full',
+      });
+      var prefs = await SharedPreferences.getInstance();
+      var notifier = AiSettingsNotifier(prefs: prefs);
+      await notifier.load();
+      expect(notifier.customInstructions, isEmpty);
+      expect(prefs.getString('ai_system_prompt_v1'), isNull);
+      expect(prefs.getString('ai_context_mode_v1'), isNull);
+
+      SharedPreferences.setMockInitialValues({
+        'ai_system_prompt_v1': 'Sou maratonista; foque em corrida.',
+      });
+      prefs = await SharedPreferences.getInstance();
+      notifier = AiSettingsNotifier(prefs: prefs);
+      await notifier.load();
+      expect(notifier.customInstructions, 'Sou maratonista; foque em corrida.');
+    });
+
+    test(
+      'chat preferences and domains persist across notifier reloads',
       () async {
         SharedPreferences.setMockInitialValues({});
         final prefs = await SharedPreferences.getInstance();
         final notifier = AiSettingsNotifier(prefs: prefs);
         await notifier.load();
         await notifier.setShowMessageTimestamps(false);
-        await notifier.setAutoExpandToolDetails(true);
+        await notifier.setDeveloperMode(true);
         await notifier.setResponseStyle(AiResponseStyle.detailed);
+        await notifier.setDomainEnabled(AiToolDomain.sleep, false);
+        await notifier.setDomainEnabled(AiToolDomain.core, false);
 
         final reloaded = AiSettingsNotifier(prefs: prefs);
         await reloaded.load();
         expect(reloaded.settings.showMessageTimestamps, isFalse);
-        expect(reloaded.settings.autoExpandToolDetails, isTrue);
+        expect(reloaded.settings.developerMode, isTrue);
         expect(reloaded.settings.responseStyle, AiResponseStyle.detailed);
+        expect(reloaded.effectiveDomains, isNot(contains(AiToolDomain.sleep)));
+        expect(reloaded.effectiveDomains, contains(AiToolDomain.core));
+        expect(reloaded.effectiveDomains, contains(AiToolDomain.nutrition));
       },
     );
   });
@@ -392,10 +470,10 @@ void main() {
         responseStyle: AiResponseStyle.concise,
         showMessageTimestamps: false,
       );
-      final updated = settings.copyWith(autoExpandToolDetails: true);
+      final updated = settings.copyWith(developerMode: true);
       expect(updated.responseStyle, AiResponseStyle.concise);
       expect(updated.showMessageTimestamps, isFalse);
-      expect(updated.autoExpandToolDetails, isTrue);
+      expect(updated.developerMode, isTrue);
     });
   });
 
@@ -583,6 +661,7 @@ void main() {
         baseUrl: 'https://example.test/v1',
         token: 'token',
         model: 'limited-model',
+        toolChoice: 'none',
         messages: const [
           {'role': 'user', 'content': 'oi'},
         ],
@@ -639,6 +718,55 @@ void main() {
       expect(client.payloads[1], isNot(contains('reasoning_effort')));
       expect(client.payloads[2], isNot(contains('reasoning_effort')));
     });
+
+    test(
+      'only 400/422 refusals that name the parameter teach a flag',
+      () async {
+        final client = _SequenceHttpClient([
+          // An outage mentioning "upstream" and "include" teaches nothing.
+          const _HttpReply(
+            503,
+            '{"error":{"message":"upstream invalid: include retry later"}}',
+          ),
+          const _HttpReply(200, '{"choices":[{"message":{"content":"ok"}}]}'),
+          // A 400 whose text merely contains "upstream" is not about stream.
+          const _HttpReply(
+            400,
+            '{"error":{"message":"invalid upstream response"}}',
+          ),
+          const _HttpReply(200, 'data: [DONE]\n\n'),
+        ]);
+        final service = AiService(client: client, delay: (_) async {});
+        await service.sendChat(
+          baseUrl: 'https://example.test/v1',
+          token: 't',
+          model: 'm',
+          messages: const [
+            {'role': 'user', 'content': 'oi'},
+          ],
+        );
+        expect(
+          service.compatibilityAdjustments('https://example.test/v1', 'm'),
+          isEmpty,
+        );
+        await expectLater(
+          service.sendChat(
+            baseUrl: 'https://example.test/v1',
+            token: 't',
+            model: 'm',
+            stream: true,
+            messages: const [
+              {'role': 'user', 'content': 'oi'},
+            ],
+          ),
+          throwsA(isA<AiServiceException>()),
+        );
+        expect(
+          service.compatibilityAdjustments('https://example.test/v1', 'm'),
+          isEmpty,
+        );
+      },
+    );
 
     test('retries transient upstream 503 failures', () async {
       final client = _SequenceHttpClient([
@@ -718,7 +846,7 @@ void main() {
         );
         fail('expected AiServiceException');
       } on AiServiceException catch (error) {
-        expect(error.code, 'http_error');
+        expect(error.code, 'bad_request');
         expect(error.statusCode, 400);
         expect(error.endpoint, 'https://example.test/v1/chat/completions');
         expect(error.message, contains('tool_choice is unsupported'));
@@ -763,7 +891,7 @@ void main() {
         ],
       );
 
-      expect(completion.toolCalls.single.id, 'call_1');
+      expect(completion.toolCalls.single.id, startsWith('call_gen_'));
       expect(
         completion.toolCalls.single.arguments['name'],
         'Pão francês médio',
@@ -833,15 +961,31 @@ void main() {
     });
   });
 
-  test('default coach prompt does not prime reference markers', () {
-    expect(kDefaultAiCoachSystemPrompt, isNot(contains(r'$1')));
-    expect(kDefaultAiCoachSystemPrompt, isNot(contains('[1]')));
-    expect(kDefaultAiCoachSystemPrompt, isNot(contains('placeholders')));
-    expect(kDefaultAiCoachSystemPrompt, contains('<workout_data>'));
-    expect(kDefaultAiCoachSystemPrompt, contains('tool_call_id'));
-    expect(kDefaultAiCoachSystemPrompt, contains('Markdown válido'));
-    expect(kDefaultAiCoachSystemPrompt, contains('propose_routine_change'));
-    expect(kDefaultAiCoachSystemPrompt, contains('seja proativo'));
+  test('product prompt does not prime reference markers', () {
+    expect(AiPrompts.product, isNot(contains('[1]')));
+    expect(AiPrompts.product, contains('propose_'));
+    expect(AiPrompts.product, contains('<app_event>'));
+    expect(AiPrompts.product, contains('<context>'));
+    expect(AiPrompts.product, contains('save_memory'));
+    // Instructions are compact: the product prompt stays under ~6k chars.
+    expect(AiPrompts.product.length, lessThan(6500));
+  });
+
+  test('error redaction keeps provider messages readable', () {
+    expect(
+      AiChatService.safeTechnicalMessage(
+        'maximum context length is 8192 tokens, however you requested 9000 '
+        'tokens. Invalid max_tokens value',
+      ),
+      'maximum context length is 8192 tokens, however you requested 9000 '
+      'tokens. Invalid max_tokens value',
+    );
+    final redacted = AiChatService.safeTechnicalMessage(
+      'Bearer abcdefghijklmnop api_key=supersecret sk-ABCDEFGHIJKL',
+    );
+    expect(redacted, isNot(contains('abcdefghijklmnop')));
+    expect(redacted, isNot(contains('supersecret')));
+    expect(redacted, isNot(contains('ABCDEFGHIJKL')));
   });
 }
 

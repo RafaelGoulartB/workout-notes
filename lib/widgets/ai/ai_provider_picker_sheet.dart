@@ -89,6 +89,8 @@ class _AiProviderPickerSheetState extends State<AiProviderPickerSheet> {
             .where((model) => model.toLowerCase().contains(_query))
             .toList() ??
         const <String>[];
+    final typed = _search.text.trim();
+    final exactMatch = models.any((model) => model == typed);
 
     return SafeArea(
       child: FractionallySizedBox(
@@ -279,64 +281,42 @@ class _AiProviderPickerSheetState extends State<AiProviderPickerSheet> {
                   ),
                   const SizedBox(height: 4),
                   Expanded(
-                    child: models.isEmpty
-                        ? Center(
+                    child: ListView(
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      children: [
+                        if (typed.isNotEmpty && !exactMatch)
+                          _modelTile(
+                            theme,
+                            title: l10n.aiProviderPickerUseTyped(typed),
+                            active: _draftModel == typed,
+                            leading: Icons.edit_outlined,
+                            onTap: () => _chooseModel(selected, typed),
+                          ),
+                        if (models.isEmpty && typed.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 20,
+                            ),
                             child: Text(
-                              l10n.aiSettingsNoModelsEmpty,
+                              '${l10n.aiSettingsNoModelsEmpty}. '
+                              '${l10n.aiSettingsModelIdHelp}',
+                              textAlign: TextAlign.center,
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 color: colors.onSurfaceVariant,
                               ),
                             ),
-                          )
-                        : ListView.builder(
-                            keyboardDismissBehavior:
-                                ScrollViewKeyboardDismissBehavior.onDrag,
-                            itemCount: models.length,
-                            itemBuilder: (_, index) {
-                              final model = models[index];
-                              final active = model == _draftModel;
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 6),
-                                child: Material(
-                                  color: active
-                                      ? colors.primaryContainer.withValues(
-                                          alpha: .65,
-                                        )
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: ListTile(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    title: Text(
-                                      model,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    trailing: Icon(
-                                      active
-                                          ? Icons.check_circle_rounded
-                                          : Icons.circle_outlined,
-                                      color: active
-                                          ? colors.primary
-                                          : colors.outline,
-                                    ),
-                                    onTap: () {
-                                      FocusScope.of(context).unfocus();
-                                      setState(() {
-                                        _draftModel = model;
-                                        _draftEffort = selected
-                                            .reasoningEffortFor(model);
-                                        _showModels = false;
-                                        _query = '';
-                                        _search.clear();
-                                      });
-                                    },
-                                  ),
-                                ),
-                              );
-                            },
                           ),
+                        for (final model in models)
+                          _modelTile(
+                            theme,
+                            title: model,
+                            active: model == _draftModel,
+                            onTap: () => _chooseModel(selected, model),
+                          ),
+                      ],
+                    ),
                   ),
                 ],
                 const SizedBox(height: 18),
@@ -362,6 +342,48 @@ class _AiProviderPickerSheetState extends State<AiProviderPickerSheet> {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  void _chooseModel(AiProvider provider, String model) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _draftModel = model;
+      _draftEffort = provider.reasoningEffortFor(model);
+      _showModels = false;
+      _query = '';
+      _search.clear();
+    });
+  }
+
+  Widget _modelTile(
+    ThemeData theme, {
+    required String title,
+    required bool active,
+    required VoidCallback onTap,
+    IconData? leading,
+  }) {
+    final colors = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Material(
+        color: active
+            ? colors.primaryContainer.withValues(alpha: .65)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: ListTile(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          leading: leading == null ? null : Icon(leading),
+          title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
+          trailing: Icon(
+            active ? Icons.check_circle_rounded : Icons.circle_outlined,
+            color: active ? colors.primary : colors.outline,
+          ),
+          onTap: onTap,
         ),
       ),
     );

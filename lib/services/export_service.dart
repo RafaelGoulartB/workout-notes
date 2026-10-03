@@ -15,6 +15,7 @@ import 'package:workout_notes/repositories/export_import_repository.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/services/backup_exception.dart';
 import 'package:workout_notes/services/backup_media_service.dart';
+import 'package:workout_notes/state/ai_chat_service.dart';
 import 'package:workout_notes/utils/csv_writer.dart';
 
 typedef SaveFileCallback =
@@ -333,6 +334,9 @@ class ExportService {
       }
       final count = await _exportRepo.restoreFromBackup(data);
       await _backupMedia.commitRestore(restoreDirectory);
+      // The AI tables were replaced underneath the coach: forget its
+      // in-memory conversation state.
+      AiChatService.instance.reset();
       return count;
     } catch (_) {
       if (preferencesChanged) {

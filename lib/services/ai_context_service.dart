@@ -1,200 +1,332 @@
 // Read-only queries built for the AI Coach may run SQL directly (a documented
 // exception to the repository-only rule); writes never happen in this file.
+import 'package:flutter/foundation.dart';
 import 'package:workout_notes/database/database_helper.dart';
-import 'package:workout_notes/models/ai_provider.dart';
+import 'package:workout_notes/models/ai_tool_domain.dart';
+import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 
-/// Builds a JSON snapshot of the user's data to inject into the system prompt.
-/// Read-only, in-memory. Same role as `ai_context_service.dart` in `gastos`.
+/// Builds the compact "today" snapshot injected into the stable part of every
+/// request: the facts most questions need (plan of the day, latest activity,
+/// weight, goals, last night), so common questions are answered without a
+/// tool round.
+///
+/// Content only changes when the day or the underlying data changes, which
+/// keeps the provider's prompt cache warm across turns. Nothing intraday-
+/// volatile (food eaten so far, time of day) goes here: the time travels with
+/// each user message instead.
 class AiContextService {
   final DatabaseHelper db;
+  final DateTime Function() _now;
 
-  AiContextService({DatabaseHelper? db}) : db = db ?? DatabaseHelper.instance;
+  AiContextService({DatabaseHelper? db, DateTime Function()? now})
+    : db = db ?? DatabaseHelper.instance,
+      _now = now ?? DateTime.now;
 
   static const Duration _kTtl = Duration(seconds: 60);
 
-  _AiContextCache? _cache;
+  _Cached? _cache;
 
-  Future<Map<String, dynamic>> build({required AiContextMode mode}) async {
-    final now = DateTime.now();
-    if (_cache != null &&
-        now.difference(_cache!.builtAt) < _kTtl &&
-        _cache!.mode == mode) {
-      return _cache!.json;
+  /// Snapshot text (a few short lines) for [domains]; empty sections are
+  /// omitted. Cached for a minute per domain set.
+  Future<String> buildSnapshot({required Set<AiToolDomain> domains}) async {
+    final now = _now();
+    final key = (domains.map((d) => d.name).toList()..sort()).join(',');
+    final cached = _cache;
+    if (cached != null &&
+        cached.key == key &&
+        now.difference(cached.builtAt) < _kTtl &&
+        isSameDay(cached.builtAt, now)) {
+      return cached.text;
     }
-    final json = await _buildFresh(mode: mode, now: now);
-    _cache = _AiContextCache(builtAt: now, mode: mode, json: json);
-    return json;
+    final text = await _build(now, domains);
+    _cache = _Cached(builtAt: now, key: key, text: text);
+    return text;
   }
 
-  void invalidate() {
-    _cache = null;
-  }
+  void invalidate() => _cache = null;
 
-  Future<Map<String, dynamic>> _buildFresh({
-    required AiContextMode mode,
-    required DateTime now,
-  }) async {
-    final parts = await Future.wait<Map<String, dynamic>>([
-      _safeMap(() => db.analyticsRepo.getWorkoutOverviewStats()),
-      _loadBaseCounts(),
-      if (mode != AiContextMode.minimal) _loadDataAvailability(now),
-    ]);
-    final overview = parts[0];
-    final counts = parts[1];
-    final availability = mode == AiContextMode.minimal
-        ? const <String, dynamic>{}
-        : parts[2];
-
-    final summary = <String, dynamic>{
-      'totals': {
-        'workouts': (overview['total_workouts'] as int?) ?? 0,
-        'sets': (overview['total_sets'] as int?) ?? 0,
-        'totalVolume': (overview['total_volume'] as num?)?.toDouble() ?? 0.0,
-        'exercises': counts['exercises'] ?? 0,
-        'routines': counts['routines'] ?? 0,
-        'bodyMeasurements': counts['bodyMeasurements'] ?? 0,
-        'activeGoals': counts['activeGoals'] ?? 0,
-        'recordedRuns': counts['recordedRuns'] ?? 0,
-        'stationaryBikeSessions': counts['stationaryBikeSessions'] ?? 0,
-        'runPlans': counts['runPlans'] ?? 0,
-      },
-      'currentStreakDays': (overview['current_streak'] as int?) ?? 0,
-    };
-
-    if (mode == AiContextMode.standard || mode == AiContextMode.full) {
-      summary['dataAvailability'] = availability;
+  Future<String> _build(DateTime now, Set<AiToolDomain> domains) async {
+    final today = dayOf(now);
+    final lines = <String>[
+      'today: ${dateKey(today)} (${_weekday(today.weekday)})',
+    ];
+    Future<void> section(Future<List<String>> Function() load) async {
+      try {
+        lines.addAll(await load());
+      } catch (error) {
+        debugPrint('AI snapshot section failed: $error');
+      }
     }
 
-    if (mode == AiContextMode.full) {
-      summary['availableDomains'] = const [
-        'workouts',
-        'exercises',
-        'routines',
-        'goals',
-        'body_measurements',
-        'sleep',
-        'nutrition',
-        'recovery_analytics',
-        'running',
-        'run_activities',
-        'run_plans',
-      ];
+    await section(_units);
+    if (domains.contains(AiToolDomain.planning) ||
+        domains.contains(AiToolDomain.nutrition)) {
+      await section(() => _plan(today, domains));
     }
-
-    // Day granularity only: a per-second timestamp would change the request
-    // on every call and defeat the provider's prompt cache.
-    return {
-      'metadata': {
-        'app': 'workout_notes',
-        'locale': 'pt_BR',
-        'today': dateKey(now),
-        'mode': mode.storageKey,
-      },
-      'summary': summary,
-    };
+    if (domains.contains(AiToolDomain.workouts)) {
+      await section(() => _workouts(today));
+    }
+    if (domains.contains(AiToolDomain.running)) {
+      await section(() => _running(today));
+    }
+    if (domains.contains(AiToolDomain.body)) {
+      await section(() => _weight(today));
+    }
+    if (domains.contains(AiToolDomain.goals)) {
+      await section(_goals);
+    }
+    if (domains.contains(AiToolDomain.sleep)) {
+      await section(() => _sleep(today));
+    }
+    return lines.join('\n');
   }
 
-  Future<Map<String, dynamic>> _loadDataAvailability(DateTime now) async {
-    try {
-      final rawDb = await db.database;
-      final start7 = dateKey(now.subtract(const Duration(days: 6)));
-      final start30 = dateKey(now.subtract(const Duration(days: 29)));
-      final rows = await rawDb.rawQuery(
-        '''
-        SELECT
-          (SELECT COUNT(*) FROM sleep_entries WHERE date >= ?) AS sleep_7d,
-          (SELECT COUNT(DISTINCT ml.date) FROM meal_logs ml
-            JOIN meal_log_items mli ON mli.meal_log_id = ml.id
-            WHERE ml.date >= ?) AS nutrition_7d,
-          (SELECT COUNT(*) FROM workouts
-            WHERE date >= ? AND date <= ? AND end_time IS NOT NULL)
-            AS workouts_30d,
-          (SELECT COUNT(*) FROM body_measurements
-            WHERE type = ? AND date >= ?) AS weight_30d,
-          (SELECT COUNT(*) FROM run_activities
-            WHERE status = 'completed' AND activity_type = 'running'
-              AND started_at >= ?) AS runs_30d,
-          (SELECT COUNT(*) FROM run_activities
-            WHERE status = 'completed' AND activity_type = 'stationary_bike'
-              AND started_at >= ?) AS bike_30d
-      ''',
-        [
-          start7,
-          start7,
-          start30,
-          dateKey(now),
-          'weight',
-          start30,
-          '${start30}T00:00:00',
-          '${start30}T00:00:00',
-        ],
+  Future<List<String>> _units() async {
+    final km = await db.settingsRepo.getIsDistanceKm();
+    return ['units: kg, ${km ? 'km' : 'mi'}'];
+  }
+
+  Future<List<String>> _plan(DateTime today, Set<AiToolDomain> domains) async {
+    final out = <String>[];
+    if (domains.contains(AiToolDomain.planning)) {
+      final dayPlan = await db.periodizationRepo.getDayPlan(today);
+      if (dayPlan != null) {
+        final day = dayPlan.day;
+        final parts = <String>[
+          if (day.strength) 'strength',
+          if (day.run)
+            day.runs.isEmpty
+                ? 'run'
+                : 'run: ${day.runs.map((r) => r.name).join(' + ')}',
+        ];
+        out.add(
+          'plan: phase "${dayPlan.phase.name}"'
+          '${dayPlan.phase.templateKey == null ? '' : ' (${dayPlan.phase.templateKey})'}'
+          ' week ${dayPlan.weekNumber}/${dayPlan.totalWeeks}; today '
+          '${dayPlan.trainingDay == false
+              ? 'rest day'
+              : parts.isEmpty
+              ? 'no session planned'
+              : parts.join(', ')}',
+        );
+      }
+    }
+    if (domains.contains(AiToolDomain.nutrition)) {
+      final effective = await EffectiveNutritionGoalService.resolve(
+        date: today,
       );
-      final row = rows.first;
-      return {
-        'sleepNights7d': (row['sleep_7d'] as num?)?.toInt() ?? 0,
-        'nutritionDays7d': (row['nutrition_7d'] as num?)?.toInt() ?? 0,
-        'workouts30d': (row['workouts_30d'] as num?)?.toInt() ?? 0,
-        'weightMeasurements30d': (row['weight_30d'] as num?)?.toInt() ?? 0,
-        'recordedRuns30d': (row['runs_30d'] as num?)?.toInt() ?? 0,
-        'stationaryBikeSessions30d': (row['bike_30d'] as num?)?.toInt() ?? 0,
-      };
-    } catch (_) {
-      return const {};
+      final goal = effective.goal;
+      if (goal != null && (goal.calories != null || goal.proteinG != null)) {
+        out.add(
+          'nutrition target today: '
+          '${[if (goal.calories != null) '${goal.calories!.round()} kcal', if (goal.proteinG != null) 'protein ${goal.proteinG!.round()} g', if (goal.carbsG != null) 'carbs ${goal.carbsG!.round()} g', if (goal.fatG != null) 'fat ${goal.fatG!.round()} g'].join(', ')}'
+          '${effective.fromPlan ? ' (from plan${effective.trainingDay == null
+                    ? ''
+                    : effective.trainingDay!
+                    ? ', training day'
+                    : ', rest day'})' : ''}',
+        );
+      }
     }
+    return out;
   }
 
-  Future<Map<String, int>> _loadBaseCounts() async {
-    try {
-      final rawDb = await db.database;
-      final rows = await rawDb.rawQuery('''
-        SELECT
-          (SELECT COUNT(*) FROM exercises) AS exercises,
-          (SELECT COUNT(*) FROM routines) AS routines,
-          (SELECT COUNT(*) FROM body_measurements) AS body_measurements,
-          (SELECT COUNT(*) FROM user_goals WHERE is_active = 1) AS active_goals,
-          (SELECT COUNT(*) FROM run_activities
-            WHERE status = 'completed' AND activity_type = 'running')
-            AS recorded_runs,
-          (SELECT COUNT(*) FROM run_activities
-            WHERE status = 'completed' AND activity_type = 'stationary_bike')
-            AS stationary_bike_sessions,
-          (SELECT COUNT(*) FROM run_plans) AS run_plans
+  Future<List<String>> _workouts(DateTime today) async {
+    final raw = await db.database;
+    final out = <String>[];
+    final last = await raw.rawQuery(
+      '''
+      SELECT w.date, w.duration_seconds, r.name AS routine, rd.name AS day,
+        (SELECT COUNT(*) FROM exercise_entries ee WHERE ee.workout_id = w.id)
+          AS exercises
+      FROM workouts w
+      LEFT JOIN routines r ON r.id = w.routine_id
+      LEFT JOIN routine_days rd ON rd.id = w.routine_day_id
+      WHERE w.end_time IS NOT NULL AND w.date <= ?
+      ORDER BY w.date DESC, w.end_time DESC LIMIT 1
+      ''',
+      [dateKey(today)],
+    );
+    if (last.isNotEmpty) {
+      final row = last.first;
+      final minutes = ((row['duration_seconds'] as num?) ?? 0) ~/ 60;
+      final name = [
+        row['routine'],
+        row['day'],
+      ].whereType<String>().where((s) => s.trim().isNotEmpty).join(' / ');
+      out.add(
+        'last strength workout: ${row['date']}'
+        '${name.isEmpty ? '' : ' "$name"'}, ${row['exercises']} exercises'
+        '${minutes > 0 ? ', $minutes min' : ''}',
+      );
+    }
+    final count = await raw.rawQuery(
+      'SELECT COUNT(*) AS n FROM workouts WHERE end_time IS NOT NULL '
+      'AND date >= ? AND date <= ?',
+      [dateKey(addDays(today, -6)), dateKey(today)],
+    );
+    out.add('strength workouts last 7 days: ${count.first['n']}');
+    final planned = await raw.rawQuery(
+      '''
+      SELECT w.date, r.name AS routine, rd.name AS day FROM workouts w
+      LEFT JOIN routines r ON r.id = w.routine_id
+      LEFT JOIN routine_days rd ON rd.id = w.routine_day_id
+      WHERE w.end_time IS NULL AND w.date >= ? ORDER BY w.date LIMIT 1
+      ''',
+      [dateKey(today)],
+    );
+    if (planned.isNotEmpty) {
+      final row = planned.first;
+      final name = [
+        row['routine'],
+        row['day'],
+      ].whereType<String>().where((s) => s.trim().isNotEmpty).join(' / ');
+      out.add(
+        'next planned/in-progress workout: ${row['date']}'
+        '${name.isEmpty ? '' : ' "$name"'}',
+      );
+    }
+    return out;
+  }
+
+  Future<List<String>> _running(DateTime today) async {
+    final raw = await db.database;
+    final out = <String>[];
+    final last = await raw.rawQuery('''
+      SELECT started_at, activity_type, distance_meters, duration_seconds,
+        moving_time_seconds
+      FROM run_activities WHERE status = 'completed'
+      ORDER BY started_at DESC LIMIT 1
       ''');
-      final row = rows.first;
-      return {
-        'exercises': (row['exercises'] as num?)?.toInt() ?? 0,
-        'routines': (row['routines'] as num?)?.toInt() ?? 0,
-        'bodyMeasurements': (row['body_measurements'] as num?)?.toInt() ?? 0,
-        'activeGoals': (row['active_goals'] as num?)?.toInt() ?? 0,
-        'recordedRuns': (row['recorded_runs'] as num?)?.toInt() ?? 0,
-        'stationaryBikeSessions':
-            (row['stationary_bike_sessions'] as num?)?.toInt() ?? 0,
-        'runPlans': (row['run_plans'] as num?)?.toInt() ?? 0,
-      };
-    } catch (_) {
-      return const {};
+    if (last.isNotEmpty) {
+      final row = last.first;
+      final km = ((row['distance_meters'] as num?) ?? 0) / 1000;
+      final moving = (row['moving_time_seconds'] as num?)?.toInt() ?? 0;
+      final seconds = moving > 0
+          ? moving
+          : (row['duration_seconds'] as num?)?.toInt() ?? 0;
+      out.add(
+        'last ${row['activity_type'] == 'stationary_bike' ? 'bike session' : 'run'}: '
+        '${(row['started_at'] as String).substring(0, 10)}, '
+        '${km.toStringAsFixed(1)} km, ${seconds ~/ 60} min',
+      );
     }
+    final week = await raw.rawQuery(
+      '''
+      SELECT COUNT(*) AS n, COALESCE(SUM(distance_meters), 0) AS m
+      FROM run_activities WHERE status = 'completed'
+        AND activity_type = 'running' AND started_at >= ?
+      ''',
+      ['${dateKey(addDays(today, -6))}T00:00:00'],
+    );
+    final row = week.first;
+    out.add(
+      'runs last 7 days: ${row['n']} '
+      '(${(((row['m'] as num?) ?? 0) / 1000).toStringAsFixed(1)} km)',
+    );
+    final next = await raw.rawQuery(
+      '''
+      SELECT sr.date, w.name FROM scheduled_runs sr
+      LEFT JOIN run_plan_workouts w ON w.id = sr.run_plan_workout_id
+      WHERE sr.status = 'planned' AND sr.date >= ? ORDER BY sr.date LIMIT 1
+      ''',
+      [dateKey(today)],
+    );
+    if (next.isNotEmpty) {
+      out.add(
+        'next planned run: ${next.first['date']}'
+        '${next.first['name'] == null ? '' : ' "${next.first['name']}"'}',
+      );
+    }
+    return out;
   }
 
-  Future<Map<String, dynamic>> _safeMap(
-    Future<Map<String, dynamic>> Function() f,
-  ) async {
-    try {
-      return await f();
-    } catch (_) {
-      return const {};
-    }
+  Future<List<String>> _weight(DateTime today) async {
+    final raw = await db.database;
+    final rows = await raw.rawQuery(
+      '''
+      SELECT value, unit, date FROM body_measurements
+      WHERE type = 'weight' AND date <= ? ORDER BY date DESC, created_at DESC
+      LIMIT 1
+      ''',
+      [dateKey(today)],
+    );
+    if (rows.isEmpty) return const [];
+    final latest = rows.first;
+    final value = (latest['value'] as num).toDouble();
+    final before = await raw.rawQuery(
+      '''
+      SELECT value FROM body_measurements
+      WHERE type = 'weight' AND date <= ? ORDER BY date DESC LIMIT 1
+      ''',
+      [dateKey(addDays(today, -28))],
+    );
+    final delta = before.isEmpty
+        ? null
+        : value - (before.first['value'] as num).toDouble();
+    return [
+      'latest weight: ${value.toStringAsFixed(1)} ${latest['unit'] ?? 'kg'} '
+          'on ${latest['date']}'
+          '${delta == null ? '' : ' (${delta >= 0 ? '+' : ''}${delta.toStringAsFixed(1)} vs 4 weeks before)'}',
+    ];
   }
+
+  Future<List<String>> _goals() async {
+    final goals = await db.goalRepo.getAll(activeOnly: true);
+    if (goals.isEmpty) return const [];
+    final progress = await db.goalRepo.getProgressForGoals(
+      goals.take(5).toList(),
+    );
+    final parts = <String>[];
+    for (final goal in goals.take(5)) {
+      final p = progress[goal.id];
+      parts.add(
+        '"${goal.title}" ${goal.period.value} ${goal.metric.value}'
+        '${p == null ? '' : ' ${(p.percent * 100).round()}%'}',
+      );
+    }
+    return ['active goals: ${parts.join('; ')}'];
+  }
+
+  Future<List<String>> _sleep(DateTime today) async {
+    final raw = await db.database;
+    final rows = await raw.rawQuery(
+      '''
+      SELECT date, sleep_minutes, actual_sleep_minutes, estimated_sleep_minutes,
+        time_in_bed_minutes
+      FROM sleep_entries WHERE date <= ? ORDER BY date DESC LIMIT 1
+      ''',
+      [dateKey(today)],
+    );
+    if (rows.isEmpty) return const [];
+    final row = rows.first;
+    final minutes =
+        (row['actual_sleep_minutes'] as num?) ??
+        (row['estimated_sleep_minutes'] as num?) ??
+        (row['sleep_minutes'] as num?);
+    if (minutes == null) return const [];
+    final m = minutes.toInt();
+    return [
+      'last sleep entry: ${row['date']}, ${DurationFormat.hhmm(m)} asleep',
+    ];
+  }
+
+  static String _weekday(int weekday) => const [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ][weekday - 1];
 }
 
-class _AiContextCache {
+class _Cached {
   final DateTime builtAt;
-  final AiContextMode mode;
-  final Map<String, dynamic> json;
-  _AiContextCache({
-    required this.builtAt,
-    required this.mode,
-    required this.json,
-  });
+  final String key;
+  final String text;
+  const _Cached({required this.builtAt, required this.key, required this.text});
 }

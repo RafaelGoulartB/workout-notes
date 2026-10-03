@@ -433,9 +433,9 @@ class PeriodizationRepository extends BaseRepository {
     var cursor = dayOf(start);
     final ranges = <({DateTime start, DateTime end})>[];
     for (final count in weeks) {
-      final end = cursor.add(Duration(days: 7 * count - 1));
+      final end = addDays(cursor, 7 * count - 1);
       ranges.add((start: cursor, end: end));
-      cursor = end.add(const Duration(days: 1));
+      cursor = addDays(end, 1);
     }
     return ranges;
   }
@@ -457,7 +457,7 @@ class PeriodizationRepository extends BaseRepository {
       throw const PeriodizationValidationException('phase_not_found');
     }
     _validateNameAndDates(name, phase.startDate, phase.endDate);
-    final boundary = phase.startDate.add(Duration(days: 7 * fromWeek));
+    final boundary = addDays(phase.startDate, 7 * fromWeek);
     if (weeks.isNotEmpty) {
       _validateWeeklyWindow(boundary, phase.startDate, phase.endDate, weeks);
     }
@@ -487,20 +487,82 @@ class PeriodizationRepository extends BaseRepository {
     });
   }
 
+  /// Sets the calorie/macro targets of [phase] from phase week [fromWeek]
+  /// (0-based) through its last week, on [executor] so a caller can fold it
+  /// into its own transaction. Earlier weeks keep their stored targets (lived
+  /// weeks are history and never rewritten); every other field of each week's
+  /// target (training days, run plan, sleep…) is preserved. Returns the number
+  /// of weeks written.
+  Future<int> applyNutritionFromWeekIn(
+    DatabaseExecutor executor,
+    PeriodizationPhase phase, {
+    required int fromWeek,
+    double? calories,
+    double? proteinG,
+    double? carbsG,
+    double? fatG,
+  }) async {
+    if (fromWeek < 0 || fromWeek >= phase.totalWeeks) {
+      throw const PeriodizationValidationException('target_outside_phase');
+    }
+    final rows = await executor.query(
+      'phase_targets',
+      where: 'phase_id = ?',
+      whereArgs: [phase.id],
+    );
+    final history = rows.map(PeriodizationTarget.fromMap).toList();
+    final boundary = addDays(phase.startDate, 7 * fromWeek);
+    final weeks = <PeriodizationTarget>[
+      for (var week = fromWeek; week < phase.totalWeeks; week++)
+        (_targetForDate(history, addDays(phase.startDate, 7 * week)) ??
+                PeriodizationTarget(
+                  id: '',
+                  phaseId: phase.id,
+                  version: 0,
+                  validFrom: boundary,
+                  createdAt: DateTime.now(),
+                ))
+            .copyWith(
+              calories: calories,
+              proteinG: proteinG,
+              carbsG: carbsG,
+              fatG: fatG,
+            ),
+    ];
+    _validateWeeklyWindow(boundary, phase.startDate, phase.endDate, weeks);
+    await _replaceTargetsFrom(
+      executor,
+      phaseId: phase.id,
+      phaseEnd: phase.endDate,
+      boundary: boundary,
+      weeks: weeks,
+    );
+    return weeks.length;
+  }
+
   /// The effective target of each phase week (index 0 = first week), read
   /// at each week's start. Null entries are weeks without any target.
   Future<List<PeriodizationTarget?>> getWeeklyTargets(
     PeriodizationPhase phase,
+  ) async => getWeeklyTargetsIn(await db, phase);
+
+  /// [getWeeklyTargets] on an explicit executor.
+  Future<List<PeriodizationTarget?>> getWeeklyTargetsIn(
+    DatabaseExecutor database,
+    PeriodizationPhase phase,
   ) async {
-    final history = await getTargetHistory(phase.id);
+    final rows = await database.query(
+      'phase_targets',
+      where: 'phase_id = ?',
+      whereArgs: [phase.id],
+      orderBy: 'version DESC',
+    );
+    final history = rows.map(PeriodizationTarget.fromMap).toList();
     return [
       for (var week = 0; week < phase.totalWeeks; week++)
         history.isEmpty
             ? null
-            : _targetForDate(
-                history,
-                phase.startDate.add(Duration(days: 7 * week)),
-              ),
+            : _targetForDate(history, addDays(phase.startDate, 7 * week)),
     ];
   }
 
@@ -700,8 +762,14 @@ class PeriodizationRepository extends BaseRepository {
     return rows.map(PeriodizationPhase.fromMap).toList();
   }
 
-  Future<PeriodizationPhase?> getPhase(String id) async {
-    final database = await db;
+  Future<PeriodizationPhase?> getPhase(String id) async =>
+      getPhaseIn(await db, id);
+
+  /// [getPhase] on an explicit executor.
+  Future<PeriodizationPhase?> getPhaseIn(
+    DatabaseExecutor database,
+    String id,
+  ) async {
     final rows = await database.query(
       'periodization_phases',
       where: 'id = ?',
@@ -811,8 +879,8 @@ class PeriodizationRepository extends BaseRepository {
       for (final routineId in routineIds) {
         final routineName = routineNames[routineId];
         if (routineName == null) continue;
-        for (final routineDay in daysByRoutine[routineId] ??
-            const <Map<String, Object?>>[]) {
+        for (final routineDay
+            in daysByRoutine[routineId] ?? const <Map<String, Object?>>[]) {
           sequence.add((
             routineId: routineId,
             routineName: routineName as String,
@@ -897,7 +965,7 @@ class PeriodizationRepository extends BaseRepository {
         scheduled: scheduled,
         completedRunsThisWeek: await _completedRunsBetween(
           weekStart,
-          weekStart.add(const Duration(days: 6)),
+          addDays(weekStart, 6),
         ),
       );
     }
@@ -931,7 +999,7 @@ class PeriodizationRepository extends BaseRepository {
         workout: match,
         completedRunsThisWeek: await _completedRunsBetween(
           weekStart,
-          weekStart.add(const Duration(days: 6)),
+          addDays(weekStart, 6),
         ),
       );
     }
@@ -962,7 +1030,7 @@ class PeriodizationRepository extends BaseRepository {
     final created = <String>[];
     var weeksCovered = 0;
     for (var week = firstWeek; week < phase.totalWeeks; week++) {
-      final weekStart = phaseStartWeek.add(Duration(days: 7 * week));
+      final weekStart = addDays(phaseStartWeek, 7 * week);
       final target = await getEffectiveTarget(phase.id, date: weekStart);
       final planIds = target?.runPlanIds ?? const <String>[];
       if (planIds.isEmpty) continue;
@@ -1050,7 +1118,7 @@ class PeriodizationRepository extends BaseRepository {
       throw const PeriodizationValidationException('phase_not_found');
     }
     final normalizedWeek = mondayOf(checkin.weekStart);
-    final weekEnd = normalizedWeek.add(const Duration(days: 6));
+    final weekEnd = addDays(normalizedWeek, 6);
     if (weekEnd.isBefore(phase.startDate) ||
         normalizedWeek.isAfter(phase.endDate)) {
       throw const PeriodizationValidationException('checkin_outside_phase');
@@ -1107,11 +1175,7 @@ class PeriodizationRepository extends BaseRepository {
     final endAfterText = _dayAfter(end);
     final targetHistory = await getTargetHistory(phase.id);
     final routineIds = <String>{};
-    for (
-      var date = start;
-      !date.isAfter(end);
-      date = date.add(const Duration(days: 1))
-    ) {
+    for (var date = start; !date.isAfter(end); date = addDays(date, 1)) {
       routineIds.addAll(
         _targetForDate(targetHistory, date)?.routineIds ?? const [],
       );
@@ -1131,7 +1195,7 @@ class PeriodizationRepository extends BaseRepository {
     for (
       var weekCursor = mondayOf(start);
       !weekCursor.isAfter(end);
-      weekCursor = weekCursor.add(const Duration(days: 7))
+      weekCursor = addDays(weekCursor, 7)
     ) {
       // Anchor on a day that belongs to the range so partial first/last weeks
       // resolve the target that actually applies.
@@ -1253,11 +1317,7 @@ class PeriodizationRepository extends BaseRepository {
     double nutritionAdherenceSum = 0;
     var sleepTargetDays = 0;
     final runPlanCache = <String, RunPlan?>{};
-    for (
-      var date = start;
-      !date.isAfter(end);
-      date = date.add(const Duration(days: 1))
-    ) {
+    for (var date = start; !date.isAfter(end); date = addDays(date, 1)) {
       final target = _targetForDate(targetHistory, date);
       if (target?.workoutsPerWeek != null) {
         plannedWorkoutSum += target!.workoutsPerWeek! / 7;
@@ -1344,11 +1404,7 @@ class PeriodizationRepository extends BaseRepository {
               sleepByDate.length;
     double sleepAdherenceSum = 0;
     var sleepTargetDaysLogged = 0;
-    for (
-      var date = start;
-      !date.isAfter(end);
-      date = date.add(const Duration(days: 1))
-    ) {
+    for (var date = start; !date.isAfter(end); date = addDays(date, 1)) {
       final expected = _targetForDate(targetHistory, date)?.sleepHours;
       if (expected == null) continue;
       final actual = sleepByDate[dateKey(date)];
@@ -1516,7 +1572,7 @@ class PeriodizationRepository extends BaseRepository {
   ) {
     var count = 0;
     for (var i = 0; i < 7; i++) {
-      final day = weekStart.add(Duration(days: i));
+      final day = addDays(weekStart, i);
       if (!day.isBefore(start) && !day.isAfter(end)) count++;
     }
     return count;
@@ -1530,10 +1586,9 @@ class PeriodizationRepository extends BaseRepository {
     rangeStart: mondayOf(weekStart).isBefore(phase.startDate)
         ? phase.startDate
         : mondayOf(weekStart),
-    rangeEnd:
-        mondayOf(weekStart).add(const Duration(days: 6)).isAfter(phase.endDate)
+    rangeEnd: addDays(mondayOf(weekStart), 6).isAfter(phase.endDate)
         ? phase.endDate
-        : mondayOf(weekStart).add(const Duration(days: 6)),
+        : addDays(mondayOf(weekStart), 6),
   );
 
   static Future<void> _deactivateCurrent(
@@ -1676,7 +1731,7 @@ class PeriodizationRepository extends BaseRepository {
     for (var i = 0; i < weeks.length; i++) {
       final week = weeks[i];
       if (!week.isEmpty) _validateTarget(week);
-      if (boundary.add(Duration(days: 7 * i)).isAfter(phaseEnd)) {
+      if (addDays(boundary, 7 * i).isAfter(phaseEnd)) {
         throw const PeriodizationValidationException('target_outside_phase');
       }
     }
@@ -1702,10 +1757,7 @@ class PeriodizationRepository extends BaseRepository {
     final retained = history
         .where((target) => target.validFrom.isBefore(boundary))
         .toList();
-    final baseline = _targetForDate(
-      retained,
-      boundary.subtract(const Duration(days: 1)),
-    );
+    final baseline = _targetForDate(retained, addDays(boundary, -1));
     final nextVersion = history.isEmpty
         ? 1
         : history.map((target) => target.version).reduce(math.max) + 1;
@@ -1754,7 +1806,7 @@ class PeriodizationRepository extends BaseRepository {
             week,
             phaseId: phaseId,
             version: version,
-            validFrom: firstValidFrom.add(Duration(days: 7 * i)),
+            validFrom: addDays(firstValidFrom, 7 * i),
           ),
         );
         version++;
@@ -1811,8 +1863,7 @@ class PeriodizationRepository extends BaseRepository {
 
   /// Exclusive upper bound for "started on or before [date]" on a
   /// `started_at` text column: the day after, as `yyyy-MM-dd`.
-  static String _dayAfter(DateTime date) =>
-      dateKey(addDays(date, 1));
+  static String _dayAfter(DateTime date) => dateKey(addDays(date, 1));
 }
 
 class PeriodizationValidationException implements Exception {

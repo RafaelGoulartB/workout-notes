@@ -9,7 +9,7 @@ import 'package:workout_notes/services/run_route_codec.dart';
 import 'support/schema_snapshot.dart';
 import 'support/test_db.dart';
 
-const _latest = 60;
+const _latest = 61;
 const _now = '2026-08-01T08:00:00.000';
 
 /// Upgrade coverage for every step from the v37 migration floor to the current
@@ -732,6 +732,66 @@ void main() {
       );
       final alarm = (await database.query('traditional_alarms')).single;
       expect(alarm['gradual_volume'], 0);
+    });
+  });
+
+  group('v61', () {
+    test('moves routine proposals into generic proposals and adds AI v2 '
+        'tables and columns', () async {
+      final database = await openAt(60);
+      await database.insert('ai_chat_threads', {
+        'id': 'thread',
+        'title': 'Rotina',
+        'created_at': _now,
+        'updated_at': _now,
+        'last_message_preview': 'Crie uma AÇÃO',
+      });
+      await database.insert('ai_chat_messages', {
+        'id': 'message',
+        'thread_id': 'thread',
+        'role': 'user',
+        'content': 'Crie uma AÇÃO de força',
+        'created_at': _now,
+      });
+      await database.insert('ai_routine_proposals', {
+        'id': 'proposal',
+        'thread_id': 'thread',
+        'tool_call_id': 'call',
+        'action': 'update',
+        'routine_id': 'routine',
+        'before_json': '{"name":"A"}',
+        'target_json': '{"name":"B","days":[]}',
+        'diff_json': '{"added":{"total":0}}',
+        'status': 'awaitingApproval',
+        'created_at': _now,
+      });
+      await DatabaseSchema.onUpgrade(database, 60, 61);
+      await DatabaseSchema.onUpgrade(database, 60, 61);
+
+      final tables = await tableNames(database);
+      expect(tables, containsAll(['ai_proposals', 'ai_memories']));
+      expect(tables, isNot(contains('ai_routine_proposals')));
+      final proposal = (await database.query('ai_proposals')).single;
+      expect(proposal['kind'], 'routine');
+      expect(proposal['status'], 'awaiting');
+      expect(proposal['subject_id'], 'routine');
+      expect(
+        proposal['payload_json'],
+        '{"action":"update","routine_id":"routine",'
+        '"routine":{"name":"B","days":[]}}',
+      );
+      expect(
+        await columnNames(database, 'ai_chat_messages'),
+        containsAll(['provider_extras', 'turn_status', 'search_text']),
+      );
+      expect(
+        await columnNames(database, 'ai_chat_thread_summaries'),
+        contains('tools_through_message_id'),
+      );
+      final message = (await database.query('ai_chat_messages')).single;
+      expect(message['search_text'], 'crie uma acao de forca');
+      final thread = (await database.query('ai_chat_threads')).single;
+      expect(thread['search_text'], 'rotina crie uma acao');
     });
   });
 }

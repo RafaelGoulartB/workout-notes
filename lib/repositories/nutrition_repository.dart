@@ -587,6 +587,7 @@ class NutritionRepository extends BaseRepository {
     required FoodVariant variant,
     required NutritionConversion conversion,
     required List<FoodServing> availableServings,
+    String? id,
   }) {
     final consumed = conversion.apply(variant.values);
     // The conversion already carries the exact serving chosen in the
@@ -615,7 +616,7 @@ class NutritionRepository extends BaseRepository {
       hasMissingValues: consumed.hasMissingFields,
     );
     final item = MealLogItem(
-      id: _uuid.v4(),
+      id: id ?? _uuid.v4(),
       mealLogId: log.id,
       foodId: food.id,
       foodVariantId: variant.id,
@@ -1179,6 +1180,35 @@ class NutritionRepository extends BaseRepository {
     String? adjustmentKind,
     double? adjustmentPercent,
   }) async {
+    final db = await this.db;
+    return db.transaction(
+      (txn) => saveGoalIn(
+        txn,
+        calories: calories,
+        proteinG: proteinG,
+        carbsG: carbsG,
+        fatG: fatG,
+        tdee: tdee,
+        adjustmentKind: adjustmentKind,
+        adjustmentPercent: adjustmentPercent,
+      ),
+    );
+  }
+
+  /// [saveGoal] on an explicit executor, so callers can fold it into their own
+  /// transaction. A caller-supplied [id] becomes the primary key (a repeated
+  /// call with the same id fails instead of storing a second goal).
+  Future<NutritionGoal> saveGoalIn(
+    DatabaseExecutor executor, {
+    String? id,
+    double? calories,
+    double? proteinG,
+    double? carbsG,
+    double? fatG,
+    double? tdee,
+    String? adjustmentKind,
+    double? adjustmentPercent,
+  }) async {
     // Derive the goal calories from TDEE + adjustment when the caller
     // configured the goal via the new TDEE-driven flow.
     final tdeeDriven = tdee != null && tdee > 0 && adjustmentPercent != null;
@@ -1220,7 +1250,7 @@ class NutritionRepository extends BaseRepository {
     }
     final now = DateTime.now();
     final goal = NutritionGoal(
-      id: _uuid.v4(),
+      id: id ?? _uuid.v4(),
       calories: resolvedCalories,
       proteinG: proteinG,
       carbsG: carbsG,
@@ -1232,14 +1262,22 @@ class NutritionRepository extends BaseRepository {
       updatedAt: now,
       isActive: true,
     );
-    final db = await this.db;
-    await db.transaction((txn) async {
-      await txn.update('nutrition_goals', {
-        'is_active': 0,
-      }, where: 'is_active = 1');
-      await txn.insert('nutrition_goals', goal.toMap());
-    });
+    await executor.update('nutrition_goals', {
+      'is_active': 0,
+    }, where: 'is_active = 1');
+    await executor.insert('nutrition_goals', goal.toMap());
     return goal;
+  }
+
+  /// [getActiveGoal] on an explicit executor.
+  Future<NutritionGoal?> getActiveGoalIn(DatabaseExecutor executor) async {
+    final rows = await executor.query(
+      'nutrition_goals',
+      where: 'is_active = 1',
+      orderBy: 'updated_at DESC',
+      limit: 1,
+    );
+    return rows.isEmpty ? null : NutritionGoal.fromMap(rows.first);
   }
 
   /// Removes the active goal, leaving the user without a target.
@@ -1397,25 +1435,40 @@ class NutritionRepository extends BaseRepository {
     required String savedMealId,
   }) async {
     _validateDate(date);
-    final meal = await getSavedMeal(savedMealId);
+    final db = await this.db;
+    return db.transaction(
+      (txn) => addSavedMealToDateIn(
+        txn,
+        date: date,
+        mealType: mealType,
+        mealName: mealName,
+        savedMealId: savedMealId,
+      ),
+    );
+  }
+
+  /// [addSavedMealToDate] on an explicit executor, so callers can fold it into
+  /// their own transaction. [itemIdFor] derives the primary key of the n-th
+  /// logged item (a repeated call then fails instead of duplicating them).
+  Future<({int added, int skipped})> addSavedMealToDateIn(
+    DatabaseExecutor executor, {
+    required String date,
+    required String mealType,
+    String? mealName,
+    required String savedMealId,
+    String Function(int index)? itemIdFor,
+  }) async {
+    _validateDate(date);
+    final meal = await getSavedMealIn(executor, savedMealId);
     if (meal == null) {
       throw const NutritionValidationException('saved_meal_not_found');
     }
-    final db = await this.db;
-    final details = await _detailsByFoodId(db, [
+    final details = await _detailsByFoodId(executor, [
       for (final item in meal.items)
         if (item.foodId != null && item.foodVariantId != null) item.foodId!,
     ]);
 
-    final planned =
-        <
-          ({
-            Food food,
-            FoodVariant variant,
-            NutritionConversion conversion,
-            List<FoodServing> servings,
-          })
-        >[];
+    final planned = <MealLogEntryDraft>[];
     var skipped = 0;
     for (final item in meal.items) {
       final food = item.foodId == null ? null : details[item.foodId!];
@@ -1458,30 +1511,90 @@ class NutritionRepository extends BaseRepository {
       ));
     }
 
-    await db.transaction((txn) async {
-      final section = await _ensureMealLogIn(
-        txn,
-        date: date,
-        mealType: mealType,
-        name: mealName,
-      );
-      final batch = txn.batch();
-      for (final entry in planned) {
-        final item = _buildMealLogItem(
-          log: section,
-          food: entry.food,
-          variant: entry.variant,
-          conversion: entry.conversion,
-          availableServings: entry.servings,
-        );
-        batch.insert('meal_log_items', item.toMap());
-      }
-      await batch.commit(noResult: true);
-      await _touchFoods(txn, [
-        for (final entry in planned) entry.food.id,
-      ], DateTime.now());
-    });
+    await addMealLogItemsIn(
+      executor,
+      date: date,
+      mealType: mealType,
+      mealName: mealName,
+      entries: planned,
+      itemIdFor: itemIdFor,
+    );
     return (added: planned.length, skipped: skipped);
+  }
+
+  /// Logs [entries] into the (date, mealType) section on [executor]: the
+  /// section is created when missing and every item gets its nutrition
+  /// snapshot. [itemIdFor] derives the primary key of the n-th item.
+  Future<List<MealLogItem>> addMealLogItemsIn(
+    DatabaseExecutor executor, {
+    required String date,
+    required String mealType,
+    String? mealName,
+    required List<MealLogEntryDraft> entries,
+    String Function(int index)? itemIdFor,
+  }) async {
+    _validateDate(date);
+    final section = await _ensureMealLogIn(
+      executor,
+      date: date,
+      mealType: mealType,
+      name: mealName,
+    );
+    final items = <MealLogItem>[];
+    final batch = executor.batch();
+    for (var i = 0; i < entries.length; i++) {
+      final entry = entries[i];
+      final item = _buildMealLogItem(
+        log: section,
+        food: entry.food,
+        variant: entry.variant,
+        conversion: entry.conversion,
+        availableServings: entry.servings,
+        id: itemIdFor?.call(i),
+      );
+      batch.insert('meal_log_items', item.toMap());
+      items.add(item);
+    }
+    await batch.commit(noResult: true);
+    await _touchFoods(executor, [
+      for (final entry in entries) entry.food.id,
+    ], DateTime.now());
+    return items;
+  }
+
+  /// [getSavedMeal] on an explicit executor.
+  Future<SavedMealWithItems?> getSavedMealIn(
+    DatabaseExecutor executor,
+    String id,
+  ) async {
+    final rows = await executor.query(
+      'saved_meals',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return _savedMealWithItems(executor, rows.first);
+  }
+
+  /// [getFoodWithDetails] on an explicit executor.
+  Future<FoodWithDetails?> getFoodWithDetailsIn(
+    DatabaseExecutor executor,
+    String foodId,
+  ) async => (await _detailsByFoodId(executor, [foodId]))[foodId];
+
+  /// The meal type with [key] (the stable id stored in meal logs), or null.
+  Future<MealTypeDefinition?> getMealTypeByKeyIn(
+    DatabaseExecutor executor,
+    String key,
+  ) async {
+    final rows = await executor.query(
+      'meal_types',
+      where: '"key" = ?',
+      whereArgs: [key],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : MealTypeDefinition.fromMap(rows.first);
   }
 
   // ===================================================================
@@ -2157,6 +2270,15 @@ class NutritionRepository extends BaseRepository {
     }
   }
 }
+
+/// One food ready to be logged: the food, the variant it is measured in, the
+/// exact quantity conversion and the servings of that variant.
+typedef MealLogEntryDraft = ({
+  Food food,
+  FoodVariant variant,
+  NutritionConversion conversion,
+  List<FoodServing> servings,
+});
 
 /// Lightweight food + variant bundle returned by local search.
 class FoodSearchResultLite {

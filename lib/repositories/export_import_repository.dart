@@ -161,7 +161,8 @@ class ExportImportRepository extends BaseRepository {
         'ai_chat_threads',
         'ai_chat_messages',
         'ai_chat_thread_summaries',
-        'ai_routine_proposals',
+        'ai_proposals',
+        'ai_memories',
         'unused_remote_food_cache',
       ],
     };
@@ -194,7 +195,10 @@ class ExportImportRepository extends BaseRepository {
 
       // 1. Clear all tables (order matters because of FKs)
       for (final table in [
-        'ai_routine_proposals',
+        // AI conversations are not part of backups; they are cleared so no
+        // conversation refers to data that no longer exists. Memories are
+        // kept (facts about the user, not about the restored records).
+        'ai_proposals',
         'ai_chat_thread_summaries',
         'ai_chat_messages',
         'ai_chat_threads',
