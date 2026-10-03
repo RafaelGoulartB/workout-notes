@@ -40,7 +40,7 @@ dependencies:
   image_picker: ^1.2.3
 
   # File import
-  file_picker: ^12.1.1
+  file_picker: ^13.1.0
 
   # AI Coach
   http: ^1.2.2

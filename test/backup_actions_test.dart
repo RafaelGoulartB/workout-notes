@@ -85,7 +85,10 @@ final class _FakePlatformFile extends PlatformFile {
   get xFile => throw UnimplementedError();
 
   @override
-  Future<int> length() async => bytes?.length ?? 0;
+  int? lengthSync() => bytes?.length;
+
+  @override
+  Future<int?> length() async => bytes?.length ?? 0;
 
   @override
   Future<Uint8List> readAsBytes() async {
@@ -113,6 +116,7 @@ class _FakeFilePicker extends FilePickerPlatform {
     Function(FilePickerStatus)? onFileLoading,
     int compressionQuality = 0,
     AndroidOptions androidOptions = const AndroidOptions(),
+    DarwinOptions darwinOptions = const DarwinOptions(),
     WindowsOptions windowsOptions = const WindowsOptions(),
     LinuxOptions linuxOptions = const LinuxOptions(),
     WebOptions webOptions = const WebOptions(),
