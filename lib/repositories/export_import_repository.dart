@@ -121,9 +121,7 @@ class ExportImportRepository extends BaseRepository {
       'body_measurements': await db.query('body_measurements'),
       'user_goals': await db.query('user_goals'),
       'sleep_entries': await db.query('sleep_entries'),
-      // Includes the stage analysis (summary columns and `stage_timeline`):
-      // the diagnostic archives that could rebuild it only last 14 days.
-      'sleep_monitor_sessions': await db.query('sleep_monitor_sessions'),
+      'sleep_monitor_sessions': await _exportSleepSessions(db),
       'foods': nutrition['foods'],
       'food_variants': nutrition['food_variants'],
       'food_servings': nutrition['food_servings'],
@@ -443,6 +441,41 @@ class ExportImportRepository extends BaseRepository {
         throw FormatException('Invalid rows in backup collection "$key".');
       }
     }
+  }
+
+  /// Preserves the monitored-night record and alarm metadata without carrying
+  /// the low-priority sleep-stage analysis. The database defaults the restored
+  /// session to `legacy_unavailable`, matching the intentionally absent epochs.
+  static Future<List<Map<String, Object?>>> _exportSleepSessions(
+    DatabaseExecutor database,
+  ) async {
+    final rows = await database.query('sleep_monitor_sessions');
+    const stageAnalysisColumns = {
+      'analysis_status',
+      'sleep_onset_at',
+      'final_wake_at',
+      'sleep_latency_minutes',
+      'awake_minutes',
+      'sleeping_minutes',
+      'deep_sleep_minutes',
+      'unknown_minutes',
+      'restless_sleep_minutes',
+      'snore_minutes',
+      'awakening_count',
+      'sleep_efficiency',
+      'stage_confidence',
+      'stage_algorithm_version',
+      'stage_timeline',
+    };
+    return rows
+        .map((raw) {
+          final row = Map<String, Object?>.from(raw);
+          for (final column in stageAnalysisColumns) {
+            row.remove(column);
+          }
+          return row;
+        })
+        .toList(growable: false);
   }
 
   /// Keeps manual/favorite/used foods while omitting disposable remote search

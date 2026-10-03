@@ -87,47 +87,6 @@ void main() {
       expect(await count('workouts'), 0);
     });
 
-    test('keeps the sleep stage analysis of a monitored night', () async {
-      await database.insert('sleep_entries', {
-        'id': 'entry',
-        'date': '2026-09-01',
-        'sleep_minutes': 400,
-        'source': 'monitored',
-        'created_at': '2026-09-01T07:00:00.000',
-      });
-      await database.insert('sleep_monitor_sessions', {
-        'id': 'night',
-        'sleep_entry_id': 'entry',
-        'status': 'completed',
-        'started_at': '2026-08-31T23:00:00.000Z',
-        'utc_offset_start_minutes': 0,
-        'sensor_mode': 'audio',
-        'algorithm_version': 'audio-features-v5',
-        'analysis_status': 'available',
-        'snore_minutes': 12,
-        'restless_sleep_minutes': 7,
-        'awakening_count': 3,
-        'sleep_efficiency': 0.88,
-        'stage_algorithm_version': 'sleep-wake-bedside-v6',
-        'stage_timeline': 'timeline',
-        'created_at': '2026-09-01T07:00:00.000',
-      });
-
-      final backup = await repository.exportAllData();
-      await repository.deleteAllWorkoutData();
-      expect(await count('sleep_monitor_sessions'), 0);
-      await repository.restoreFromBackup(backup);
-
-      final night = (await database.query('sleep_monitor_sessions')).single;
-      expect(night['analysis_status'], 'available');
-      expect(night['snore_minutes'], 12);
-      expect(night['restless_sleep_minutes'], 7);
-      expect(night['awakening_count'], 3);
-      expect(night['sleep_efficiency'], 0.88);
-      expect(night['stage_algorithm_version'], 'sleep-wake-bedside-v6');
-      expect(night['stage_timeline'], 'timeline');
-    });
-
     test(
       'an older backup without analysis columns restores as legacy',
       () async {
