@@ -629,17 +629,6 @@
     </issue>
 
     <issue
-        id="PermissionImpliesUnsupportedChromeOsHardware"
-        message="Permission exists without corresponding hardware `&lt;uses-feature android:name=&quot;android.hardware.camera&quot; required=&quot;false&quot;>` tag"
-        errorLine1="    &lt;uses-permission android:name=&quot;android.permission.CAMERA&quot; />"
-        errorLine2="     ~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/AndroidManifest.xml"
-            line="6"
-            column="6"/>
-    </issue>
-
-    <issue
         id="InsecureBaseConfiguration"
         message="Insecure Base Configuration"
         errorLine1="    &lt;base-config cleartextTrafficPermitted=&quot;true&quot;>"
