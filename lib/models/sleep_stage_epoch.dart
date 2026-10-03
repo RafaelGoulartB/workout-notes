@@ -17,6 +17,14 @@ class SleepStageEpoch {
   final String algorithmVersion;
   final String source;
 
+  /// Seconds of sound attributed to the person in this window (movement,
+  /// voice), excluding ambient sound and snoring. Drives restlessness.
+  final double movementSeconds;
+
+  /// Seconds of sound attributed to the room (birds, HVAC, traffic).
+  final double ambientSeconds;
+  final bool snoring;
+
   const SleepStageEpoch({
     required this.id,
     required this.sessionId,
@@ -29,6 +37,9 @@ class SleepStageEpoch {
     required this.deepProbability,
     required this.algorithmVersion,
     this.source = 'acoustic_model',
+    this.movementSeconds = 0,
+    this.ambientSeconds = 0,
+    this.snoring = false,
   });
 
   DateTime get endedAt =>
@@ -49,6 +60,9 @@ class SleepStageEpoch {
     'deep_probability': deepProbability,
     'algorithm_version': algorithmVersion,
     'source': source,
+    'movement_seconds': movementSeconds,
+    'ambient_seconds': ambientSeconds,
+    'snoring': snoring,
   };
 
   factory SleepStageEpoch.fromMap(Map<String, dynamic> map) {
@@ -65,6 +79,9 @@ class SleepStageEpoch {
       algorithmVersion:
           (map['algorithm_version'] as String?) ?? 'unknown-model',
       source: (map['source'] as String?) ?? 'acoustic_model',
+      movementSeconds: (map['movement_seconds'] as num?)?.toDouble() ?? 0,
+      ambientSeconds: (map['ambient_seconds'] as num?)?.toDouble() ?? 0,
+      snoring: map['snoring'] == true,
     );
   }
 }

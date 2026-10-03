@@ -76,6 +76,8 @@ class AiSleepToolService {
         'sleepingMinutes': session?['sleeping_minutes'],
         'deepSleepMinutes': session?['deep_sleep_minutes'],
         'unknownMinutes': session?['unknown_minutes'],
+        'restlessSleepMinutes': session?['restless_sleep_minutes'],
+        'snoreMinutes': session?['snore_minutes'],
         'awakeningCount': session?['awakening_count'],
         'efficiencyPct': AiToolMath.round1OrNull(
           (session?['sleep_efficiency'] as num?)?.toDouble() ??

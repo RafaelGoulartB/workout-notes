@@ -17,6 +17,9 @@ class SleepMonitorState {
   final DateTime? startedAt;
   final DateTime? updatedAt;
   final DateTime? alarmAt;
+
+  /// Minutes before [alarmAt] in which the smart alarm may ring; 0 = off.
+  final int smartWindowMinutes;
   final SleepMonitoringMode mode;
   final SleepMissionStatus missionStatus;
   final bool alarmRinging;
@@ -43,6 +46,7 @@ class SleepMonitorState {
     required this.startedAt,
     required this.updatedAt,
     this.alarmAt,
+    this.smartWindowMinutes = 0,
     this.mode = SleepMonitoringMode.alarmWithoutMission,
     this.missionStatus = SleepMissionStatus.unconfigured,
     this.alarmRinging = false,
@@ -120,6 +124,7 @@ class SleepMonitorState {
     DateTime? startedAt,
     DateTime? updatedAt,
     DateTime? alarmAt,
+    int? smartWindowMinutes,
     SleepMonitoringMode? mode,
     SleepMissionStatus? missionStatus,
     bool? alarmRinging,
@@ -146,6 +151,7 @@ class SleepMonitorState {
       startedAt: startedAt ?? this.startedAt,
       updatedAt: updatedAt ?? this.updatedAt,
       alarmAt: alarmAt ?? this.alarmAt,
+      smartWindowMinutes: smartWindowMinutes ?? this.smartWindowMinutes,
       mode: mode ?? this.mode,
       missionStatus: missionStatus ?? this.missionStatus,
       alarmRinging: alarmRinging ?? this.alarmRinging,
@@ -180,6 +186,7 @@ class SleepMonitorState {
       startedAt: startedText == null ? null : DateTime.parse(startedText),
       updatedAt: updatedText == null ? null : DateTime.parse(updatedText),
       alarmAt: alarmText == null ? null : DateTime.parse(alarmText),
+      smartWindowMinutes: (map['smart_window_minutes'] as num?)?.toInt() ?? 0,
       mode: SleepMonitoringMode.fromWire(map['monitor_mode']),
       missionStatus: SleepMissionStatus.fromWire(map['mission_status']),
       alarmRinging: map['alarm_ringing'] as bool? ?? false,

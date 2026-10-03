@@ -1,3 +1,4 @@
+import 'package:workout_notes/models/sleep_night_timeline.dart';
 import 'package:workout_notes/models/sleep_stage_epoch.dart';
 import 'package:workout_notes/models/sleep_stage_summary.dart';
 import 'package:workout_notes/models/sleep_stage_type.dart';
@@ -12,6 +13,13 @@ class SleepStageAnalysisService {
   static const onsetRequiredSleepSeconds = 8 * 60;
   static const finalWakeSeconds = 5 * 60;
   static const awakeningSeconds = 60;
+
+  /// A sleep window is restless when, within this many seconds on either
+  /// side, at least [restlessMovementWindows] windows carry a sound of the
+  /// person moving (not ambient sound, not snoring).
+  static const restlessNeighbourhoodSeconds = 5 * 60;
+  static const restlessMovementWindows = 5;
+  static const movementSeconds = 2.0;
 
   const SleepStageAnalysisService();
 
@@ -65,7 +73,14 @@ class SleepStageAnalysisService {
     }
 
     final timeInBedSeconds = sessionEnd.difference(sessionStart).inSeconds;
+    // Time without a usable estimate is neither sleep nor wake; efficiency is
+    // measured over the time that was actually classified.
+    final classifiedSeconds = timeInBedSeconds - unknownSeconds;
     final sleepSeconds = sleepingSeconds + deepSeconds;
+    final restlessSeconds = _restlessSleepSeconds(ordered);
+    final snoreSeconds = ordered
+        .where((e) => e.isSleep && e.snoring)
+        .fold<int>(0, (sum, e) => sum + e.durationSeconds.clamp(1, 3600));
     final version = ordered
         .firstWhere(
           (epoch) => epoch.algorithmVersion.isNotEmpty,
@@ -79,17 +94,24 @@ class SleepStageAnalysisService {
       sleepingMinutes: _roundMinutes(sleepingSeconds),
       deepSleepMinutes: _roundMinutes(deepSeconds),
       unknownMinutes: _roundMinutes(unknownSeconds),
+      restlessSleepMinutes: _roundMinutes(restlessSeconds),
+      snoreMinutes: _roundMinutes(snoreSeconds),
       sleepLatencyMinutes: onset == null
           ? 0
           : onset.difference(sessionStart).inMinutes.clamp(0, 16 * 60),
       awakeningCount: onset == null
           ? 0
           : _countAwakenings(ordered, onset, finalWake ?? sessionEnd),
-      sleepEfficiency: timeInBedSeconds <= 0
+      sleepEfficiency: classifiedSeconds <= 0
           ? 0
-          : (sleepSeconds / timeInBedSeconds * 100).clamp(0.0, 100.0),
+          : (sleepSeconds / classifiedSeconds * 100).clamp(0.0, 100.0),
       stageConfidence: knownSeconds == 0 ? 0 : confidenceSeconds / knownSeconds,
       algorithmVersion: version,
+      timeline: SleepNightTimeline.fromEpochs(
+        start: sessionStart,
+        end: sessionEnd,
+        epochs: ordered,
+      ),
     );
   }
 
@@ -151,13 +173,41 @@ class SleepStageAnalysisService {
       }
       if (epoch.stage == SleepStageType.awake) {
         runSeconds += epoch.durationSeconds.clamp(1, 3600);
-      } else {
+      } else if (epoch.stage != SleepStageType.unknown) {
+        // Unknown time inside a wake neither ends nor extends it, so a short
+        // capture glitch does not split one awakening into two.
         if (runSeconds >= awakeningSeconds) count++;
         runSeconds = 0;
       }
     }
     if (runSeconds >= awakeningSeconds) count++;
     return count;
+  }
+
+  int _restlessSleepSeconds(List<SleepStageEpoch> epochs) {
+    const reach = Duration(seconds: restlessNeighbourhoodSeconds);
+    final moving = [
+      for (final e in epochs)
+        if (e.movementSeconds >= movementSeconds) e.startedAt,
+    ];
+    var seconds = 0;
+    var lo = 0;
+    var hi = 0;
+    for (final epoch in epochs) {
+      final from = epoch.startedAt.subtract(reach);
+      final to = epoch.startedAt.add(reach);
+      while (lo < moving.length && moving[lo].isBefore(from)) {
+        lo++;
+      }
+      if (hi < lo) hi = lo;
+      while (hi < moving.length && !moving[hi].isAfter(to)) {
+        hi++;
+      }
+      if (epoch.isSleep && hi - lo >= restlessMovementWindows) {
+        seconds += epoch.durationSeconds.clamp(1, 3600);
+      }
+    }
+    return seconds;
   }
 
   int _overlapSeconds(

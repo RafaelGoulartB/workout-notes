@@ -14,6 +14,7 @@ class TraditionalAlarm {
     required this.snoozeMinutes,
     required this.maxSnoozes,
     required this.requiresMission,
+    this.gradualVolume = false,
     required this.nextTriggerAt,
     required this.createdAt,
     required this.updatedAt,
@@ -28,6 +29,9 @@ class TraditionalAlarm {
   final int snoozeMinutes;
   final int maxSnoozes;
   final bool requiresMission;
+
+  /// Starts soft and rises (length and final boost are global settings).
+  final bool gradualVolume;
   final DateTime? nextTriggerAt;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -43,6 +47,7 @@ class TraditionalAlarm {
     int? snoozeMinutes,
     int? maxSnoozes,
     bool? requiresMission,
+    bool? gradualVolume,
     DateTime? nextTriggerAt,
     bool clearNextTriggerAt = false,
     DateTime? updatedAt,
@@ -56,6 +61,7 @@ class TraditionalAlarm {
     snoozeMinutes: snoozeMinutes ?? this.snoozeMinutes,
     maxSnoozes: maxSnoozes ?? this.maxSnoozes,
     requiresMission: requiresMission ?? this.requiresMission,
+    gradualVolume: gradualVolume ?? this.gradualVolume,
     nextTriggerAt: clearNextTriggerAt
         ? null
         : (nextTriggerAt ?? this.nextTriggerAt),
@@ -94,6 +100,7 @@ class TraditionalAlarm {
     'snooze_minutes': snoozeMinutes,
     'max_snoozes': maxSnoozes,
     'requires_mission': requiresMission ? 1 : 0,
+    'gradual_volume': gradualVolume ? 1 : 0,
     'next_trigger_at': nextTriggerAt?.toIso8601String(),
     'created_at': createdAt.toIso8601String(),
     'updated_at': updatedAt.toIso8601String(),
@@ -112,6 +119,7 @@ class TraditionalAlarm {
       snoozeMinutes: map['snooze_minutes'] as int? ?? 5,
       maxSnoozes: map['max_snoozes'] as int? ?? 3,
       requiresMission: (map['requires_mission'] as int? ?? 0) == 1,
+      gradualVolume: (map['gradual_volume'] as int? ?? 0) == 1,
       nextTriggerAt: DateTime.tryParse(map['next_trigger_at'] as String? ?? ''),
       createdAt: DateTime.parse(map['created_at']! as String),
       updatedAt: DateTime.parse(map['updated_at']! as String),

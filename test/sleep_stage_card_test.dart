@@ -4,6 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
+import 'package:workout_notes/services/sleep_stage_analysis_service.dart';
+import 'package:workout_notes/services/sleep_wake_engine.dart';
+import 'package:workout_notes/widgets/sleep/sleep_night_chart.dart';
 import 'package:workout_notes/widgets/sleep/sleep_stage_card.dart';
 import 'support/sleep_bedside_fixture.dart';
 
@@ -29,6 +32,98 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets('bedside result shows restless sleep and snoring at 320 px', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final session = bedsideSession(minutes: 420).copyWith(
+      analysisStatus: SleepMonitorSession.analysisAvailable,
+      awakeMinutes: 40,
+      sleepingMinutes: 380,
+      unknownMinutes: 0,
+      restlessSleepMinutes: 65,
+      snoreMinutes: 12,
+    );
+    await tester.pumpWidget(_app(SleepStageCard(session: session)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sono agitado'), findsOneWidget);
+    expect(find.text('1h 5min'), findsOneWidget);
+    expect(find.text('Ronco'), findsOneWidget);
+    expect(find.text('12 min'), findsOneWidget);
+    expect(find.text('Sono profundo estimado'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  SleepMonitorSession dawnNight() {
+    final segments = quantizedBedsideSegments(
+      fileName: 'sleep_dawn_bedside.json',
+    );
+    final session = SleepMonitorSession.fromMap({
+      ...bedsideSession(minutes: 373).toMap(),
+      'algorithm_version': 'audio-features-v4',
+    });
+    final result = const SleepWakeEngine().run(
+      session: session,
+      segments: segments,
+    );
+    final summary = const SleepStageAnalysisService().summarize(
+      sessionStart: session.startedAt,
+      sessionEnd: session.endedAt!,
+      epochs: result.epochs,
+    )!;
+    return session.copyWith(
+      analysisStatus: SleepMonitorSession.analysisAvailable,
+      awakeMinutes: summary.awakeMinutes,
+      sleepingMinutes: summary.sleepingMinutes,
+      unknownMinutes: summary.unknownMinutes,
+      restlessSleepMinutes: summary.restlessSleepMinutes,
+      snoreMinutes: summary.snoreMinutes,
+      stageTimeline: summary.timeline!.encode(),
+    );
+  }
+
+  testWidgets('bedside night shows the minute chart and inspects a minute', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(_app(SleepStageCard(session: dawnNight())));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SleepNightChart), findsOneWidget);
+    expect(find.text('Movimento ou voz'), findsOneWidget);
+    expect(find.text('Som do ambiente'), findsOneWidget);
+    expect(find.textContaining('de chance de estar dormindo'), findsNothing);
+    final chart = tester.getRect(find.byType(SleepNightChart));
+    await tester.tapAt(Offset(chart.left + chart.width * 0.4, chart.center.dy));
+    await tester.pump();
+    expect(find.textContaining('de chance de estar dormindo'), findsOneWidget);
+    expect(find.textContaining('s de ambiente'), findsOneWidget);
+    await tester.drag(find.byType(SleepNightChart), const Offset(-80, 0));
+    await tester.pump();
+    expect(find.textContaining('de chance de estar dormindo'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('bedside night without stored analysis explains why', (
+    tester,
+  ) async {
+    final session = bedsideSession().copyWith(
+      analysisStatus: SleepMonitorSession.analysisLegacyUnavailable,
+    );
+    await tester.pumpWidget(_app(SleepStageCard(session: session)));
+    await tester.pumpAndSettle();
+    expect(find.byType(SleepNightChart), findsNothing);
+    expect(find.textContaining('restaurada de um backup'), findsOneWidget);
+    expect(find.textContaining('sono profundo'), findsNothing);
+  });
+
   testWidgets('renders the three estimated stage aggregates at 320 px', (
     tester,
   ) async {

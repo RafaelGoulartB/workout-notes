@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.workoutnotes.workout_notes.R
@@ -68,8 +69,17 @@ class MedicationAlarmService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        try {
+            startForeground(NOTIFICATION_ID, notification(slot))
+        } catch (error: Throwable) {
+            // Refused (e.g. right after a boot): escalate again shortly
+            // instead of crashing the app.
+            Log.w("MedicationAlarm", "Alarm refused to start", error)
+            MedicationReminderScheduler.recoverRefusedRing(this, slot.id)
+            stopSelf()
+            return START_NOT_STICKY
+        }
         ringingSlotId = slot.id
-        startForeground(NOTIFICATION_ID, notification(slot))
         if (!ringer.hasPlayer) ringer.start()
         return START_STICKY
     }

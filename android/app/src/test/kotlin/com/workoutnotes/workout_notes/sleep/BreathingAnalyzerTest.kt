@@ -1,53 +1,104 @@
 package com.workoutnotes.workout_notes.sleep
 
-import kotlin.math.PI
-import kotlin.math.sin
+import com.workoutnotes.workout_notes.sleep.SyntheticSleepAudio.night
+import com.workoutnotes.workout_notes.sleep.SyntheticSleepAudio.rate
+import com.workoutnotes.workout_notes.sleep.SyntheticSleepAudio.regularity
+import com.workoutnotes.workout_notes.sleep.SyntheticSleepAudio.snapshots
+import kotlin.math.ln
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BreathingAnalyzerTest {
-    @Test
-    fun detectsRegularBreathingEnvelope() {
-        val analyzer = BreathingAnalyzer()
-        val seconds = 30
-        val samples = ShortArray(16_000 * seconds) { index ->
-            val t = index.toDouble()
-            val envelope = 0.5 + 0.4 * sin(2.0 * PI * 0.25 * t / 16_000.0)
-            (envelope * sin(2.0 * PI * 100.0 * t / 16_000.0) * Short.MAX_VALUE * 0.5)
-                .toInt()
-                .toShort()
+    private fun assertBreath(rateHz: Double, seconds: Double = 60.0, sampleRate: Int = 16_000) {
+        val results = snapshots(night(sampleRate, seconds, breathHz = rateHz), sampleRate)
+        assertTrue(results.isNotEmpty())
+        for (result in results) {
+            assertTrue("regularity ${regularity(result)} at $rateHz Hz", regularity(result) >= 0.6)
+            assertEquals("rate at $rateHz Hz", rateHz, rate(result), 0.02)
         }
-        analyzer.add(samples, samples.size)
-        val (regularity, rate) = analyzer.snapshot()
-        assertTrue("expected a regular envelope, got $regularity", regularity >= 0.5)
-        assertEquals("expected ~0.25 Hz breathing rate", 0.25, rate, 0.05)
+    }
+
+    @Test
+    fun detectsBreathingBuriedInHissAndHum() = assertBreath(0.25)
+
+    @Test
+    fun resolvesSlowAndFastBreathing() {
+        assertBreath(0.2)
+        assertBreath(0.4)
+    }
+
+    @Test
+    fun worksAtTheFortyFourKilohertzFallbackRate() = assertBreath(0.25, seconds = 40.0, sampleRate = 44_100)
+
+    @Test
+    fun hissAndHumAloneAreNotBreathing() {
+        // Chance autocorrelation peaks stay well below the 0.45 Dart threshold.
+        for (humHz in listOf(50.0, 60.0)) {
+            val results = snapshots(night(16_000, 90.0, breathHz = null, humHz = humHz), 16_000)
+            assertEquals(3, results.size)
+            for (result in results) {
+                assertTrue("regularity ${regularity(result)} with $humHz Hz hum", regularity(result) < 0.4)
+            }
+        }
+    }
+
+    @Test
+    fun shallowBreathingStillReads() {
+        val results = snapshots(night(16_000, 60.0, breathHz = 0.25, depth = 0.4), 16_000)
+        assertTrue(regularity(results.last()) >= 0.5)
+        assertEquals(0.25, rate(results.last()), 0.02)
+    }
+
+    @Test
+    fun historySpansSnapshotsAndNeedsTwentySeconds() {
+        val analyzer = BreathingAnalyzer()
+        val period = analyzer.framePeriodSeconds
+        assertEquals(0.125, period, 1e-9)
+        fun feed(seconds: Double, offsetSeconds: Double = 0.0) {
+            val frames = (seconds / period).toInt()
+            for (i in 0 until frames) {
+                val t = offsetSeconds + i * period
+                analyzer.addFrame(1e-8 * (1.0 + 0.6 * kotlin.math.sin(2 * Math.PI * 0.25 * t)))
+            }
+        }
+        feed(15.0)
+        assertEquals(0.0 to 0.0, analyzer.snapshot())
+        feed(15.0, 15.0)
+        val first = analyzer.snapshot()
+        assertEquals(0.25, first.second, 0.01)
+        // The history is not cleared by a snapshot: a second one right away
+        // still has the same data.
+        assertEquals(first.second, analyzer.snapshot().second, 1e-9)
     }
 
     @Test
     fun silenceYieldsNoRate() {
         val analyzer = BreathingAnalyzer()
-        val samples = ShortArray(16_000 * 5) // all zeros
-        analyzer.add(samples, samples.size)
-        val (regularity, rate) = analyzer.snapshot()
-        assertEquals(0.0, regularity, 0.0)
-        assertEquals(0.0, rate, 0.0)
+        repeat(30 * 8) { analyzer.addFrame(0.0) }
+        assertEquals(0.0 to 0.0, analyzer.snapshot())
     }
 
     @Test
-    fun slowDriftIsNotReportedAsFastBreathing() {
-        // A monotonic loudness ramp (fan spinning up, distant traffic) has a
-        // high autocorrelation at the shortest lag but no periodic peak.
+    fun silentFramesStillAdvanceTime() {
+        // All-zero frames skip the FFT but must still reach the analyzer.
+        val frames = mutableListOf<Double>()
+        val spectral = SpectralAnalyzer(16_000) { frames += it }
+        val silence = ShortArray(16_000 * 3)
+        spectral.add(silence, silence.size)
+        assertEquals(24, frames.size)
+        assertTrue(frames.all { it == 0.0 })
+    }
+
+    @Test
+    fun slowDriftIsNotReportedAsBreathing() {
+        // A loudness ramp (fan spinning up, distant traffic) decays
+        // monotonically in the autocorrelation and has no periodic peak.
         val analyzer = BreathingAnalyzer()
-        val seconds = 30
-        val samples = ShortArray(16_000 * seconds) { index ->
-            val t = index.toDouble()
-            val envelope = 0.05 + 0.4 * t / (16_000.0 * seconds)
-            (envelope * sin(2.0 * PI * 100.0 * t / 16_000.0) * Short.MAX_VALUE)
-                .toInt()
-                .toShort()
+        val frames = 60 * 8
+        for (i in 0 until frames) {
+            analyzer.addFrame(1e-9 * (1.0 + 9.0 * i / frames))
         }
-        analyzer.add(samples, samples.size)
         val (regularity, rate) = analyzer.snapshot()
         assertEquals(0.0, regularity, 0.0)
         assertEquals(0.0, rate, 0.0)
@@ -56,18 +107,17 @@ class BreathingAnalyzerTest {
     @Test
     fun oneLoudEventDoesNotSwampPeriodicBreathing() {
         val analyzer = BreathingAnalyzer()
-        val seconds = 30
-        val samples = ShortArray(16_000 * seconds) { index ->
-            val t = index.toDouble()
-            val breathing = 0.02 * (1.2 + sin(2.0 * PI * 0.25 * t / 16_000.0))
-            val bump = if (t / 16_000.0 in 14.0..14.5) 0.8 else 0.0
-            ((breathing + bump) * sin(2.0 * PI * 100.0 * t / 16_000.0) * Short.MAX_VALUE)
-                .toInt()
-                .toShort()
+        val period = analyzer.framePeriodSeconds
+        val frames = (60 / period).toInt()
+        for (i in 0 until frames) {
+            val t = i * period
+            val breathing = 1e-9 * (1.2 + kotlin.math.sin(2 * Math.PI * 0.25 * t))
+            val bump = if (t in 30.0..30.5) 1e-3 else 0.0
+            analyzer.addFrame(breathing + bump)
         }
-        analyzer.add(samples, samples.size)
         val (regularity, rate) = analyzer.snapshot()
         assertTrue("expected periodic envelope, got $regularity", regularity >= 0.45)
-        assertEquals(0.25, rate, 0.05)
+        assertEquals(0.25, rate, 0.02)
+        assertTrue(ln(1e-3 / 1e-9) > 10) // the bump really is a huge outlier
     }
 }

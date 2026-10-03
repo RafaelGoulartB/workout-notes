@@ -5,11 +5,14 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import java.util.Calendar
+import com.workoutnotes.workout_notes.common.AlarmRestorePolicy
 import com.workoutnotes.workout_notes.common.PendingIntentFlags
 
 /** Durable, multi-alarm companion to the single sleep-monitor scheduler. */
 object TraditionalAlarmScheduler {
+    private const val TAG = "TraditionalAlarms"
     const val ACTION_FIRE = "com.workoutnotes.workout_notes.sleep.TRADITIONAL_ALARM_FIRE"
     const val EXTRA_ID = "traditional_alarm_id"
     const val EXTRA_ALARM_AT = "alarm_at_epoch_ms"
@@ -32,6 +35,8 @@ object TraditionalAlarmScheduler {
         val missionFormat: String?,
         val state: String,
         val enabled: Boolean,
+        /** Starts soft and rises ([com.workoutnotes.workout_notes.common.AlarmWakePrefs]). */
+        val gradualVolume: Boolean = false,
     )
 
     fun schedule(context: Context, snapshot: Snapshot) {
@@ -122,20 +127,78 @@ object TraditionalAlarmScheduler {
         schedule(context, snapshot.copy(alarmAtMillis = next, state = "scheduled", enabled = true, snoozeCount = 0))
     }
 
-    fun restore(context: Context) {
+    /**
+     * Re-arms every alarm after a reboot, an update or an app launch. A due
+     * alarm (ringing, or missed while the phone was off) rings again through
+     * an exact alarm shortly after (30 s after a boot), never from the boot receiver
+     * itself; one missed by more than
+     * [AlarmRestorePolicy.MAX_LATE_RING_MILLIS] is closed (a repeating alarm
+     * moves to its next day). One alarm failing never blocks the others.
+     */
+    fun restore(context: Context, fromBoot: Boolean = false) {
         ids(context).forEach { id ->
-            val snapshot = read(context, id) ?: return@forEach
-            if (!snapshot.enabled || snapshot.state == "completed") return@forEach
-            if (snapshot.state == "ringing") {
-                TraditionalAlarmRingingService.start(context, id)
-            } else {
-                try {
-                    val next = if (snapshot.alarmAtMillis > System.currentTimeMillis()) snapshot.alarmAtMillis
-                    else if (snapshot.weekdays.isEmpty()) snapshot.alarmAtMillis else nextOccurrence(snapshot, System.currentTimeMillis())
-                    if (next <= System.currentTimeMillis() && snapshot.weekdays.isEmpty()) markRinging(context, id)
-                    else schedule(context, snapshot.copy(alarmAtMillis = next))
-                } catch (_: Throwable) { }
+            try {
+                val snapshot = read(context, id) ?: return@forEach
+                if (!snapshot.enabled || snapshot.state == "completed") return@forEach
+                val now = System.currentTimeMillis()
+                if (snapshot.state == "ringing" && !fromBoot) {
+                    // Ringing in this boot: the service start is idempotent.
+                    startRinging(context, id)
+                    return@forEach
+                }
+                if (snapshot.state != "ringing" && snapshot.alarmAtMillis > now) {
+                    schedule(context, snapshot)
+                    return@forEach
+                }
+                if (AlarmRestorePolicy.shouldRingLate(snapshot.alarmAtMillis, now)) {
+                    rearmSoon(context, snapshot, afterBoot = fromBoot)
+                } else {
+                    finish(context, id)
+                }
+            } catch (error: Throwable) {
+                Log.w(TAG, "Could not restore alarm $id", error)
             }
+        }
+    }
+
+    /**
+     * Starts the ringing service of an alarm already marked ringing. If
+     * Android refuses the start, the alarm is re-armed shortly ahead
+     * instead of staying silently "ringing".
+     */
+    fun startRinging(context: Context, id: String) {
+        try {
+            TraditionalAlarmRingingService.start(context, id)
+        } catch (error: Throwable) {
+            Log.w(TAG, "Alarm ringing service refused to start", error)
+            read(context, id)?.let { rearmSoon(context, it, afterBoot = true) }
+        }
+    }
+
+    /**
+     * The ringing service could not become a foreground service (Android
+     * refused it, typically right after a boot): ring again once the refusal
+     * no longer applies instead of crashing or staying silently "ringing".
+     */
+    fun recoverRefusedRing(context: Context, id: String) {
+        read(context, id)?.let { rearmSoon(context, it, afterBoot = true) }
+    }
+
+    private fun rearmSoon(context: Context, snapshot: Snapshot, afterBoot: Boolean) {
+        try {
+            schedule(
+                context,
+                snapshot.copy(
+                    alarmAtMillis = AlarmRestorePolicy.rearmAt(
+                        System.currentTimeMillis(),
+                        afterBoot,
+                    ),
+                    state = "scheduled",
+                ),
+            )
+        } catch (error: Throwable) {
+            // Exact alarms were revoked: the next launch or boot retries.
+            Log.w(TAG, "Could not re-arm alarm ${snapshot.id}", error)
         }
     }
 
@@ -164,6 +227,7 @@ object TraditionalAlarmScheduler {
             p.getBoolean("requires_mission", false), p.getString("mission_hash", null),
             p.getString("mission_salt", null), p.getString("mission_format", null),
             p.getString("state", "scheduled") ?: "scheduled", p.getBoolean("enabled", true),
+            p.getBoolean("gradual_volume", false),
         )
     }
 
@@ -176,7 +240,8 @@ object TraditionalAlarmScheduler {
             .putInt("max_snoozes", snapshot.maxSnoozes).putInt("snooze_count", snapshot.snoozeCount)
             .putBoolean("requires_mission", snapshot.requiresMission).putString("mission_hash", snapshot.missionHash)
             .putString("mission_salt", snapshot.missionSalt).putString("mission_format", snapshot.missionFormat)
-            .putString("state", snapshot.state).putBoolean("enabled", snapshot.enabled).apply()
+            .putString("state", snapshot.state).putBoolean("enabled", snapshot.enabled)
+            .putBoolean("gradual_volume", snapshot.gradualVolume).apply()
         index(context).edit().putStringSet(KEY_IDS, (ids(context) + snapshot.id).toMutableSet()).apply()
     }
 

@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/alarm_wake_settings.dart';
 import 'package:workout_notes/screens/sleep/sleep_monitor_screen.dart';
+import 'package:workout_notes/services/alarm_wake_settings_service.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'support/test_db.dart';
 
@@ -101,6 +103,73 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
+  testWidgets('the smart window is shown and chosen before the night', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await _pumpMonitor(tester, until: 'Smart · 30 min');
+
+    expect(find.text('Smart · 30 min'), findsOneWidget);
+    expect(find.textContaining('Wake between'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('sleep-monitor-smart-wake')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('Smart alarm'), findsOneWidget);
+    expect(find.text('Balanced'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('smart-window-20')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('smart-sensitivity-sensitive')));
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('smart-wake-save')));
+    await tester.tap(find.byKey(const Key('smart-wake-save')));
+    await _settle(tester);
+    expect(find.text('Smart · 20 min'), findsOneWidget);
+    final saved = (await tester.runAsync(
+      () => AlarmWakeSettingsService().load(),
+    ))!;
+    expect(saved.windowMinutes, 20);
+    expect(saved.sensitivity, SmartWakeSensitivity.sensitive);
+
+    // Turning the window off brings back a plain fixed-time alarm.
+    await tester.tap(find.byKey(const Key('sleep-monitor-smart-wake')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byKey(const Key('smart-window-0')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('smart-wake-save')));
+    await _settle(tester);
+    expect(find.text('Fixed time'), findsOneWidget);
+    expect(find.textContaining('Wake between'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('a running night shows its own smart window', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    nativeState = {
+      ...nativeState,
+      'status': 'running',
+      'session_id': 'night',
+      'started_at': DateTime.now()
+          .subtract(const Duration(minutes: 5))
+          .toIso8601String(),
+      'alarm_at': DateTime.now()
+          .add(const Duration(hours: 7))
+          .toIso8601String(),
+      'smart_window_minutes': 45,
+    };
+
+    await _pumpMonitor(tester, until: 'Finish and view result');
+    expect(find.textContaining('Wake between'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   testWidgets(
     'shows the wake time, live waves and a quiet stop while running',
     (tester) async {
@@ -156,5 +225,14 @@ Future<void> _pumpMonitor(WidgetTester tester, {required String until}) async {
     );
     await tester.pump(const Duration(milliseconds: 50));
     if (find.text(until).evaluate().isNotEmpty) break;
+  }
+}
+
+Future<void> _settle(WidgetTester tester) async {
+  for (var attempt = 0; attempt < 10; attempt++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
   }
 }

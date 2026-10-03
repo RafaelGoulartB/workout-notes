@@ -6,7 +6,9 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import com.workoutnotes.workout_notes.MainActivity
+import com.workoutnotes.workout_notes.common.AlarmRestorePolicy
 import com.workoutnotes.workout_notes.sleep.SleepAlarmScheduler
 import java.util.UUID
 import org.json.JSONArray
@@ -24,6 +26,7 @@ import com.workoutnotes.workout_notes.common.PendingIntentFlags
  * same one-way flow used by the sleep monitor.
  */
 object MedicationReminderScheduler {
+    private const val TAG = "MedicationReminders"
     const val ACTION_REMIND = "com.workoutnotes.workout_notes.medication.REMIND"
     const val ACTION_ESCALATE = "com.workoutnotes.workout_notes.medication.ESCALATE"
     const val EXTRA_SLOT_ID = "medication_slot_id"
@@ -185,30 +188,92 @@ object MedicationReminderScheduler {
         return true
     }
 
-    /** Re-arms everything after a reboot, an update or an app launch. */
+    /**
+     * Re-arms everything after a reboot, an update or an app launch.
+     *
+     * A dose whose reminder was missed meanwhile (phone off, app
+     * force-stopped) is reminded late, the most recent one only, and then
+     * escalates as usual. An escalation that came due is re-armed as an exact
+     * alarm shortly after (30 s after a boot) instead of starting the alarm service from
+     * the boot receiver, which Android 15+ forbids. One slot failing never
+     * blocks the others.
+     */
     @Synchronized
-    fun restore(context: Context) {
+    fun restore(context: Context, fromBoot: Boolean = false) {
         val now = System.currentTimeMillis()
         ids(context).forEach { id ->
-            val slot = read(context, id) ?: return@forEach
-            val next = if (slot.nextAt > now) slot.nextAt
-            else MedicationReminderPolicy.nextOccurrence(slot.hour, slot.minute, slot.weekdays, now)
-            var updated = slot.copy(nextAt = next)
-            if (slot.state == MedicationReminderPolicy.STATE_AWAITING && slot.escalationAt <= now) {
-                updated = updated.copy(state = MedicationReminderPolicy.STATE_RINGING)
-            }
-            persist(context, updated)
             try {
-                setReminderAlarm(context, updated)
-            } catch (_: Throwable) { }
-            when (updated.state) {
-                MedicationReminderPolicy.STATE_AWAITING -> {
-                    try {
-                        setEscalationAlarm(context, updated)
-                    } catch (_: Throwable) { }
-                }
-                MedicationReminderPolicy.STATE_RINGING -> MedicationAlarmService.start(context, id)
+                restoreSlot(context, id, now, fromBoot)
+            } catch (error: Throwable) {
+                Log.w(TAG, "Could not restore medication slot $id", error)
             }
+        }
+    }
+
+    private fun restoreSlot(context: Context, id: String, now: Long, fromBoot: Boolean) {
+        val slot = read(context, id) ?: return
+        val pending = slot.state != MedicationReminderPolicy.STATE_SCHEDULED &&
+            slot.pendingDoseKey != null
+        // Reminders that should have fired since the last one handled.
+        val since = if (pending) slot.pendingDueAt + 1 else slot.nextAt
+        val missed = MedicationReminderPolicy.missedDose(
+            since, slot.hour, slot.minute, slot.weekdays, now,
+        )
+        if (missed != null) {
+            // Supersedes an older pending dose, like a reminder firing on time.
+            onReminder(context, id, missed)
+            return
+        }
+        val next = if (slot.nextAt > now) slot.nextAt
+        else MedicationReminderPolicy.nextOccurrence(slot.hour, slot.minute, slot.weekdays, now)
+        val updated = slot.copy(nextAt = next)
+        persist(context, updated)
+        try {
+            setReminderAlarm(context, updated)
+        } catch (_: Throwable) { }
+        val escalationDue = slot.state == MedicationReminderPolicy.STATE_RINGING ||
+            (slot.state == MedicationReminderPolicy.STATE_AWAITING && slot.escalationAt <= now)
+        when {
+            !pending -> Unit
+            escalationDue && fromBoot -> rearmEscalation(context, updated, now, afterBoot = true)
+            escalationDue -> {
+                persist(context, updated.copy(state = MedicationReminderPolicy.STATE_RINGING))
+                try {
+                    MedicationAlarmService.start(context, id)
+                } catch (error: Throwable) {
+                    Log.w(TAG, "Medication alarm refused to start", error)
+                    rearmEscalation(context, updated, now, afterBoot = true)
+                }
+            }
+            else -> try {
+                setEscalationAlarm(context, updated)
+            } catch (_: Throwable) { }
+        }
+    }
+
+    /**
+     * The alarm service could not become a foreground service (Android
+     * refused it, typically right after a boot): escalate again once the
+     * refusal no longer applies.
+     */
+    @Synchronized
+    fun recoverRefusedRing(context: Context, id: String) {
+        val slot = read(context, id) ?: return
+        if (slot.state != MedicationReminderPolicy.STATE_RINGING) return
+        rearmEscalation(context, slot, System.currentTimeMillis(), afterBoot = true)
+    }
+
+    /** Escalates again shortly through the exact escalation alarm. */
+    private fun rearmEscalation(context: Context, slot: Slot, now: Long, afterBoot: Boolean) {
+        val rearmed = slot.copy(
+            state = MedicationReminderPolicy.STATE_AWAITING,
+            escalationAt = AlarmRestorePolicy.rearmAt(now, afterBoot),
+        )
+        persist(context, rearmed)
+        try {
+            setEscalationAlarm(context, rearmed)
+        } catch (error: Throwable) {
+            Log.w(TAG, "Could not re-arm the medication escalation", error)
         }
     }
 

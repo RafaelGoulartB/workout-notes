@@ -25,7 +25,8 @@ class SleepMonitorService extends ChangeNotifier {
   static const methods = MethodChannel('workout_notes/sleep_monitor/methods');
   static const events = EventChannel('workout_notes/sleep_monitor/events');
 
-  final SleepMonitorRepository _repository = DatabaseHelper.instance.sleepMonitorRepo;
+  final SleepMonitorRepository _repository =
+      DatabaseHelper.instance.sleepMonitorRepo;
   SleepMonitorState _state = SleepMonitorState.initial(
     supported: defaultTargetPlatform == TargetPlatform.android,
   );
@@ -46,6 +47,11 @@ class SleepMonitorService extends ChangeNotifier {
   bool get isSupported => _state.supported;
   bool get isMonitoring => _state.isActive;
   int get recoveredCount => _recoveredCount;
+
+  /// Bumped when stored nights are re-staged in the background, so screens
+  /// showing them reload without announcing a recovery.
+  int get analysisRevision => _analysisRevision;
+  int _analysisRevision = 0;
 
   /// Subscribes to the native events, reads capabilities/state and imports
   /// pending spools. Concurrent and later callers share the same run; a failed
@@ -250,6 +256,8 @@ class SleepMonitorService extends ChangeNotifier {
     SleepMonitoringMode mode = SleepMonitoringMode.alarmWithoutMission,
     SleepMissionConfig? mission,
     int maxSnoozes = 3,
+    int smartWindowMinutes = 0,
+    double smartThreshold = 0.5,
   }) async {
     if (!_isAndroid) return false;
     if (_state.isActive) return true;
@@ -266,6 +274,10 @@ class SleepMonitorService extends ChangeNotifier {
       arguments['max_snoozes'] = maxSnoozes.clamp(0, 10);
       if (alarmAt != null) {
         arguments['alarm_at_epoch_ms'] = alarmAt.millisecondsSinceEpoch;
+        if (smartWindowMinutes > 0) {
+          arguments['smart_window_minutes'] = smartWindowMinutes;
+          arguments['smart_threshold'] = smartThreshold;
+        }
       }
       if (mission != null) {
         arguments.addAll({
@@ -469,6 +481,7 @@ class SleepMonitorService extends ChangeNotifier {
             'sleep-wake-bedside-v2',
             'sleep-wake-bedside-v3',
             'sleep-wake-bedside-v4',
+            'sleep-wake-bedside-v5',
           }.contains(session.stageAlgorithmVersion)) {
             continue;
           }
@@ -483,6 +496,26 @@ class SleepMonitorService extends ChangeNotifier {
             }
           } catch (error) {
             _setError('import_failed', error.toString());
+          }
+        }
+        // Upgrade recent nights staged by an older engine (or without the
+        // night chart) while their archive still exists.
+        if (await store.isEnabled()) {
+          for (final session
+              in await _repository.getSessionsNeedingAnalysisRefresh()) {
+            if (_state.isActive) break;
+            try {
+              final archive = await store.readSession(session.id);
+              if (archive == null) continue;
+              final refreshed = await _repository.refreshAnalysis(archive);
+              if (refreshed != null) {
+                _analysisRevision++;
+                await store.save(archive, resultSummary: refreshed.toMap());
+                notifyListeners();
+              }
+            } catch (error) {
+              _setError('import_failed', error.toString());
+            }
           }
         }
       }
@@ -537,6 +570,8 @@ class SleepMonitorService extends ChangeNotifier {
       // awake; a cursor joining mid-night must not invent that evidence.
       _liveCursor = SleepWakeCursor(
         sessionId: segment.sessionId,
+        // Live sessions are recorded by the native side shipped with this app.
+        featureVersion: SleepWakeEngine.currentFeatureVersion,
         startsAwake:
             started != null &&
             segment.startedAt.difference(started).inSeconds.abs() <= 1,

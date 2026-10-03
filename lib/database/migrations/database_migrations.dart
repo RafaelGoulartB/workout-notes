@@ -234,6 +234,35 @@ abstract final class DatabaseMigrations {
     if (step(57)) {
       await normalizeRunTimestamps(db);
     }
+    if (step(58)) {
+      // Bedside sleep engine v6: restless-sleep and snoring minutes.
+      for (final column in const ['restless_sleep_minutes', 'snore_minutes']) {
+        await tryExecute(
+          db,
+          'ALTER TABLE sleep_monitor_sessions ADD COLUMN $column INTEGER',
+        );
+      }
+    }
+    if (step(59)) {
+      // Minute-by-minute night summary for the sleep chart (~2 KB a night).
+      await tryExecute(
+        db,
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN stage_timeline TEXT',
+      );
+    }
+    if (step(60)) {
+      // Smart alarm: the window of the night, when and why it rang and the
+      // one-tap morning answer; gentle volume rise per standalone alarm.
+      for (final statement in const [
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN smart_window_minutes INTEGER',
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN alarm_fired_at TEXT',
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN alarm_trigger TEXT',
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN wake_feeling INTEGER',
+        'ALTER TABLE traditional_alarms ADD COLUMN gradual_volume INTEGER NOT NULL DEFAULT 0',
+      ]) {
+        await tryExecute(db, statement);
+      }
+    }
   }
 
   /// Statements that create the v56 indexes. Also used by `onCreate`.

@@ -1,5 +1,6 @@
 import 'package:workout_notes/models/sleep_monitor_mode.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
+import 'package:workout_notes/models/sleep_night_timeline.dart';
 
 /// Durable aggregate for one microphone monitoring session.
 class SleepMonitorSession {
@@ -52,10 +53,38 @@ class SleepMonitorSession {
   final int? sleepingMinutes;
   final int? deepSleepMinutes;
   final int? unknownMinutes;
+
+  /// Sleep minutes in stretches with repeated movement (bedside v6+).
+  final int? restlessSleepMinutes;
+  final int? snoreMinutes;
   final int? awakeningCount;
   final double? sleepEfficiency;
   final double? stageConfidence;
   final String? stageAlgorithmVersion;
+
+  /// Encoded [SleepNightTimeline] for the night chart (bedside v6+).
+  final String? stageTimeline;
+
+  /// Minutes before [alarmAt] in which the smart alarm could ring (v60).
+  final int? smartWindowMinutes;
+
+  /// When the night's alarm first rang (v60): before [alarmAt] when the
+  /// smart alarm caught the person stirring.
+  final DateTime? alarmFiredAt;
+
+  /// Why it rang then: [triggerAwake], [triggerStirring] or [triggerDeadline].
+  final String? alarmTrigger;
+
+  /// The user's one-tap morning answer: [feelingTired], [feelingOkay] or
+  /// [feelingRefreshed].
+  final int? wakeFeeling;
+
+  static const triggerAwake = 'awake';
+  static const triggerStirring = 'stirring';
+  static const triggerDeadline = 'deadline';
+  static const feelingTired = 1;
+  static const feelingOkay = 2;
+  static const feelingRefreshed = 3;
 
   const SleepMonitorSession({
     required this.id,
@@ -88,11 +117,40 @@ class SleepMonitorSession {
     this.sleepingMinutes,
     this.deepSleepMinutes,
     this.unknownMinutes,
+    this.restlessSleepMinutes,
+    this.snoreMinutes,
     this.awakeningCount,
     this.sleepEfficiency,
     this.stageConfidence,
     this.stageAlgorithmVersion,
+    this.stageTimeline,
+    this.smartWindowMinutes,
+    this.alarmFiredAt,
+    this.alarmTrigger,
+    this.wakeFeeling,
   });
+
+  bool get hasSmartWindow => (smartWindowMinutes ?? 0) > 0 && alarmAt != null;
+
+  /// Start of the smart window; null without one.
+  DateTime? get smartWindowStart => hasSmartWindow
+      ? alarmAt!.subtract(Duration(minutes: smartWindowMinutes!))
+      : null;
+
+  /// Whole minutes the smart alarm rang before the deadline; null when it did
+  /// not ring early.
+  int? get smartWakeLeadMinutes {
+    final fired = alarmFiredAt;
+    if (!hasSmartWindow || fired == null) return null;
+    if (alarmTrigger != triggerAwake && alarmTrigger != triggerStirring) {
+      return null;
+    }
+    final lead = alarmAt!.difference(fired).inSeconds;
+    return lead <= 0 ? null : (lead / 60).round();
+  }
+
+  /// Decoded night chart data; null when absent or unreadable.
+  SleepNightTimeline? get timeline => SleepNightTimeline.decode(stageTimeline);
 
   bool get hasSleepStages =>
       analysisStatus == analysisAvailable &&
@@ -133,10 +191,17 @@ class SleepMonitorSession {
     int? sleepingMinutes,
     int? deepSleepMinutes,
     int? unknownMinutes,
+    int? restlessSleepMinutes,
+    int? snoreMinutes,
     int? awakeningCount,
     double? sleepEfficiency,
     double? stageConfidence,
     String? stageAlgorithmVersion,
+    String? stageTimeline,
+    int? smartWindowMinutes,
+    DateTime? alarmFiredAt,
+    String? alarmTrigger,
+    int? wakeFeeling,
   }) {
     return SleepMonitorSession(
       id: id,
@@ -170,11 +235,18 @@ class SleepMonitorSession {
       sleepingMinutes: sleepingMinutes ?? this.sleepingMinutes,
       deepSleepMinutes: deepSleepMinutes ?? this.deepSleepMinutes,
       unknownMinutes: unknownMinutes ?? this.unknownMinutes,
+      restlessSleepMinutes: restlessSleepMinutes ?? this.restlessSleepMinutes,
+      snoreMinutes: snoreMinutes ?? this.snoreMinutes,
       awakeningCount: awakeningCount ?? this.awakeningCount,
       sleepEfficiency: sleepEfficiency ?? this.sleepEfficiency,
       stageConfidence: stageConfidence ?? this.stageConfidence,
       stageAlgorithmVersion:
           stageAlgorithmVersion ?? this.stageAlgorithmVersion,
+      stageTimeline: stageTimeline ?? this.stageTimeline,
+      smartWindowMinutes: smartWindowMinutes ?? this.smartWindowMinutes,
+      alarmFiredAt: alarmFiredAt ?? this.alarmFiredAt,
+      alarmTrigger: alarmTrigger ?? this.alarmTrigger,
+      wakeFeeling: wakeFeeling ?? this.wakeFeeling,
     );
   }
 
@@ -225,12 +297,25 @@ class SleepMonitorSession {
       map['deep_sleep_minutes'] = deepSleepMinutes;
     }
     if (unknownMinutes != null) map['unknown_minutes'] = unknownMinutes;
+    if (restlessSleepMinutes != null) {
+      map['restless_sleep_minutes'] = restlessSleepMinutes;
+    }
+    if (snoreMinutes != null) map['snore_minutes'] = snoreMinutes;
     if (awakeningCount != null) map['awakening_count'] = awakeningCount;
     if (sleepEfficiency != null) map['sleep_efficiency'] = sleepEfficiency;
     if (stageConfidence != null) map['stage_confidence'] = stageConfidence;
     if (stageAlgorithmVersion != null) {
       map['stage_algorithm_version'] = stageAlgorithmVersion;
     }
+    if (stageTimeline != null) map['stage_timeline'] = stageTimeline;
+    if (smartWindowMinutes != null) {
+      map['smart_window_minutes'] = smartWindowMinutes;
+    }
+    if (alarmFiredAt != null) {
+      map['alarm_fired_at'] = alarmFiredAt!.toIso8601String();
+    }
+    if (alarmTrigger != null) map['alarm_trigger'] = alarmTrigger;
+    if (wakeFeeling != null) map['wake_feeling'] = wakeFeeling;
     return map;
   }
 
@@ -279,10 +364,19 @@ class SleepMonitorSession {
       sleepingMinutes: (map['sleeping_minutes'] as num?)?.toInt(),
       deepSleepMinutes: (map['deep_sleep_minutes'] as num?)?.toInt(),
       unknownMinutes: (map['unknown_minutes'] as num?)?.toInt(),
+      restlessSleepMinutes: (map['restless_sleep_minutes'] as num?)?.toInt(),
+      snoreMinutes: (map['snore_minutes'] as num?)?.toInt(),
       awakeningCount: (map['awakening_count'] as num?)?.toInt(),
       sleepEfficiency: (map['sleep_efficiency'] as num?)?.toDouble(),
       stageConfidence: (map['stage_confidence'] as num?)?.toDouble(),
       stageAlgorithmVersion: map['stage_algorithm_version'] as String?,
+      stageTimeline: map['stage_timeline'] as String?,
+      smartWindowMinutes: (map['smart_window_minutes'] as num?)?.toInt(),
+      alarmFiredAt: (map['alarm_fired_at'] as String?) == null
+          ? null
+          : DateTime.parse(map['alarm_fired_at'] as String),
+      alarmTrigger: map['alarm_trigger'] as String?,
+      wakeFeeling: (map['wake_feeling'] as num?)?.toInt(),
     );
   }
 

@@ -92,4 +92,57 @@ class MedicationReminderPolicyTest {
         val keys = (1..50).map { "2026-09-%02dT08:00".format(it % 28 + 1) + it }.toSet()
         assertEquals(40, MedicationReminderPolicy.pruneConfirmed(keys).size)
     }
+
+    @Test
+    fun `a reminder missed while the phone was off is reminded late`() {
+        // Due Tuesday 08:00; the phone came back at 11:30.
+        val due = at(2026, 9, 29, 8, 0)
+        val now = at(2026, 9, 29, 11, 30)
+        assertEquals(due, MedicationReminderPolicy.missedDose(due, 8, 0, emptySet(), now, zone))
+        // Nothing was due yet.
+        assertEquals(
+            null,
+            MedicationReminderPolicy.missedDose(due, 8, 0, emptySet(), at(2026, 9, 29, 7, 0), zone),
+        )
+    }
+
+    @Test
+    fun `only the most recent missed dose is reminded`() {
+        // Off from Monday 07:00 to Wednesday 09:00: Monday's and Tuesday's
+        // 08:00 doses are gone, Wednesday's is the one to remind.
+        val since = at(2026, 9, 28, 8, 0)
+        val now = at(2026, 9, 30, 9, 0)
+        assertEquals(
+            at(2026, 9, 30, 8, 0),
+            MedicationReminderPolicy.missedDose(since, 8, 0, emptySet(), now, zone),
+        )
+    }
+
+    @Test
+    fun `a pending dose is superseded only by a newer one`() {
+        val pendingDue = at(2026, 9, 29, 8, 0)
+        // Still Tuesday: the pending dose is the latest, nothing newer.
+        assertEquals(
+            null,
+            MedicationReminderPolicy.missedDose(
+                pendingDue + 1, 8, 0, emptySet(), at(2026, 9, 29, 20, 0), zone,
+            ),
+        )
+        // Wednesday 08:30: Wednesday's dose replaces it.
+        assertEquals(
+            at(2026, 9, 30, 8, 0),
+            MedicationReminderPolicy.missedDose(
+                pendingDue + 1, 8, 0, emptySet(), at(2026, 9, 30, 8, 30), zone,
+            ),
+        )
+    }
+
+    @Test
+    fun `latest occurrence honours the selected weekdays`() {
+        // Wednesday 2026-09-30; only Mondays (1) are selected.
+        assertEquals(
+            at(2026, 9, 28, 9, 30),
+            MedicationReminderPolicy.latestOccurrence(9, 30, setOf(1), at(2026, 9, 30, 12, 0), zone),
+        )
+    }
 }

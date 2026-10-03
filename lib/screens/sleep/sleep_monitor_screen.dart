@@ -11,6 +11,7 @@ import 'package:workout_notes/widgets/sleep/monitor/monitor_mode_widgets.dart';
 import 'package:workout_notes/widgets/sleep/monitor/monitor_sections.dart';
 import 'package:workout_notes/widgets/sleep/monitor/monitor_status_widgets.dart';
 import 'package:workout_notes/widgets/sleep/monitor/sleep_monitor_texts.dart';
+import 'package:workout_notes/widgets/sleep/monitor/smart_wake_widgets.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class SleepMonitorScreen extends StatefulWidget {
@@ -114,6 +115,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
                     onChooseAlarmTime: _chooseAlarmTime,
                     onShiftAlarmTime: _shiftAlarmTime,
                     onShowModePicker: _showModePicker,
+                    onShowSmartWake: _showSmartWake,
                   ),
           ),
         ),
@@ -321,7 +323,17 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
       hasAlarm: _controller.selectedMode.hasAlarm,
       snoozeEnabled: _controller.globalSnoozeEnabled,
       maxSnoozes: _controller.globalMaxSnoozes,
+      smartWake: _controller.wakeSettings.smartWindowEnabled,
     );
+  }
+
+  Future<void> _showSmartWake() async {
+    final selected = await showSmartWakeSheet(
+      context,
+      _controller.wakeSettings,
+    );
+    if (selected == null || !mounted) return;
+    await _controller.updateWakeSettings(selected);
   }
 
   Future<void> _showModePicker() async {

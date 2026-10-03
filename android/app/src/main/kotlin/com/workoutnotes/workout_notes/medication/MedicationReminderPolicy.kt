@@ -40,6 +40,52 @@ internal object MedicationReminderPolicy {
         return now + 7 * DAY_MILLIS
     }
 
+    /** Latest reminder at or before [now] for the slot's time and days, if any this week. */
+    fun latestOccurrence(
+        hour: Int,
+        minute: Int,
+        weekdays: Set<Int>,
+        now: Long,
+        timeZone: TimeZone = TimeZone.getDefault(),
+    ): Long? {
+        val base = Calendar.getInstance(timeZone).apply {
+            timeInMillis = now
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        for (offset in 0..7) {
+            val candidate = (base.clone() as Calendar).apply {
+                add(Calendar.DAY_OF_YEAR, -offset)
+                set(Calendar.HOUR_OF_DAY, hour)
+                set(Calendar.MINUTE, minute)
+            }
+            if (candidate.timeInMillis > now) continue
+            if (weekdays.isEmpty() || weekdays.contains(weekdayOf(candidate))) {
+                return candidate.timeInMillis
+            }
+        }
+        return null
+    }
+
+    /**
+     * The dose to remind late after reminders were missed (phone off, app
+     * force-stopped): the most recent occurrence at or after [sinceMillis]
+     * and not after [now]. Only the latest one: reminding older doses could
+     * lead to two doses taken close together. Null when nothing was missed.
+     */
+    fun missedDose(
+        sinceMillis: Long,
+        hour: Int,
+        minute: Int,
+        weekdays: Set<Int>,
+        now: Long,
+        timeZone: TimeZone = TimeZone.getDefault(),
+    ): Long? {
+        if (sinceMillis > now) return null
+        val latest = latestOccurrence(hour, minute, weekdays, now, timeZone) ?: return null
+        return latest.takeIf { it >= sinceMillis }
+    }
+
     /**
      * Identifies one scheduled dose ("2026-09-29T08:00", local time). Dart
      * builds the same key, so confirmations made on either side match.

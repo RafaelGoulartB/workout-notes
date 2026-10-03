@@ -78,4 +78,94 @@ void main() {
 
     expect(result, isNull);
   });
+
+  group('bedside summaries', () {
+    final start = DateTime.utc(2026, 8, 1, 22);
+
+    List<SleepStageEpoch> night(
+      List<(SleepStageType, int)> parts, {
+      bool Function(int index)? moving,
+      bool Function(int index)? snoring,
+    }) {
+      final epochs = <SleepStageEpoch>[];
+      for (final (stage, count) in parts) {
+        for (var i = 0; i < count; i++) {
+          final index = epochs.length;
+          epochs.add(
+            SleepStageEpoch(
+              id: 'e$index',
+              sessionId: 's',
+              startedAt: start.add(Duration(seconds: index * 30)),
+              durationSeconds: 30,
+              stage: stage,
+              confidence: 0.9,
+              awakeProbability: null,
+              sleepingProbability: null,
+              deepProbability: null,
+              algorithmVersion: 'sleep-wake-bedside-v6',
+              source: 'bedside_heuristic',
+              movementSeconds: moving?.call(index) ?? false ? 4 : 0,
+              snoring: snoring?.call(index) ?? false,
+            ),
+          );
+        }
+      }
+      return epochs;
+    }
+
+    test('restless sleep needs repeated movement nearby', () {
+      // 60 min asleep; movement every other window from minute 20 to 30.
+      final epochs = night(
+        [(SleepStageType.sleeping, 120)],
+        moving: (i) => i >= 40 && i < 60 && i.isEven,
+      );
+      final summary = service.summarize(
+        sessionStart: start,
+        sessionEnd: start.add(const Duration(minutes: 60)),
+        epochs: epochs,
+      )!;
+      // The busy 10 minutes plus the edges of the 5-minute neighbourhood.
+      expect(summary.restlessSleepMinutes, inInclusiveRange(10, 18));
+      final isolated = service.summarize(
+        sessionStart: start,
+        sessionEnd: start.add(const Duration(minutes: 60)),
+        epochs: night(
+          [(SleepStageType.sleeping, 120)],
+          moving: (i) => i % 20 == 0,
+        ),
+      )!;
+      expect(isolated.restlessSleepMinutes, 0);
+    });
+
+    test('snoring minutes count only snoring while asleep', () {
+      final summary = service.summarize(
+        sessionStart: start,
+        sessionEnd: start.add(const Duration(minutes: 30)),
+        epochs: night(
+          [(SleepStageType.awake, 20), (SleepStageType.sleeping, 40)],
+          snoring: (i) => i % 2 == 0,
+        ),
+      )!;
+      expect(summary.snoreMinutes, 10);
+    });
+
+    test('unknown time neither splits an awakening nor counts as wake', () {
+      final summary = service.summarize(
+        sessionStart: start,
+        sessionEnd: start.add(const Duration(minutes: 60)),
+        epochs: night([
+          (SleepStageType.awake, 10),
+          (SleepStageType.sleeping, 40),
+          (SleepStageType.awake, 4),
+          (SleepStageType.unknown, 2),
+          (SleepStageType.awake, 4),
+          (SleepStageType.sleeping, 60),
+        ]),
+      )!;
+      expect(summary.awakeningCount, 1);
+      expect(summary.unknownMinutes, 1);
+      // Efficiency over the classified 59 minutes, not the 60 in bed.
+      expect(summary.sleepEfficiency, closeTo(50 / 59 * 100, 0.01));
+    });
+  });
 }

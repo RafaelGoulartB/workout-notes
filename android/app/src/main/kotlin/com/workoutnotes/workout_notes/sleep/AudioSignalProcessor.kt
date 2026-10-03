@@ -5,6 +5,7 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.SystemClock
 import java.util.UUID
+import kotlin.math.ceil
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
@@ -210,37 +211,79 @@ class AudioSignalProcessor(
     )
 }
 
-/** Device-relative ambient baseline with a short, noise-resistant bootstrap. */
+/**
+ * Device-relative ambient floor: a low percentile of the last few minutes of
+ * block levels.
+ *
+ * A percentile of a rolling window (instead of an EMA gated to "near the
+ * floor") has properties the wake evidence depends on:
+ * - a burst or an episode of talking shorter than (1 - percentile) of the
+ *   window cannot raise the floor at all, because loud blocks only occupy the
+ *   top of the ordering;
+ * - a quiet dip has to outlast `percentile * window` (30 s by default) before
+ *   it lowers the floor;
+ * - a sustained level change (fan or AC turning on, rain) is absorbed once it
+ *   fills `(1 - percentile)` of the window (about 4.5 min), instead of
+ *   staying "activity" for the rest of the night.
+ *
+ * Levels are kept in a fixed 0.5 dB histogram plus a ring of the bin indexes,
+ * so an update is O(bins) and allocation free. Blocks are sampleRate / 8
+ * samples, so one block is always 125 ms.
+ */
 internal class AdaptiveNoiseBaseline(
-    private val calibrationSampleCount: Int = 20,
-    initialValue: Double = -55.0,
+    private val windowBlocks: Int = DEFAULT_WINDOW_BLOCKS,
+    private val percentile: Double = DEFAULT_PERCENTILE,
+    private val calibrationBlocks: Int = DEFAULT_CALIBRATION_BLOCKS,
+    private val initialValue: Double = -55.0,
 ) {
-    private val calibrationValues = mutableListOf<Double>()
+    companion object {
+        const val DEFAULT_WINDOW_BLOCKS = 2_400 // 5 min of 125 ms blocks
+        const val DEFAULT_PERCENTILE = 0.10
+        const val DEFAULT_CALIBRATION_BLOCKS = 80 // 10 s
+        private const val MIN_DBFS = -120.0
+        private const val MAX_DBFS = 0.0
+        private const val BIN_DB = 0.5
+        private const val BINS = ((MAX_DBFS - MIN_DBFS) / BIN_DB).toInt()
+        // Codec noise floor / digital silence: not real ambient noise.
+        private const val SILENCE_DBFS = -118.0
+    }
+
+    init {
+        require(windowBlocks > 0 && calibrationBlocks > 0)
+        require(percentile > 0.0 && percentile < 1.0)
+    }
+
+    private val histogram = IntArray(BINS)
+    private val ring = IntArray(windowBlocks)
+    private var head = 0
+    private var filled = 0
+    private var validBlocks = 0
     var value: Double = initialValue
         private set
     var isCalibrated: Boolean = false
         private set
 
     fun observe(dbfs: Double) {
-        if (!dbfs.isFinite()) return
-        // Ignore the codec noise floor so calibration tracks real ambient
-        // noise instead of drifting toward digital silence.
-        if (dbfs <= -118.0) return
-        if (!isCalibrated) {
-            calibrationValues += dbfs
-            if (calibrationValues.size >= calibrationSampleCount) {
-                val sorted = calibrationValues.sorted()
-                // A lower quartile ignores speech/noise during initial setup
-                // while adapting to each device's microphone gain.
-                value = sorted[(sorted.lastIndex / 4).coerceAtLeast(0)]
-                calibrationValues.clear()
-                isCalibrated = true
-            }
-            return
+        if (!dbfs.isFinite() || dbfs <= SILENCE_DBFS) return
+        val bin = ((dbfs.coerceIn(MIN_DBFS, MAX_DBFS) - MIN_DBFS) / BIN_DB).toInt()
+            .coerceIn(0, BINS - 1)
+        if (filled == windowBlocks) histogram[ring[head]]-- else filled++
+        ring[head] = bin
+        histogram[bin]++
+        head = (head + 1) % windowBlocks
+        if (validBlocks < calibrationBlocks) validBlocks++
+        if (!isCalibrated && validBlocks >= calibrationBlocks) isCalibrated = true
+        if (isCalibrated) value = percentileValue()
+    }
+
+    private fun percentileValue(): Double {
+        val rank = max(1, ceil(percentile * filled).toInt())
+        var cumulative = 0
+        for (bin in 0 until BINS) {
+            cumulative += histogram[bin]
+            if (cumulative >= rank) return MIN_DBFS + (bin + 0.5) * BIN_DB
         }
-        if (dbfs <= value + 6.0) {
-            value = value * 0.98 + dbfs * 0.02
-        }
+        return initialValue
     }
 
     fun noiseScore(dbfs: Double): Double =

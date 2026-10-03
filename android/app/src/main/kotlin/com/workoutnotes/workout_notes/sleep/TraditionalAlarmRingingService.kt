@@ -9,10 +9,13 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.workoutnotes.workout_notes.R
 import com.workoutnotes.workout_notes.common.AlarmRinger
+import com.workoutnotes.workout_notes.common.AlarmVolumeRamp
+import com.workoutnotes.workout_notes.common.AlarmWakePrefs
 import com.workoutnotes.workout_notes.common.NotificationChannels
 import com.workoutnotes.workout_notes.common.NotificationChannels.silent
 import com.workoutnotes.workout_notes.common.PendingIntentFlags
@@ -92,8 +95,25 @@ class TraditionalAlarmRingingService : Service() {
         }
         if (snapshot.state != "ringing") return START_NOT_STICKY
         ensureChannel()
-        startForeground(NOTIFICATION_ID, notification(snapshot))
-        if (!ringer.hasPlayer) ringer.start()
+        try {
+            startForeground(NOTIFICATION_ID, notification(snapshot))
+        } catch (error: Throwable) {
+            // Refused (e.g. right after a boot): ring again shortly instead
+            // of crashing the app with the alarm stuck as "ringing".
+            Log.w("TraditionalAlarm", "Ringing refused to start", error)
+            TraditionalAlarmScheduler.recoverRefusedRing(this, id)
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        if (!ringer.hasPlayer) {
+            ringer.start(
+                if (snapshot.gradualVolume) {
+                    AlarmWakePrefs.ramp(this, snoozed = snapshot.snoozeCount > 0)
+                } else {
+                    AlarmVolumeRamp.NONE
+                },
+            )
+        }
         return START_STICKY
     }
 

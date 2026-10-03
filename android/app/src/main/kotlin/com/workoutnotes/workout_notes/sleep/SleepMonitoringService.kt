@@ -8,7 +8,9 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import androidx.core.content.ContextCompat
 import java.time.Instant
@@ -163,6 +165,37 @@ class SleepMonitoringService : Service() {
             eventSink?.invoke(updated)
         }
 
+        /**
+         * Records on the night when (and why) its alarm first rang, before the
+         * monitoring stops. Falls back to the spool when the service is gone.
+         */
+        fun recordAlarmFired(
+            context: android.content.Context,
+            trigger: String,
+            firedAtMillis: Long,
+        ) {
+            val firedAt = Instant.ofEpochMilli(firedAtMillis).toString()
+            val service = activeInstance
+            if (service != null) {
+                service.markAlarmFired(trigger, firedAt)
+                return
+            }
+            val snapshot = SleepAlarmScheduler.read(context) ?: return
+            try {
+                val spool = SleepSessionSpool(context)
+                val stored = spool.read(snapshot.sessionId)
+                @Suppress("UNCHECKED_CAST")
+                val session: MutableMap<String, Any?> =
+                    (stored["session"] as? Map<String, Any?>)?.toMutableMap() ?: return
+                if (session["alarm_fired_at"] != null) return
+                session["alarm_fired_at"] = firedAt
+                session["alarm_trigger"] = trigger
+                spool.updateSession(session)
+            } catch (_: Throwable) {
+                // No spool left (already imported): nothing to annotate.
+            }
+        }
+
         /** Live microphone level while recording; a UI signal, never spooled. */
         fun liveLevel(): Map<String, Any?>? = activeInstance?.processor?.liveLevel()
 
@@ -235,6 +268,12 @@ class SleepMonitoringService : Service() {
     private var missionHash: String? = null
     private var missionSalt: String? = null
     private var missionFormat: String? = null
+    private var wakeFilter: SleepWakeFilter? = null
+    private var smartWake: SmartWakePolicy? = null
+    private var smartWindowMinutes = 0
+    @Volatile private var smartFired = false
+    private var liveSleepProbability: Double? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate() {
         super.onCreate()
@@ -257,6 +296,10 @@ class SleepMonitoringService : Service() {
         missionHash = intent?.getStringExtra(SleepAlarmScheduler.EXTRA_MISSION_HASH)
         missionSalt = intent?.getStringExtra(SleepAlarmScheduler.EXTRA_MISSION_SALT)
         missionFormat = intent?.getStringExtra(SleepAlarmScheduler.EXTRA_MISSION_FORMAT)
+        smartWindowMinutes = intent?.getIntExtra(
+            SleepAlarmScheduler.EXTRA_SMART_WINDOW_MINUTES,
+            0,
+        ) ?: 0
         SleepMonitorNotification.ensureChannel(this)
         val startedAt = System.currentTimeMillis()
         sessionStartedAtMillis = startedAt
@@ -299,7 +342,7 @@ class SleepMonitoringService : Service() {
             "utc_offset_start_minutes" to offset,
             "utc_offset_end_minutes" to null,
             "sensor_mode" to "audio_bedside",
-            "algorithm_version" to "audio-features-v4",
+            "algorithm_version" to "audio-features-v5",
             "battery_start" to batterySnapshot(),
             "time_in_bed_minutes" to null,
             "quiet_minutes" to null,
@@ -309,10 +352,17 @@ class SleepMonitoringService : Service() {
             "signal_quality_score" to null,
             "analysis_status" to "pending",
             "stage_algorithm_version" to null,
+            "smart_window_minutes" to smartWindowMinutes.takeIf { it > 0 },
+            "alarm_fired_at" to null,
+            "alarm_trigger" to null,
             "end_reason" to null,
             "created_at" to start.toString(),
         )
         spool.create(session!!)
+        wakeFilter = SleepWakeFilter(sessionId)
+        smartWake = SleepAlarmScheduler.read(this)
+            ?.takeIf { it.sessionId == sessionId && it.hasSmartWindow }
+            ?.let { SmartWakePolicy(it.smartThreshold) }
         publish()
 
         if (!hasMicrophonePermission()) {
@@ -337,9 +387,10 @@ class SleepMonitoringService : Service() {
         return START_NOT_STICKY
     }
 
-    private fun onSegment(segment: Map<String, Any?>) {
+    private fun onSegment(rawSegment: Map<String, Any?>) {
         val current = session ?: return
         if (finished) return
+        val segment = evaluateWake(rawSegment)
         val startedMillis = Instant.parse(current["started_at"].toString()).toEpochMilli()
         if (!finishing) {
             if (!hasMicrophonePermission()) {
@@ -369,6 +420,52 @@ class SleepMonitoringService : Service() {
         spool.appendSegment(segment)
         spool.updateSession(current)
         publish()
+    }
+
+    /**
+     * Runs the native sleep/wake filter on the window, keeps its probability
+     * with the segment (diagnostics) and, inside a smart alarm window, asks
+     * [SmartWakePolicy] whether to ring now.
+     */
+    private fun evaluateWake(segment: Map<String, Any?>): Map<String, Any?> {
+        val filter = wakeFilter ?: return segment
+        val decision = try {
+            filter.add(segment)
+        } catch (_: Throwable) {
+            return segment
+        }
+        liveSleepProbability = decision.sleepProbability
+        val policy = smartWake
+        if (policy != null && !smartFired && !finishing) {
+            val snapshot = SleepAlarmScheduler.read(this)
+            val seconds = (segment["duration_seconds"] as? Number)?.toInt() ?: 0
+            if (snapshot != null &&
+                snapshot.sessionId == session?.get("id") &&
+                snapshot.hasSmartWindow &&
+                snapshot.state == SleepAlarmScheduler.STATE_SCHEDULED &&
+                snapshot.snoozeCount == 0
+            ) {
+                val trigger = policy.onWindow(
+                    decision,
+                    seconds,
+                    System.currentTimeMillis(),
+                    snapshot.smartWindowStartMillis,
+                    snapshot.alarmAtMillis,
+                )
+                if (trigger != null) {
+                    smartFired = true
+                    val deadline = snapshot.alarmAtMillis
+                    // Off the capture thread: ringing stops this recording,
+                    // which joins that thread.
+                    // A refused early ring is not retried: the deadline,
+                    // still armed, rings as usual.
+                    mainHandler.post {
+                        SleepAlarmScheduler.fireEarly(applicationContext, deadline, trigger)
+                    }
+                }
+            }
+        }
+        return segment + ("live_sleep_probability" to decision.sleepProbability)
     }
 
     @Synchronized
@@ -476,6 +573,8 @@ class SleepMonitoringService : Service() {
         "started_at" to session?.get("started_at"),
         "updated_at" to Instant.now().toString(),
         "alarm_at" to session?.get("alarm_at"),
+        "smart_window_minutes" to smartWindowMinutes,
+        "live_sleep_probability" to liveSleepProbability,
         "monitor_mode" to (session?.get("monitor_mode") ?: monitorMode),
         "mission_status" to (session?.get("mission_status") ?: "unconfigured"),
         "alarm_ringing" to false,
@@ -507,6 +606,14 @@ class SleepMonitoringService : Service() {
         val map = stateMap()
         lastState = map
         eventSink?.invoke(map)
+    }
+
+    private fun markAlarmFired(trigger: String, firedAt: String) {
+        val current = session ?: return
+        if (current["alarm_fired_at"] != null) return
+        current["alarm_fired_at"] = firedAt
+        current["alarm_trigger"] = trigger
+        spool.updateSession(current)
     }
 
     private fun markAlarmDismissed(method: String) {

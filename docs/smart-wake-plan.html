@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Despertador inteligente: plano</title>
+<style>
+.viz-root {
+  color-scheme: light;
+  --surface-0: #f4f3f0; --surface-1: #fcfcfb;
+  --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #7a7974;
+  --grid: #e4e3df; --border: #dddcd7; --code-bg: #efeeea;
+  --sleep: #2a78d6; --person: #52514e; --ambient: #1baf7a;
+  --window: rgba(74, 58, 167, .10);
+  --smart: #4a3aa7; --naive: #eb6834; --fixed: #7a7974;
+  --ok: #1a7f4b; --warn: #b26a00; --bad: #c0392b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) .viz-root {
+    color-scheme: dark;
+    --surface-0: #111110; --surface-1: #1a1a19;
+    --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #8f8e87;
+    --grid: #30302e; --border: #3a3a37; --code-bg: #262624;
+    --sleep: #3987e5; --person: #c3c2b7; --ambient: #199e70;
+    --window: rgba(144, 133, 233, .14);
+    --smart: #9085e9; --naive: #d95926; --fixed: #8f8e87;
+    --ok: #3fbf7f; --warn: #e0a030; --bad: #e0655a;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+.viz-root { background: var(--surface-0); color: var(--text-primary); font: 15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; min-height: 100vh; padding: 32px 16px 64px; }
+main { max-width: 1000px; margin: 0 auto; }
+h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.01em; }
+h2 { font-size: 21px; margin: 44px 0 10px; }
+h3 { font-size: 16px; margin: 0 0 6px; }
+p, li { color: var(--text-secondary); }
+p { margin: 0 0 12px; }
+p strong, li strong, td strong { color: var(--text-primary); }
+ul, ol { margin: 0 0 12px; padding-left: 22px; }
+li { margin-bottom: 4px; }
+.lede { font-size: 17px; max-width: 780px; }
+.muted { color: var(--text-muted); font-size: 13px; }
+code { font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; color: var(--text-primary); }
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin: 16px 0; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 20px; }
+.tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.tile .label { font-size: 13px; color: var(--text-secondary); }
+.tile .value { font-size: 24px; font-weight: 700; line-height: 1.25; margin-top: 4px; }
+.tile .note { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 14px; }
+.option { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.option.pick { border: 2px solid var(--smart); }
+.option .tag { font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
+.option.pick .tag { color: var(--smart); }
+.option p { font-size: 14px; margin-bottom: 6px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+th { color: var(--text-secondary); font-weight: 600; font-size: 13px; }
+td { color: var(--text-secondary); }
+td.num { text-align: right; white-space: nowrap; }
+.st { font-weight: 700; white-space: nowrap; }
+.st.ok { color: var(--ok); } .st.part { color: var(--warn); } .st.no { color: var(--bad); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--text-secondary); margin: 4px 0 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.sw.line { height: 3px; border-radius: 2px; width: 16px; }
+.sw.vline { width: 3px; height: 14px; border-radius: 2px; }
+.sw.dash { width: 0; height: 14px; border-left: 2px dashed var(--fixed); border-radius: 0; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--text-secondary); font-size: 12px; font-family: inherit; }
+.chart .axis { fill: var(--text-muted); font-size: 11px; }
+.chart .mark-label { font-size: 12px; font-weight: 600; }
+.tooltip { position: absolute; pointer-events: none; background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; line-height: 1.45; box-shadow: 0 4px 16px rgba(0,0,0,.14); color: var(--text-primary); min-width: 180px; opacity: 0; transition: opacity .08s; z-index: 5; }
+.tooltip b { font-weight: 700; }
+.tooltip .r { color: var(--text-secondary); }
+.phase { display: grid; grid-template-columns: 44px 1fr; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--grid); }
+.phase:last-child { border-bottom: 0; }
+.phase .n { width: 36px; height: 36px; border-radius: 50%; background: var(--smart); color: #fff; display: grid; place-items: center; font-weight: 700; }
+.phase p { font-size: 14px; margin-bottom: 4px; }
+.size { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.decision { padding: 12px 0; border-bottom: 1px solid var(--grid); }
+.decision:last-child { border-bottom: 0; }
+.decision .q { font-weight: 600; color: var(--text-primary); }
+.decision .rec { font-size: 14px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+<div class="viz-root">
+<main>
+
+<h1>Despertador inteligente com volume crescente</h1>
+<p class="lede">Você define uma <strong>janela</strong> (por exemplo, 06:30 a 07:00) em vez de um horário fixo. Dentro dela, o alarme toca no primeiro momento em que o seu corpo está se mexendo ou quase acordando. O som começa baixinho e vai subindo, e se você não acordar ele termina no volume máximo. Este relatório avalia se o monitoramento de hoje dá conta disso e o que falta construir.</p>
+
+<div class="tiles">
+  <div class="tile"><div class="label">Dá para fazer com o que temos?</div><div class="value">Sim</div><div class="note">O microfone e o modelo v6 já medem o que a função precisa.</div></div>
+  <div class="tile"><div class="label">Principal bloqueio</div><div class="value">O modelo só roda no Flutter</div><div class="note">Com o app fechado ninguém decide a hora de tocar.</div></div>
+  <div class="tile"><div class="label">Nas suas 2 noites (janela de 30 min)</div><div class="value">30 e 7 min antes</div><div class="note">Nas duas, o toque cairia num momento de movimento.</div></div>
+  <div class="tile"><div class="label">Volume crescente</div><div class="value">Independente</div><div class="note">Pode sair primeiro e vale também para os alarmes comuns.</div></div>
+</div>
+
+<h2>1. O que o microfone consegue (e o que não consegue) saber</h2>
+<p>Apps como o que você usava (Sleep Cycle, Sleep as Android no modo sonar/microfone) não medem fases do sono de verdade: isso exige EEG. Eles usam o mesmo sinal que o nosso: <strong>som de movimento na cama</strong>. A ideia por trás funciona assim. No sono profundo o corpo quase não se mexe. Perto do fim de um ciclo, nas transições e nos microdespertares, aparecem viradas e ajustes de posição. Acordar num desses momentos dá menos "ressaca de sono" (inércia do sono) do que ser arrancado de um trecho parado.</p>
+<p>Na prática, então, a função <strong>não procura "sono leve"</strong>. Ela procura <strong>o primeiro sinal de que você está emergindo</strong> dentro da janela. Nas últimas horas da noite o sono profundo já é raro, e o grande ganho vem de pegar esse microdespertar em vez de um horário arbitrário. Vou manter essa honestidade no app também. O texto seria "tocou quando você estava se mexendo", nunca "tocou no sono leve".</p>
+
+<h2>2. O que já existe e o que falta</h2>
+<div class="card">
+<table>
+<thead><tr><th>Peça necessária</th><th>Hoje</th><th>Detalhe</th></tr></thead>
+<tbody>
+<tr><td><strong>Gravar a noite com o app fechado</strong></td><td class="st ok">Pronto</td><td>Serviço nativo em primeiro plano com wake lock, janelas de 30 s e spool durável.</td></tr>
+<tr><td><strong>Separar você do som do quarto</strong></td><td class="st ok">Pronto</td><td>O motor v6 compara com o "silêncio" do próprio quarto e ignora pássaros, ar-condicionado e ruído constante.</td></tr>
+<tr><td><strong>Probabilidade de estar dormindo, minuto a minuto</strong></td><td class="st part">Só no Dart</td><td>O filtro causal (<code>SleepWakeCursor</code>) existe, mas roda no Flutter e só com o app aberto. O lado nativo nunca rotula nada.</td></tr>
+<tr><td><strong>Alarme exato, tela cheia, soneca, missões</strong></td><td class="st ok">Pronto</td><td><code>SleepAlarmScheduler</code> usa <code>setAlarmClock</code>. Já existem a máquina de estados, missão com código de barras, emergência e retomada após reboot.</td></tr>
+<tr><td><strong>Tocar antes da hora, a partir do monitor</strong></td><td class="st no">Falta</td><td>Hoje só o <code>AlarmManager</code> dispara o alarme. É preciso um caminho seguro para disparar mais cedo sem quebrar a máquina de estados.</td></tr>
+<tr><td><strong>Janela no app</strong></td><td class="st no">Falta</td><td>Seletor da janela e da sensibilidade, e o texto "Despertar entre 06:30 e 07:00".</td></tr>
+<tr><td><strong>Volume crescente</strong></td><td class="st no">Falta</td><td><code>AlarmRinger</code> toca direto no volume do sistema. Ele é compartilhado pelos alarmes de sono, comuns e de remédio.</td></tr>
+<tr><td><strong>Registrar como foi o despertar</strong></td><td class="st no">Falta</td><td>Guardar a hora real do toque e o motivo (movimento, já acordado ou limite). São 3 colunas pequenas na sessão.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>3. O bloqueio principal: quem decide com o app fechado</h2>
+<p>A decisão de "tocar agora" precisa acontecer às 06:47 com a tela apagada e o Flutter fechado. Quem está vivo nessa hora é o <code>SleepMonitoringService</code> (Kotlin). Hoje ele só extrai números de cada janela e o modelo que interpreta esses números mora no Dart. Há três caminhos:</p>
+<div class="grid2">
+  <div class="option pick"><div class="tag">Recomendado · A</div><h3>Portar o filtro causal para Kotlin</h3><p>O extrator de evidências e o HMM de 5 estados somam cerca de 400 linhas de Dart puro. Eles viram uma classe Kotlin chamada a cada janela dentro do serviço.</p><p><strong>Garantia:</strong> um arquivo "golden" gerado pelo Dart com a probabilidade de cada janela das 3 noites reais. Os testes de Kotlin precisam bater com ele (tolerância 1e-9). Se alguém ajustar um parâmetro no Dart, o teste quebra até o Kotlin acompanhar.</p></div>
+  <div class="option"><div class="tag">B</div><h3>Rodar o Dart em segundo plano</h3><p>Um FlutterEngine "headless" dentro do serviço. Ele é pesado, frágil com o app morto (Android mata o engine) e contraria a regra do projeto de o nativo ser autônomo à noite.</p></div>
+  <div class="option"><div class="tag">C</div><h3>Regra simples no nativo</h3><p>"Tocar ao detectar 2 movimentos em 3 min", sem o modelo. É fácil, mas a seção 4 mostra que nas suas manhãs isso dispara quase sempre logo na abertura da janela.</p></div>
+</div>
+<p class="muted">Com A, o banco continua recebendo os rótulos do motor Dart suavizado. O Kotlin só usa a probabilidade ao vivo para decidir o toque. Ele também pode publicar essa probabilidade para a tela ao vivo, e aí o Dart deixa de manter um segundo cursor.</p>
+
+<h2>4. Teste com as suas duas noites reais</h2>
+<p>Passei as duas gravações que você exportou (27/09 e 30/09, ambas encerradas pelo alarme) pelo filtro causal, janela a janela, como o serviço faria ao vivo. Depois simulei a janela de 30 min antes do alarme real de cada noite. A linha azul é a chance de estar dormindo naquele instante e as barras são os segundos de som atribuídos a você.</p>
+<div class="legend">
+  <span><i class="sw line" style="background:var(--sleep)"></i>Chance de estar dormindo</span>
+  <span><i class="sw" style="background:var(--person)"></i>Movimento ou voz (s por janela)</span>
+  <span><i class="sw" style="background:var(--window)"></i>Janela de 30 min</span>
+  <span><i class="sw vline" style="background:var(--smart)"></i>Toque inteligente (equilibrado)</span>
+  <span><i class="sw vline" style="background:var(--naive)"></i>Regra simples (opção C)</span>
+  <span><i class="sw dash"></i>Horário limite</span>
+</div>
+<div class="card"><h3>Noite de 27/09 · alarme às 09:15</h3><div class="chart" id="c1"></div>
+<p class="muted" style="margin-top:8px">Por volta de 08:40 você teve um despertar (a chance de dormir cai perto de zero). Quando a janela abre, às 08:44, o modelo ainda te considera meio acordado, então tocaria na hora, 30 min antes. A regra simples esperaria um ruído qualquer e tocaria às 08:48.</p></div>
+<div class="card"><h3>Noite de 30/09 · alarme às 09:00</h3><div class="chart" id="c2"></div>
+<p class="muted" style="margin-top:8px">A janela abre com você dormindo tranquilo. O toque inteligente espera a sequência de movimentos das 08:53 e toca 7 min antes do limite, exatamente quando você começava a se mexer. A regra simples tocaria às 08:32 por causa de um barulho isolado.</p></div>
+
+<p>Para não depender de dois exemplos, simulei também <strong>um alarme a cada 2 minutos nas últimas 3 horas</strong> de cada noite (90 horários por noite) e medi o comportamento de cada regra:</p>
+<div class="card">
+<table>
+<thead><tr><th>Regra</th><th class="num">Tocou antes do limite</th><th class="num">Antecipação mediana</th><th class="num">Tocou já na abertura da janela</th></tr></thead>
+<tbody>
+<tr><td><strong>Regra simples</strong> (2 movimentos em 3 min)</td><td class="num">98–100%</td><td class="num">28–29 min</td><td class="num"><strong>45–51%</strong></td></tr>
+<tr><td>Chance de dormir &lt; 70% (sensível)</td><td class="num">80–88%</td><td class="num">20–23 min</td><td class="num">22–27%</td></tr>
+<tr><td><strong>Chance de dormir &lt; 50% (equilibrado)</strong></td><td class="num">63–78%</td><td class="num">13–15 min</td><td class="num">15–19%</td></tr>
+<tr><td>Chance de dormir &lt; 30% (conservador, só acordado)</td><td class="num">60%</td><td class="num">5–8 min</td><td class="num">9–12%</td></tr>
+</tbody>
+</table>
+<p class="muted" style="margin-top:10px">"Tocou já na abertura da janela" é o sintoma de uma regra que só está adiantando o alarme, e não escolhendo o momento. As suas manhãs têm muito som (pássaros, movimento). A regra simples confunde isso com despertar em metade dos casos. As regras baseadas no modelo escolhem um momento de verdade na maioria das vezes, e quando nada acontece o limite garante o horário.</p>
+</div>
+
+<h2>5. Como o toque inteligente decidiria</h2>
+<div class="card">
+<ol>
+<li><strong>Só arma depois de você dormir.</strong> O modelo começa a noite assumindo "acordado". Sem essa trava, uma janela que começa cedo tocaria na hora. A regra exige ter visto pelo menos 10 min com chance de dormir ≥ 80% desde o início da sessão.</li>
+<li><strong>Dentro da janela, a cada 30 s,</strong> toca se a chance de dormir cair abaixo do limiar da sensibilidade: 70% (sensível), 50% (equilibrado, o padrão) ou 30% (conservador).</li>
+<li><strong>Som que não é seu não conta.</strong> Pássaros, ar-condicionado, trânsito e ronco já são tratados pelo motor v6. Ronco, aliás, puxa para "dormindo".</li>
+<li><strong>O limite é sagrado.</strong> O alarme do horário final continua agendado no <code>AlarmManager</code> exatamente como hoje. O toque inteligente só pode <em>adiantar</em>, e se o microfone falhar, o serviço morrer ou a bateria acabar, o alarme normal toca no limite.</li>
+<li><strong>Ao tocar cedo,</strong> passa pela mesma máquina de estados de hoje (<code>markFired</code>), cancela o agendamento do limite e segue igual: tela cheia, soneca e missão.</li>
+</ol>
+<p class="muted">A latência é de até 30 s, o tamanho de uma janela. O custo de bateria é desprezível: são algumas multiplicações de matriz 5×5 por janela, sobre dados que o serviço já calcula.</p>
+</div>
+
+<h2>6. Volume crescente</h2>
+<p>O ouvido percebe volume em escala logarítmica. Uma rampa linear no controle soa como "nada, nada, nada, de repente alto". Por isso a rampa é feita em decibéis: começa cerca de 30 dB abaixo do volume de alarme e sobe de forma constante <em>para o ouvido</em>.</p>
+<div class="legend">
+  <span><i class="sw line" style="background:var(--smart)"></i>Rampa em dB (percebida como constante)</span>
+  <span><i class="sw line" style="background:var(--naive)"></i>Rampa linear (percebida como salto)</span>
+  <span><i class="sw" style="background:var(--window)"></i>Vibração ligada</span>
+</div>
+<div class="card"><div class="chart" id="c3"></div><p class="muted" style="margin-top:8px">Supondo o volume de alarme do sistema em 60%. O eixo mostra a intensidade percebida, que é aproximadamente proporcional aos decibéis. A rampa linear chega a 70% da sensação na metade do tempo e depois quase não muda. A rampa em dB sobe por igual.</p></div>
+<div class="card">
+<ul>
+<li><strong>Implementação:</strong> um <code>Handler</code> ajusta o ganho do player a cada 200 ms (passos de 0,05 dB, inaudíveis), com o mesmo código em todas as versões do Android. Tudo fica em <code>AlarmRinger</code>, que já é compartilhado.</li>
+<li><strong>Duração:</strong> 30 s, 1, 2, 3 ou 5 min. Sugiro 2 min como padrão.</li>
+<li><strong>Vibração:</strong> entra na segunda metade da rampa. Vibrar desde o primeiro segundo anula a ideia de acordar suave.</li>
+<li><strong>Reforço final</strong> (o "toca alto no final"): quando a rampa termina, se o volume de alarme do sistema estiver baixo, ele sobe ao máximo e volta ao valor original ao desligar ou adiar. O valor original fica salvo, então é restaurado mesmo se o app cair ou o celular reiniciar.</li>
+<li><strong>Soneca:</strong> o toque seguinte usa rampa curta (15–30 s), porque você já está meio acordado.</li>
+<li><strong>Missões:</strong> quando o alarme volta depois de uma pausa de missão, volta no volume cheio.</li>
+<li><strong>Alarmes comuns:</strong> a mesma rampa vira opção nos alarmes da aba Alarmes, sem a janela inteligente, porque ali não há monitoramento. Os lembretes de remédio ficam como estão.</li>
+</ul>
+</div>
+
+<h2>7. O que muda no código</h2>
+<div class="card">
+<table>
+<thead><tr><th>Onde</th><th>Mudança</th></tr></thead>
+<tbody>
+<tr><td><code>common/AlarmRinger.kt</code></td><td>Perfil de rampa (duração, vibração tardia, reforço final), ajuste de ganho a cada 200 ms, restauração do volume do sistema.</td></tr>
+<tr><td><code>sleep/SleepWakeFilter.kt</code> (novo)</td><td>Porte do extrator de evidências e do HMM, com parâmetros idênticos aos do Dart.</td></tr>
+<tr><td><code>sleep/SmartWakePolicy.kt</code> (novo, puro)</td><td>Trava de "já dormiu", janela, limiar e motivo do toque. É testável sem Android.</td></tr>
+<tr><td><code>SleepMonitoringService.kt</code></td><td>Alimenta o filtro a cada janela. Dentro da janela, pergunta à política e dispara.</td></tr>
+<tr><td><code>SleepAlarmScheduler.kt</code> / <code>SleepAlarmReceiver.kt</code></td><td>A janela e a sensibilidade entram no snapshot. Um <code>fireNow(trigger)</code> compartilhado reaproveita <code>markFired</code> e cancela o agendamento do limite.</td></tr>
+<tr><td>Tela do monitor + <code>SleepMonitorController</code></td><td>Seletor de janela (desligado, 10, 20, 30 ou 45 min), sensibilidade e rampa. Texto "Despertar entre…".</td></tr>
+<tr><td>Banco v60</td><td>3 colunas em <code>sleep_monitor_sessions</code>: <code>smart_window_minutes</code>, <code>alarm_fired_at</code>, <code>alarm_trigger</code>. Não há tabela nova nem dado por janela.</td></tr>
+<tr><td>Resultado da noite + gráfico</td><td>"Tocou 12 min antes do limite, quando você se mexia" e uma marca vertical no <code>SleepNightChart</code>.</td></tr>
+<tr><td><code>tool/replay_sleep.dart</code></td><td>Opção <code>--smart-window 30</code> para simular o toque em qualquer diagnóstico exportado, como fiz acima.</td></tr>
+<tr><td>Testes</td><td>Golden de paridade Dart↔Kotlin nas 3 noites reais, a política (trava, janela, limite), a curva da rampa, a migração v60 e widgets em pt/en.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>8. Ordem sugerida</h2>
+<div class="card">
+  <div class="phase"><div class="n">1</div><div><h3>Volume crescente <span class="size">· pequeno</span></h3><p>É independente e já melhora o despertar amanhã, inclusive nos alarmes comuns. Tem risco baixo porque não mexe no monitoramento.</p></div></div>
+  <div class="phase"><div class="n">2</div><div><h3>Filtro causal em Kotlin + golden de paridade <span class="size">· médio</span></h3><p>É a base técnica. Até aqui nada muda para o usuário, mas os testes provam que o nativo enxerga a noite igual ao Dart.</p></div></div>
+  <div class="phase"><div class="n">3</div><div><h3>Janela inteligente de ponta a ponta <span class="size">· médio/grande</span></h3><p>Política, disparo antecipado, UI, colunas v60 e texto no resultado da noite.</p></div></div>
+  <div class="phase"><div class="n">4</div><div><h3>Calibração com as suas noites <span class="size">· pequeno</span></h3><p>O replay com <code>--smart-window</code> e, se você quiser, uma pergunta de 1 toque de manhã ("Como você acordou?") para comparar noites inteligentes com noites de horário fixo e ajustar o limiar.</p></div></div>
+</div>
+
+<h2>9. Limites e riscos</h2>
+<ul>
+<li><strong>Outra pessoa ou pet na cama:</strong> o microfone não sabe de quem é o movimento, então um parceiro que se vira pode disparar o seu alarme. Não há solução por áudio. Vale um aviso na tela.</li>
+<li><strong>Posição do celular:</strong> longe da cama, os movimentos somem. Aí a função simplesmente toca no limite, nunca pior do que hoje.</li>
+<li><strong>Manhãs barulhentas:</strong> o filtro de som ambiente do v6 ajuda, e a seção 4 mostra que funciona nas suas. Um barulho alto e súbito (porta, moto) ainda pode acordar você <em>e</em> disparar o alarme. Nesse caso você já estava acordando mesmo.</li>
+<li><strong>Sem validação clínica:</strong> ninguém tem isso com microfone. Por isso a proposta de comparar pelo seu próprio relato matinal.</li>
+<li><strong>Só com o monitor ligado:</strong> a janela inteligente exige a gravação da noite. Os alarmes comuns ganham só a rampa.</li>
+</ul>
+
+<h2>10. Decisões para você</h2>
+<div class="card">
+  <div class="decision"><div class="q">Tamanho padrão da janela?</div><div class="rec">Recomendo 30 min, com opções de 10 a 45. É o padrão dos apps do gênero.</div></div>
+  <div class="decision"><div class="q">Sensibilidade padrão?</div><div class="rec">Recomendo "equilibrado" (&lt; 50%). É o que tocou no momento certo nas duas noites.</div></div>
+  <div class="decision"><div class="q">Duração da rampa e reforço final?</div><div class="rec">Recomendo 2 min de rampa com reforço final ligado.</div></div>
+  <div class="decision"><div class="q">Rampa também nos alarmes comuns?</div><div class="rec">Recomendo que sim, como opção por alarme, desligada por padrão para não mudar alarmes existentes.</div></div>
+  <div class="decision"><div class="q">Pergunta "Como você acordou?" de manhã?</div><div class="rec">É opcional e custa 1 coluna. Ajuda a calibrar com dados seus.</div></div>
+</div>
+
+</main>
+</div>
+<script>
+const DATA = {"27/09": {"t": ["07:44", "07:45", "07:45", "07:46", "07:46", "07:47", "07:47", "07:48", "07:48", "07:49", "07:49", "07:50", "07:50", "07:51", "07:51", "07:52", "07:52", "07:53", "07:53", "07:54", "07:54", "07:55", "07:55", "07:56", "07:56", "07:57", "07:57", "07:58", "07:58", "07:59", "07:59", "08:00", "08:00", "08:01", "08:01", "08:02", "08:02", "08:03", "08:03", "08:04", "08:04", "08:05", "08:05", "08:06", "08:06", "08:07", "08:07", "08:08", "08:08", "08:09", "08:09", "08:10", "08:10", "08:11", "08:11", "08:12", "08:12", "08:13", "08:13", "08:14", "08:14", "08:15", "08:15", "08:16", "08:16", "08:17", "08:17", "08:18", "08:18", "08:19", "08:19", "08:20", "08:20", "08:21", "08:21", "08:22", "08:22", "08:23", "08:23", "08:24", "08:24", "08:25", "08:25", "08:26", "08:26", "08:27", "08:27", "08:28", "08:28", "08:29", "08:29", "08:30", "08:30", "08:31", "08:31", "08:32", "08:32", "08:33", "08:33", "08:34", "08:34", "08:35", "08:35", "08:36", "08:36", "08:37", "08:37", "08:38", "08:38", "08:39", "08:39", "08:40", "08:40", "08:41", "08:41", "08:42", "08:42", "08:43", "08:43", "08:44", "08:44", "08:45", "08:45", "08:46", "08:46", "08:47", "08:47", "08:48", "08:48", "08:49", "08:49", "08:50", "08:50", "08:51", "08:51", "08:52", "08:52", "08:53", "08:53", "08:54", "08:54", "08:55", "08:55", "08:56", "08:56", "08:57", "08:57", "08:58", "08:58", "08:59", "08:59", "09:00", "09:00", "09:01", "09:01", "09:02", "09:02", "09:03", "09:03", "09:04", "09:04", "09:05", "09:05", "09:06", "09:06", "09:07", "09:07", "09:08", "09:08", "09:09", "09:09", "09:10", "09:10", "09:11", "09:11", "09:12", "09:12", "09:13", "09:13", "09:14"], "p": [0.959, 0.96, 0.961, 0.949, 0.958, 0.946, 0.956, 0.959, 0.947, 0.878, 0.928, 0.942, 0.948, 0.951, 0.953, 0.955, 0.957, 0.959, 0.96, 0.961, 0.962, 0.963, 0.96, 0.958, 0.957, 0.961, 0.963, 0.964, 0.964, 0.965, 0.965, 0.965, 0.966, 0.962, 0.947, 0.958, 0.961, 0.959, 0.957, 0.961, 0.959, 0.962, 0.963, 0.964, 0.952, 0.96, 0.83, 0.913, 0.936, 0.939, 0.941, 0.943, 0.932, 0.92, 0.941, 0.942, 0.883, 0.925, 0.915, 0.934, 0.942, 0.818, 0.609, 0.72, 0.788, 0.828, 0.866, 0.884, 0.897, 0.908, 0.912, 0.917, 0.927, 0.929, 0.932, 0.934, 0.942, 0.942, 0.916, 0.928, 0.935, 0.945, 0.92, 0.93, 0.74, 0.626, 0.612, 0.712, 0.805, 0.842, 0.863, 0.86, 0.883, 0.878, 0.847, 0.839, 0.885, 0.903, 0.896, 0.888, 0.903, 0.828, 0.817, 0.991, 0.985, 0.98, 0.976, 0.831, 0.886, 0.822, 0.391, 0.033, 0.583, 0.973, 0.769, 0.144, 0.097, 0.185, 0.291, 0.39, 0.472, 0.54, 0.596, 0.431, 0.538, 0.617, 0.673, 0.716, 0.694, 0.759, 0.689, 0.768, 0.806, 0.831, 0.851, 0.867, 0.877, 0.892, 0.899, 0.905, 0.917, 0.909, 0.878, 0.913, 0.926, 0.928, 0.931, 0.934, 0.942, 0.942, 0.931, 0.937, 0.947, 0.922, 0.932, 0.858, 0.993, 0.986, 0.972, 0.957, 0.962, 0.963, 0.899, 0.942, 0.946, 0.916, 0.904, 0.783, 0.882, 0.872, 0.862, 0.809, 0.626, 0.614, 0.711, 0.771, 0.809, 0.834, 0.853, 0.827], "mv": [0, 0, 0, 1, 0, 1, 0, 0, 2, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 14, 0, 0, 0, 0, 0, 2, 2, 0, 0, 9, 0, 1, 0, 0, 11, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 7, 0, 12, 5, 2, 0, 0, 0, 0, 1, 0, 1, 4, 1, 0, 0, 2, 2, 0, 6, 1, 0, 0, 0, 0, 11, 0, 3, 10, 24, 0, 0, 18, 20, 3, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 4, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 5, 0, 3, 0, 0, 2, 2, 0, 0, 5, 0, 0, 4, 1, 4, 0, 2, 2, 4, 10, 3, 0, 0, 0, 0, 0, 8], "amb": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 7, 5, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 1, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 3, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 2, 1, 0, 1, 3, 2, 0, 4, 0, 1, 1, 0, 0, 7, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 6, 2, 6, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 8, 8, 6, 0, 5, 2, 12, 7, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 4, 0, 0, 0, 0, 0, 10, 7, 8, 0, 7, 0, 2, 0, 0, 2, 0, 0, 8, 0, 0, 2, 6, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 5, 4, 4, 0], "naive": ["08:48", 26.0], "rules": {"sensivel": ["08:44", 30.0], "equilibrado": ["08:44", 30.0], "conservador": null}, "windowStart": "08:44"}, "30/09": {"t": ["07:29", "07:30", "07:30", "07:31", "07:31", "07:32", "07:32", "07:33", "07:33", "07:34", "07:34", "07:35", "07:35", "07:36", "07:36", "07:37", "07:37", "07:38", "07:38", "07:39", "07:39", "07:40", "07:40", "07:41", "07:41", "07:42", "07:42", "07:43", "07:43", "07:44", "07:44", "07:45", "07:45", "07:46", "07:46", "07:47", "07:47", "07:48", "07:48", "07:49", "07:49", "07:50", "07:50", "07:51", "07:51", "07:52", "07:52", "07:53", "07:53", "07:54", "07:54", "07:55", "07:55", "07:56", "07:56", "07:57", "07:57", "07:58", "07:58", "07:59", "07:59", "08:00", "08:00", "08:01", "08:01", "08:02", "08:02", "08:03", "08:03", "08:04", "08:04", "08:05", "08:05", "08:06", "08:06", "08:07", "08:07", "08:08", "08:08", "08:09", "08:09", "08:10", "08:10", "08:11", "08:11", "08:12", "08:12", "08:13", "08:13", "08:14", "08:14", "08:15", "08:15", "08:16", "08:16", "08:17", "08:17", "08:18", "08:18", "08:19", "08:19", "08:20", "08:20", "08:21", "08:21", "08:22", "08:22", "08:23", "08:23", "08:24", "08:24", "08:25", "08:25", "08:26", "08:26", "08:27", "08:27", "08:28", "08:28", "08:29", "08:29", "08:30", "08:30", "08:31", "08:31", "08:32", "08:32", "08:33", "08:33", "08:34", "08:34", "08:35", "08:35", "08:36", "08:36", "08:37", "08:37", "08:38", "08:38", "08:39", "08:39", "08:40", "08:40", "08:41", "08:41", "08:42", "08:42", "08:43", "08:43", "08:44", "08:44", "08:45", "08:46", "08:46", "08:47", "08:47", "08:48", "08:48", "08:49", "08:49", "08:50", "08:50", "08:51", "08:51", "08:52", "08:52", "08:53", "08:53", "08:54", "08:54", "08:55", "08:55", "08:56", "08:56", "08:57", "08:57", "08:58", "08:58", "08:59", "08:59"], "p": [0.879, 0.907, 0.92, 0.911, 0.926, 0.929, 0.919, 0.935, 0.941, 0.941, 0.942, 0.916, 0.928, 0.935, 0.904, 0.933, 0.942, 0.947, 0.95, 0.953, 0.941, 0.93, 0.946, 0.952, 0.941, 0.951, 0.926, 0.945, 0.934, 0.922, 0.942, 0.883, 0.546, 0.129, 0.051, 0.024, 0.118, 0.246, 0.35, 0.433, 0.502, 0.562, 0.609, 0.606, 0.657, 0.71, 0.741, 0.768, 0.792, 0.772, 0.818, 0.844, 0.863, 0.878, 0.891, 0.902, 0.911, 0.92, 0.897, 0.91, 0.918, 0.924, 0.929, 0.932, 0.941, 0.945, 0.949, 0.951, 0.954, 0.942, 0.952, 0.951, 0.951, 0.951, 0.952, 0.952, 0.803, 0.863, 0.894, 0.922, 0.933, 0.939, 0.943, 0.895, 0.927, 0.932, 0.935, 0.944, 0.948, 0.951, 0.953, 0.955, 0.957, 0.959, 0.96, 0.957, 0.96, 0.962, 0.963, 0.963, 0.964, 0.964, 0.965, 0.918, 0.904, 0.938, 0.948, 0.948, 0.953, 0.951, 0.956, 0.958, 0.955, 0.959, 0.961, 0.962, 0.963, 0.963, 0.964, 0.964, 0.965, 0.965, 0.965, 0.941, 0.948, 0.877, 0.928, 0.943, 0.943, 0.944, 0.946, 0.952, 0.955, 0.953, 0.952, 0.952, 0.952, 0.952, 0.94, 0.863, 0.69, 0.837, 0.868, 0.886, 0.874, 0.903, 0.91, 0.916, 0.921, 0.925, 0.935, 0.94, 0.944, 0.934, 0.945, 0.945, 0.919, 0.94, 0.948, 0.951, 0.832, 0.91, 0.899, 0.927, 0.899, 0.631, 0.362, 0.162, 0.272, 0.14, 0.313, 0.41, 0.387, 0.138, 0.316, 0.454, 0.377, 0.51, 0.589, 0.644], "mv": [0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 9, 0, 0, 6, 0, 0, 0, 0, 0, 2, 1, 0, 0, 3, 0, 4, 0, 2, 2, 0, 8, 17, 16, 8, 10, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 4, 5, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 5, 0, 0, 0, 10, 0, 2, 0, 6, 13, 10, 5, 0, 8, 0, 0, 3, 14, 0, 0, 4, 0, 0, 0], "amb": [0, 0, 0, 0, 0, 2, 0, 0, 0, 6, 10, 0, 4, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 2, 0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 10, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 2, 8, 5, 4, 7, 0, 1, 3, 0, 0, 0, 0, 0, 0, 4, 3, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 4, 1, 3, 0, 0, 1, 4, 1, 2, 8, 0, 0, 0, 0, 2, 2, 0, 0, 1, 5, 3, 3, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0], "naive": ["08:32", 27.5], "rules": {"sensivel": ["08:39", 20.0], "equilibrado": ["08:53", 7.0], "conservador": ["08:53", 6.5]}, "windowStart": "08:29"}};
+const css = n => getComputedStyle(document.querySelector('.viz-root')).getPropertyValue(n).trim();
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function txt(parent, x, y, s, cls, anchor, fill) { const t = el('text', {x, y, class: cls || '', 'text-anchor': anchor || 'start'}, parent); if (fill) t.setAttribute('style', 'fill:' + fill); t.textContent = s; return t; }
+function tip(host) { const d = document.createElement('div'); d.className = 'tooltip'; host.appendChild(d); return d; }
+
+function night(id, d) {
+  const host = document.getElementById(id);
+  const W = 960, H = 280, L = 40, R = 16, top = 56, pH = 130, gap = 16, mH = 50;
+  const svg = el('svg', {viewBox: `0 0 ${W} ${H}`, role: 'img'}, host);
+  const n = d.t.length, cw = (W - L - R) / n;
+  const x = i => L + i * cw;
+  const idx = t => d.t.indexOf(t);
+  const ws = idx(d.windowStart);
+  el('rect', {x: x(ws), y: top - 8, width: x(n) - x(ws), height: pH + gap + mH + 8, fill: css('--window')}, svg);
+  txt(svg, x(ws) + 6, top + pH + gap - 4, 'janela de 30 min', 'axis');
+  for (const v of [0, .5, 1]) {
+    const y = top + pH * (1 - v);
+    el('line', {x1: L, x2: W - R, y1: y, y2: y, stroke: css('--grid'), 'stroke-width': 1}, svg);
+    txt(svg, L - 6, y + 4, Math.round(v * 100) + '%', 'axis', 'end');
+  }
+  let path = '', pen = false;
+  d.p.forEach((p, i) => { if (p == null) { pen = false; return; } const px = x(i) + cw / 2, py = top + pH * (1 - p); path += (pen ? 'L' : 'M') + px.toFixed(1) + ' ' + py.toFixed(1); pen = true; });
+  el('path', {d: path, fill: 'none', stroke: css('--sleep'), 'stroke-width': 2, 'stroke-linejoin': 'round'}, svg);
+  const mTop = top + pH + gap, mMax = 30;
+  el('line', {x1: L, x2: W - R, y1: mTop + mH, y2: mTop + mH, stroke: css('--grid')}, svg);
+  txt(svg, L - 6, mTop + 10, '30 s', 'axis', 'end');
+  d.mv.forEach((m, i) => { if (m <= 0) return; const h = Math.max(2, mH * Math.min(m, mMax) / mMax); el('rect', {x: x(i) + 0.5, y: mTop + mH - h, width: Math.max(1, cw - 1), height: h, fill: css('--person'), rx: 1}, svg); });
+  d.t.forEach((t, i) => { if ((t.endsWith(':00') || t.endsWith(':30')) && d.t[i - 1] !== t) { txt(svg, x(i), H - 4, t, 'axis', 'middle'); } });
+  el('line', {x1: x(n), x2: x(n), y1: top - 8, y2: mTop + mH, stroke: css('--fixed'), 'stroke-width': 2, 'stroke-dasharray': '4 3'}, svg);
+  const marks = [];
+  if (d.naive) marks.push([idx(d.naive[0]), css('--naive'), 'regra simples ' + d.naive[0]]);
+  const s = d.rules.equilibrado;
+  if (s) marks.push([idx(s[0]), css('--smart'), 'inteligente ' + s[0]]);
+  marks.sort((a, b) => a[0] - b[0]);
+  marks.forEach(([i, c, label], k) => {
+    const mx = x(i) + cw / 2;
+    el('line', {x1: mx, x2: mx, y1: 14 + k * 18, y2: mTop + mH, stroke: c, 'stroke-width': 2.5}, svg);
+    const ly = 24 + k * 18;
+    const right = mx < W - 200;
+    const t = txt(svg, right ? mx + 6 : mx - 6, ly, label, 'mark-label', right ? 'start' : 'end', c);
+  });
+  const t = tip(host);
+  const cross = el('line', {y1: top - 8, y2: mTop + mH, stroke: css('--text-muted'), 'stroke-width': 1, opacity: 0}, svg);
+  const hit = el('rect', {x: L, y: 0, width: W - L - R, height: H, fill: 'transparent'}, svg);
+  hit.addEventListener('mousemove', ev => {
+    const r = svg.getBoundingClientRect(), sx = (ev.clientX - r.left) * W / r.width;
+    const i = Math.max(0, Math.min(n - 1, Math.floor((sx - L) / cw)));
+    const cx = x(i) + cw / 2; cross.setAttribute('x1', cx); cross.setAttribute('x2', cx); cross.setAttribute('opacity', 1);
+    const p = d.p[i];
+    t.innerHTML = `<b>${d.t[i]}</b><div class="r">Chance de dormir: <b>${p == null ? '—' : Math.round(p * 100) + '%'}</b></div><div class="r">Movimento: <b>${d.mv[i]} s</b> · ambiente: <b>${d.amb[i]} s</b></div>`;
+    const hr = host.getBoundingClientRect(); let lx = ev.clientX - hr.left + 14; if (lx > hr.width - 200) lx -= 228;
+    t.style.left = lx + 'px'; t.style.top = '8px'; t.style.opacity = 1;
+  });
+  hit.addEventListener('mouseleave', () => { t.style.opacity = 0; cross.setAttribute('opacity', 0); });
+}
+
+function ramp(id) {
+  const host = document.getElementById(id);
+  const W = 960, H = 230, L = 46, R = 16, top = 14, pH = 180;
+  const svg = el('svg', {viewBox: `0 0 ${W} ${H}`, role: 'img'}, host);
+  const T = 150, rampEnd = 120; // seconds: 2 min ramp, then boost
+  const x = s => L + (W - L - R) * s / T, y = v => top + pH * (1 - v);
+  el('rect', {x: x(60), y: top, width: x(T) - x(60), height: pH, fill: css('--window')}, svg);
+  txt(svg, x(60) + 6, top + 14, 'vibração', 'axis');
+  for (const v of [0, .25, .5, .75, 1]) { el('line', {x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: css('--grid')}, svg); txt(svg, L - 6, y(v) + 4, Math.round(v * 100) + '%', 'axis', 'end'); }
+  for (let s = 0; s <= T; s += 30) txt(svg, x(s), H - 4, s === 0 ? '0' : (s % 60 === 0 ? (s / 60) + ' min' : (s / 60).toFixed(1).replace('.', ',') + ' min'), 'axis', 'middle');
+  // amplitude relative to max stream volume: system alarm volume at 60% (≈ -9 dB), ramp -30 dB → 0 dB of that, then boost to 100%
+  const stream = 0.6;
+  let dbPath = '', linPath = '';
+  for (let s = 0; s <= T; s += 1) {
+    const f = Math.min(1, s / rampEnd);
+    const a = s <= rampEnd ? stream * Math.pow(10, (-30 + 30 * f) / 20) : Math.min(1, stream + (1 - stream) * (s - rampEnd) / 6);
+    const lin = s <= rampEnd ? stream * f : stream;
+    // perceived loudness ~ 1 + dB/30 relative to max, clamp 0..1
+    const perc = v => Math.max(0, Math.min(1, 1 + 20 * Math.log10(Math.max(v, 1e-4)) / 36));
+    dbPath += (s ? 'L' : 'M') + x(s).toFixed(1) + ' ' + y(perc(a)).toFixed(1);
+    linPath += (s ? 'L' : 'M') + x(s).toFixed(1) + ' ' + y(perc(lin)).toFixed(1);
+  }
+  el('path', {d: linPath, fill: 'none', stroke: css('--naive'), 'stroke-width': 2}, svg);
+  el('path', {d: dbPath, fill: 'none', stroke: css('--smart'), 'stroke-width': 2.5}, svg);
+  el('line', {x1: x(rampEnd), x2: x(rampEnd), y1: top, y2: top + pH, stroke: css('--fixed'), 'stroke-dasharray': '4 3', 'stroke-width': 1.5}, svg);
+  txt(svg, x(rampEnd) - 6, y(1) + 14, 'reforço final: alarme ao máximo →', 'axis', 'end');
+  txt(svg, L + 4, y(0.97) , 'volume percebido', 'axis');
+}
+
+night('c1', DATA['27/09']);
+night('c2', DATA['30/09']);
+ramp('c3');
+</script>
+</body>
+</html>

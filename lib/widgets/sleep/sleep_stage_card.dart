@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
+import 'package:workout_notes/widgets/sleep/sleep_night_chart.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
@@ -31,6 +32,9 @@ class SleepStageCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final timeline = SleepWakeEngine.supports(session)
+        ? session.timeline
+        : null;
     return AppSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,10 +69,31 @@ class SleepStageCard extends StatelessWidget {
           if (!_hasStageAggregates)
             _UnavailableState(session: session)
           else ...[
+            if (timeline != null) ...[
+              SleepNightChart(
+                timeline: timeline,
+                startedAt: session.startedAt,
+                utcOffsetMinutes: session.utcOffsetStartMinutes,
+                smartWindowStart: session.smartWindowStart,
+                alarmFiredAt: session.alarmFiredAt,
+              ),
+              const SizedBox(height: 16),
+            ],
             _Breakdown(session: session),
+            if (SleepWakeEngine.supports(session) &&
+                (session.restlessSleepMinutes != null ||
+                    session.snoreMinutes != null)) ...[
+              const SizedBox(height: 12),
+              _SleepQuality(session: session),
+            ],
             if (SleepWakeEngine.supports(session)) ...[
               const SizedBox(height: 12),
-              Text(loc.sleepBedsideEstimateBody),
+              Text(
+                loc.sleepBedsideEstimateBody,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
             ],
             if (showNightMetrics) ...[
               const SizedBox(height: 14),
@@ -114,7 +139,11 @@ class _UnavailableState extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                _unavailableBody(loc, session.analysisStatus),
+                SleepWakeEngine.supports(session) &&
+                        session.analysisStatus !=
+                            SleepMonitorSession.analysisInsufficient
+                    ? loc.sleepStageUnavailableBedsideBody
+                    : _unavailableBody(loc, session.analysisStatus),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: colors.onSurfaceVariant,
                 ),
@@ -175,6 +204,37 @@ class _Breakdown extends StatelessWidget {
                 : session.deepSleepMinutes ?? 0,
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// Bedside nights only: how much of the sleep was restless, and snoring.
+class _SleepQuality extends StatelessWidget {
+  final SleepMonitorSession session;
+
+  const _SleepQuality({required this.session});
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    return Row(
+      children: [
+        Expanded(
+          child: _StageValue(
+            color: SleepUi.restless,
+            label: loc.sleepStageRestless,
+            minutes: session.restlessSleepMinutes ?? 0,
+          ),
+        ),
+        Expanded(
+          child: _StageValue(
+            color: SleepUi.snoring,
+            label: loc.sleepSnoring,
+            minutes: session.snoreMinutes ?? 0,
+          ),
+        ),
+        const Spacer(),
       ],
     );
   }

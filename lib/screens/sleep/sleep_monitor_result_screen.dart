@@ -5,6 +5,7 @@ import 'package:workout_notes/models/sleep_entry.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/widgets/sleep/sleep_stage_card.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
+import 'package:workout_notes/widgets/sleep/sleep_wake_up_card.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Detail of one monitored night: headline sleep and efficiency, the night's
@@ -152,6 +153,10 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
                 '${SleepUi.wallTime(session.startedAt, session.utcOffsetStartMinutes)}'
                 ' → ${SleepUi.wallTime(end, endOffset)}',
           ),
+          if (SleepWakeUpCard.appliesTo(session)) ...[
+            const SizedBox(height: 12),
+            SleepWakeUpCard(session: session, onFeeling: _setWakeFeeling),
+          ],
           const SizedBox(height: 12),
           AppMetricGrid(children: metrics),
           const SizedBox(height: 12),
@@ -196,6 +201,13 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _setWakeFeeling(int feeling) async {
+    final session = _session;
+    if (session == null) return;
+    setState(() => _session = session.copyWith(wakeFeeling: feeling));
+    await _repository.setWakeFeeling(session.id, feeling);
   }
 
   Future<void> _deleteSession() async {

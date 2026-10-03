@@ -447,10 +447,13 @@ class ExportImportRepository extends BaseRepository {
       'sleeping_minutes',
       'deep_sleep_minutes',
       'unknown_minutes',
+      'restless_sleep_minutes',
+      'snore_minutes',
       'awakening_count',
       'sleep_efficiency',
       'stage_confidence',
       'stage_algorithm_version',
+      'stage_timeline',
     };
     return rows
         .map((raw) {
