@@ -13,6 +13,7 @@ import 'package:workout_notes/screens/nutrition/manual_food_screen.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 import 'package:workout_notes/widgets/nutrition/food_search/food_search_controls.dart';
 import 'package:workout_notes/widgets/nutrition/food_search/food_search_results.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Food search screen. Combines local cache + remote gateway results
 /// with a debounce and explicit fallback messaging. Before any query
@@ -74,12 +75,6 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
   void _onTextChanged() => _controller.onQueryChanged(_textController.text);
 
-  void _showSnack(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-
   Future<void> _manualEntry() async {
     final created = await Navigator.of(context).push<Food>(
       MaterialPageRoute(
@@ -104,20 +99,20 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   Future<void> _handleScannedCode(String rawCode) async {
     final loc = AppLocalizations.of(context)!;
     if (FoodSearchController.extractProductCode(rawCode) == null) {
-      _showSnack(loc.nutritionScanInvalid);
+      showAppSnack(context, loc.nutritionScanInvalid);
       return;
     }
     final lookup = await _controller.lookupScannedCode(rawCode);
     if (!mounted) return;
     switch (lookup.kind) {
       case BarcodeLookupKind.invalidCode:
-        _showSnack(loc.nutritionScanInvalid);
+        showAppSnack(context, loc.nutritionScanInvalid);
       case BarcodeLookupKind.cachedWithoutVariant:
         break;
       case BarcodeLookupKind.gatewayError:
-        _showSnack(_barcodeErrorText(loc, lookup.errorCode!));
+        showAppSnack(context, _barcodeErrorText(loc, lookup.errorCode!));
       case BarcodeLookupKind.notFound:
-        _showSnack(loc.nutritionScanNotFound);
+        showAppSnack(context, loc.nutritionScanNotFound);
       case BarcodeLookupKind.found:
         _returnSelection(lookup.selection!);
     }
@@ -148,7 +143,10 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   void _selectFood(FoodSearchResult result) {
     if (result.primaryVariant == null) {
       if (!mounted) return;
-      _showSnack(AppLocalizations.of(context)!.nutritionFoodNoVariant);
+      showAppSnack(
+        context,
+        AppLocalizations.of(context)!.nutritionFoodNoVariant,
+      );
       return;
     }
     _returnSelection(
@@ -173,7 +171,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
       mealName = _controller.mealLabel(loc);
     } else if (_controller.mealTypes.isEmpty) {
       if (!mounted) return;
-      _showSnack(loc.nutritionSavedMealNoMealTypes);
+      showAppSnack(context, loc.nutritionSavedMealNoMealTypes);
       return;
     } else {
       final mealTypes = _controller.mealTypes;
@@ -211,10 +209,11 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                     result.skipped,
                   )
                 : loc.nutritionSavedMealLogged(result.added));
-      _showSnack(message);
-    } catch (e) {
+      showAppSnack(context, message);
+    } catch (e, stack) {
+      debugPrint('food_search_screen: action failed: $e\n$stack');
       if (!mounted) return;
-      _showSnack(loc.commonError(e.toString()));
+      showAppSnack(context, loc.commonSomethingWentWrong);
     }
   }
 

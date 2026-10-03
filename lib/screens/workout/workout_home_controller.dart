@@ -178,7 +178,7 @@ class WorkoutHomeController extends ChangeNotifier {
     final monday = mondayOf(today);
     // A year of history is enough for a week streak and keeps the reads
     // cheap; older weeks never change the number shown.
-    final since = monday.subtract(const Duration(days: 7 * 52));
+    final since = addDays(monday, -(7 * 52));
 
     // The rest is independent, so the awaits no longer chain (SQLite still
     // serialises the statements). Only this week's runs are read in full —
@@ -212,7 +212,7 @@ class WorkoutHomeController extends ChangeNotifier {
     final weekDays = [
       for (var i = 0; i < 7; i++)
         () {
-          final date = monday.add(Duration(days: i));
+          final date = addDays(monday, i);
           return WorkoutDayMark(
             date: date,
             strengthDone: stamps.any((g) => DateUtils.isSameDay(g.date, date)),
@@ -269,7 +269,7 @@ class WorkoutHomeController extends ChangeNotifier {
     DateTime monday,
   ) {
     const weeks = 12;
-    final from = monday.subtract(const Duration(days: 7 * (weeks - 1)));
+    final from = addDays(monday, -(7 * (weeks - 1)));
     return stamps.where((s) => !s.date.isBefore(from)).length / weeks;
   }
 

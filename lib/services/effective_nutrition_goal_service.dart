@@ -56,46 +56,39 @@ class EffectiveNutritionGoalService {
     DateTime? date,
   }) async {
     final day = date ?? DateTime.now();
-    final nutrition = nutritionRepository ?? DatabaseHelper.instance.nutritionRepo;
-    final periodization = periodizationRepository ?? DatabaseHelper.instance.periodizationRepo;
+    final nutrition =
+        nutritionRepository ?? DatabaseHelper.instance.nutritionRepo;
+    final periodization =
+        periodizationRepository ?? DatabaseHelper.instance.periodizationRepo;
     final base = await nutrition.getActiveGoal();
-    try {
-      final phase = await periodization.getEffectivePhase(day);
-      if (phase == null) {
-        return EffectiveNutritionGoal(goal: base);
-      }
-      final target = await periodization.getEffectiveTarget(
-        phase.id,
-        date: day,
-      );
-      if (target == null || target.nutritionJson.isEmpty) {
-        return EffectiveNutritionGoal(goal: base);
-      }
-      // Rest days only differ when the phase has rest-day nutrition and a
-      // template week saying which weekdays are training days.
-      final trainingDay = target.hasRestDayNutrition
-          ? (await periodization.dayPlanFor(phase, target, day)).trainingDay
-          : null;
-      final values = target.nutritionFor(trainingDay: trainingDay ?? true);
-      return EffectiveNutritionGoal(
-        goal: NutritionGoal(
-          id: 'periodization:${target.id}',
-          calories: values.calories ?? base?.calories,
-          proteinG: values.proteinG ?? base?.proteinG,
-          carbsG: values.carbsG ?? base?.carbsG,
-          fatG: values.fatG ?? base?.fatG,
-          createdAt: target.createdAt,
-          updatedAt: DateTime.now(),
-        ),
-        phase: phase,
-        weekNumber: phase.weekAt(day),
-        totalWeeks: phase.totalWeeks,
-        trainingDay: trainingDay,
-      );
-    } catch (_) {
-      // Nutrition stays fully usable on databases that have not reached
-      // the periodization migration.
+    final phase = await periodization.getEffectivePhase(day);
+    if (phase == null) {
       return EffectiveNutritionGoal(goal: base);
     }
+    final target = await periodization.getEffectiveTarget(phase.id, date: day);
+    if (target == null || target.nutritionJson.isEmpty) {
+      return EffectiveNutritionGoal(goal: base);
+    }
+    // Rest days only differ when the phase has rest-day nutrition and a
+    // template week saying which weekdays are training days.
+    final trainingDay = target.hasRestDayNutrition
+        ? (await periodization.dayPlanFor(phase, target, day)).trainingDay
+        : null;
+    final values = target.nutritionFor(trainingDay: trainingDay ?? true);
+    return EffectiveNutritionGoal(
+      goal: NutritionGoal(
+        id: 'periodization:${target.id}',
+        calories: values.calories ?? base?.calories,
+        proteinG: values.proteinG ?? base?.proteinG,
+        carbsG: values.carbsG ?? base?.carbsG,
+        fatG: values.fatG ?? base?.fatG,
+        createdAt: target.createdAt,
+        updatedAt: DateTime.now(),
+      ),
+      phase: phase,
+      weekNumber: phase.weekAt(day),
+      totalWeeks: phase.totalWeeks,
+      trainingDay: trainingDay,
+    );
   }
 }

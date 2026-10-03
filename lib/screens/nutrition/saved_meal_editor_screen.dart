@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/food_serving.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
+import 'package:workout_notes/models/nutrition/saved_meal_item_draft.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/screens/nutrition/food_quantity_sheet.dart';
 import 'package:workout_notes/screens/nutrition/food_search_screen.dart';
@@ -157,11 +157,12 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text(loc.nutritionSavedMealSaved)));
       Navigator.of(context).pop(true);
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('saved_meal_editor_screen: action failed: $e\n$stack');
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
+      ).showSnackBar(SnackBar(content: Text(loc.commonSomethingWentWrong)));
     }
   }
 

@@ -6,6 +6,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/periodization/phase_week_plan.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 
 /// Shared building blocks of the planning screens. They follow the running
@@ -209,11 +210,11 @@ class PlanRoadmap extends StatelessWidget {
     final scheme = theme.colorScheme;
     final start = phases.first.startDate;
     final end = phases.last.endDate;
-    final totalDays = end.difference(start).inDays + 1;
+    final totalDays = daysBetween(start, end) + 1;
     final day = dayOf(today);
     final inside = !day.isBefore(start) && !day.isAfter(end);
     final todayFraction = inside
-        ? (day.difference(start).inDays + 0.5) / totalDays
+        ? (daysBetween(start, day) + 0.5) / totalDays
         : null;
 
     return LayoutBuilder(
@@ -504,7 +505,7 @@ class _DayColumn extends StatelessWidget {
     );
     if (meters <= 0) return '';
     final km = meters / 1000;
-    return '${km.toStringAsFixed(km >= 10 ? 0 : 1).replaceAll('.', ',')}k';
+    return '${AppNumberFormat.decimal(km, km >= 10 ? 0 : 1)}k';
   }
 }
 
@@ -604,6 +605,7 @@ class PlanningStepper extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
+            tooltip: AppLocalizations.of(context)!.commonDecrease,
             visualDensity: VisualDensity.compact,
             onPressed: onDecrement == null
                 ? null
@@ -624,6 +626,7 @@ class PlanningStepper extends StatelessWidget {
             ),
           ),
           IconButton(
+            tooltip: AppLocalizations.of(context)!.commonIncrease,
             visualDensity: VisualDensity.compact,
             onPressed: onIncrement == null
                 ? null
@@ -651,7 +654,7 @@ String phaseStatusLabel(
   if (phase.contains(day)) {
     return loc.planningWeekOf(phase.weekAt(day), phase.totalWeeks);
   }
-  final weeks = (phase.startDate.difference(day).inDays / 7).ceil();
+  final weeks = (daysBetween(day, phase.startDate) / 7).ceil();
   return loc.planningStartsInWeeks(weeks);
 }
 

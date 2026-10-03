@@ -1,74 +1,28 @@
 import 'package:workout_notes/models/nutrition/ai_food_label_draft.dart';
+import 'package:workout_notes/utils/ai_json.dart';
 
-enum AiManualFoodProposalStatus {
-  awaitingApproval,
-  created,
-  rejected;
-
-  String get storageValue => switch (this) {
-    awaitingApproval => 'awaiting_approval',
-    created => 'created',
-    rejected => 'rejected',
-  };
-
-  static AiManualFoodProposalStatus fromStorage(String? value) =>
-      switch (value) {
-        'created' => created,
-        'rejected' => rejected,
-        _ => awaitingApproval,
-      };
-}
-
-/// A non-persisting AI proposal for a user-created food.
-///
-/// Approval opens the regular manual food form with [draft] pre-filled. The
-/// food is only written when the user saves that form.
+/// The payload of a `manual_food` proposal: a food the AI drafted for the user
+/// to review in the regular manual food form. Nothing is persisted until the
+/// user saves that form; the proposal's status lives in `AiProposal`.
 class AiManualFoodProposal {
   final AiFoodLabelDraft draft;
   final String? notes;
-  final AiManualFoodProposalStatus status;
-  final String? createdFoodId;
 
-  const AiManualFoodProposal({
-    required this.draft,
-    this.notes,
-    this.status = AiManualFoodProposalStatus.awaitingApproval,
-    this.createdFoodId,
-  });
+  const AiManualFoodProposal({required this.draft, this.notes});
 
+  /// Reads a stored payload (`{draft, notes}`). Throws [FormatException] when
+  /// the draft is missing or invalid.
   factory AiManualFoodProposal.fromJson(Map<String, dynamic> json) {
     final rawDraft = json['draft'];
-    if (rawDraft is! Map) {
-      throw const FormatException('missing food draft');
-    }
+    if (rawDraft is! Map) throw const FormatException('missing food draft');
     return AiManualFoodProposal(
       draft: AiFoodLabelDraft.fromJson(rawDraft.cast<String, dynamic>()),
-      notes: _nullableString(json['notes']),
-      status: AiManualFoodProposalStatus.fromStorage(json['status'] as String?),
-      createdFoodId: _nullableString(json['createdFoodId']),
+      notes: AiJson.text(json['notes']),
     );
   }
 
-  AiManualFoodProposal copyWith({
-    AiManualFoodProposalStatus? status,
-    String? createdFoodId,
-  }) => AiManualFoodProposal(
-    draft: draft,
-    notes: notes,
-    status: status ?? this.status,
-    createdFoodId: createdFoodId ?? this.createdFoodId,
-  );
-
   Map<String, dynamic> toJson() => {
-    'status': status.storageValue,
     'draft': draft.toJson(),
     if (notes != null) 'notes': notes,
-    if (createdFoodId != null) 'createdFoodId': createdFoodId,
   };
-}
-
-String? _nullableString(dynamic value) {
-  if (value is! String) return null;
-  final trimmed = value.trim();
-  return trimmed.isEmpty ? null : trimmed;
 }

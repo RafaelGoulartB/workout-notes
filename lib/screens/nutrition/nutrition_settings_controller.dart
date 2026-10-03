@@ -3,6 +3,7 @@ import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/nutrition_goal_suggest.dart';
 
 /// State and persistence of the nutrition settings screen: the stored daily
@@ -15,17 +16,24 @@ class NutritionSettingsController extends ChangeNotifier {
   final NutritionRepository repository;
 
   bool _isLoading = true;
+  bool _loadFailed = false;
   NutritionGoal? _current;
   EffectiveNutritionGoal _effective = const EffectiveNutritionGoal();
   List<MealTypeDefinition> _mealTypes = const [];
   bool _disposed = false;
 
   bool get isLoading => _isLoading;
+  bool get loadFailed => _loadFailed;
   NutritionGoal? get current => _current;
   EffectiveNutritionGoal get effective => _effective;
   List<MealTypeDefinition> get mealTypes => _mealTypes;
 
   Future<void> load() async {
+    if (_loadFailed) {
+      _loadFailed = false;
+      _isLoading = true;
+      notifyListeners();
+    }
     try {
       final results = await Future.wait([
         repository.getActiveGoal(),
@@ -39,9 +47,11 @@ class NutritionSettingsController extends ChangeNotifier {
       _effective = results[2] as EffectiveNutritionGoal;
       _isLoading = false;
       notifyListeners();
-    } catch (_) {
+    } catch (error, stack) {
+      debugPrint('Nutrition settings failed to load: $error\n$stack');
       if (_disposed) return;
       _isLoading = false;
+      _loadFailed = true;
       notifyListeners();
     }
   }
@@ -176,14 +186,16 @@ class NutritionSettingsController extends ChangeNotifier {
   // ===================================================================
 
   static String formatNum(double value) {
-    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
-    return value.toStringAsFixed(1);
+    if (value == value.roundToDouble()) {
+      return AppNumberFormat.decimal(value, 0);
+    }
+    return AppNumberFormat.decimal(value, 1);
   }
 
   static String formatPercent(double percent) {
     final rounded = percent.round();
-    if (rounded > 0) return '+${rounded.toStringAsFixed(0)}%';
-    return '${rounded.toStringAsFixed(0)}%';
+    if (rounded > 0) return '+${AppNumberFormat.decimal(rounded, 0)}%';
+    return '${AppNumberFormat.decimal(rounded, 0)}%';
   }
 
   static NutritionObjective parseAdjustmentKind(String? raw) {

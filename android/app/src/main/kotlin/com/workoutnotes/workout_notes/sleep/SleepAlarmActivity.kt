@@ -3,13 +3,13 @@ package com.workoutnotes.workout_notes.sleep
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
-import android.app.Activity
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
 import android.os.SystemClock
+import android.os.UserManager
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
@@ -19,6 +19,8 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextClock
 import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import com.workoutnotes.workout_notes.R
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -30,13 +32,23 @@ import java.util.Locale
  * it opens silently from the snooze notification or the app, so the mission
  * can be completed early; leaving keeps the snooze as it was.
  */
-class SleepAlarmActivity : Activity() {
+class SleepAlarmActivity : ComponentActivity() {
     private var missionError: String? = null
     private var showCameraSettings = false
     private var pulse: AnimatorSet? = null
 
+    // A ringing alarm must be explicitly handled; a snooze just continues.
+    // (A dispatcher callback, because onBackPressed() is not called with
+    // predictive back.)
+    private val backCallback = object : OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() {
+            if (SleepAlarmScheduler.read(this@SleepAlarmActivity)?.isSnoozed == true) finish()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        onBackPressedDispatcher.addCallback(this, backCallback)
         SleepAlarmUi.configureWindow(this)
     }
 
@@ -81,12 +93,6 @@ class SleepAlarmActivity : Activity() {
             SleepAlarmRingingService.resumeAfterBarcode(this)
             missionError = getString(R.string.sleep_alarm_mission_wrong_code)
         }
-    }
-
-    @Suppress("DEPRECATION")
-    override fun onBackPressed() {
-        // A ringing alarm must be explicitly handled; a snooze just continues.
-        if (SleepAlarmScheduler.read(this)?.isSnoozed == true) super.onBackPressed()
     }
 
     private fun render() {
@@ -317,6 +323,14 @@ class SleepAlarmActivity : Activity() {
     }
 
     private fun openScanner() {
+        // The scanner (camera, ML Kit) is not available before the first
+        // unlock after a reboot; the emergency option works without it.
+        if (!getSystemService(UserManager::class.java).isUserUnlocked) {
+            missionError = getString(R.string.alarm_mission_unlock_required)
+            showCameraSettings = false
+            render()
+            return
+        }
         if (!SleepAlarmScheduler.beginBarcodeChallenge(this)) return
         missionError = null
         showCameraSettings = false

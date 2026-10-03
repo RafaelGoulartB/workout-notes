@@ -20,17 +20,6 @@ class ExerciseLocalization {
     return _categoryNames[locale]?[key];
   }
 
-  /// Returns all localized names for exercises in the given [locale].
-  /// Useful for search across translations.
-  static Map<String, String> allExerciseNames(String locale) {
-    return _exerciseNames[locale] ?? {};
-  }
-
-  /// Returns all localized category names in the given [locale].
-  static Map<String, String> allCategoryNames(String locale) {
-    return _categoryNames[locale] ?? {};
-  }
-
   /// Returns the full list of supported locale codes.
   static List<String> get supportedLocales => _exerciseNames.keys.toList();
 

@@ -42,6 +42,18 @@ android {
         }
     }
 
+    lint {
+        // Existing findings live in lint-baseline.xml so CI only fails on new
+        // ones. Regenerate with `./gradlew :app:updateLintBaseline` after
+        // fixing issues (never to hide a new one).
+        baseline = file("lint-baseline.xml")
+        abortOnError = true
+        checkReleaseBuilds = false
+        // "A newer version is available" depends on the day lint runs;
+        // Dependabot proposes those updates instead.
+        disable += setOf("AndroidGradlePluginVersion", "GradleDependency", "NewerVersionAvailable")
+    }
+
     testOptions {
         // android.util.Log and friends return defaults in JVM unit tests.
         unitTests.isReturnDefaultValues = true

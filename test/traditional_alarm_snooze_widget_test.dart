@@ -70,9 +70,8 @@ void main() {
           final id = (call.arguments as Map<Object?, Object?>)['id'];
           nativeStates = nativeStates
               .map(
-                (state) => state['id'] == id
-                    ? {...state, 'state': 'ringing'}
-                    : state,
+                (state) =>
+                    state['id'] == id ? {...state, 'state': 'ringing'} : state,
               )
               .toList();
           return null;
@@ -80,9 +79,8 @@ void main() {
           final id = (call.arguments as Map<Object?, Object?>)['id'];
           nativeStates = nativeStates
               .map(
-                (state) => state['id'] == id
-                    ? {...state, 'snooze_count': 0}
-                    : state,
+                (state) =>
+                    state['id'] == id ? {...state, 'snooze_count': 0} : state,
               )
               .toList();
           return null;
@@ -157,10 +155,7 @@ Future<void> _pumpUntilCall(
   fail('Timed out waiting for $method');
 }
 
-Future<void> _pumpUntilButtonEnabled(
-  WidgetTester tester,
-  String label,
-) async {
+Future<void> _pumpUntilButtonEnabled(WidgetTester tester, String label) async {
   final buttonFinder = find.ancestor(
     of: find.text(label),
     matching: find.byType(FilledButton),

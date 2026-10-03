@@ -9,6 +9,8 @@ import 'package:workout_notes/screens/run/plan_editor/run_plan_editor_sheets.dar
 import 'package:workout_notes/screens/run/plan_editor/run_plan_editor_summary.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Session editor — the running counterpart of [RoutineDayEditorScreen].
@@ -24,11 +26,10 @@ class RunPlanWorkoutEditorScreen extends StatefulWidget {
       _RunPlanWorkoutEditorScreenState();
 }
 
-class _RunPlanWorkoutEditorScreenState
-    extends State<RunPlanWorkoutEditorScreen> {
+class _RunPlanWorkoutEditorScreenState extends State<RunPlanWorkoutEditorScreen>
+    with GuardedLoad {
   final _repo = DatabaseHelper.instance.runPlanRepo;
   RunPlanWorkout? _workout;
-  bool _loading = true;
 
   @override
   void initState() {
@@ -36,7 +37,7 @@ class _RunPlanWorkoutEditorScreenState
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     final workout = await _repo.getWorkout(widget.workoutId);
     if (!mounted) return;
     if (workout == null) {
@@ -45,9 +46,9 @@ class _RunPlanWorkoutEditorScreenState
     }
     setState(() {
       _workout = workout;
-      _loading = false;
+      isLoading = false;
     });
-  }
+  });
 
   // ===================== SESSION =====================
 
@@ -294,7 +295,13 @@ class _RunPlanWorkoutEditorScreenState
     final loc = AppLocalizations.of(context)!;
     final workout = _workout;
 
-    if (_loading || workout == null) {
+    if (loadFailed) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: LoadErrorView(onRetry: _load),
+      );
+    }
+    if (isLoading || workout == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 

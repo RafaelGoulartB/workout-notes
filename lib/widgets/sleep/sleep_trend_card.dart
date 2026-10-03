@@ -146,7 +146,7 @@ class SleepTrendCard extends StatelessWidget {
                     getTooltipItems: (spots) => [
                       for (final spot in spots)
                         LineTooltipItem(
-                          '${spot.barIndex == 0 ? '${DateFormat.MMMd(Intl.defaultLocale).format(start.add(Duration(days: spot.x.toInt())))}\n' : ''}'
+                          '${spot.barIndex == 0 ? '${DateFormat.MMMd(Intl.defaultLocale).format(addDays(start, spot.x.toInt()))}\n' : ''}'
                           '${SleepUi.duration(loc, (spot.y * 60).round())}',
                           TextStyle(
                             color: spot.bar.color ?? colors.onInverseSurface,
@@ -192,12 +192,12 @@ class SleepTrendCard extends StatelessWidget {
                             fromEnd % 7 != 0) {
                           return const SizedBox.shrink();
                         }
-                        final date = start.add(Duration(days: value.toInt()));
+                        final date = addDays(start, value.toInt());
                         return SideTitleWidget(
                           meta: meta,
                           fitInside: SideTitleFitInsideData.fromTitleMeta(meta),
                           child: Text(
-                            DateFormat('d/M').format(date),
+                            DateFormat.Md(Intl.defaultLocale).format(date),
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: colors.onSurfaceVariant,
                             ),

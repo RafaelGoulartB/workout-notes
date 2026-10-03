@@ -236,7 +236,11 @@ class _Generator {
 
   Future<void> _seedRoutines() async {
     final w = _TxnWriter(db);
-    const routines = ['Treino A - Empurrar', 'Treino B - Puxar', 'Treino C - Pernas'];
+    const routines = [
+      'Treino A - Empurrar',
+      'Treino B - Puxar',
+      'Treino C - Pernas',
+    ];
     for (final rName in routines) {
       final rId = _uuid.v4();
       await w.insert('routines', {
@@ -293,9 +297,13 @@ class _Generator {
     final end = endDate;
     var generated = 0;
     while (day.isBefore(end) && generated < totalTarget + 60) {
-      var weekSessions =
-          (s.workoutsPerWeek + (random.nextDouble() * 2 - 1)).round();
-      weekSessions = _clampInt(weekSessions, 1, (s.workoutsPerWeek + 2).round());
+      var weekSessions = (s.workoutsPerWeek + (random.nextDouble() * 2 - 1))
+          .round();
+      weekSessions = _clampInt(
+        weekSessions,
+        1,
+        (s.workoutsPerWeek + 2).round(),
+      );
       if (random.nextDouble() < 0.03) weekSessions = 0; // vacation week
       final used = <int>{};
       for (var i = 0; i < weekSessions; i++) {
@@ -450,8 +458,9 @@ class _Generator {
         'alarm_at': _iso(startedAt.add(const Duration(minutes: 450))),
         'monitor_mode': 'alarm_without_mission',
         'mission_type': null,
-        'alarm_dismiss_method':
-            random.nextDouble() < 0.7 ? 'snoozed' : 'dismissed',
+        'alarm_dismiss_method': random.nextDouble() < 0.7
+            ? 'snoozed'
+            : 'dismissed',
         'alarm_dismissed_at': _iso(startedAt.add(const Duration(minutes: 455))),
         'utc_offset_start_minutes': -180,
         'utc_offset_end_minutes': -180,
@@ -492,13 +501,41 @@ class _Generator {
     var foodCounter = 0;
     const catalogCount = 120;
     final foodNames = <String>[
-      'Arroz branco', 'Feijão preto', 'Frango grelhado', 'Ovo cozido',
-      'Banana', 'Maçã', 'Aveia', 'Whey protein', 'Batata doce', 'Brócolis',
-      'Iogurte natural', 'Pão integral', 'Café', 'Azeite', 'Amendoim',
-      'Queijo minas', 'Carne moída', 'Salmão', 'Atum', 'Abacate',
-      'Mamão', 'Manga', 'Cenoura', 'Alface', 'Tomate', 'Peito de peru',
-      'Leite desnatado', 'Tapioca', 'Granola', 'Castanhas', 'Suco de laranja',
-      'Cuscuz', 'Farinha de mandioca', 'Café com leite', 'Pão francês',
+      'Arroz branco',
+      'Feijão preto',
+      'Frango grelhado',
+      'Ovo cozido',
+      'Banana',
+      'Maçã',
+      'Aveia',
+      'Whey protein',
+      'Batata doce',
+      'Brócolis',
+      'Iogurte natural',
+      'Pão integral',
+      'Café',
+      'Azeite',
+      'Amendoim',
+      'Queijo minas',
+      'Carne moída',
+      'Salmão',
+      'Atum',
+      'Abacate',
+      'Mamão',
+      'Manga',
+      'Cenoura',
+      'Alface',
+      'Tomate',
+      'Peito de peru',
+      'Leite desnatado',
+      'Tapioca',
+      'Granola',
+      'Castanhas',
+      'Suco de laranja',
+      'Cuscuz',
+      'Farinha de mandioca',
+      'Café com leite',
+      'Pão francês',
     ];
 
     Future<void> addFood() async {
@@ -581,7 +618,8 @@ class _Generator {
       final date = startDate.add(Duration(days: i));
       if (random.nextDouble() > s.nutritionDaysPerWeek / 7) continue;
       loggedDays++;
-      final neededFoods = catalogCount + (loggedDays * s.newFoodsPerDay).round();
+      final neededFoods =
+          catalogCount + (loggedDays * s.newFoodsPerDay).round();
       while (foodIds.length < neededFoods) {
         await addFood();
       }
@@ -780,8 +818,8 @@ class _Generator {
           'content': isUser
               ? 'Quanto evoluiu meu supino nos últimos 3 meses?'
               : hasToolCall
-                  ? null
-                  : 'Seu supino evoluiu X% nas últimas 12 semanas. Os dados mostram progressão consistente de carga.',
+              ? null
+              : 'Seu supino evoluiu X% nas últimas 12 semanas. Os dados mostram progressão consistente de carga.',
           'tool_call_id': hasToolCall ? _uuid.v4() : null,
           'tool_name': hasToolCall ? 'get_exercise_history' : null,
           'tool_calls_json': hasToolCall
@@ -884,7 +922,9 @@ class _Generator {
             'recovery': 3 + random.nextInt(3),
             'performance': 'estável',
             'decision': 'manter',
-            'notes': random.nextDouble() < 0.2 ? 'Semana puxada no trabalho' : null,
+            'notes': random.nextDouble() < 0.2
+                ? 'Semana puxada no trabalho'
+                : null,
             'metrics_json': jsonEncode({
               'weight': _round2(80 + random.nextDouble() * 5),
               'waist': _round2(85 + random.nextDouble() * 5),
@@ -929,7 +969,7 @@ Future<Map<String, int>> _rowCounts(Database db) async {
 Future<Map<String, int>> _tableBytes(Database db) async {
   try {
     final rows = await db.rawQuery(
-      "SELECT name, SUM(pgsize) AS bytes FROM dbstat WHERE aggregate=TRUE GROUP BY name",
+      'SELECT name, SUM(pgsize) AS bytes FROM dbstat WHERE aggregate=TRUE GROUP BY name',
     );
     return {
       for (final r in rows) r['name'] as String: (r['bytes'] as int?) ?? 0,
@@ -1064,125 +1104,123 @@ void main() {
     ),
   ];
 
-  test(
-    'Long-term storage study (multi-year simulation)',
-    () async {
-      final dir = Directory.systemTemp.createTempSync('wn_storage_study');
-      final results = <ScenarioResult>[];
+  test('Long-term storage study (multi-year simulation)', () async {
+    final dir = Directory.systemTemp.createTempSync('wn_storage_study');
+    final results = <ScenarioResult>[];
 
-      for (final scenario in scenarios) {
-        // ignore: avoid_print
-        print(
-          '\n═══════════════════════════════════════════════════════════\n'
-          'GEN: ${scenario.name}',
-        );
+    for (final scenario in scenarios) {
+      // ignore: avoid_print
+      print(
+        '\n═══════════════════════════════════════════════════════════\n'
+        'GEN: ${scenario.name}',
+      );
 
-        final dbName = '${scenario.name.replaceAll(' ', '_')}.db';
-        final db = await _openFreshDb(dir.path, dbName);
-        DatabaseHelper.overrideDatabase = db;
-        final generator = _Generator(
-          db,
-          scenario,
-          math.Random(42 + scenario.years * 7),
-        );
-        final genSw = Stopwatch()..start();
-        await generator.run();
-        genSw.stop();
-        final dbFile = File(p.join(dir.path, dbName));
-        // ignore: avoid_print
-        print(
-          'GEN: done in ${_fmtMs(genSw.elapsed)} | '
-          'size=${_fmtBytes(dbFile.lengthSync())}',
-        );
+      final dbName = '${scenario.name.replaceAll(' ', '_')}.db';
+      final db = await _openFreshDb(dir.path, dbName);
+      DatabaseHelper.overrideDatabase = db;
+      final generator = _Generator(
+        db,
+        scenario,
+        math.Random(42 + scenario.years * 7),
+      );
+      final genSw = Stopwatch()..start();
+      await generator.run();
+      genSw.stop();
+      final dbFile = File(p.join(dir.path, dbName));
+      // ignore: avoid_print
+      print(
+        'GEN: done in ${_fmtMs(genSw.elapsed)} | '
+        'size=${_fmtBytes(dbFile.lengthSync())}',
+      );
 
-        // ---- row counts & table bytes ----
-        final counts = await _rowCounts(db);
-        final bytes = await _tableBytes(db);
+      // ---- row counts & table bytes ----
+      final counts = await _rowCounts(db);
+      final bytes = await _tableBytes(db);
 
-        // ---- representative queries (warm run first, then timed) ----
-        final now = DateTime.now();
-        final workoutRepo = WorkoutRepository();
-        final analyticsRepo = AnalyticsRepository();
-        final sleepRepo = SleepRepository();
+      // ---- representative queries (warm run first, then timed) ----
+      final now = DateTime.now();
+      final workoutRepo = WorkoutRepository();
+      final analyticsRepo = AnalyticsRepository();
+      final sleepRepo = SleepRepository();
 
-        final mostUsedExercise = await _mostUsedExercise(db);
-        final recentWorkout = await _recentWorkout(db);
-        final biggestThread = await _biggestThread(db);
-        final recentDay = _dateStr(now);
+      final mostUsedExercise = await _mostUsedExercise(db);
+      final recentWorkout = await _recentWorkout(db);
+      final biggestThread = await _biggestThread(db);
+      final recentDay = _dateStr(now);
 
-        Future<void> warmup() async {
-          await workoutRepo.getWorkoutsByMonth(now.year, now.month);
-          await workoutRepo.getWorkoutCategoriesByDate(now.year, now.month);
-          if (mostUsedExercise != null) {
-            await analyticsRepo.getExerciseHistory(mostUsedExercise);
-          }
-          await analyticsRepo.getWorkoutOverviewStats();
-          if (recentWorkout != null) {
-            await workoutRepo.getWorkout(recentWorkout);
-            final entries = await workoutRepo.getWorkoutExercises(recentWorkout);
-            for (final e in entries) {
-              await workoutRepo.getExerciseSets(e['id'] as String);
-            }
-          }
-          await sleepRepo.getDashboardStats();
-        }
-
-        await warmup();
-
-        final queryTimes = <String, Timed>{};
-        queryTimes['calendario (mes)'] = await _timed(() async {
-          await workoutRepo.getWorkoutsByMonth(now.year, now.month);
-        });
-        queryTimes['calendario categorias (mes)'] = await _timed(() async {
-          await workoutRepo.getWorkoutCategoriesByDate(now.year, now.month);
-        });
+      Future<void> warmup() async {
+        await workoutRepo.getWorkoutsByMonth(now.year, now.month);
+        await workoutRepo.getWorkoutCategoriesByDate(now.year, now.month);
         if (mostUsedExercise != null) {
-          queryTimes['historico exercicio (todo periodo)'] = await _timed(
-            () async {
-              await analyticsRepo.getExerciseHistory(mostUsedExercise);
-            },
-          );
+          await analyticsRepo.getExerciseHistory(mostUsedExercise);
         }
-        queryTimes['visao geral treinos (totais)'] = await _timed(() async {
-          await analyticsRepo.getWorkoutOverviewStats();
-        });
+        await analyticsRepo.getWorkoutOverviewStats();
         if (recentWorkout != null) {
-          queryTimes['detalhe treino + sets'] = await _timed(() async {
-            await workoutRepo.getWorkout(recentWorkout);
-            final entries = await workoutRepo.getWorkoutExercises(recentWorkout);
-            for (final e in entries) {
-              await workoutRepo.getExerciseSets(e['id'] as String);
-            }
-          });
+          await workoutRepo.getWorkout(recentWorkout);
+          final entries = await workoutRepo.getWorkoutExercises(recentWorkout);
+          for (final e in entries) {
+            await workoutRepo.getExerciseSets(e['id'] as String);
+          }
         }
-        queryTimes['dashboard sono (30d)'] = await _timed(() async {
-          await sleepRepo.getDashboardStats();
-        });
-        queryTimes['sessoes monitoradas recentes (20)'] = await _timed(() async {
-          await db.query(
-            'sleep_monitor_sessions',
-            where: "status = 'completed'",
-            orderBy: 'started_at DESC',
-            limit: 20,
-          );
-        });
-        queryTimes['nutricao: diario completo'] = await _timed(() async {
-          final logs = await db.query(
-            'meal_logs',
-            where: 'date = ?',
-            whereArgs: [recentDay],
-          );
-          for (final log in logs) {
-            await db.query(
-              'meal_log_items',
-              where: 'meal_log_id = ?',
-              whereArgs: [log['id']],
-            );
+        await sleepRepo.getDashboardStats();
+      }
+
+      await warmup();
+
+      final queryTimes = <String, Timed>{};
+      queryTimes['calendario (mes)'] = await _timed(() async {
+        await workoutRepo.getWorkoutsByMonth(now.year, now.month);
+      });
+      queryTimes['calendario categorias (mes)'] = await _timed(() async {
+        await workoutRepo.getWorkoutCategoriesByDate(now.year, now.month);
+      });
+      if (mostUsedExercise != null) {
+        queryTimes['historico exercicio (todo periodo)'] = await _timed(
+          () async {
+            await analyticsRepo.getExerciseHistory(mostUsedExercise);
+          },
+        );
+      }
+      queryTimes['visao geral treinos (totais)'] = await _timed(() async {
+        await analyticsRepo.getWorkoutOverviewStats();
+      });
+      if (recentWorkout != null) {
+        queryTimes['detalhe treino + sets'] = await _timed(() async {
+          await workoutRepo.getWorkout(recentWorkout);
+          final entries = await workoutRepo.getWorkoutExercises(recentWorkout);
+          for (final e in entries) {
+            await workoutRepo.getExerciseSets(e['id'] as String);
           }
         });
-        queryTimes['nutricao: resumo 30d macros'] = await _timed(() async {
-          await db.rawQuery(
-            '''
+      }
+      queryTimes['dashboard sono (30d)'] = await _timed(() async {
+        await sleepRepo.getDashboardStats();
+      });
+      queryTimes['sessoes monitoradas recentes (20)'] = await _timed(() async {
+        await db.query(
+          'sleep_monitor_sessions',
+          where: "status = 'completed'",
+          orderBy: 'started_at DESC',
+          limit: 20,
+        );
+      });
+      queryTimes['nutricao: diario completo'] = await _timed(() async {
+        final logs = await db.query(
+          'meal_logs',
+          where: 'date = ?',
+          whereArgs: [recentDay],
+        );
+        for (final log in logs) {
+          await db.query(
+            'meal_log_items',
+            where: 'meal_log_id = ?',
+            whereArgs: [log['id']],
+          );
+        }
+      });
+      queryTimes['nutricao: resumo 30d macros'] = await _timed(() async {
+        await db.rawQuery(
+          '''
             SELECT SUM(calories) cals, SUM(protein_g) protein,
                    SUM(carbs_g) carbs, SUM(fat_g) fat
             FROM meal_log_items
@@ -1190,136 +1228,133 @@ void main() {
               SELECT id FROM meal_logs WHERE date >= ? AND date <= ?
             )
             ''',
-            [_dateStr(now.subtract(const Duration(days: 30))), _dateStr(now)],
+          [_dateStr(now.subtract(const Duration(days: 30))), _dateStr(now)],
+        );
+      });
+      if (biggestThread != null) {
+        queryTimes['carregar thread IA'] = await _timed(() async {
+          await db.query(
+            'ai_chat_messages',
+            where: 'thread_id = ?',
+            whereArgs: [biggestThread],
+            orderBy: 'created_at ASC',
           );
         });
-        if (biggestThread != null) {
-          queryTimes['carregar thread IA'] = await _timed(() async {
-            await db.query(
-              'ai_chat_messages',
-              where: 'thread_id = ?',
-              whereArgs: [biggestThread],
-              orderBy: 'created_at ASC',
-            );
-          });
-        }
-
-        // ---- export (exact app path: pretty-printed JSON) ----
-        final exportRepo = ExportImportRepository();
-        Map<String, dynamic> backupData = {};
-        final exportDump = await _timed(() async {
-          backupData = await exportRepo.exportAllData();
-        });
-        final prettySw = Stopwatch()..start();
-        final prettyStr = const JsonEncoder.withIndent('  ').convert(backupData);
-        final prettySize = utf8.encode(prettyStr).length;
-        prettySw.stop();
-        final compactSw = Stopwatch()..start();
-        final compactSize = utf8.encode(jsonEncode(backupData)).length;
-        compactSw.stop();
-
-        // ---- restore into a fresh DB (real restoreFromBackup path) ----
-        final restoreDbName =
-            'restore_${scenario.name.replaceAll(' ', '_')}.db';
-        final restoreDb = await _openFreshDb(dir.path, restoreDbName);
-        DatabaseHelper.overrideDatabase = restoreDb;
-        final restoreRepo = ExportImportRepository();
-        var restoreRows = 0;
-        final restoreTimed = await _timed(() async {
-          restoreRows = await restoreRepo.restoreFromBackup(backupData);
-        });
-        final restoreDbFile = File(p.join(dir.path, restoreDbName));
-        final restoreBytes = restoreDbFile.lengthSync();
-        await restoreDb.close();
-        DatabaseHelper.overrideDatabase = db;
-
-        results.add(
-          ScenarioResult(
-            scenario: scenario,
-            db: db,
-            dbFile: dbFile,
-            dbBytes: dbFile.lengthSync(),
-            restoreDbBytes: restoreBytes,
-            rowCounts: counts,
-            tableBytes: bytes,
-            exportPretty: Timed(exportDump.duration + prettySw.elapsed),
-            exportCompact: Timed(compactSw.elapsed),
-            exportPrettyBytes: prettySize,
-            exportCompactBytes: compactSize,
-            restore: restoreTimed,
-            restoreRows: restoreRows,
-            queryTimes: queryTimes,
-          ),
-        );
       }
 
-      // -----------------------------------------------------------------
-      // REPORT
-      // -----------------------------------------------------------------
-      for (final r in results) {
-        final dbSize = r.dbBytes;
-        final totalRows = r.rowCounts.values.fold(0, (a, b) => a + b);
-        // ignore: avoid_print
-        print(
-          '\n'
-          '──────────────────────────────────────────────────────────────\n'
-          'RESULT: ${r.scenario.name} (${r.scenario.years} ano(s))\n'
-          '──────────────────────────────────────────────────────────────\n'
-          'Tamanho do arquivo .db ............ ${_fmtBytes(dbSize)}\n'
-          'Linhas no banco ................... $totalRows\n'
-          'Backup JSON pretty (formato do app) ${_fmtBytes(r.exportPrettyBytes)} '
-          '(${_fmtMs(r.exportPretty.duration)})\n'
-          'Backup JSON compacto .............. ${_fmtBytes(r.exportCompactBytes)} '
-          '(${_fmtMs(r.exportCompact.duration)})\n'
-          'Restore (import) .................. ${_fmtMs(r.restore.duration)} '
-          'para ${r.restoreRows} linhas | db resultante=${_fmtBytes(r.restoreDbBytes)}\n'
-          'Proporcao pretty/compacto ......... '
-          '${(r.exportPrettyBytes / r.exportCompactBytes).toStringAsFixed(2)}x\n'
-          'Proporcao json/db ................. '
-          '${(r.exportPrettyBytes / dbSize).toStringAsFixed(2)}x\n',
-        );
+      // ---- export (exact app path: pretty-printed JSON) ----
+      final exportRepo = ExportImportRepository();
+      Map<String, dynamic> backupData = {};
+      final exportDump = await _timed(() async {
+        backupData = await exportRepo.exportAllData();
+      });
+      final prettySw = Stopwatch()..start();
+      final prettyStr = const JsonEncoder.withIndent('  ').convert(backupData);
+      final prettySize = utf8.encode(prettyStr).length;
+      prettySw.stop();
+      final compactSw = Stopwatch()..start();
+      final compactSize = utf8.encode(jsonEncode(backupData)).length;
+      compactSw.stop();
 
-        final entries = r.tableBytes.entries.toList()
+      // ---- restore into a fresh DB (real restoreFromBackup path) ----
+      final restoreDbName = 'restore_${scenario.name.replaceAll(' ', '_')}.db';
+      final restoreDb = await _openFreshDb(dir.path, restoreDbName);
+      DatabaseHelper.overrideDatabase = restoreDb;
+      final restoreRepo = ExportImportRepository();
+      var restoreRows = 0;
+      final restoreTimed = await _timed(() async {
+        restoreRows = await restoreRepo.restoreFromBackup(backupData);
+      });
+      final restoreDbFile = File(p.join(dir.path, restoreDbName));
+      final restoreBytes = restoreDbFile.lengthSync();
+      await restoreDb.close();
+      DatabaseHelper.overrideDatabase = db;
+
+      results.add(
+        ScenarioResult(
+          scenario: scenario,
+          db: db,
+          dbFile: dbFile,
+          dbBytes: dbFile.lengthSync(),
+          restoreDbBytes: restoreBytes,
+          rowCounts: counts,
+          tableBytes: bytes,
+          exportPretty: Timed(exportDump.duration + prettySw.elapsed),
+          exportCompact: Timed(compactSw.elapsed),
+          exportPrettyBytes: prettySize,
+          exportCompactBytes: compactSize,
+          restore: restoreTimed,
+          restoreRows: restoreRows,
+          queryTimes: queryTimes,
+        ),
+      );
+    }
+
+    // -----------------------------------------------------------------
+    // REPORT
+    // -----------------------------------------------------------------
+    for (final r in results) {
+      final dbSize = r.dbBytes;
+      final totalRows = r.rowCounts.values.fold(0, (a, b) => a + b);
+      // ignore: avoid_print
+      print(
+        '\n'
+        '──────────────────────────────────────────────────────────────\n'
+        'RESULT: ${r.scenario.name} (${r.scenario.years} ano(s))\n'
+        '──────────────────────────────────────────────────────────────\n'
+        'Tamanho do arquivo .db ............ ${_fmtBytes(dbSize)}\n'
+        'Linhas no banco ................... $totalRows\n'
+        'Backup JSON pretty (formato do app) ${_fmtBytes(r.exportPrettyBytes)} '
+        '(${_fmtMs(r.exportPretty.duration)})\n'
+        'Backup JSON compacto .............. ${_fmtBytes(r.exportCompactBytes)} '
+        '(${_fmtMs(r.exportCompact.duration)})\n'
+        'Restore (import) .................. ${_fmtMs(r.restore.duration)} '
+        'para ${r.restoreRows} linhas | db resultante=${_fmtBytes(r.restoreDbBytes)}\n'
+        'Proporcao pretty/compacto ......... '
+        '${(r.exportPrettyBytes / r.exportCompactBytes).toStringAsFixed(2)}x\n'
+        'Proporcao json/db ................. '
+        '${(r.exportPrettyBytes / dbSize).toStringAsFixed(2)}x\n',
+      );
+
+      final entries = r.tableBytes.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      if (r.tableBytes.isNotEmpty) {
+        // ignore: avoid_print
+        print('  Espaco por tabela (top 12, dbstat):');
+        for (final e in entries.take(12)) {
+          final pct = dbSize == 0 ? 0 : e.value * 100.0 / dbSize;
+          // ignore: avoid_print
+          print(
+            '    ${e.key.padRight(28)} ${_fmtBytes(e.value).padLeft(10)}  '
+            '${pct.toStringAsFixed(1).padLeft(5)}%  '
+            '(${r.rowCounts[e.key] ?? 0} linhas)',
+          );
+        }
+      } else {
+        // ignore: avoid_print
+        print('  (dbstat indisponivel; apenas contagem de linhas)');
+        final countEntries = r.rowCounts.entries.toList()
           ..sort((a, b) => b.value.compareTo(a.value));
-        if (r.tableBytes.isNotEmpty) {
+        for (final e in countEntries.take(12)) {
           // ignore: avoid_print
-          print('  Espaco por tabela (top 12, dbstat):');
-          for (final e in entries.take(12)) {
-            final pct = dbSize == 0 ? 0 : e.value * 100.0 / dbSize;
-            // ignore: avoid_print
-            print(
-              '    ${e.key.padRight(28)} ${_fmtBytes(e.value).padLeft(10)}  '
-              '${pct.toStringAsFixed(1).padLeft(5)}%  '
-              '(${r.rowCounts[e.key] ?? 0} linhas)',
-            );
-          }
-        } else {
-          // ignore: avoid_print
-          print('  (dbstat indisponivel; apenas contagem de linhas)');
-          final countEntries = r.rowCounts.entries.toList()
-            ..sort((a, b) => b.value.compareTo(a.value));
-          for (final e in countEntries.take(12)) {
-            // ignore: avoid_print
-            print(
-              '    ${e.key.padRight(28)} ${e.value.toString().padLeft(9)} linhas',
-            );
-          }
+          print(
+            '    ${e.key.padRight(28)} ${e.value.toString().padLeft(9)} linhas',
+          );
         }
-
-        // ignore: avoid_print
-        print('\n  Queries representativas (2a execucao, cache quente):');
-        for (final q in r.queryTimes.entries) {
-          // ignore: avoid_print
-          print('    ${q.key.padRight(36)} ${_fmtMs(q.value.duration)}');
-        }
-        // ignore: avoid_print
-        print('');
       }
 
-      for (final r in results) {
-        await r.db.close();
+      // ignore: avoid_print
+      print('\n  Queries representativas (2a execucao, cache quente):');
+      for (final q in r.queryTimes.entries) {
+        // ignore: avoid_print
+        print('    ${q.key.padRight(36)} ${_fmtMs(q.value.duration)}');
       }
-    },
-    timeout: const Timeout(Duration(minutes: 45)),
-  );
+      // ignore: avoid_print
+      print('');
+    }
+
+    for (final r in results) {
+      await r.db.close();
+    }
+  }, timeout: const Timeout(Duration(minutes: 45)));
 }

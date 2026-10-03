@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/body_progress_analytics.dart';
 
 /// Weekly averages as a line, with the period average drawn as a dashed
@@ -112,7 +113,7 @@ class BodyWeeklyAverageChart extends StatelessWidget {
                     '${DateFormat.Md().format(w.weekStart)} – '
                     '${DateFormat.Md().format(w.weekEnd)}';
                 return LineTooltipItem(
-                  '$range\n${t.y.toStringAsFixed(1)} $unit',
+                  '$range\n${AppNumberFormat.decimal(t.y, 1)} $unit',
                   TextStyle(
                     color: theme.colorScheme.onSurface,
                     fontWeight: FontWeight.w700,
@@ -218,7 +219,7 @@ class BodyWeeklyDeltaChart extends StatelessWidget {
                 final sign = delta >= 0 ? '+' : '-';
                 return BarTooltipItem(
                   '${DateFormat.Md().format(w.weekStart)}\n'
-                  '$sign${delta.abs().toStringAsFixed(2)} $unit',
+                  '$sign${AppNumberFormat.decimal(delta.abs(), 2)} $unit',
                   TextStyle(
                     color: colors.onSurface,
                     fontWeight: FontWeight.w700,
@@ -249,7 +250,7 @@ class BodyWeeklyDeltaChart extends StatelessWidget {
             leftReserved: 40,
             leftFormatter: (v) => v == 0
                 ? '0'
-                : '${v > 0 ? '+' : '-'}${v.abs().toStringAsFixed(1)}',
+                : '${v > 0 ? '+' : '-'}${AppNumberFormat.decimal(v.abs(), 1)}',
           ),
           barGroups: [
             for (final i in indexed)
@@ -345,7 +346,7 @@ class BodyDailyTrendChart extends StatelessWidget {
                 if (i < 0 || i >= daily.length) return null;
                 return LineTooltipItem(
                   '${DateFormat.MMMd().format(daily[i].date)}\n'
-                  '${daily[i].value.toStringAsFixed(1)} $unit',
+                  '${AppNumberFormat.decimal(daily[i].value, 1)} $unit',
                   TextStyle(
                     color: colors.onSurface,
                     fontWeight: FontWeight.w700,
@@ -457,7 +458,7 @@ FlTitlesData _titles({
           }
           final text =
               leftFormatter?.call(value) ??
-              value.toStringAsFixed(value.abs() >= 100 ? 0 : 1);
+              AppNumberFormat.decimal(value, value.abs() >= 100 ? 0 : 1);
           return SideTitleWidget(
             meta: meta,
             space: 6,

@@ -27,6 +27,8 @@ import 'package:workout_notes/widgets/run/home/run_home_today_card.dart';
 import 'package:workout_notes/widgets/run/home/run_home_trends_card.dart';
 import 'package:workout_notes/widgets/run/home/run_home_week_card.dart';
 import 'package:workout_notes/widgets/run/run_pending_review_banner.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 enum _HomeMenu { plans, history, shoes, records, voice }
@@ -41,7 +43,7 @@ class RunStatsScreen extends StatefulWidget {
   State<RunStatsScreen> createState() => _RunStatsScreenState();
 }
 
-class _RunStatsScreenState extends State<RunStatsScreen> {
+class _RunStatsScreenState extends State<RunStatsScreen> with GuardedLoad {
   final _repo = DatabaseHelper.instance.runRepo;
   final _todayService = RunTodayService();
 
@@ -51,7 +53,6 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
   RunFitnessEstimate? _fitness;
   RunTrainingLoad? _load;
   RunProgressAnalytics? _analytics;
-  bool _loading = true;
   RunStatsPeriod _period = RunStatsPeriod.weeks12;
   int _bannerRefresh = 0;
 
@@ -61,8 +62,8 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
     _reload();
   }
 
-  Future<void> _reload() async {
-    setState(() => _loading = _analytics == null);
+  Future<void> _reload() => guardedLoad(() async {
+    setState(() => isLoading = _analytics == null);
     await _repo.backfillMissingEfforts(limit: 60);
     await _repo.backfillSmoothedElevation();
     final rows = await _repo.listActivities(
@@ -83,9 +84,9 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
       );
       _analytics = RunProgressAnalytics.fromActivities(rows, period: _period);
       _bannerRefresh++;
-      _loading = false;
+      isLoading = false;
     });
-  }
+  });
 
   void _setPeriod(RunStatsPeriod period) {
     setState(() {
@@ -202,8 +203,10 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
         icon: const Icon(Icons.directions_run),
         label: Text(loc.runRecordStart),
       ),
-      body: _loading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed && _analytics == null
+          ? LoadErrorView(onRetry: _reload)
           : RefreshIndicator(
               onRefresh: _reload,
               child: ListView(

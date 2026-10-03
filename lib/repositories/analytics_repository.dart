@@ -113,7 +113,7 @@ class AnalyticsRepository extends BaseRepository {
     int months = 6,
   }) async {
     final db = await this.db;
-    final start = dateKey(DateTime.now().subtract(Duration(days: months * 30)));
+    final start = dateKey(addDays(DateTime.now(), -(months * 30)));
     return db.rawQuery(
       '''
       SELECT bm.date, bm.value as weight, bm.unit,
@@ -156,11 +156,11 @@ class AnalyticsRepository extends BaseRepository {
 
     int streak = 1;
     DateTime prev = DateTime.parse(rows[0]['date'] as String);
-    if (today.difference(prev).inDays > 1) return 0;
+    if (daysBetween(prev, today) > 1) return 0;
 
     for (int i = 1; i < rows.length; i++) {
       final curr = DateTime.parse(rows[i]['date'] as String);
-      if (prev.difference(curr).inDays == 1) {
+      if (daysBetween(curr, prev) == 1) {
         streak++;
         prev = curr;
       } else {

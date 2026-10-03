@@ -34,6 +34,8 @@ import 'package:workout_notes/widgets/run/plan_detail/run_plan_week_header.dart'
 import 'package:workout_notes/widgets/run/plan_detail/run_plan_week_strip.dart';
 import 'package:workout_notes/widgets/run/run_balance_dialog.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Plan detail: identity header, status, week picker and the training week
@@ -51,7 +53,8 @@ class RunPlanDetailScreen extends StatefulWidget {
   State<RunPlanDetailScreen> createState() => _RunPlanDetailScreenState();
 }
 
-class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
+class _RunPlanDetailScreenState extends State<RunPlanDetailScreen>
+    with GuardedLoad {
   final _repo = DatabaseHelper.instance.runPlanRepo;
   final _weekStrip = ScrollController();
   RunPlan? _plan;
@@ -62,7 +65,6 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
   /// Driven by a periodization phase: the phase owns the week mapping, so this
   /// screen reports it instead of offering its own activation.
   bool _linkedToPlanning = false;
-  bool _loading = true;
   int _week = 0;
 
   /// This week's suggestion from the weekly review, if any.
@@ -85,7 +87,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     final plan = await _repo.getPlan(widget.planId);
     if (!mounted) return;
     if (plan == null) {
@@ -113,17 +115,14 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
         ? () {
             final start = mondayOf(anchor);
             return RunnerStrengthRoutine()
-                .completedDays(
-                  start,
-                  start.add(Duration(days: 7 * plan.weeks)),
-                )
+                .completedDays(start, addDays(start, 7 * plan.weeks))
                 .catchError((Object _) => <DateTime>{});
           }()
         : Future<Set<DateTime>>.value(const {});
     final proposal = await proposalFuture;
     final strengthDone = await strengthFuture;
     if (!mounted) return;
-    final firstLoad = _loading;
+    final firstLoad = isLoading;
     setState(() {
       _plan = plan;
       _scheduledWeeks = scheduled;
@@ -138,9 +137,9 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
         _week = plan.activeWeekIndexOn(_today) ?? _week;
       }
       _week = _week.clamp(0, plan.weeks - 1);
-      _loading = false;
+      isLoading = false;
     });
-  }
+  });
 
   static bool _includesStrength(RunPlan plan) =>
       plan.config?['includeStrength'] == true;
@@ -158,11 +157,12 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(loc.runPlanAdaptApplied)));
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('run_plan_detail_screen: action failed: $e\n$stack');
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
+      ).showSnackBar(SnackBar(content: Text(loc.commonSomethingWentWrong)));
     }
     if (mounted) setState(() => _applying = false);
     await _load();
@@ -250,6 +250,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
       title: loc.runPlanResetTitle,
       message: loc.runPlanResetBody,
       confirmLabel: loc.runPlanResetConfirm,
+      destructive: true,
       icon: Icons.restart_alt_rounded,
     );
     if (confirmed != true) return;
@@ -331,7 +332,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
       context: context,
       helpText: loc.runPlanScheduleWeek,
       // The plan week starts on a Monday, so default to the coming Monday.
-      initialDate: now.add(Duration(days: (8 - now.weekday) % 7)),
+      initialDate: addDays(now, (8 - now.weekday) % 7),
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 5),
     );
@@ -452,7 +453,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     final loc = AppLocalizations.of(context)!;
     // Any Monday works: the check only needs weekdays as dates.
     final monday = DateTime(2024, 1, 1);
-    DateTime dateOf(int day) => monday.add(Duration(days: day - 1));
+    DateTime dateOf(int day) => addDays(monday, day - 1);
     final week = [
       for (final w in plan.workoutsForWeek(workout.weekIndex))
         if (w.dayOfWeek != null)
@@ -527,7 +528,13 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     final loc = AppLocalizations.of(context)!;
     final plan = _plan;
 
-    if (_loading || plan == null) {
+    if (loadFailed && plan == null) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: LoadErrorView(onRetry: _load),
+      );
+    }
+    if (isLoading || plan == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 

@@ -27,7 +27,7 @@ class RunPlanWeekResolver {
 
   /// Zero-based phase week of [date]. Negative before the phase starts.
   int phaseWeekOf({required DateTime phaseStart, required DateTime date}) =>
-      weekStart(date).difference(weekStart(phaseStart)).inDays ~/ 7;
+      daysBetween(weekStart(phaseStart), weekStart(date)) ~/ 7;
 
   /// Zero-based plan week that phase week [phaseWeek] maps to, or null when
   /// the plan has no weeks. Wraps in both directions so negative offsets and

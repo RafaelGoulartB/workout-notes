@@ -4,7 +4,6 @@ import 'package:workout_notes/services/sleep_goal_service.dart';
 import 'support/test_db.dart';
 
 void main() {
-
   setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {

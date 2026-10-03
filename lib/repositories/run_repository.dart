@@ -159,18 +159,21 @@ class RunRepository extends BaseRepository {
     final database = await db;
     // The FK only nulls `run_activity_id`, which would leave a plan session
     // counted as completed with no run behind it. Put it back to planned so
-    // the plan's progress keeps matching reality.
-    await database.update(
-      'scheduled_runs',
-      {
-        'status': 'planned',
-        'run_activity_id': null,
-        'updated_at': DateTime.now().toIso8601String(),
-      },
-      where: 'run_activity_id = ?',
-      whereArgs: [id],
-    );
-    await database.delete('run_activities', where: 'id = ?', whereArgs: [id]);
+    // the plan's progress keeps matching reality. One transaction, so a
+    // failure cannot leave only one of the two statements applied.
+    await database.transaction((txn) async {
+      await txn.update(
+        'scheduled_runs',
+        {
+          'status': 'planned',
+          'run_activity_id': null,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'run_activity_id = ?',
+        whereArgs: [id],
+      );
+      await txn.delete('run_activities', where: 'id = ?', whereArgs: [id]);
+    });
   }
 
   /// Completed runs of a calendar month, for the calendar view.
@@ -247,7 +250,7 @@ class RunRepository extends BaseRepository {
       'run_activities',
       columns: ['id'],
       where:
-          "status = ? AND activity_type = ? AND IFNULL(efforts_computed, 0) = 0",
+          'status = ? AND activity_type = ? AND IFNULL(efforts_computed, 0) = 0',
       whereArgs: ['completed', CardioActivityType.running.databaseValue],
       orderBy: 'started_at DESC',
       limit: limit,
@@ -310,7 +313,17 @@ class RunRepository extends BaseRepository {
 
     final laps = _decodeNativeLaps(spool);
     final database = await db;
-    await database.transaction((txn) async {
+    final imported = await database.transaction((txn) async {
+      // Checked again inside the transaction: a concurrent import of the same
+      // spool may have committed since the check above.
+      final already = await txn.query(
+        'run_activities',
+        columns: ['id'],
+        where: 'id = ?',
+        whereArgs: [activity.id],
+        limit: 1,
+      );
+      if (already.isNotEmpty) return false;
       await txn.insert('run_activities', activity.toMap());
       if (laps.isNotEmpty) {
         // Manual laps ride in the same transaction: either the activity and
@@ -330,8 +343,10 @@ class RunRepository extends BaseRepository {
           summary: summary,
         );
       }
+      return true;
     });
 
+    if (!imported) return await getActivity(activity.id) ?? activity;
     return activity;
   }
 
@@ -661,11 +676,7 @@ class RunRepository extends BaseRepository {
     ).activity;
   }
 
-  ({
-    RunActivity activity,
-    List<RunTrackPoint> points,
-    RunTrackProfile profile,
-  })
+  ({RunActivity activity, List<RunTrackPoint> points, RunTrackProfile profile})
   _decodeNativeSpool(
     Map<String, dynamic> spool, {
     required String id,
@@ -792,7 +803,8 @@ class RunRepository extends BaseRepository {
 
   Future<double> _latestBodyWeightKg() async {
     try {
-      final latest = await DatabaseHelper.instance.bodyMeasurementRepo.getLatestWeightKg();
+      final latest = await DatabaseHelper.instance.bodyMeasurementRepo
+          .getLatestWeightKg();
       return latest ?? 70;
     } catch (_) {
       // Lightweight repository tests and partially recovered databases may not

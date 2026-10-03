@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/exercise_equipment.dart';
 import 'package:workout_notes/widgets/ui/form_section_card.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 
 class ExerciseFormScreen extends StatefulWidget {
   final String? exerciseId;
@@ -13,7 +16,8 @@ class ExerciseFormScreen extends StatefulWidget {
   State<ExerciseFormScreen> createState() => _ExerciseFormScreenState();
 }
 
-class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
+class _ExerciseFormScreenState extends State<ExerciseFormScreen>
+    with GuardedLoad {
   final _exerciseRepo = DatabaseHelper.instance.exerciseRepo;
   final _nameCtl = TextEditingController();
   final _notesCtl = TextEditingController();
@@ -23,7 +27,6 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
   String _type = 'weightReps';
   String _equipment = '';
   List<Map<String, dynamic>> _categories = [];
-  bool _isLoading = true;
   bool _isSaving = false;
   bool get _isEditing => widget.exerciseId != null;
 
@@ -55,7 +58,7 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     _categories = await _exerciseRepo.getCategories();
     if (_isEditing) {
       final ex = await _exerciseRepo.getExercise(widget.exerciseId!);
@@ -67,15 +70,15 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
         _equipment = ex['equipment'] as String? ?? '';
         final wi = (ex['weight_increment'] as num?)?.toDouble();
         _weightIncrementCtl.text = wi != null
-            ? wi.toStringAsFixed(wi.truncateToDouble() == wi ? 0 : 1)
+            ? AppNumberFormat.decimal(wi, wi.truncateToDouble() == wi ? 0 : 1)
             : '';
         final drt = ex['default_rest_time'] as int?;
         _defaultRestCtl.text = drt?.toString() ?? '';
       }
     }
     if (!mounted) return;
-    setState(() => _isLoading = false);
-  }
+    setState(() => isLoading = false);
+  });
 
   Future<void> _save() async {
     if (_nameCtl.text.trim().isEmpty) {
@@ -119,13 +122,14 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
         );
       }
       if (mounted) Navigator.pop(context, true);
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('exercise_form_screen: action failed: $e\n$stack');
       setState(() => _isSaving = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              AppLocalizations.of(context)!.commonError(e.toString()),
+              AppLocalizations.of(context)!.commonSomethingWentWrong,
             ),
             behavior: SnackBarBehavior.floating,
           ),
@@ -158,8 +162,10 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
           ),
         ],
       ),
-      body: _isLoading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _load)
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               children: [
@@ -347,7 +353,7 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
             );
           },
         );
-        if (selected != null) {
+        if (selected != null && mounted) {
           setState(() => _type = selected);
         }
       },

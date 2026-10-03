@@ -8,6 +8,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/daily_nutrition_summary.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/meal_log_item.dart';
+import 'package:workout_notes/models/nutrition/meal_log_with_items.dart';
 import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
@@ -23,6 +24,7 @@ import 'package:workout_notes/screens/settings/settings_screen.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 import 'package:workout_notes/services/open_food_facts_gateway.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
@@ -93,7 +95,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
         _repository.getDayMeals(date),
         _repository.getDailyNutritionHistoryForRange(
           startDate: weekStart,
-          endDate: weekStart.add(const Duration(days: 6)),
+          endDate: addDays(weekStart, 6),
         ),
       ]);
       if (!mounted || generation != _loadGeneration) return;
@@ -174,7 +176,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2018),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: addDays(DateTime.now(), 365),
     );
     if (picked == null || !mounted) return;
     await _selectDate(picked);
@@ -234,8 +236,10 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   }
 
   static String _formatNum(double value) {
-    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
-    return value.toStringAsFixed(1);
+    if (value == value.roundToDouble()) {
+      return AppNumberFormat.decimal(value, 0);
+    }
+    return AppNumberFormat.decimal(value, 1);
   }
 
   Future<void> _openFoodSearchForMeal(
@@ -286,12 +290,6 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     await _openFoodSearchForMeal(type.key, type.displayName(loc));
   }
 
-  void _showSnack(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-
   Future<void> _persistAdd(
     String? mealType,
     String? mealLabel,
@@ -314,7 +312,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                   )
                   .displayName(loc));
     if (resolvedType == null || resolvedLabel == null) {
-      _showSnack(loc.nutritionSavedMealNoMealTypes);
+      showAppSnack(context, loc.nutritionSavedMealNoMealTypes);
       return;
     }
     try {
@@ -333,10 +331,11 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
         availableServings: selection.availableServings,
       );
       if (!mounted) return;
-      _showSnack(loc.nutritionItemSaved);
-    } catch (e) {
+      showAppSnack(context, loc.nutritionItemSaved);
+    } catch (e, stack) {
+      debugPrint('nutrition_home_screen: action failed: $e\n$stack');
       if (!mounted) return;
-      _showSnack(loc.commonError(e.toString()));
+      showAppSnack(context, loc.commonSomethingWentWrong);
     } finally {
       await _load();
     }
@@ -346,7 +345,10 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     final details = await _repository.getFoodWithDetails(item.foodId ?? '');
     if (details == null) {
       if (!mounted) return;
-      _showSnack(AppLocalizations.of(context)!.nutritionItemFoodUnavailable);
+      showAppSnack(
+        context,
+        AppLocalizations.of(context)!.nutritionItemFoodUnavailable,
+      );
       return;
     }
     final variant = details.variants.isEmpty
@@ -373,10 +375,11 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
         variant: variant,
       );
       if (!mounted) return;
-      _showSnack(loc.nutritionItemUpdated);
-    } catch (e) {
+      showAppSnack(context, loc.nutritionItemUpdated);
+    } catch (e, stack) {
+      debugPrint('nutrition_home_screen: action failed: $e\n$stack');
       if (!mounted) return;
-      _showSnack(loc.commonError(e.toString()));
+      showAppSnack(context, loc.commonSomethingWentWrong);
     } finally {
       await _load();
     }
@@ -410,9 +413,10 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
           ),
         ),
       );
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('nutrition_home_screen: action failed: $e\n$stack');
       if (!mounted) return;
-      _showSnack(loc.commonError(e.toString()));
+      showAppSnack(context, loc.commonSomethingWentWrong);
     }
   }
 
@@ -695,26 +699,16 @@ class _NutritionWeekSelector extends StatelessWidget {
           for (var index = 0; index < DateTime.daysPerWeek; index++)
             Expanded(
               child: _NutritionDayButton(
-                date: weekStart.add(Duration(days: index)),
+                date: addDays(weekStart, index),
                 locale: locale,
                 collapseProgress: collapseProgress,
-                isSelected: isSameDay(
-                  weekStart.add(Duration(days: index)),
-                  selectedDate,
-                ),
-                isToday: isSameDay(
-                  weekStart.add(Duration(days: index)),
-                  today,
-                ),
+                isSelected: isSameDay(addDays(weekStart, index), selectedDate),
+                isToday: isSameDay(addDays(weekStart, index), today),
                 calorieProgress: _calorieProgress(
-                  weeklyCalories[dateKey(
-                    weekStart.add(Duration(days: index)),
-                  )],
+                  weeklyCalories[dateKey(addDays(weekStart, index))],
                 ),
                 isOverCalorieGoal: _isOverCalorieGoal(
-                  weeklyCalories[dateKey(
-                    weekStart.add(Duration(days: index)),
-                  )],
+                  weeklyCalories[dateKey(addDays(weekStart, index))],
                 ),
                 onTap: onSelected,
               ),

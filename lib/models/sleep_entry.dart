@@ -112,7 +112,6 @@ class SleepEntry {
     if (asleepMinutes == null || denominator <= 0) return null;
     return (asleepMinutes / denominator * 100).clamp(0.0, 100.0);
   }
-
 }
 
 class SleepDashboardStats {

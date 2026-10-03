@@ -161,5 +161,4 @@ class PeriodizationMetrics {
     'run_volume_adherence_percent': runVolumeAdherencePercent,
     'run_session_adherence_percent': runSessionAdherencePercent,
   };
-
 }

@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/ai_food_label_draft.dart';
 import 'package:workout_notes/models/nutrition/food.dart';
+import 'package:workout_notes/models/nutrition/food_lookup.dart';
 import 'package:workout_notes/models/nutrition/food_serving.dart';
+import 'package:workout_notes/models/nutrition/manual_serving_input.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 
 /// Text fields of one serving row being edited.
 class ManualServingDraft {
@@ -233,8 +236,10 @@ class ManualFoodController extends ChangeNotifier {
   }
 
   static String formatAmount(double value) {
-    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
-    return value.toStringAsFixed(2);
+    if (value == value.roundToDouble()) {
+      return AppNumberFormat.decimal(value, 0);
+    }
+    return AppNumberFormat.decimal(value, 2);
   }
 
   static bool hasAnyText(Iterable<TextEditingController> controllers) =>

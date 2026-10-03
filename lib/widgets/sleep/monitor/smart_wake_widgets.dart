@@ -4,14 +4,15 @@ import 'package:workout_notes/models/alarm_wake_settings.dart';
 import 'package:workout_notes/widgets/sleep/monitor/monitor_mode_widgets.dart';
 
 /// Short label of a smart window choice: "Off" or "30 min".
-String smartWindowLabel(AppLocalizations loc, int minutes) =>
-    minutes <= 0 ? loc.sleepSmartWakeWindowOff : '$minutes min';
+String smartWindowLabel(AppLocalizations loc, int minutes) => minutes <= 0
+    ? loc.sleepSmartWakeWindowOff
+    : loc.commonMinutesShort(minutes);
 
 /// Short label of a volume rise choice: "Off", "30 s" or "2 min".
 String alarmRampLabel(AppLocalizations loc, int seconds) {
   if (seconds <= 0) return loc.alarmRampOff;
-  if (seconds < 60) return '$seconds s';
-  return '${seconds ~/ 60} min';
+  if (seconds < 60) return loc.commonSecondsShort(seconds);
+  return loc.commonMinutesShort(seconds ~/ 60);
 }
 
 String smartWakeSensitivityTitle(

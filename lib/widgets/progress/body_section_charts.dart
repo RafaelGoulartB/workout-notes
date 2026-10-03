@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/screens/body/body_tracker_screen.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/progress_helpers.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
@@ -195,7 +196,7 @@ class _BodySummaryGrid extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   currentValue != null
-                      ? '${currentValue.toStringAsFixed(1)}${delta != null && delta != 0 ? " ${delta > 0 ? '+' : ''}${delta.toStringAsFixed(1)}$unit" : ""}'
+                      ? '${AppNumberFormat.decimal(currentValue, 1)}${delta != null && delta != 0 ? " ${delta > 0 ? '+' : ''}${AppNumberFormat.decimal(delta, 1)}$unit" : ""}'
                       : '--',
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
@@ -298,11 +299,9 @@ class _BodyCompositionChart extends StatelessWidget {
                       reservedSize: 36,
                       getTitlesWidget: (v, _) => Text(
                         v > 100
-                            ? '${(v / 1000).toStringAsFixed(0)}k'
-                            : v.toStringAsFixed(0),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 8,
-                        ),
+                            ? '${AppNumberFormat.decimal(v / 1000, 0)}k'
+                            : AppNumberFormat.decimal(v, 0),
+                        style: theme.textTheme.bodySmall?.copyWith(fontSize: 8),
                       ),
                     ),
                   ),
@@ -401,13 +400,13 @@ class _BodyCompositionChart extends StatelessWidget {
                       String label;
                       if (s.barIndex == 0) {
                         label =
-                            '${loc.bodyTrackerWeight}: ${s.y.toStringAsFixed(1)}kg';
+                            '${loc.bodyTrackerWeight}: ${AppNumberFormat.decimal(s.y, 1)}kg';
                       } else if (s.barIndex == 1) {
                         label =
-                            '${loc.bodyTrackerBodyFat}: ${s.y.toStringAsFixed(1)}%';
+                            '${loc.bodyTrackerBodyFat}: ${AppNumberFormat.decimal(s.y, 1)}%';
                       } else {
                         label =
-                            '${loc.bodyTrackerWaist}: ${s.y.toStringAsFixed(1)}cm';
+                            '${loc.bodyTrackerWaist}: ${AppNumberFormat.decimal(s.y, 1)}cm';
                       }
                       return LineTooltipItem(
                         '${_longDate(d)}\n$label',
@@ -505,11 +504,9 @@ class _BodyWeightChart extends StatelessWidget {
                       reservedSize: 36,
                       getTitlesWidget: (v, _) => Text(
                         v > 100
-                            ? '${(v / 1000).toStringAsFixed(0)}k'
-                            : v.toStringAsFixed(0),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 8,
-                        ),
+                            ? '${AppNumberFormat.decimal(v / 1000, 0)}k'
+                            : AppNumberFormat.decimal(v, 0),
+                        style: theme.textTheme.bodySmall?.copyWith(fontSize: 8),
                       ),
                     ),
                   ),
@@ -588,7 +585,7 @@ class _BodyWeightChart extends StatelessWidget {
                           : '';
                       final isWeight = s.barIndex == 0;
                       return LineTooltipItem(
-                        '${_longDate(d)}\n${isWeight ? '${loc.progressBodyWeight}: ${s.y.toStringAsFixed(1)}${loc.workoutDetailKg}' : '${loc.commonVolume}: ${formatVolume(s.y)}'}',
+                        '${_longDate(d)}\n${isWeight ? '${loc.progressBodyWeight}: ${AppNumberFormat.decimal(s.y, 1)}${loc.workoutDetailKg}' : '${loc.commonVolume}: ${formatVolume(s.y)}'}',
                         TextStyle(
                           color: theme.colorScheme.onSurface,
                           fontWeight: FontWeight.bold,
@@ -690,14 +687,14 @@ class _BodyTrackerLink extends StatelessWidget {
   }
 }
 
-/// `dd/MM` for an ISO `yyyy-MM-dd` date (axis labels).
+/// Short day/month (`Md`) for an ISO `yyyy-MM-dd` date (axis labels).
 String _shortDate(String iso) {
   final date = DateTime.tryParse(iso);
-  return date == null ? iso : DateFormat('dd/MM').format(date);
+  return date == null ? iso : DateFormat.Md(Intl.defaultLocale).format(date);
 }
 
-/// `dd/MM/yyyy` for an ISO `yyyy-MM-dd` date (tooltips).
+/// Numeric date (`yMd`) for an ISO `yyyy-MM-dd` date (tooltips).
 String _longDate(String iso) {
   final date = DateTime.tryParse(iso);
-  return date == null ? iso : DateFormat('dd/MM/yyyy').format(date);
+  return date == null ? iso : DateFormat.yMd(Intl.defaultLocale).format(date);
 }

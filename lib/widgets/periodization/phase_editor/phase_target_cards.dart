@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/periodization/phase_editor_controller.dart';
 import 'package:workout_notes/periodization/run_plan_week_resolver.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/widgets/periodization/phase_editor/phase_editor_fields.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
@@ -123,9 +124,8 @@ class PhaseTrainingCard extends StatelessWidget {
                   lowest: 1,
                   highest: 10,
                   start: 7,
-                  format: (value) => value
-                      .toStringAsFixed(value % 1 == 0 ? 0 : 1)
-                      .replaceAll('.', ','),
+                  format: (value) =>
+                      AppNumberFormat.decimal(value, value % 1 == 0 ? 0 : 1),
                   onChanged: (min, max) => controller.setTrainingVolume(
                     minSets: controller.minSets,
                     maxSets: controller.maxSets,
@@ -552,7 +552,7 @@ class PhaseBodySleepCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               loc.planningWeightRateKg(
-                ((weight * rate / 100).abs()).toStringAsFixed(2),
+                AppNumberFormat.decimal((weight * rate / 100).abs(), 2),
                 rate < 0 ? loc.planningLose : loc.planningGain,
               ),
               style: theme.textTheme.bodySmall?.copyWith(
@@ -568,7 +568,7 @@ class PhaseBodySleepCard extends StatelessWidget {
             decimal: true,
             helper: weight == null
                 ? null
-                : loc.planningCurrentWeight(weight.toStringAsFixed(1)),
+                : loc.planningCurrentWeight(AppNumberFormat.decimal(weight, 1)),
             onChanged: controller.touch,
           ),
           const Divider(height: 28),
@@ -615,13 +615,13 @@ class PhaseBodySleepCard extends StatelessWidget {
         : value < 0
         ? '−'
         : '';
-    final text = value
-        .abs()
-        .toStringAsFixed(value.abs() * 100 % 50 == 0 ? 1 : 2)
-        .replaceAll('.', ',');
+    final text = AppNumberFormat.decimal(
+      value.abs(),
+      value.abs() * 100 % 50 == 0 ? 1 : 2,
+    );
     return '$sign$text%';
   }
 
   static String _hours(double value) =>
-      value.toStringAsFixed(value % 1 == 0 ? 0 : 1).replaceAll('.', ',');
+      AppNumberFormat.decimal(value, value % 1 == 0 ? 0 : 1);
 }

@@ -62,6 +62,47 @@ class GoalRepository extends BaseRepository {
     );
   }
 
+  // Transaction-aware variants (AI proposals fold them into their approval
+  // transaction). Each write must hit exactly one row.
+
+  Future<Goal?> getByIdIn(DatabaseExecutor executor, String id) async {
+    final rows = await executor.query(
+      'user_goals',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : Goal.fromMap(rows.first);
+  }
+
+  /// Plain insert (no replace): a repeated insert of the same id fails.
+  Future<void> insertIn(DatabaseExecutor executor, Goal goal) =>
+      executor.insert('user_goals', goal.toMap());
+
+  Future<void> updateIn(DatabaseExecutor executor, Goal goal) async {
+    final changed = await executor.update(
+      'user_goals',
+      goal.toMap(),
+      where: 'id = ?',
+      whereArgs: [goal.id],
+    );
+    if (changed != 1) throw StateError('goal ${goal.id} not found');
+  }
+
+  Future<void> toggleActiveIn(
+    DatabaseExecutor executor,
+    String id,
+    bool isActive,
+  ) async {
+    final changed = await executor.update(
+      'user_goals',
+      {'is_active': isActive ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (changed != 1) throw StateError('goal $id not found');
+  }
+
   // ===================================================================
   // PERIOD COMPUTATION
   // ===================================================================
@@ -378,9 +419,9 @@ class GoalRepository extends BaseRepository {
     final target = goal.targetValue;
     final percent = target > 0 ? (value / target).clamp(0.0, 1.5) : 0.0;
     final isComplete = target > 0 && value >= target;
-    final daysElapsed = now.difference(start).inDays + 1;
-    final daysTotal = end.difference(start).inDays + 1;
-    final daysRemaining = (end.difference(now).inDays).clamp(0, daysTotal);
+    final daysElapsed = daysBetween(start, now) + 1;
+    final daysTotal = daysBetween(start, end) + 1;
+    final daysRemaining = (daysBetween(now, end)).clamp(0, daysTotal);
     return GoalProgress(
       currentValue: value,
       targetValue: target,

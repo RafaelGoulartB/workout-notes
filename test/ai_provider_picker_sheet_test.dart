@@ -73,4 +73,45 @@ void main() {
     expect(saved.reasoningEffortFor(), AiReasoningEffort.high);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('a model id can be typed when it is not in the fetched list', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 860);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final notifier = AiSettingsNotifier(prefs: prefs);
+    await notifier.load();
+    final provider = await notifier.addProvider(
+      name: 'Local',
+      baseUrl: 'http://localhost:11434/v1',
+    );
+    await notifier.setProviderModels(provider.id, const ['model-a']);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(body: AiProviderPickerSheet(notifier: notifier)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Select a model'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'my-custom-model');
+    await tester.pump();
+    expect(find.text('Use "my-custom-model"'), findsOneWidget);
+    expect(find.text('model-a'), findsNothing);
+    await tester.tap(find.text('Use "my-custom-model"'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Use this configuration'));
+    await tester.pumpAndSettle();
+
+    expect(notifier.settings.activeProvider!.selectedModel, 'my-custom-model');
+  });
 }

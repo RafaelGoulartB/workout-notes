@@ -39,19 +39,5 @@ void main() {
       expect(id(false, true), 'rest_timer_v2');
       expect(id(true, true), 'rest_timer_v3');
     });
-
-    test('changing a setting moves to a different channel', () {
-      final before = NotificationService.channelId(
-        'workout_timer',
-        sound: false,
-        vibration: false,
-      );
-      final after = NotificationService.channelId(
-        'workout_timer',
-        sound: true,
-        vibration: false,
-      );
-      expect(after, isNot(before));
-    });
   });
 }

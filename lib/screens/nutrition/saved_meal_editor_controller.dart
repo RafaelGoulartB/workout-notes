@@ -6,7 +6,9 @@ import 'package:workout_notes/models/nutrition/food_serving.dart';
 import 'package:workout_notes/models/nutrition/food_variant.dart';
 import 'package:workout_notes/models/nutrition/meal_log_item.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
+import 'package:workout_notes/models/nutrition/saved_meal_item_draft.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 
 /// One ingredient being edited, before it is persisted.
 class SavedMealIngredient {
@@ -115,11 +117,10 @@ class SavedMealEditorController extends ChangeNotifier {
   }) : ingredients = initialItems.map(SavedMealIngredient.fromDraft).toList() {
     nameController.text = initialName ?? '';
     if (initialPortions != 1) {
-      portionsController.text = initialPortions
-          .toStringAsFixed(
-            initialPortions == initialPortions.roundToDouble() ? 0 : 1,
-          )
-          .replaceAll(',', '.');
+      portionsController.text = AppNumberFormat.decimal(
+        initialPortions,
+        initialPortions == initialPortions.roundToDouble() ? 0 : 1,
+      );
     }
     portionsController.addListener(_onPortionsChanged);
   }
@@ -257,9 +258,9 @@ class SavedMealEditorController extends ChangeNotifier {
   /// Quantities and portions: no decimals when whole, otherwise two.
   static String formatQuantity(double value) {
     if (value == value.roundToDouble()) {
-      return value.toStringAsFixed(0);
+      return AppNumberFormat.decimal(value, 0);
     }
-    return value.toStringAsFixed(2);
+    return AppNumberFormat.decimal(value, 2);
   }
 
   @override

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
@@ -9,7 +10,6 @@ import 'package:workout_notes/models/ai_image_attachment.dart';
 import 'package:workout_notes/models/ai_message_role.dart';
 import 'package:workout_notes/widgets/ai/ai_chat_input_bar.dart';
 import 'package:workout_notes/widgets/ai/ai_message_bubble.dart';
-import 'package:workout_notes/widgets/ai/ai_tool_result_bubble.dart';
 
 void main() {
   testWidgets('renders markdown captures instead of literal dollar one', (
@@ -30,6 +30,32 @@ void main() {
     expect(find.textContaining('Agachamento: 60x10'), findsOneWidget);
     expect(find.textContaining('Supino reto: 50x10'), findsOneWidget);
     expect(find.textContaining(r'$1'), findsNothing);
+  });
+
+  testWidgets('a cut-off answer shows a notice, a complete one does not', (
+    tester,
+  ) async {
+    AiChatMessage answer({required bool cutOff}) => AiChatMessage(
+      id: 'm-$cutOff',
+      threadId: 't',
+      role: AiMessageRole.assistant,
+      content: 'Resposta pela metade',
+      createdAt: DateTime(2026, 9, 30),
+      providerExtras: {if (cutOff) kAiCutOffExtra: true},
+    );
+
+    await tester.pumpWidget(
+      _testApp(AiMessageBubble(message: answer(cutOff: true))),
+    );
+    expect(
+      find.text('Esta resposta foi cortada antes do fim.'),
+      findsOneWidget,
+    );
+
+    await tester.pumpWidget(
+      _testApp(AiMessageBubble(message: answer(cutOff: false))),
+    );
+    expect(find.text('Esta resposta foi cortada antes do fim.'), findsNothing);
   });
 
   testWidgets('assistant response stays readable at narrow mobile width', (
@@ -88,78 +114,191 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('tool call card exposes status and expandable details', (
+  testWidgets('a user turn that did not finish shows its status and retry', (
     tester,
   ) async {
+    var retries = 0;
     final message = AiChatMessage(
-      id: 'tool-1',
+      id: 'user-stopped',
       threadId: 'thread-1',
-      role: AiMessageRole.tool,
-      content: '{"ok":true,"data":{"recordedNights":7}}',
-      toolCallId: 'call-1',
-      toolName: 'get_sleep_summary',
+      role: AiMessageRole.user,
+      content: 'Analise meu treino',
+      turnStatus: AiTurnStatus.cancelled,
       createdAt: DateTime(2026, 8, 10, 20),
     );
 
     await tester.pumpWidget(
       _testApp(
-        AiToolResultBubble(
+        AiMessageBubble(
           message: message,
-          toolLabel: 'Analisando sono recente',
+          showTimestamp: false,
+          onRetryTurn: () => retries++,
         ),
       ),
     );
 
-    expect(find.text('Analisando sono recente'), findsOneWidget);
-    expect(find.text('Consulta concluída'), findsOneWidget);
-    expect(
-      tester
-          .widget<AnimatedCrossFade>(find.byType(AnimatedCrossFade))
-          .crossFadeState,
-      CrossFadeState.showFirst,
-    );
+    expect(find.text('Interrompido por você'), findsOneWidget);
+    await tester.tap(find.text('Tentar de novo'));
+    expect(retries, 1);
 
-    await tester.tap(find.text('Analisando sono recente'));
-    await tester.pumpAndSettle();
-    expect(
-      tester
-          .widget<AnimatedCrossFade>(find.byType(AnimatedCrossFade))
-          .crossFadeState,
-      CrossFadeState.showSecond,
+    final interrupted = message.copyWith(turnStatus: AiTurnStatus.interrupted);
+    await tester.pumpWidget(
+      _testApp(AiMessageBubble(message: interrupted, showTimestamp: false)),
     );
-    expect(find.textContaining('recordedNights'), findsOneWidget);
+    expect(find.text('Interrompido'), findsOneWidget);
+    // No retry unless the screen offers one (only the last message).
+    expect(find.text('Tentar de novo'), findsNothing);
+
+    final done = message.copyWith(turnStatus: AiTurnStatus.done);
+    await tester.pumpWidget(
+      _testApp(AiMessageBubble(message: done, showTimestamp: false)),
+    );
+    expect(find.text('Interrompido'), findsNothing);
+    expect(find.text('Interrompido por você'), findsNothing);
   });
 
-  testWidgets('tool call card can start expanded from chat preference', (
+  testWidgets('markdown never loads images and links only show their address', (
     tester,
   ) async {
     final message = AiChatMessage(
-      id: 'tool-expanded',
+      id: 'assistant-md',
       threadId: 'thread-1',
-      role: AiMessageRole.tool,
-      content: '{"ok":true,"data":{"days":7}}',
-      toolCallId: 'call-expanded',
-      toolName: 'get_weekly_recovery_trend',
+      role: AiMessageRole.assistant,
+      content:
+          '![gráfico de sono](https://example.com/chart.png)\n\n'
+          'Veja [o guia](https://example.com/guia) agora.',
       createdAt: DateTime(2026, 8, 10, 20),
     );
 
     await tester.pumpWidget(
+      _testApp(AiMessageBubble(message: message, showTimestamp: false)),
+    );
+
+    expect(find.byType(Image), findsNothing);
+    expect(find.text('gráfico de sono'), findsOneWidget);
+
+    // Tapping the link opens nothing: it shows the address with a copy action.
+    final selectable = find.byWidgetPredicate(
+      (widget) =>
+          widget is SelectableText &&
+          (widget.textSpan?.toPlainText().contains('o guia') ?? false),
+    );
+    expect(selectable, findsOneWidget);
+    final span = _findLinkSpan(
+      tester.widget<SelectableText>(selectable).textSpan!,
+    );
+    expect(span, isNotNull);
+    (span!.recognizer! as TapGestureRecognizer).onTap!();
+    await tester.pump();
+    expect(find.text('https://example.com/guia'), findsOneWidget);
+    expect(find.text('Copiar'), findsOneWidget);
+  });
+
+  testWidgets('composer swaps send for a stop button while a turn runs', (
+    tester,
+  ) async {
+    final controller = TextEditingController(text: 'pergunta');
+    addTearDown(controller.dispose);
+    var stops = 0;
+    var sends = 0;
+    await tester.pumpWidget(
       _testApp(
-        AiToolResultBubble(
-          message: message,
-          toolLabel: 'Recuperação semanal',
-          initiallyExpanded: true,
+        AiChatInputBar(
+          controller: controller,
+          enabled: true,
+          sending: true,
+          onStop: () => stops++,
+          onSend: () => sends++,
+        ),
+      ),
+    );
+
+    expect(find.byTooltip('Enviar mensagem'), findsNothing);
+    expect(find.bySemanticsLabel('Parar a resposta'), findsOneWidget);
+    // The field is locked while the turn runs.
+    expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
+    await tester.tap(find.byTooltip('Parar'));
+    expect(stops, 1);
+    expect(sends, 0);
+
+    await tester.pumpWidget(
+      _testApp(
+        AiChatInputBar(
+          controller: controller,
+          enabled: true,
+          sending: true,
+          stopping: true,
+          onStop: () => stops++,
+          onSend: () => sends++,
+        ),
+      ),
+    );
+    expect(find.byTooltip('Parar'), findsNothing);
+  });
+
+  testWidgets('composer waits for a turn that runs in another conversation', (
+    tester,
+  ) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    var opened = 0;
+    await tester.pumpWidget(
+      _testApp(
+        AiChatInputBar(
+          controller: controller,
+          enabled: true,
+          sending: true,
+          busyElsewhere: true,
+          onStop: () {},
+          onOpenBusyConversation: () => opened++,
+          onSend: () {},
         ),
       ),
     );
 
     expect(
-      tester
-          .widget<AnimatedCrossFade>(find.byType(AnimatedCrossFade))
-          .crossFadeState,
-      CrossFadeState.showSecond,
+      find.text('O treinador está respondendo em outra conversa'),
+      findsWidgets,
     );
-    expect(find.textContaining('days'), findsOneWidget);
+    expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
+    await tester.tap(find.text('Abrir'));
+    expect(opened, 1);
+  });
+
+  testWidgets('removing a pending image has a 48 dp touch target', (
+    tester,
+  ) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    var removed = -1;
+    await tester.pumpWidget(
+      _testApp(
+        AiChatInputBar(
+          controller: controller,
+          enabled: true,
+          sending: false,
+          images: [
+            AiPendingImage(
+              bytes: _tinyPng,
+              mimeType: 'image/png',
+              fileName: 'photo.png',
+            ),
+          ],
+          onRemoveImage: (index) => removed = index,
+          onSend: () {},
+        ),
+      ),
+    );
+
+    final target = find.ancestor(
+      of: find.byIcon(Icons.close_rounded),
+      matching: find.byType(InkResponse),
+    );
+    final size = tester.getSize(target);
+    expect(size.width, greaterThanOrEqualTo(48));
+    expect(size.height, greaterThanOrEqualTo(48));
+    await tester.tap(find.byTooltip('Remover imagem'));
+    expect(removed, 0);
   });
 
   testWidgets('composer enables send only after meaningful input', (
@@ -270,3 +409,15 @@ Widget _testApp(Widget child) => MaterialApp(
 final Uint8List _tinyPng = base64Decode(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
 );
+
+TextSpan? _findLinkSpan(InlineSpan root) {
+  TextSpan? found;
+  root.visitChildren((span) {
+    if (span is TextSpan && span.recognizer is TapGestureRecognizer) {
+      found = span;
+      return false;
+    }
+    return true;
+  });
+  return found;
+}

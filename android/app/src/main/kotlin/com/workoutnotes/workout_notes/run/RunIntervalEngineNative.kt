@@ -32,13 +32,26 @@ data class RunIntervalSnapshot(
     )
 }
 
-enum class RunIntervalEventKind { workStarted, restStarted, completed, timeRemainingCue }
+enum class RunIntervalEventKind {
+    workStarted,
+    restStarted,
+    completed,
+    timeRemainingCue,
+    distanceRemainingCue,
+
+    /** One tick of the 3-2-1 countdown before a timed phase ends. */
+    countdown,
+}
 
 data class RunIntervalEvent(
     val kind: RunIntervalEventKind,
     val workIndex: Int,
     val totalWorks: Int,
     val remainingSeconds: Int? = null,
+    val remainingMeters: Int? = null,
+    /** The work phase that just ended ([RunIntervalEventKind.restStarted], next work, completed). */
+    val lastWorkSeconds: Int? = null,
+    val lastWorkMeters: Double? = null,
 )
 
 /**
@@ -48,10 +61,27 @@ data class RunIntervalEvent(
 class RunIntervalEngineNative(
     private var preset: RunIntervalPreset = RunIntervalPreset(),
 ) {
+    private companion object {
+        const val COUNTDOWN = 2_000_000
+    }
+
+    /** Seconds until the running phase ends, when it is timed. */
+    fun secondsToTransition(): Double? {
+        if (phase != RunIntervalPhase.work && phase != RunIntervalPhase.rest) return null
+        val metric = if (phase == RunIntervalPhase.work) preset.workMetric else preset.restMetric
+        if (metric != RunIntervalMetric.time) return null
+        val target = if (phase == RunIntervalPhase.work) preset.workValue else preset.restValue
+        return (target - phaseAccum).coerceAtLeast(0.0)
+    }
+
+    val currentPreset: RunIntervalPreset get() = preset
+
     private var phase: RunIntervalPhase = RunIntervalPhase.idle
     private var workIndex: Int = 0
     private var phaseAccum: Double = 0.0
-    private var remainingCueSpoken: Boolean = false
+    private val firedCues = mutableSetOf<Int>()
+    private var phaseSeconds: Int = 0
+    private var phaseMeters: Double = 0.0
     private var lastDistance: Double = 0.0
     private var lastMovingSeconds: Int = 0
 
@@ -104,7 +134,7 @@ class RunIntervalEngineNative(
         workIndex = 1
         phase = RunIntervalPhase.work
         phaseAccum = 0.0
-        remainingCueSpoken = false
+        resetPhase()
         return listOf(RunIntervalEvent(RunIntervalEventKind.workStarted, workIndex, preset.repeats))
     }
 
@@ -112,7 +142,7 @@ class RunIntervalEngineNative(
         phase = RunIntervalPhase.idle
         workIndex = 0
         phaseAccum = 0.0
-        remainingCueSpoken = false
+        resetPhase()
         lastDistance = 0.0
         lastMovingSeconds = 0
     }
@@ -133,18 +163,40 @@ class RunIntervalEngineNative(
         val metric = if (phase == RunIntervalPhase.work) preset.workMetric else preset.restMetric
         val target = (if (phase == RunIntervalPhase.work) preset.workValue else preset.restValue).toDouble()
 
+        phaseSeconds += timeDelta
+        phaseMeters += distanceDelta
         if (metric == RunIntervalMetric.distance) {
             phaseAccum += distanceDelta
         } else {
             phaseAccum += timeDelta.toDouble()
         }
 
-        if (metric == RunIntervalMetric.time && !remainingCueSpoken && target > 15) {
-            val cueAt = if (target <= 120) 10 else 30
-            val remaining = target - phaseAccum
-            if (remaining <= cueAt && remaining > 0) {
-                remainingCueSpoken = true
-                events.add(RunIntervalEvent(RunIntervalEventKind.timeRemainingCue, workIndex, preset.repeats, cueAt))
+        val remaining = target - phaseAccum
+        if (remaining > 1e-6) {
+            val step = RunWorkoutStepNative(
+                role = if (phase == RunIntervalPhase.work) RunStepRole.work else RunStepRole.recovery,
+                metric = metric,
+                value = target.toInt(),
+            )
+            val crossed = RunWorkoutStepEngineNative.remainingThresholds(step)
+                .filter { remaining <= it && firedCues.add(it) }
+            crossed.minOrNull()?.let { threshold ->
+                events.add(
+                    if (metric == RunIntervalMetric.time) {
+                        RunIntervalEvent(RunIntervalEventKind.timeRemainingCue, workIndex, preset.repeats, remainingSeconds = threshold)
+                    } else {
+                        RunIntervalEvent(RunIntervalEventKind.distanceRemainingCue, workIndex, preset.repeats, remainingMeters = threshold)
+                    },
+                )
+            }
+            if (metric == RunIntervalMetric.time && target >= RunWorkoutStepEngineNative.COUNTDOWN_MIN_STEP_S) {
+                var tick: Int? = null
+                for (k in 3 downTo 1) {
+                    if (remaining <= k && firedCues.add(COUNTDOWN + k)) tick = k
+                }
+                tick?.let {
+                    events.add(RunIntervalEvent(RunIntervalEventKind.countdown, workIndex, preset.repeats, remainingSeconds = it))
+                }
             }
         }
 
@@ -163,44 +215,61 @@ class RunIntervalEngineNative(
     private fun advancePhase(): List<RunIntervalEvent> {
         val events = mutableListOf<RunIntervalEvent>()
         if (phase == RunIntervalPhase.work) {
+            val workSeconds = phaseSeconds
+            val workMeters = phaseMeters
+            fun withResult(kind: RunIntervalEventKind) = RunIntervalEvent(
+                kind,
+                workIndex,
+                preset.repeats,
+                lastWorkSeconds = workSeconds,
+                lastWorkMeters = workMeters,
+            )
             if (workIndex >= preset.repeats) {
                 phase = RunIntervalPhase.done
                 phaseAccum = 0.0
-                events.add(RunIntervalEvent(RunIntervalEventKind.completed, workIndex, preset.repeats))
+                resetPhase()
+                events.add(withResult(RunIntervalEventKind.completed))
                 return events
             }
             if (preset.restValue <= 0) {
                 workIndex += 1
                 phase = RunIntervalPhase.work
                 phaseAccum = 0.0
-                remainingCueSpoken = false
-                events.add(RunIntervalEvent(RunIntervalEventKind.workStarted, workIndex, preset.repeats))
+                resetPhase()
+                events.add(withResult(RunIntervalEventKind.workStarted).copy(workIndex = workIndex))
                 return events
             }
             phase = RunIntervalPhase.rest
             phaseAccum = 0.0
-            remainingCueSpoken = false
-            events.add(RunIntervalEvent(RunIntervalEventKind.restStarted, workIndex, preset.repeats))
+            resetPhase()
+            events.add(withResult(RunIntervalEventKind.restStarted))
             return events
         }
         // rest finished
         if (workIndex >= preset.repeats) {
             phase = RunIntervalPhase.done
             phaseAccum = 0.0
+            resetPhase()
             events.add(RunIntervalEvent(RunIntervalEventKind.completed, workIndex, preset.repeats))
             return events
         }
         workIndex += 1
         phase = RunIntervalPhase.work
         phaseAccum = 0.0
-        remainingCueSpoken = false
+        resetPhase()
         events.add(RunIntervalEvent(RunIntervalEventKind.workStarted, workIndex, preset.repeats))
         return events
     }
 
+    private fun resetPhase() {
+        firedCues.clear()
+        phaseSeconds = 0
+        phaseMeters = 0.0
+    }
+
     private fun resetAccumulators() {
         phaseAccum = 0.0
-        remainingCueSpoken = false
+        resetPhase()
         lastDistance = 0.0
         lastMovingSeconds = 0
     }

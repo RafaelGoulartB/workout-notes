@@ -10,7 +10,6 @@ import org.junit.Test
 class RunAutoPauseDetectorTest {
     private val baseLat = -23.5505
     private val baseLng = -46.6333
-    private val metersPerDegree = 111_320.0
 
     /** Feeds one fix per second and returns the events with their second. */
     private class Feeder(val detector: RunAutoPauseDetector, val lat0: Double, val lng0: Double) {
@@ -127,11 +126,5 @@ class RunAutoPauseDetectorTest {
         val restored = RunAutoPauseDetector()
         restored.reset(startPaused = true)
         assertTrue(restored.paused)
-    }
-
-    @Test
-    fun metersPerDegreeSanity() {
-        // Guards the helper used above: 1.11 m north is ~1e-5 degrees.
-        assertEquals(1e-5, 1.1132 / metersPerDegree, 1e-7)
     }
 }

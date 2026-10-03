@@ -164,14 +164,16 @@ class StrengthRecordsRepository extends BaseRepository {
   /// All qualifying sets, oldest first. [from]/[to] bound the workout date
   /// (inclusive, `yyyy-MM-dd`). With [includeUnweighted] bodyweight and timed
   /// sets (no load) are returned too, for set counts and frequency; records
-  /// leave them out.
+  /// leave them out. [exerciseId] / [exerciseIds] restrict the exercises.
   Future<List<StrengthSetSample>> loadSets({
     DateTime? from,
     DateTime? to,
     String? exerciseId,
+    Iterable<String>? exerciseIds,
     bool includeUnweighted = false,
   }) async {
     final database = await db;
+    final ids = exerciseIds?.toList();
     final rows = await database.rawQuery(
       '''
       SELECT w.id AS workout_id, w.date AS date, w.start_time AS start_time,
@@ -191,9 +193,15 @@ class StrengthRecordsRepository extends BaseRepository {
         ${from == null ? '' : 'AND w.date >= ?'}
         ${to == null ? '' : 'AND w.date <= ?'}
         ${exerciseId == null ? '' : 'AND e.id = ?'}
+        ${ids == null ? '' : 'AND e.id IN (${List.filled(ids.length, '?').join(',')})'}
       ORDER BY w.date ASC, w.start_time ASC, ee.order_index ASC, s.order_index ASC
       ''',
-      [if (from != null) dateKey(from), if (to != null) dateKey(to), ?exerciseId],
+      [
+        if (from != null) dateKey(from),
+        if (to != null) dateKey(to),
+        ?exerciseId,
+        ...?ids,
+      ],
     );
     return [
       for (final r in rows)
@@ -271,9 +279,35 @@ class StrengthRecordsRepository extends BaseRepository {
   }
 
   /// Records set in a given workout (used by workout detail badges).
+  ///
+  /// Records are causal per exercise (an event only depends on earlier
+  /// sessions of the same exercise), so only the sets of the exercises done in
+  /// this workout, dated up to it, are loaded instead of the whole history.
   Future<List<StrengthRecordEvent>> recordsInWorkout(String workoutId) async {
-    final events = StrengthRecordsCalculator.events(await loadSets());
-    return events.where((e) => e.workoutId == workoutId).toList();
+    final database = await db;
+    final workout = await database.query(
+      'workouts',
+      columns: ['date'],
+      where: 'id = ?',
+      whereArgs: [workoutId],
+      limit: 1,
+    );
+    if (workout.isEmpty) return const [];
+    final entries = await database.query(
+      'exercise_entries',
+      distinct: true,
+      columns: ['exercise_id'],
+      where: 'workout_id = ?',
+      whereArgs: [workoutId],
+    );
+    if (entries.isEmpty) return const [];
+    final sets = await loadSets(
+      to: DateTime.parse(workout.first['date'] as String),
+      exerciseIds: [for (final e in entries) e['exercise_id'] as String],
+    );
+    return StrengthRecordsCalculator.events(
+      sets,
+    ).where((e) => e.workoutId == workoutId).toList();
   }
 }
 

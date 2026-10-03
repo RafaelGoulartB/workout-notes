@@ -64,8 +64,11 @@ void main() {
 
     final restoredDirectory = await service.materializeForRestore(data);
     final bodyPaths =
-        (jsonDecode(((data['body_measurements'] as List).first as Map)['photos_paths']
-                as String)
+        (jsonDecode(
+                  ((data['body_measurements'] as List).first
+                          as Map)['photos_paths']
+                      as String,
+                )
                 as List)
             .cast<String>();
     expect(await File(bodyPaths.single).readAsBytes(), [1, 2, 3]);

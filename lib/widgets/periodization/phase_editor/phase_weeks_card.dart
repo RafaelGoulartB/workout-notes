@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/periodization/phase_editor_controller.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 
 class PhaseWeeksCard extends StatelessWidget {
@@ -125,10 +126,7 @@ class PhaseWeekRow extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Text(
-                          planningDateRange(
-                            start,
-                            start.add(const Duration(days: 6)),
-                          ),
+                          planningDateRange(start, addDays(start, 6)),
                           style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
@@ -269,7 +267,7 @@ class _PhaseWeekSheetState extends State<PhaseWeekSheet> {
             Text(
               loc.planningWeekTitle(
                 widget.week + 1,
-                planningDateRange(start, start.add(const Duration(days: 6))),
+                planningDateRange(start, addDays(start, 6)),
               ),
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w800,

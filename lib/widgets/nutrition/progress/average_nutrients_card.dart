@@ -3,6 +3,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_progress.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class AverageNutrientsCard extends StatelessWidget {
@@ -382,8 +383,8 @@ class AverageNutrientValue extends StatelessWidget {
 }
 
 String formatNutrient(double value) {
-  if (value == value.roundToDouble()) return value.toStringAsFixed(0);
-  return value.toStringAsFixed(1);
+  if (value == value.roundToDouble()) return AppNumberFormat.decimal(value, 0);
+  return AppNumberFormat.decimal(value, 1);
 }
 
 String _stripUnit(String label) =>

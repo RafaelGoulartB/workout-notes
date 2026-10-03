@@ -266,7 +266,9 @@ class BackupMediaService {
           }
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort cleanup: the media root may be missing or unreadable.
+    }
   }
 
   Future<Directory> _rootDirectory() async {

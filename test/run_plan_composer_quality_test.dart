@@ -92,11 +92,10 @@ void main() {
       // Pace is seconds per km, so the faster bound is the smaller number. A
       // step with min > max renders as "5:16-4:50".
       for (final template in RunPlanTemplates.all) {
-        for (final session
-            in RunPlanComposer.compose(
-              template,
-              _config(),
-            ).expand((w) => w)) {
+        for (final session in RunPlanComposer.compose(
+          template,
+          _config(),
+        ).expand((w) => w)) {
           for (final step in session.steps) {
             final min = step.targetPaceMinSecPerKm;
             final max = step.targetPaceMaxSecPerKm;
@@ -285,13 +284,14 @@ void main() {
       // 120 s after a 1000 m rep is barely a third of the rep, so every rep
       // after the first degrades. Daniels jogs roughly the rep duration.
       final paces = _calibration.paces;
-      for (final session
-          in RunPlanComposer.compose(
-            RunPlanTemplates.half,
-            _config(),
-          ).expand((w) => w)) {
+      for (final session in RunPlanComposer.compose(
+        RunPlanTemplates.half,
+        _config(),
+      ).expand((w) => w)) {
         if (session.kind != RunWorkoutKind.interval) continue;
-        final work = session.steps.firstWhere((s) => s.role == RunStepRole.work);
+        final work = session.steps.firstWhere(
+          (s) => s.role == RunStepRole.work,
+        );
         final rest = session.steps.firstWhere(
           (s) => s.role == RunStepRole.recovery,
         );
@@ -310,11 +310,10 @@ void main() {
     test('hill reps are prescribed by effort, never by flat-ground pace', () {
       // The same effort uphill is 30-60 s/km slower, so a track pace here is
       // either impossible or a licence to overreach.
-      for (final session
-          in RunPlanComposer.compose(
-            RunPlanTemplates.tenK,
-            _config(),
-          ).expand((w) => w)) {
+      for (final session in RunPlanComposer.compose(
+        RunPlanTemplates.tenK,
+        _config(),
+      ).expand((w) => w)) {
         if (session.kind != RunWorkoutKind.hills) continue;
         expect(session.targetPaceSecPerKm, isNull);
         for (final step in session.steps) {
@@ -369,12 +368,10 @@ void main() {
     });
 
     test('build weeks add strides to an easy run', () {
-      final hasStrides = RunPlanComposer.compose(
-        RunPlanTemplates.tenK,
-        _config(),
-      ).expand((w) => w).any(
-        (s) => s.kind == RunWorkoutKind.easy && s.steps.isNotEmpty,
-      );
+      final hasStrides =
+          RunPlanComposer.compose(RunPlanTemplates.tenK, _config())
+              .expand((w) => w)
+              .any((s) => s.kind == RunWorkoutKind.easy && s.steps.isNotEmpty);
       expect(hasStrides, isTrue);
     });
 

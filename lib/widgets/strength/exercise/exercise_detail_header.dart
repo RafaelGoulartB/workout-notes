@@ -104,7 +104,7 @@ class ExerciseRecordsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final date = DateFormat('dd/MM/yy');
+    final date = DateFormat.yMd(Intl.defaultLocale);
     final r = record;
 
     return AppSectionCard(

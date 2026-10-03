@@ -6,6 +6,8 @@ import 'package:workout_notes/services/run_voice_settings_store.dart';
 import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class RunVoiceSettingsScreen extends StatefulWidget {
@@ -15,10 +17,10 @@ class RunVoiceSettingsScreen extends StatefulWidget {
   State<RunVoiceSettingsScreen> createState() => _RunVoiceSettingsScreenState();
 }
 
-class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
+class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen>
+    with GuardedLoad {
   final _store = RunVoiceSettingsStore.instance;
   RunVoiceSettings _settings = const RunVoiceSettings.defaults();
-  bool _loading = true;
 
   @override
   void initState() {
@@ -26,14 +28,14 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     final loaded = await _store.load();
     if (!mounted) return;
     setState(() {
       _settings = loaded;
-      _loading = false;
+      isLoading = false;
     });
-  }
+  });
 
   Future<void> _persist(RunVoiceSettings next) async {
     setState(() => _settings = next);
@@ -237,6 +239,135 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
     }
   }
 
+  Future<T?> _pickOption<T>({
+    required List<T> values,
+    required T selected,
+    required String Function(T value) label,
+    String Function(T value)? description,
+  }) {
+    return showModalBottomSheet<T>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final value in values)
+              ListTile(
+                title: Text(label(value)),
+                subtitle: description == null ? null : Text(description(value)),
+                trailing: value == selected ? const Icon(Icons.check) : null,
+                onTap: () => Navigator.pop(ctx, value),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _verbosityLabel(AppLocalizations loc, RunVoiceVerbosity v) =>
+      switch (v) {
+        RunVoiceVerbosity.minimal => loc.runVoiceVerbosityMinimal,
+        RunVoiceVerbosity.standard => loc.runVoiceVerbosityStandard,
+        RunVoiceVerbosity.detailed => loc.runVoiceVerbosityDetailed,
+      };
+
+  String _verbosityDescription(AppLocalizations loc, RunVoiceVerbosity v) =>
+      switch (v) {
+        RunVoiceVerbosity.minimal => loc.runVoiceVerbosityMinimalDesc,
+        RunVoiceVerbosity.standard => loc.runVoiceVerbosityStandardDesc,
+        RunVoiceVerbosity.detailed => loc.runVoiceVerbosityDetailedDesc,
+      };
+
+  Future<void> _pickVerbosity() async {
+    final loc = AppLocalizations.of(context)!;
+    final choice = await _pickOption<RunVoiceVerbosity>(
+      values: RunVoiceVerbosity.values,
+      selected: _settings.verbosity,
+      label: (v) => _verbosityLabel(loc, v),
+      description: (v) => _verbosityDescription(loc, v),
+    );
+    if (choice != null) await _persist(_settings.copyWith(verbosity: choice));
+  }
+
+  Future<void> _pickSpeechRate() async {
+    final loc = AppLocalizations.of(context)!;
+    final choice = await _pickOption<double>(
+      values: RunVoiceSettings.speechRateOptions,
+      selected: _settings.speechRate,
+      label: loc.runVoiceSpeechRateValue,
+    );
+    if (choice != null) await _persist(_settings.copyWith(speechRate: choice));
+  }
+
+  String _volumeLabel(AppLocalizations loc, double volume) =>
+      loc.runVoiceVolumeValue((volume * 100).round());
+
+  Future<void> _pickVoiceVolume() async {
+    final loc = AppLocalizations.of(context)!;
+    final choice = await _pickOption<double>(
+      values: RunVoiceSettings.voiceVolumeOptions,
+      selected: _settings.voiceVolume,
+      label: (v) => _volumeLabel(loc, v),
+    );
+    if (choice != null) await _persist(_settings.copyWith(voiceVolume: choice));
+  }
+
+  String _mediaLabel(AppLocalizations loc, RunVoiceMediaBehavior v) =>
+      switch (v) {
+        RunVoiceMediaBehavior.duck => loc.runVoiceMediaDuck,
+        RunVoiceMediaBehavior.pause => loc.runVoiceMediaPause,
+      };
+
+  Future<void> _pickMediaBehavior() async {
+    final loc = AppLocalizations.of(context)!;
+    final choice = await _pickOption<RunVoiceMediaBehavior>(
+      values: RunVoiceMediaBehavior.values,
+      selected: _settings.mediaBehavior,
+      label: (v) => _mediaLabel(loc, v),
+      description: (v) => switch (v) {
+        RunVoiceMediaBehavior.duck => loc.runVoiceMediaDuckDesc,
+        RunVoiceMediaBehavior.pause => loc.runVoiceMediaPauseDesc,
+      },
+    );
+    if (choice != null) {
+      await _persist(_settings.copyWith(mediaBehavior: choice));
+    }
+  }
+
+  String _timeCuesLabel(AppLocalizations loc, int minutes) => minutes <= 0
+      ? loc.runVoiceTimeCuesOff
+      : loc.runVoiceTimeCuesEveryMin(minutes);
+
+  Future<void> _pickTimeCues() async {
+    final loc = AppLocalizations.of(context)!;
+    final choice = await _pickOption<int>(
+      values: RunVoiceSettings.announceTimeOptions,
+      selected: _settings.announceTimeEveryMin,
+      label: (v) => _timeCuesLabel(loc, v),
+    );
+    if (choice != null) {
+      await _persist(_settings.copyWith(announceTimeEveryMin: choice));
+    }
+  }
+
+  String _autoPauseStyleLabel(AppLocalizations loc, RunVoiceAutoPauseStyle v) =>
+      switch (v) {
+        RunVoiceAutoPauseStyle.voice => loc.runVoiceAutoPauseStyleVoice,
+        RunVoiceAutoPauseStyle.beep => loc.runVoiceAutoPauseStyleBeep,
+      };
+
+  Future<void> _pickAutoPauseStyle() async {
+    final loc = AppLocalizations.of(context)!;
+    final choice = await _pickOption<RunVoiceAutoPauseStyle>(
+      values: RunVoiceAutoPauseStyle.values,
+      selected: _settings.autoPauseStyle,
+      label: (v) => _autoPauseStyleLabel(loc, v),
+    );
+    if (choice != null) {
+      await _persist(_settings.copyWith(autoPauseStyle: choice));
+    }
+  }
+
   Future<void> _pickPaceTolerance() async {
     final loc = AppLocalizations.of(context)!;
     final choice = await showModalBottomSheet<int>(
@@ -315,6 +446,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                         children: [
                           Expanded(child: Text(loc.runIntervalRepeats)),
                           IconButton(
+                            tooltip: loc.commonDecrease,
                             onPressed: draft.repeats <= 1
                                 ? null
                                 : () => setDialogState(() {
@@ -326,6 +458,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                           ),
                           Text('${draft.repeats}'),
                           IconButton(
+                            tooltip: loc.commonIncrease,
                             onPressed: draft.repeats >= 99
                                 ? null
                                 : () => setDialogState(() {
@@ -385,8 +518,10 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
 
     return Scaffold(
       appBar: SettingsAppBar(title: loc.runVoiceSettingsTitle),
-      body: _loading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _load)
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
@@ -397,7 +532,10 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                AppSectionHeader(loc.runVoiceSectionGeneral, padding: AppSectionHeader.compactPadding),
+                AppSectionHeader(
+                  loc.runVoiceSectionGeneral,
+                  padding: AppSectionHeader.compactPadding,
+                ),
                 SettingsCard(
                   children: [
                     SettingsSwitchTile(
@@ -413,6 +551,50 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                       title: loc.runVoiceLanguage,
                       subtitle: _languageLabel(loc, s.language),
                       onTap: _pickLanguage,
+                    ),
+                    const SettingsCardDivider(),
+                    SettingsLinkTile(
+                      icon: Icons.tune,
+                      title: loc.runVoiceVerbosity,
+                      subtitle: _verbosityLabel(loc, s.verbosity),
+                      onTap: _pickVerbosity,
+                    ),
+                    const SettingsCardDivider(),
+                    SettingsLinkTile(
+                      icon: Icons.speed,
+                      title: loc.runVoiceSpeechRate,
+                      subtitle: loc.runVoiceSpeechRateValue(s.speechRate),
+                      onTap: _pickSpeechRate,
+                    ),
+                    const SettingsCardDivider(),
+                    SettingsLinkTile(
+                      icon: Icons.volume_up_outlined,
+                      title: loc.runVoiceVolume,
+                      subtitle: _volumeLabel(loc, s.voiceVolume),
+                      onTap: _pickVoiceVolume,
+                    ),
+                    const SettingsCardDivider(),
+                    SettingsLinkTile(
+                      icon: Icons.library_music_outlined,
+                      title: loc.runVoiceMediaBehavior,
+                      subtitle: _mediaLabel(loc, s.mediaBehavior),
+                      onTap: _pickMediaBehavior,
+                    ),
+                    const SettingsCardDivider(),
+                    SettingsSwitchTile(
+                      icon: Icons.notifications_active_outlined,
+                      title: loc.runVoiceEarcons,
+                      subtitle: loc.runVoiceEarconsSubtitle,
+                      value: s.earcons,
+                      onChanged: (v) => _persist(s.copyWith(earcons: v)),
+                    ),
+                    const SettingsCardDivider(),
+                    SettingsSwitchTile(
+                      icon: Icons.vibration,
+                      title: loc.runVoiceHaptics,
+                      subtitle: loc.runVoiceHapticsSubtitle,
+                      value: s.haptics,
+                      onChanged: (v) => _persist(s.copyWith(haptics: v)),
                     ),
                     const SettingsCardDivider(),
                     SettingsLinkTile(
@@ -439,7 +621,10 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                     ),
                   ],
                 ),
-                AppSectionHeader(loc.runVoiceSectionRunning, padding: AppSectionHeader.compactPadding),
+                AppSectionHeader(
+                  loc.runVoiceSectionRunning,
+                  padding: AppSectionHeader.compactPadding,
+                ),
                 SettingsCard(
                   children: [
                     SettingsSwitchTile(
@@ -459,7 +644,10 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                     ),
                   ],
                 ),
-                AppSectionHeader(loc.runVoiceSectionAnnouncements, padding: AppSectionHeader.compactPadding),
+                AppSectionHeader(
+                  loc.runVoiceSectionAnnouncements,
+                  padding: AppSectionHeader.compactPadding,
+                ),
                 SettingsCard(
                   children: [
                     SettingsSwitchTile(
@@ -480,14 +668,41 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                         ),
                         onTap: _pickDistanceEvery,
                       ),
+                      const SettingsCardDivider(),
+                      SettingsSwitchTile(
+                        icon: Icons.schedule,
+                        title: loc.runVoiceKmIncludeTime,
+                        subtitle: loc.runVoiceKmIncludeTimeSubtitle,
+                        value: s.kmIncludeTime,
+                        onChanged: (v) =>
+                            _persist(s.copyWith(kmIncludeTime: v)),
+                      ),
+                      const SettingsCardDivider(),
+                      SettingsSwitchTile(
+                        icon: Icons.flag_outlined,
+                        title: loc.runVoiceAnnounceSplit,
+                        subtitle: loc.runVoiceAnnounceSplitSubtitle,
+                        value: s.announceSplit,
+                        onChanged: (v) =>
+                            _persist(s.copyWith(announceSplit: v)),
+                      ),
+                      const SettingsCardDivider(),
+                      SettingsSwitchTile(
+                        icon: Icons.show_chart,
+                        title: loc.runVoiceKmIncludeAvgPace,
+                        subtitle: loc.runVoiceKmIncludeAvgPaceSubtitle,
+                        value: s.kmIncludeAvgPace,
+                        onChanged: (v) =>
+                            _persist(s.copyWith(kmIncludeAvgPace: v)),
+                      ),
                     ],
                     const SettingsCardDivider(),
-                    SettingsSwitchTile(
-                      icon: Icons.flag_outlined,
-                      title: loc.runVoiceAnnounceSplit,
-                      subtitle: loc.runVoiceAnnounceSplitSubtitle,
-                      value: s.announceSplit,
-                      onChanged: (v) => _persist(s.copyWith(announceSplit: v)),
+                    SettingsLinkTile(
+                      icon: Icons.hourglass_bottom,
+                      title: loc.runVoiceTimeCues,
+                      subtitle:
+                          '${_timeCuesLabel(loc, s.announceTimeEveryMin)} · ${loc.runVoiceTimeCuesSubtitle}',
+                      onTap: _pickTimeCues,
                     ),
                     const SettingsCardDivider(),
                     SettingsSwitchTile(
@@ -538,6 +753,15 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                       onChanged: (v) =>
                           _persist(s.copyWith(announceAutoPause: v)),
                     ),
+                    if (s.announceAutoPause) ...[
+                      const SettingsCardDivider(),
+                      SettingsLinkTile(
+                        icon: Icons.campaign_outlined,
+                        title: loc.runVoiceAutoPauseStyle,
+                        subtitle: _autoPauseStyleLabel(loc, s.autoPauseStyle),
+                        onTap: _pickAutoPauseStyle,
+                      ),
+                    ],
                     const SettingsCardDivider(),
                     SettingsSwitchTile(
                       icon: Icons.flag_circle_outlined,
@@ -557,7 +781,10 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                     ),
                   ],
                 ),
-                AppSectionHeader(loc.runVoiceSectionIntervals, padding: AppSectionHeader.compactPadding),
+                AppSectionHeader(
+                  loc.runVoiceSectionIntervals,
+                  padding: AppSectionHeader.compactPadding,
+                ),
                 SettingsCard(
                   children: [
                     SettingsSwitchTile(

@@ -73,6 +73,7 @@ class RunSessionCoach extends ChangeNotifier {
         goal: _goal.toMap(),
         intervalsOn: _intervalsOn,
         plan: _planWorkout?.stepsJson(),
+        workout: _planWorkout?.voiceProfile(),
       );
     }
     notifyListeners();
@@ -101,7 +102,8 @@ class RunSessionCoach extends ChangeNotifier {
 
   /// Hands the session set-up to the native voice controller. Pass
   /// `nativeVoice: false` for a session that has no native tracker (the debug
-  /// simulator).
+  /// simulator) or whose coach is started elsewhere (the treadmill, see
+  /// [indoorVoiceSetup]).
   Future<void> beginSession({
     required bool intervalsOn,
     RunSessionGoal? goal,
@@ -120,10 +122,20 @@ class RunSessionCoach extends ChangeNotifier {
         goal: _goal.toMap(),
         intervalsOn: _intervalsOn,
         plan: _planWorkout?.stepsJson(),
+        workout: _planWorkout?.voiceProfile(),
       );
     }
     notifyListeners();
   }
+
+  /// What the treadmill coach needs: the same set-up, with the plan's
+  /// distance steps turned into time (there is no distance indoors).
+  RunIndoorVoiceSetup indoorVoiceSetup() => RunIndoorVoiceSetup(
+    settings: _settings,
+    goal: _goal.toMap(),
+    plan: _planWorkout?.treadmillStepsJson() ?? const [],
+    workout: _planWorkout?.voiceProfile(),
+  );
 
   /// Reattaches Flutter UI to a session already owned by the native service.
   /// Unlike [beginSession], this never sends `begin` over the platform channel,

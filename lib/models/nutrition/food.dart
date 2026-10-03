@@ -1,4 +1,3 @@
-
 /// Source of a food record.
 ///
 /// - `manual`: created by the user directly in the app.
@@ -127,7 +126,7 @@ class Food {
     final lower = input.toLowerCase();
     final stripped = _stripDiacritics(lower);
     final cleaned = stripped
-        .replaceAll(RegExp(r"[^a-z0-9\s]"), ' ')
+        .replaceAll(RegExp(r'[^a-z0-9\s]'), ' ')
         .replaceAll(RegExp(r'\s+'), ' ');
     return cleaned.trim();
   }

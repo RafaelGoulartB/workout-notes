@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/exercise_with_sets.dart';
 import 'package:workout_notes/screens/workout/exercise_detail_tabs_screen.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/workout_card_helpers.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
@@ -274,7 +275,7 @@ class ExerciseCard extends StatelessWidget {
                                 ),
                               ),
                       ),
-                      ..._buildSetColumns(exercise, set, theme),
+                      ..._buildSetColumns(context, exercise, set, theme),
                     ],
                   ),
                 ),
@@ -389,7 +390,7 @@ class ExerciseCard extends StatelessWidget {
         const SizedBox(width: 10),
         const SizedBox(width: 32, child: SizedBox.shrink()),
         ..._buildHeaderFieldColumns(theme, fields, keys),
-        const SizedBox(width: 32),
+        const SizedBox(width: 40),
       ],
     );
   }
@@ -434,6 +435,7 @@ class ExerciseCard extends StatelessWidget {
   }
 
   List<Widget> _buildSetColumns(
+    BuildContext context,
     ExerciseWithSets ex,
     Map<String, dynamic> set,
     ThemeData theme,
@@ -470,20 +472,19 @@ class ExerciseCard extends StatelessWidget {
         Expanded(
           flex: 2,
           child: Text(
-            (set['rpe'] as num?)?.toStringAsFixed(1) ?? '-',
+            AppNumberFormat.decimalOrDash(set['rpe'] as num?, 1),
             style: theme.textTheme.bodyMedium,
           ),
         ),
-      SizedBox(
-        width: 32,
-        child: GestureDetector(
-          onTap: () => onDeleteSet(set['id'] as String),
-          behavior: HitTestBehavior.opaque,
-          child: Icon(
-            Icons.close,
-            size: 18,
-            color: theme.colorScheme.error.withAlpha(180),
-          ),
+      IconButton(
+        tooltip: AppLocalizations.of(context)!.workoutDeleteSetTooltip,
+        onPressed: () => onDeleteSet(set['id'] as String),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+        icon: Icon(
+          Icons.close,
+          size: 18,
+          color: theme.colorScheme.error.withAlpha(180),
         ),
       ),
     ];

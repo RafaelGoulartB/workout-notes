@@ -9,6 +9,7 @@ import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_phase_draft.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_routine_suggestion.dart';
+import 'package:workout_notes/models/periodization_run_schedule_result.dart';
 import 'package:workout_notes/models/periodization_run_suggestion.dart';
 import 'package:workout_notes/models/periodization_schedule.dart';
 import 'package:workout_notes/models/periodization_target.dart';
@@ -18,42 +19,18 @@ import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/periodization/phase_week_plan.dart';
 import 'package:workout_notes/periodization/run_plan_week_resolver.dart';
 import 'package:workout_notes/repositories/base_repository.dart';
+import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/sql_helpers.dart';
 
-/// Sentinel for "no matching session" — `firstWhere` needs a non-null default.
-final RunPlanWorkout _missingRunWorkout = RunPlanWorkout(
-  id: '',
-  runPlanId: '',
-  weekIndex: -1,
-  orderIndex: -1,
-  kind: RunWorkoutKind.easy,
-  name: '',
-  createdAt: DateTime(2000),
-);
+part 'periodization_repository_day_plan.dart';
+part 'periodization_repository_metrics.dart';
+part 'periodization_repository_suggestions.dart';
 
-/// Outcome of [PeriodizationRepository.scheduleRunPlanForPhase].
-class PeriodizationRunScheduleResult {
-  /// Rows actually created (already-scheduled sessions are skipped). Kept as
-  /// ids rather than a count so the caller can offer an undo.
-  final List<String> createdIds;
-
-  /// Phase weeks that had a linked plan to schedule.
-  final int weeksCovered;
-
-  const PeriodizationRunScheduleResult({
-    this.createdIds = const [],
-    this.weeksCovered = 0,
-  });
-
-  int get created => createdIds.length;
-
-  bool get isEmpty => createdIds.isEmpty;
-}
-
+/// Plans, phases and weekly targets. Read-only day plans, suggestions and
+/// metrics live in `part` files as extensions
+/// (`periodization_repository_*.dart`) so the public API is unchanged.
 class PeriodizationRepository extends BaseRepository {
-  static const _uuid = Uuid();
-
   Future<List<PeriodizationPlan>> getPlans({
     bool includeArchived = true,
   }) async {
@@ -370,7 +347,7 @@ class PeriodizationRepository extends BaseRepository {
           where: 'id = ?',
           whereArgs: [original.id],
         );
-        final shift = range.start.difference(original.startDate).inDays;
+        final shift = daysBetween(original.startDate, range.start);
         if (shift != 0) {
           await txn.rawUpdate(
             'UPDATE phase_targets SET valid_from = date(valid_from, ?) '
@@ -433,9 +410,9 @@ class PeriodizationRepository extends BaseRepository {
     var cursor = dayOf(start);
     final ranges = <({DateTime start, DateTime end})>[];
     for (final count in weeks) {
-      final end = cursor.add(Duration(days: 7 * count - 1));
+      final end = addDays(cursor, 7 * count - 1);
       ranges.add((start: cursor, end: end));
-      cursor = end.add(const Duration(days: 1));
+      cursor = addDays(end, 1);
     }
     return ranges;
   }
@@ -457,7 +434,7 @@ class PeriodizationRepository extends BaseRepository {
       throw const PeriodizationValidationException('phase_not_found');
     }
     _validateNameAndDates(name, phase.startDate, phase.endDate);
-    final boundary = phase.startDate.add(Duration(days: 7 * fromWeek));
+    final boundary = addDays(phase.startDate, 7 * fromWeek);
     if (weeks.isNotEmpty) {
       _validateWeeklyWindow(boundary, phase.startDate, phase.endDate, weeks);
     }
@@ -487,111 +464,57 @@ class PeriodizationRepository extends BaseRepository {
     });
   }
 
-  /// The effective target of each phase week (index 0 = first week), read
-  /// at each week's start. Null entries are weeks without any target.
-  Future<List<PeriodizationTarget?>> getWeeklyTargets(
-    PeriodizationPhase phase,
-  ) async {
-    final history = await getTargetHistory(phase.id);
-    return [
-      for (var week = 0; week < phase.totalWeeks; week++)
-        history.isEmpty
-            ? null
-            : _targetForDate(
-                history,
-                phase.startDate.add(Duration(days: 7 * week)),
-              ),
-    ];
-  }
-
-  /// What the active plan expects on [date], or null outside any phase.
-  Future<PeriodizationDayPlan?> getDayPlan(DateTime date) async {
-    final day = dayOf(date);
-    final phase = await getEffectivePhase(day);
-    if (phase == null) return null;
-    final target = await getEffectiveTarget(phase.id, date: day);
-    return dayPlanFor(phase, target, day);
-  }
-
-  /// Resolves the template week of [phase] around [date] with [target].
-  Future<PeriodizationDayPlan> dayPlanFor(
-    PeriodizationPhase phase,
-    PeriodizationTarget? target,
-    DateTime date, {
-    Map<String, RunPlan?>? runPlanCache,
+  /// Sets the calorie/macro targets of [phase] from phase week [fromWeek]
+  /// (0-based) through its last week, on [executor] so a caller can fold it
+  /// into its own transaction. Earlier weeks keep their stored targets (lived
+  /// weeks are history and never rewritten); every other field of each week's
+  /// target (training days, run plan, sleep…) is preserved. Returns the number
+  /// of weeks written.
+  Future<int> applyNutritionFromWeekIn(
+    DatabaseExecutor executor,
+    PeriodizationPhase phase, {
+    required int fromWeek,
+    double? calories,
+    double? proteinG,
+    double? carbsG,
+    double? fatG,
   }) async {
-    final day = dayOf(date);
-    RunPlan? runPlan;
-    int? runPlanWeek;
-    final planId = target?.runPlanIds.firstOrNull;
-    if (planId != null) {
-      final cache = runPlanCache ?? <String, RunPlan?>{};
-      if (!cache.containsKey(planId)) {
-        cache[planId] = await DatabaseHelper.instance.runPlanRepo.getPlan(
-          planId,
-        );
-      }
-      runPlan = cache[planId];
-      if (runPlan != null) {
-        const resolver = RunPlanWeekResolver();
-        runPlanWeek = resolver.planWeekFor(
-          phaseWeek: resolver.phaseWeekOf(
-            phaseStart: phase.startDate,
-            date: day,
-          ),
-          planWeeks: runPlan.weeks,
-          startWeek: target?.runPlanStartWeek ?? 0,
-        );
-      }
+    if (fromWeek < 0 || fromWeek >= phase.totalWeeks) {
+      throw const PeriodizationValidationException('target_outside_phase');
     }
-    return PeriodizationDayPlan(
-      phase: phase,
-      target: target,
-      weekNumber: phase.weekAt(day),
-      totalWeeks: phase.totalWeeks,
-      week: PhaseWeekPlan.build(
-        target: target,
-        runPlan: runPlan,
-        runPlanWeek: runPlanWeek,
-      ),
-      runPlan: runPlan,
-      runPlanWeek: runPlanWeek,
-      date: day,
+    final rows = await executor.query(
+      'phase_targets',
+      where: 'phase_id = ?',
+      whereArgs: [phase.id],
     );
-  }
-
-  /// Dates (`yyyy-MM-dd`) in [start]..[end] with a finished strength workout
-  /// and with a completed run — what ticks days off in the week strips.
-  Future<({Set<String> strength, Set<String> runs})> getActivityDates(
-    DateTime start,
-    DateTime end,
-  ) async {
-    final database = await db;
-    final strengthRows = await database.rawQuery(
-      '''
-      SELECT DISTINCT date FROM workouts
-      WHERE end_time IS NOT NULL AND date BETWEEN ? AND ?
-      ''',
-      [dateKey(start), dateKey(end)],
+    final history = rows.map(PeriodizationTarget.fromMap).toList();
+    final boundary = addDays(phase.startDate, 7 * fromWeek);
+    final weeks = <PeriodizationTarget>[
+      for (var week = fromWeek; week < phase.totalWeeks; week++)
+        (_targetForDate(history, addDays(phase.startDate, 7 * week)) ??
+                PeriodizationTarget(
+                  id: '',
+                  phaseId: phase.id,
+                  version: 0,
+                  validFrom: boundary,
+                  createdAt: DateTime.now(),
+                ))
+            .copyWith(
+              calories: calories,
+              proteinG: proteinG,
+              carbsG: carbsG,
+              fatG: fatG,
+            ),
+    ];
+    _validateWeeklyWindow(boundary, phase.startDate, phase.endDate, weeks);
+    await _replaceTargetsFrom(
+      executor,
+      phaseId: phase.id,
+      phaseEnd: phase.endDate,
+      boundary: boundary,
+      weeks: weeks,
     );
-    // `started_at >= day AND started_at < nextDay` matches the same rows as
-    // comparing `date(started_at)` but can use the started_at indexes.
-    final runRows = await database.rawQuery(
-      '''
-      SELECT DISTINCT date(started_at) AS day FROM run_activities
-      WHERE status = 'completed' AND activity_type = 'running'
-        AND started_at >= ? AND started_at < ?
-      ''',
-      [dateKey(start), _dayAfter(end)],
-    );
-    final runs = runRows.map((row) => row['day']).whereType<String>().toSet();
-    return (
-      strength: strengthRows
-          .map((row) => (row['date'] as String?)?.substring(0, 10))
-          .whereType<String>()
-          .toSet(),
-      runs: runs,
-    );
+    return weeks.length;
   }
 
   /// Ends [phaseId] at the end of its current week and pulls the following
@@ -700,8 +623,14 @@ class PeriodizationRepository extends BaseRepository {
     return rows.map(PeriodizationPhase.fromMap).toList();
   }
 
-  Future<PeriodizationPhase?> getPhase(String id) async {
-    final database = await db;
+  Future<PeriodizationPhase?> getPhase(String id) async =>
+      getPhaseIn(await db, id);
+
+  /// [getPhase] on an explicit executor.
+  Future<PeriodizationPhase?> getPhaseIn(
+    DatabaseExecutor database,
+    String id,
+  ) async {
     final rows = await database.query(
       'periodization_phases',
       where: 'id = ?',
@@ -733,1087 +662,266 @@ class PeriodizationRepository extends BaseRepository {
       return null;
     }
   }
+}
 
-  Future<List<PeriodizationTarget>> getTargetHistory(String phaseId) async {
-    final database = await db;
-    final rows = await database.query(
-      'phase_targets',
-      where: 'phase_id = ?',
-      whereArgs: [phaseId],
-      orderBy: 'version DESC',
-    );
-    return rows.map(PeriodizationTarget.fromMap).toList();
-  }
-
-  Future<PeriodizationTarget?> getEffectiveTarget(
-    String phaseId, {
-    DateTime? date,
-  }) async {
-    final database = await db;
-    final effectiveDate = dateKey(date ?? DateTime.now());
-    final rows = await database.query(
-      'phase_targets',
-      where: 'phase_id = ? AND valid_from <= ?',
-      whereArgs: [phaseId, effectiveDate],
-      orderBy: 'valid_from DESC, version DESC',
-      limit: 1,
-    );
-    if (rows.isNotEmpty) return PeriodizationTarget.fromMap(rows.first);
-    return null;
-  }
-
-  /// Resolves the routine linked to the active phase on [date].
-  ///
-  /// The routines come from the effective weekly target (`routine_ids` inside
-  /// `training_json`) — each phase week may carry its own routine sequence.
-  Future<PeriodizationRoutineSuggestion?> getRoutineSuggestion(
-    DateTime date,
-  ) async {
-    final day = dayOf(date);
-    final phase = await getEffectivePhase(day);
-    if (phase == null) return null;
-    final database = await db;
-    final target = await getEffectiveTarget(phase.id, date: day);
-    final routineIds = target?.routineIds ?? const <String>[];
-    if (routineIds.isNotEmpty) {
-      final sequence =
-          <
-            ({
-              String routineId,
-              String routineName,
-              String dayId,
-              String dayName,
-            })
-          >[];
-      // Two queries for every linked routine instead of two per routine.
-      final routineRows = await database.query(
-        'routines',
-        columns: ['id', 'name'],
-        where: 'id IN (${List.filled(routineIds.length, '?').join(', ')})',
-        whereArgs: routineIds,
-      );
-      final routineNames = {
-        for (final row in routineRows) row['id'] as String: row['name'],
-      };
-      final dayRows = await database.query(
-        'routine_days',
-        where:
-            'routine_id IN (${List.filled(routineIds.length, '?').join(', ')})',
-        whereArgs: routineIds,
-        orderBy: 'order_index ASC',
-      );
-      final daysByRoutine = <String, List<Map<String, Object?>>>{};
-      for (final row in dayRows) {
-        daysByRoutine
-            .putIfAbsent(row['routine_id'] as String, () => [])
-            .add(row);
-      }
-      for (final routineId in routineIds) {
-        final routineName = routineNames[routineId];
-        if (routineName == null) continue;
-        for (final routineDay in daysByRoutine[routineId] ??
-            const <Map<String, Object?>>[]) {
-          sequence.add((
-            routineId: routineId,
-            routineName: routineName as String,
-            dayId: routineDay['id'] as String,
-            dayName: routineDay['name'] as String? ?? '',
-          ));
-        }
-      }
-      if (sequence.isEmpty) return null;
-      final completed =
-          Sqflite.firstIntValue(
-            await database.rawQuery(
-              '''
-              SELECT COUNT(*) FROM workouts
-              WHERE routine_id IN (${List.filled(routineIds.length, '?').join(', ')})
-                AND end_time IS NOT NULL
-                AND date BETWEEN ? AND ?
-              ''',
-              [
-                ...routineIds,
-                dateKey(
-                  mondayOf(day).isBefore(phase.startDate)
-                      ? phase.startDate
-                      : mondayOf(day),
-                ),
-                dateKey(day),
-              ],
-            ),
-          ) ??
-          0;
-      final index = completed % sequence.length;
-      final nextDay = sequence[index];
-      return PeriodizationRoutineSuggestion(
-        phaseId: phase.id,
-        routineId: nextDay.routineId,
-        routineName: nextDay.routineName,
-        routineDayId: nextDay.dayId,
-        routineDayName: nextDay.dayName,
-        routineDayIndex: index,
-        routineDayCount: sequence.length,
-        completedWorkouts: completed,
-      );
-    }
-    return null;
-  }
-
-  /// Resolves the running session the plan expects on [date].
-  ///
-  /// Reads `run_plan_ids` from the effective weekly target, maps the date onto
-  /// the plan week (phase week, wrapping when the plan is shorter than the
-  /// phase) and picks the session whose `day_of_week` matches. Prefers an
-  /// already-scheduled row so a rescheduled or skipped run is respected.
-  Future<PeriodizationRunSuggestion?> getRunSuggestion(DateTime date) async {
-    final day = dayOf(date);
-    final phase = await getEffectivePhase(day);
-    if (phase == null) return null;
-    final target = await getEffectiveTarget(phase.id, date: day);
-    final planIds = target?.runPlanIds ?? const <String>[];
-    if (planIds.isEmpty) return null;
-
-    final runPlanRepo = DatabaseHelper.instance.runPlanRepo;
-    final weekStart = mondayOf(day);
-    const resolver = RunPlanWeekResolver();
-    final phaseWeekIndex = resolver.phaseWeekOf(
-      phaseStart: phase.startDate,
-      date: day,
-    );
-
-    // An already materialised row wins: it carries reschedules and skips.
-    final scheduledToday = await runPlanRepo.getScheduledRunsForDate(day);
-    for (final scheduled in scheduledToday) {
-      final workout = scheduled.workout;
-      if (workout == null || !planIds.contains(scheduled.runPlanId)) continue;
-      final plan = await runPlanRepo.getPlan(workout.runPlanId);
-      if (plan == null) continue;
-      return PeriodizationRunSuggestion(
-        phaseId: phase.id,
-        runPlanId: plan.id,
-        runPlanName: plan.name,
-        weekIndex: workout.weekIndex,
-        workout: workout,
-        scheduled: scheduled,
-        completedRunsThisWeek: await _completedRunsBetween(
-          weekStart,
-          weekStart.add(const Duration(days: 6)),
-        ),
-      );
-    }
-
-    for (final planId in planIds) {
-      final plan = await runPlanRepo.getPlan(planId);
-      if (plan == null || plan.weeks < 1) continue;
-      // The offset says which plan week the phase's first week is; plans
-      // shorter than the phase wrap, so a 1-week maintenance plan applies to
-      // every week of the phase.
-      final weekIndex = resolver.planWeekFor(
-        phaseWeek: phaseWeekIndex,
-        planWeeks: plan.weeks,
-        startWeek: target?.runPlanStartWeek ?? 0,
-      );
-      if (weekIndex == null) continue;
-      final sessions = plan.workoutsForWeek(weekIndex);
-      final match = sessions.firstWhere(
-        (session) => session.dayOfWeek == day.weekday,
-        orElse: () => sessions.firstWhere(
-          (session) => session.dayOfWeek == null,
-          orElse: () => _missingRunWorkout,
-        ),
-      );
-      if (identical(match, _missingRunWorkout)) continue;
-      return PeriodizationRunSuggestion(
-        phaseId: phase.id,
-        runPlanId: plan.id,
-        runPlanName: plan.name,
-        weekIndex: weekIndex,
-        workout: match,
-        completedRunsThisWeek: await _completedRunsBetween(
-          weekStart,
-          weekStart.add(const Duration(days: 6)),
-        ),
-      );
-    }
-    return null;
-  }
-
-  /// Materialises the running plans linked to [phase] across its weeks, so the
-  /// calendar carries every planned session instead of only today's suggestion.
-  ///
-  /// Each phase week resolves its own effective target, so a phase that swaps
-  /// plans mid-way schedules the right plan per week. Weeks before [from]
-  /// (default: this week) are skipped — back-filling would invent sessions the
-  /// user never had a chance to run. Idempotent: existing rows are kept.
-  Future<PeriodizationRunScheduleResult> scheduleRunPlanForPhase(
-    PeriodizationPhase phase, {
-    DateTime? from,
-  }) async {
-    const resolver = RunPlanWeekResolver();
-    final runPlanRepo = DatabaseHelper.instance.runPlanRepo;
-    final phaseStartWeek = mondayOf(phase.startDate);
-    final fromWeek = mondayOf(dayOf(from ?? DateTime.now()));
-    final firstWeek = fromWeek.isAfter(phaseStartWeek)
-        ? resolver.phaseWeekOf(phaseStart: phase.startDate, date: fromWeek)
-        : 0;
-    // Plans are reused across weeks; loading each one once keeps a 30-week
-    // phase from re-reading the same sessions thirty times.
-    final plans = <String, RunPlan?>{};
-    final created = <String>[];
-    var weeksCovered = 0;
-    for (var week = firstWeek; week < phase.totalWeeks; week++) {
-      final weekStart = phaseStartWeek.add(Duration(days: 7 * week));
-      final target = await getEffectiveTarget(phase.id, date: weekStart);
-      final planIds = target?.runPlanIds ?? const <String>[];
-      if (planIds.isEmpty) continue;
-      var weekTouched = false;
-      for (final planId in planIds) {
-        if (!plans.containsKey(planId)) {
-          plans[planId] = await runPlanRepo.getPlan(planId);
-        }
-        final plan = plans[planId];
-        if (plan == null || plan.weeks < 1) continue;
-        final planWeek = resolver.planWeekFor(
-          phaseWeek: week,
-          planWeeks: plan.weeks,
-          startWeek: target?.runPlanStartWeek ?? 0,
-        );
-        if (planWeek == null) continue;
-        created.addAll(
-          await runPlanRepo.materializeWeek(
-            planId: planId,
-            weekIndex: planWeek,
-            weekStart: weekStart,
-          ),
-        );
-        weekTouched = true;
-      }
-      if (weekTouched) weeksCovered++;
-    }
-    return PeriodizationRunScheduleResult(
-      createdIds: created,
-      weeksCovered: weeksCovered,
-    );
-  }
-
-  Future<int> _completedRunsBetween(DateTime start, DateTime end) async {
-    final database = await db;
-    return Sqflite.firstIntValue(
-          await database.rawQuery(
-            '''
-            SELECT COUNT(*) FROM run_activities
-            WHERE status = 'completed' AND activity_type = 'running'
-              AND started_at >= ? AND started_at < ?
-            ''',
-            [dateKey(start), _dayAfter(end)],
-          ),
-        ) ??
-        0;
-  }
-
-  Future<List<PeriodizationCheckin>> getCheckins(String phaseId) async {
-    final database = await db;
-    final rows = await database.query(
-      'periodization_checkins',
-      where: 'phase_id = ?',
-      whereArgs: [phaseId],
-      orderBy: 'week_start DESC',
-    );
-    return rows.map(PeriodizationCheckin.fromMap).toList();
-  }
-
-  Future<PeriodizationCheckin?> getCheckin(
-    String phaseId,
-    DateTime weekStart,
-  ) async {
-    final database = await db;
-    final rows = await database.query(
-      'periodization_checkins',
-      where: 'phase_id = ? AND week_start = ?',
-      whereArgs: [phaseId, dateKey(mondayOf(weekStart))],
-      limit: 1,
-    );
-    return rows.isEmpty ? null : PeriodizationCheckin.fromMap(rows.first);
-  }
-
-  Future<void> saveCheckin(PeriodizationCheckin checkin) async {
-    if (checkin.energy < 1 ||
-        checkin.energy > 5 ||
-        checkin.hunger < 1 ||
-        checkin.hunger > 5 ||
-        checkin.recovery < 1 ||
-        checkin.recovery > 5) {
-      throw const PeriodizationValidationException('checkin_rating_invalid');
-    }
-    final phase = await getPhase(checkin.phaseId);
-    if (phase == null) {
-      throw const PeriodizationValidationException('phase_not_found');
-    }
-    final normalizedWeek = mondayOf(checkin.weekStart);
-    final weekEnd = normalizedWeek.add(const Duration(days: 6));
-    if (weekEnd.isBefore(phase.startDate) ||
-        normalizedWeek.isAfter(phase.endDate)) {
-      throw const PeriodizationValidationException('checkin_outside_phase');
-    }
-    final normalized = PeriodizationCheckin(
-      id: checkin.id,
-      phaseId: checkin.phaseId,
-      weekStart: normalizedWeek,
-      energy: checkin.energy,
-      hunger: checkin.hunger,
-      recovery: checkin.recovery,
-      performance: checkin.performance,
-      decision: checkin.decision,
-      notes: checkin.notes,
-      metricsSnapshot: checkin.metricsSnapshot,
-      targetsSnapshot: checkin.targetsSnapshot,
-      createdAt: checkin.createdAt,
-    );
-    final database = await db;
-    await database.transaction((txn) async {
-      await txn.delete(
-        'periodization_checkins',
-        where: 'phase_id = ? AND week_start = ?',
-        whereArgs: [checkin.phaseId, dateKey(normalizedWeek)],
-      );
-      await txn.insert('periodization_checkins', normalized.toMap());
-    });
-  }
-
-  Future<PeriodizationMetrics> getPhaseMetrics(
-    PeriodizationPhase phase, {
-    DateTime? rangeStart,
-    DateTime? rangeEnd,
-  }) async {
-    final now = dayOf(DateTime.now());
-    final start = dayOf(rangeStart ?? phase.startDate);
-    var end = dayOf(rangeEnd ?? phase.endDate);
-    if (end.isAfter(now)) end = now;
-    if (end.isBefore(start)) {
-      return PeriodizationMetrics(
-        startDate: start,
-        endDate: end,
-        elapsedDays: 0,
-        workoutCount: 0,
-        completedSets: 0,
-        volume: 0,
-        nutritionDaysLogged: 0,
-        sleepDaysLogged: 0,
-      );
-    }
-    final database = await db;
-    final startText = dateKey(start);
-    final endText = dateKey(end);
-    final endAfterText = _dayAfter(end);
-    final targetHistory = await getTargetHistory(phase.id);
-    final routineIds = <String>{};
-    for (
-      var date = start;
-      !date.isAfter(end);
-      date = date.add(const Duration(days: 1))
-    ) {
-      routineIds.addAll(
-        _targetForDate(targetHistory, date)?.routineIds ?? const [],
-      );
-    }
-    final routineFilter = routineIds.isEmpty
-        ? ''
-        : ' AND w.routine_id IN (${List.filled(routineIds.length, '?').join(', ')})';
-    final routineArgs = routineIds.toList();
-
-    // Weekly running targets are summed per week, not per day: a weekly volume
-    // of 40 km must not become 280 km over seven days.
-    var plannedRunSessions = 0;
-    var plannedRunDistance = 0.0;
-    var plannedQualityRuns = 0;
-    double? plannedLongRun;
-    var hasRunTarget = false;
-    for (
-      var weekCursor = mondayOf(start);
-      !weekCursor.isAfter(end);
-      weekCursor = weekCursor.add(const Duration(days: 7))
-    ) {
-      // Anchor on a day that belongs to the range so partial first/last weeks
-      // resolve the target that actually applies.
-      final anchor = weekCursor.isBefore(start) ? start : weekCursor;
-      final target = _targetForDate(targetHistory, anchor);
-      if (target == null) continue;
-      final weekDays = _daysOfWeekInRange(weekCursor, start, end);
-      if (weekDays == 0) continue;
-      final weight = weekDays / 7;
-      if (target.runSessionsPerWeek != null) {
-        hasRunTarget = true;
-        plannedRunSessions += (target.runSessionsPerWeek! * weight).round();
-      }
-      if (target.runWeeklyDistanceMeters != null) {
-        hasRunTarget = true;
-        plannedRunDistance += target.runWeeklyDistanceMeters! * weight;
-      }
-      if (target.qualitySessionsPerWeek != null) {
-        hasRunTarget = true;
-        plannedQualityRuns += (target.qualitySessionsPerWeek! * weight).round();
-      }
-      if (target.longRunDistanceMeters != null) {
-        hasRunTarget = true;
-        // The long run is a per-week peak, so take the largest one asked for.
-        plannedLongRun = plannedLongRun == null
-            ? target.longRunDistanceMeters
-            : (target.longRunDistanceMeters! > plannedLongRun
-                  ? target.longRunDistanceMeters
-                  : plannedLongRun);
-      }
-    }
-
-    final run = (await database.rawQuery(
-      '''
-      SELECT COUNT(*) AS run_count,
-             COALESCE(SUM(distance_meters), 0) AS distance_meters,
-             COALESCE(SUM(moving_time_seconds), 0) AS moving_time_seconds,
-             COALESCE(MAX(distance_meters), 0) AS longest_run_meters
-      FROM run_activities
-      WHERE status = 'completed' AND activity_type = 'running'
-        AND started_at >= ? AND started_at < ?
-      ''',
-      [startText, endAfterText],
-    )).first;
-
-    // A "quality" run is one linked to a tempo/interval/hills/fartlek/race
-    // session of a plan. Ad-hoc runs count as volume, never as quality.
-    final qualityRunCount =
-        Sqflite.firstIntValue(
-          await database.rawQuery(
-            '''
-            SELECT COUNT(*) FROM run_activities activity
-            JOIN run_plan_workouts session
-              ON session.id = activity.plan_workout_id
-            WHERE activity.status = 'completed'
-              AND activity.activity_type = 'running'
-              AND activity.started_at >= ? AND activity.started_at < ?
-              AND session.kind IN
-                  ('tempo', 'interval', 'fartlek', 'hills', 'race')
-            ''',
-            [startText, endAfterText],
-          ),
-        ) ??
-        0;
-
-    final workoutRows = await database.rawQuery(
-      '''
-      SELECT COUNT(DISTINCT w.id) AS workout_count,
-             COUNT(CASE WHEN s.is_complete = 1 AND s.is_warmup = 0 THEN 1 END) AS set_count,
-             SUM(CASE WHEN s.is_complete = 1 AND s.is_warmup = 0
-                      THEN COALESCE(s.weight, 0) * COALESCE(s.reps, 0) ELSE 0 END) AS volume
-      FROM workouts w
-      LEFT JOIN exercise_entries ee ON ee.workout_id = w.id
-      LEFT JOIN sets s ON s.exercise_entry_id = ee.id
-       WHERE w.date BETWEEN ? AND ? AND w.end_time IS NOT NULL
-         $routineFilter
-     ''',
-      [startText, endText, ...routineArgs],
-    );
-    final workout = workoutRows.first;
-
-    final nutritionRows = await database.rawQuery(
-      '''
-      SELECT ml.date,
-             SUM(COALESCE(item.calories, 0)) AS calories,
-             SUM(COALESCE(item.protein_g, 0)) AS protein_g,
-             SUM(COALESCE(item.carbs_g, 0)) AS carbs_g,
-             SUM(COALESCE(item.fat_g, 0)) AS fat_g
-      FROM meal_logs ml
-      JOIN meal_log_items item ON item.meal_log_id = ml.id
-      WHERE ml.date BETWEEN ? AND ?
-      GROUP BY ml.date
-      ORDER BY ml.date ASC
-    ''',
-      [startText, endText],
-    );
-    double calorieSum = 0;
-    double proteinSum = 0;
-    double carbsSum = 0;
-    double fatSum = 0;
-    final nutritionByDate = <String, Map<String, Object?>>{};
-    for (final row in nutritionRows) {
-      final calories = (row['calories'] as num?)?.toDouble() ?? 0;
-      calorieSum += calories;
-      proteinSum += (row['protein_g'] as num?)?.toDouble() ?? 0;
-      carbsSum += (row['carbs_g'] as num?)?.toDouble() ?? 0;
-      fatSum += (row['fat_g'] as num?)?.toDouble() ?? 0;
-      nutritionByDate[row['date'] as String] = row;
-    }
-
-    double plannedWorkoutSum = 0;
-    double plannedSetsMinimumSum = 0;
-    double plannedSetsMaximumSum = 0;
-    var hasPlannedWorkouts = false;
-    var hasPlannedSetsMinimum = false;
-    var hasPlannedSetsMaximum = false;
-    var nutritionTargetDays = 0;
-    var nutritionTargetDaysLogged = 0;
-    double nutritionAdherenceSum = 0;
-    var sleepTargetDays = 0;
-    final runPlanCache = <String, RunPlan?>{};
-    for (
-      var date = start;
-      !date.isAfter(end);
-      date = date.add(const Duration(days: 1))
-    ) {
-      final target = _targetForDate(targetHistory, date);
-      if (target?.workoutsPerWeek != null) {
-        plannedWorkoutSum += target!.workoutsPerWeek! / 7;
-        hasPlannedWorkouts = true;
-      }
-      if (target?.minSetsPerWeek != null) {
-        plannedSetsMinimumSum += target!.minSetsPerWeek! / 7;
-        hasPlannedSetsMinimum = true;
-      }
-      if (target?.maxSetsPerWeek != null) {
-        plannedSetsMaximumSum += target!.maxSetsPerWeek! / 7;
-        hasPlannedSetsMaximum = true;
-      }
-      // Training and rest days can carry different nutrition targets.
-      final trainingDay = target == null || !target.hasRestDayNutrition
-          ? true
-          : (await dayPlanFor(
-                  phase,
-                  target,
-                  date,
-                  runPlanCache: runPlanCache,
-                )).trainingDay ??
-                true;
-      final dayNutrition = target?.nutritionFor(trainingDay: trainingDay);
-      final targetValues = [
-        dayNutrition?.calories,
-        dayNutrition?.proteinG,
-        dayNutrition?.carbsG,
-        dayNutrition?.fatG,
-      ];
-      if (targetValues.any((value) => value != null)) {
-        nutritionTargetDays++;
-        final actual = nutritionByDate[dateKey(date)];
-        if (actual != null) nutritionTargetDaysLogged++;
-        final actualValues = [
-          (actual?['calories'] as num?)?.toDouble(),
-          (actual?['protein_g'] as num?)?.toDouble(),
-          (actual?['carbs_g'] as num?)?.toDouble(),
-          (actual?['fat_g'] as num?)?.toDouble(),
-        ];
-        var score = 0.0;
-        var configured = 0;
-        for (var i = 0; i < targetValues.length; i++) {
-          final expected = targetValues[i];
-          if (expected != null) {
-            configured++;
-            score += _adherenceScore(actualValues[i], expected);
-          }
-        }
-        nutritionAdherenceSum += configured == 0 ? 0 : score / configured;
-      }
-      if (target?.sleepHours != null) sleepTargetDays++;
-    }
-
-    final weights = await database.query(
-      'body_measurements',
-      where: "type = 'weight' AND date BETWEEN ? AND ?",
-      whereArgs: [startText, endText],
-      orderBy: 'date ASC, created_at ASC',
-    );
-    final normalizedWeights = weights
-        .map(_weightKg)
-        .whereType<double>()
-        .toList();
-
-    final sleepRows = await database.rawQuery(
-      '''
-      SELECT date,
-             COALESCE(actual_sleep_minutes, estimated_sleep_minutes, sleep_minutes) AS minutes
-      FROM sleep_entries
-      WHERE date BETWEEN ? AND ?
-      ORDER BY date ASC
-      ''',
-      [startText, endText],
-    );
-    final sleepByDate = <String, double>{};
-    for (final row in sleepRows) {
-      final minutes = (row['minutes'] as num?)?.toDouble();
-      if (minutes != null) sleepByDate[row['date'] as String] = minutes / 60;
-    }
-    final averageSleepHours = sleepByDate.isEmpty
-        ? null
-        : sleepByDate.values.fold<double>(0, (sum, value) => sum + value) /
-              sleepByDate.length;
-    double sleepAdherenceSum = 0;
-    var sleepTargetDaysLogged = 0;
-    for (
-      var date = start;
-      !date.isAfter(end);
-      date = date.add(const Duration(days: 1))
-    ) {
-      final expected = _targetForDate(targetHistory, date)?.sleepHours;
-      if (expected == null) continue;
-      final actual = sleepByDate[dateKey(date)];
-      if (actual != null) sleepTargetDaysLogged++;
-      sleepAdherenceSum += _adherenceScore(actual, expected);
-    }
-
-    final rpeRows = await database.rawQuery(
-      '''
-      SELECT w.date, s.rpe
-      FROM workouts w
-      JOIN exercise_entries ee ON ee.workout_id = w.id
-      JOIN sets s ON s.exercise_entry_id = ee.id
-       WHERE w.date BETWEEN ? AND ? AND w.end_time IS NOT NULL
-         AND s.is_complete = 1 AND s.is_warmup = 0
-         $routineFilter
-      ''',
-      [startText, endText, ...routineArgs],
-    );
-    var rpeExpectedSets = 0;
-    var rpeSetsLogged = 0;
-    double rpeSum = 0;
-    double rpeAdherenceSum = 0;
-    for (final row in rpeRows) {
-      final date = DateTime.parse(row['date'] as String);
-      final target = _targetForDate(targetHistory, date);
-      if (target?.minRpe == null && target?.maxRpe == null) continue;
-      rpeExpectedSets++;
-      final actual = (row['rpe'] as num?)?.toDouble();
-      if (actual == null) continue;
-      rpeSetsLogged++;
-      rpeSum += actual;
-      final minimum = target?.minRpe ?? target?.maxRpe ?? actual;
-      final maximum = target?.maxRpe ?? target?.minRpe ?? actual;
-      final distance = actual < minimum
-          ? minimum - actual
-          : actual > maximum
-          ? actual - maximum
-          : 0.0;
-      rpeAdherenceSum += math.max(0, 1 - distance / 10);
-    }
-    final latestTarget = _targetForDate(targetHistory, end);
-    final elapsedDays = end.difference(start).inDays + 1;
-    final plannedWorkouts = hasPlannedWorkouts
-        ? plannedWorkoutSum.round()
-        : null;
-    final plannedSetsMinimum = hasPlannedSetsMinimum
-        ? plannedSetsMinimumSum.round()
-        : null;
-    final plannedSetsMaximum = hasPlannedSetsMaximum
-        ? plannedSetsMaximumSum.round()
-        : null;
-    final completedSets = (workout['set_count'] as num?)?.toInt() ?? 0;
-    double? setAdherence;
-    if (plannedSetsMinimum != null || plannedSetsMaximum != null) {
-      if (plannedSetsMinimum != null && completedSets < plannedSetsMinimum) {
-        setAdherence = plannedSetsMinimum == 0
-            ? 100
-            : completedSets / plannedSetsMinimum * 100;
-      } else if (plannedSetsMaximum != null &&
-          completedSets > plannedSetsMaximum) {
-        setAdherence = plannedSetsMaximum == 0
-            ? 0
-            : plannedSetsMaximum / completedSets * 100;
-      } else {
-        setAdherence = 100;
-      }
-    }
-    final startingWeight = normalizedWeights.isEmpty
-        ? null
-        : normalizedWeights.first;
-    final endingWeight = normalizedWeights.isEmpty
-        ? null
-        : normalizedWeights.last;
-    final weightChange = normalizedWeights.length < 2
-        ? null
-        : normalizedWeights.last - normalizedWeights.first;
-    final elapsedWeeks = elapsedDays / 7;
-    final weeklyWeightChange =
-        startingWeight == null ||
-            startingWeight == 0 ||
-            weightChange == null ||
-            elapsedWeeks == 0
-        ? null
-        : weightChange / startingWeight / elapsedWeeks * 100;
-    final expectedWeeklyWeightChange = latestTarget?.weeklyWeightChangePercent;
-    final weightAdherence =
-        weeklyWeightChange == null || expectedWeeklyWeightChange == null
-        ? null
-        : _adherenceScore(
-                weeklyWeightChange,
-                expectedWeeklyWeightChange,
-                toleranceFloor: 0.1,
-              ) *
-              100;
-    return PeriodizationMetrics(
-      startDate: start,
-      endDate: end,
-      elapsedDays: elapsedDays,
-      workoutCount: (workout['workout_count'] as num?)?.toInt() ?? 0,
-      completedSets: completedSets,
-      volume: (workout['volume'] as num?)?.toDouble() ?? 0,
-      plannedWorkouts: plannedWorkouts,
-      plannedSetsMinimum: plannedSetsMinimum,
-      plannedSetsMaximum: plannedSetsMaximum,
-      setAdherencePercent: setAdherence,
-      nutritionDaysLogged: nutritionRows.length,
-      nutritionTargetDays: nutritionTargetDays,
-      averageCalories: nutritionRows.isEmpty
-          ? null
-          : calorieSum / nutritionRows.length,
-      averageProteinG: nutritionRows.isEmpty
-          ? null
-          : proteinSum / nutritionRows.length,
-      averageCarbsG: nutritionRows.isEmpty
-          ? null
-          : carbsSum / nutritionRows.length,
-      averageFatG: nutritionRows.isEmpty ? null : fatSum / nutritionRows.length,
-      nutritionAdherencePercent: nutritionTargetDays == 0
-          ? null
-          : nutritionAdherenceSum / nutritionTargetDays * 100,
-      nutritionCoveragePercent: nutritionTargetDays == 0
-          ? null
-          : nutritionTargetDaysLogged / nutritionTargetDays * 100,
-      startingWeightKg: startingWeight,
-      endingWeightKg: endingWeight,
-      weightChangeKg: weightChange,
-      weeklyWeightChangePercent: weeklyWeightChange,
-      weightAdherencePercent: weightAdherence,
-      averageSleepHours: averageSleepHours,
-      sleepDaysLogged: sleepByDate.length,
-      sleepTargetDays: sleepTargetDays,
-      sleepAdherencePercent: sleepTargetDays == 0
-          ? null
-          : sleepAdherenceSum / sleepTargetDays * 100,
-      sleepCoveragePercent: sleepTargetDays == 0
-          ? null
-          : sleepTargetDaysLogged / sleepTargetDays * 100,
-      averageRpe: rpeSetsLogged == 0 ? null : rpeSum / rpeSetsLogged,
-      rpeSetsLogged: rpeSetsLogged,
-      rpeAdherencePercent: rpeExpectedSets == 0
-          ? null
-          : rpeAdherenceSum / rpeExpectedSets * 100,
-      rpeCoveragePercent: rpeExpectedSets == 0
-          ? null
-          : rpeSetsLogged / rpeExpectedSets * 100,
-      runCount: (run['run_count'] as num?)?.toInt() ?? 0,
-      runDistanceMeters: (run['distance_meters'] as num?)?.toDouble() ?? 0,
-      runMovingTimeSeconds: (run['moving_time_seconds'] as num?)?.toInt() ?? 0,
-      longestRunMeters: (run['longest_run_meters'] as num?)?.toDouble() ?? 0,
-      qualityRunCount: qualityRunCount,
-      plannedRunSessions: hasRunTarget ? plannedRunSessions : null,
-      plannedRunDistanceMeters: hasRunTarget ? plannedRunDistance : null,
-      plannedLongRunMeters: plannedLongRun,
-      plannedQualityRunSessions: hasRunTarget ? plannedQualityRuns : null,
-    );
-  }
-
-  /// How many days of the week starting at [weekStart] fall inside
-  /// [start]..[end]. Used to pro-rate weekly targets over a partial week.
-  static int _daysOfWeekInRange(
-    DateTime weekStart,
-    DateTime start,
-    DateTime end,
-  ) {
-    var count = 0;
-    for (var i = 0; i < 7; i++) {
-      final day = weekStart.add(Duration(days: i));
-      if (!day.isBefore(start) && !day.isAfter(end)) count++;
-    }
-    return count;
-  }
-
-  Future<PeriodizationMetrics> getWeekMetrics(
-    PeriodizationPhase phase,
-    DateTime weekStart,
-  ) => getPhaseMetrics(
-    phase,
-    rangeStart: mondayOf(weekStart).isBefore(phase.startDate)
-        ? phase.startDate
-        : mondayOf(weekStart),
-    rangeEnd:
-        mondayOf(weekStart).add(const Duration(days: 6)).isAfter(phase.endDate)
-        ? phase.endDate
-        : mondayOf(weekStart).add(const Duration(days: 6)),
+Future<void> _deactivateCurrent(
+  DatabaseExecutor txn, {
+  String? exceptId,
+}) async {
+  await txn.update(
+    'periodization_plans',
+    {
+      'status': PeriodizationPlanStatus.archived.value,
+      'updated_at': DateTime.now().toIso8601String(),
+    },
+    where: exceptId == null
+        ? "status = 'active'"
+        : "status = 'active' AND id != ?",
+    whereArgs: exceptId == null ? null : [exceptId],
   );
+}
 
-  static Future<void> _deactivateCurrent(
-    DatabaseExecutor txn, {
-    String? exceptId,
-  }) async {
-    await txn.update(
-      'periodization_plans',
-      {
-        'status': PeriodizationPlanStatus.archived.value,
-        'updated_at': DateTime.now().toIso8601String(),
-      },
-      where: exceptId == null
-          ? "status = 'active'"
-          : "status = 'active' AND id != ?",
-      whereArgs: exceptId == null ? null : [exceptId],
-    );
+void _validateNameAndDates(String name, DateTime start, DateTime end) {
+  if (name.trim().isEmpty) {
+    throw const PeriodizationValidationException('name_required');
   }
-
-  static void _validateNameAndDates(String name, DateTime start, DateTime end) {
-    if (name.trim().isEmpty) {
-      throw const PeriodizationValidationException('name_required');
-    }
-    if (dayOf(end).isBefore(dayOf(start))) {
-      throw const PeriodizationValidationException('invalid_date_range');
-    }
+  if (dayOf(end).isBefore(dayOf(start))) {
+    throw const PeriodizationValidationException('invalid_date_range');
   }
+}
 
-  static void _validateTarget(PeriodizationTarget target) {
-    for (final value in [
-      target.calories,
-      target.proteinG,
-      target.carbsG,
-      target.fatG,
-      target.targetWeightKg,
-      target.sleepHours,
-    ]) {
-      if (value != null && (!value.isFinite || value <= 0)) {
-        throw const PeriodizationValidationException('invalid_target');
-      }
-    }
-    if (target.workoutsPerWeek != null &&
-        (target.workoutsPerWeek! < 1 || target.workoutsPerWeek! > 14)) {
+void _validateTarget(PeriodizationTarget target) {
+  for (final value in [
+    target.calories,
+    target.proteinG,
+    target.carbsG,
+    target.fatG,
+    target.targetWeightKg,
+    target.sleepHours,
+  ]) {
+    if (value != null && (!value.isFinite || value <= 0)) {
       throw const PeriodizationValidationException('invalid_target');
     }
-    for (final value in [target.minSetsPerWeek, target.maxSetsPerWeek]) {
-      if (value != null && value < 0) {
-        throw const PeriodizationValidationException('invalid_target');
-      }
-    }
-    if (target.minSetsPerWeek != null &&
-        target.maxSetsPerWeek != null &&
-        target.minSetsPerWeek! > target.maxSetsPerWeek!) {
-      throw const PeriodizationValidationException('invalid_target_range');
-    }
-    if (target.minRpe != null &&
-        target.maxRpe != null &&
-        target.minRpe! > target.maxRpe!) {
-      throw const PeriodizationValidationException('invalid_target_range');
-    }
-    for (final value in [target.minRpe, target.maxRpe]) {
-      if (value != null && (value < 1 || value > 10)) {
-        throw const PeriodizationValidationException('invalid_target');
-      }
-    }
-    if (target.sleepHours != null &&
-        (target.sleepHours! < 1 || target.sleepHours! > 16)) {
+  }
+  if (target.workoutsPerWeek != null &&
+      (target.workoutsPerWeek! < 1 || target.workoutsPerWeek! > 14)) {
+    throw const PeriodizationValidationException('invalid_target');
+  }
+  for (final value in [target.minSetsPerWeek, target.maxSetsPerWeek]) {
+    if (value != null && value < 0) {
       throw const PeriodizationValidationException('invalid_target');
-    }
-    if (target.weeklyWeightChangePercent != null &&
-        (!target.weeklyWeightChangePercent!.isFinite ||
-            target.weeklyWeightChangePercent!.abs() > 5)) {
-      throw const PeriodizationValidationException('invalid_target');
-    }
-    if (target.runSessionsPerWeek != null &&
-        (target.runSessionsPerWeek! < 0 || target.runSessionsPerWeek! > 14)) {
-      throw const PeriodizationValidationException('invalid_target');
-    }
-    if (target.qualitySessionsPerWeek != null &&
-        (target.qualitySessionsPerWeek! < 0 ||
-            target.qualitySessionsPerWeek! > 7)) {
-      throw const PeriodizationValidationException('invalid_target');
-    }
-    for (final value in [
-      target.runWeeklyDistanceMeters,
-      target.longRunDistanceMeters,
-    ]) {
-      if (value != null && (!value.isFinite || value < 0)) {
-        throw const PeriodizationValidationException('invalid_target');
-      }
-    }
-    if (target.runSessionsPerWeek != null &&
-        target.qualitySessionsPerWeek != null &&
-        target.qualitySessionsPerWeek! > target.runSessionsPerWeek!) {
-      throw const PeriodizationValidationException('invalid_target_range');
     }
   }
-
-  static Map<String, dynamic> _targetMap(
-    PeriodizationTarget target, {
-    required String phaseId,
-    required int version,
-    required DateTime validFrom,
-  }) {
-    final remapped = target.copyWith(
-      id: _uuid.v4(),
-      phaseId: phaseId,
-      version: version,
-      validFrom: validFrom,
-      createdAt: DateTime.now(),
-    );
-    return remapped.toMap();
+  if (target.minSetsPerWeek != null &&
+      target.maxSetsPerWeek != null &&
+      target.minSetsPerWeek! > target.maxSetsPerWeek!) {
+    throw const PeriodizationValidationException('invalid_target_range');
   }
-
-  static PeriodizationTarget? _targetForDate(
-    List<PeriodizationTarget> targets,
-    DateTime date,
-  ) {
-    final eligible =
-        targets.where((target) => !target.validFrom.isAfter(date)).toList()
-          ..sort((a, b) {
-            final byDate = b.validFrom.compareTo(a.validFrom);
-            return byDate == 0 ? b.version.compareTo(a.version) : byDate;
-          });
-    if (eligible.isNotEmpty) return eligible.first;
-    if (targets.isEmpty) return null;
-    final oldest = [...targets]..sort((a, b) => a.version.compareTo(b.version));
-    return oldest.first;
+  if (target.minRpe != null &&
+      target.maxRpe != null &&
+      target.minRpe! > target.maxRpe!) {
+    throw const PeriodizationValidationException('invalid_target_range');
   }
+  for (final value in [target.minRpe, target.maxRpe]) {
+    if (value != null && (value < 1 || value > 10)) {
+      throw const PeriodizationValidationException('invalid_target');
+    }
+  }
+  if (target.sleepHours != null &&
+      (target.sleepHours! < 1 || target.sleepHours! > 16)) {
+    throw const PeriodizationValidationException('invalid_target');
+  }
+  if (target.weeklyWeightChangePercent != null &&
+      (!target.weeklyWeightChangePercent!.isFinite ||
+          target.weeklyWeightChangePercent!.abs() > 5)) {
+    throw const PeriodizationValidationException('invalid_target');
+  }
+  if (target.runSessionsPerWeek != null &&
+      (target.runSessionsPerWeek! < 0 || target.runSessionsPerWeek! > 14)) {
+    throw const PeriodizationValidationException('invalid_target');
+  }
+  if (target.qualitySessionsPerWeek != null &&
+      (target.qualitySessionsPerWeek! < 0 ||
+          target.qualitySessionsPerWeek! > 7)) {
+    throw const PeriodizationValidationException('invalid_target');
+  }
+  for (final value in [
+    target.runWeeklyDistanceMeters,
+    target.longRunDistanceMeters,
+  ]) {
+    if (value != null && (!value.isFinite || value < 0)) {
+      throw const PeriodizationValidationException('invalid_target');
+    }
+  }
+  if (target.runSessionsPerWeek != null &&
+      target.qualitySessionsPerWeek != null &&
+      target.qualitySessionsPerWeek! > target.runSessionsPerWeek!) {
+    throw const PeriodizationValidationException('invalid_target_range');
+  }
+}
 
-  static void _validateWeeklyWindow(
-    DateTime boundary,
-    DateTime phaseStart,
-    DateTime phaseEnd,
-    List<PeriodizationTarget> weeks,
-  ) {
-    if (boundary.isBefore(phaseStart) || boundary.isAfter(phaseEnd)) {
+Map<String, dynamic> _targetMap(
+  PeriodizationTarget target, {
+  required String phaseId,
+  required int version,
+  required DateTime validFrom,
+}) {
+  final remapped = target.copyWith(
+    id: _uuid.v4(),
+    phaseId: phaseId,
+    version: version,
+    validFrom: validFrom,
+    createdAt: DateTime.now(),
+  );
+  return remapped.toMap();
+}
+
+PeriodizationTarget? _targetForDate(
+  List<PeriodizationTarget> targets,
+  DateTime date,
+) {
+  final eligible =
+      targets.where((target) => !target.validFrom.isAfter(date)).toList()
+        ..sort((a, b) {
+          final byDate = b.validFrom.compareTo(a.validFrom);
+          return byDate == 0 ? b.version.compareTo(a.version) : byDate;
+        });
+  if (eligible.isNotEmpty) return eligible.first;
+  if (targets.isEmpty) return null;
+  final oldest = [...targets]..sort((a, b) => a.version.compareTo(b.version));
+  return oldest.first;
+}
+
+void _validateWeeklyWindow(
+  DateTime boundary,
+  DateTime phaseStart,
+  DateTime phaseEnd,
+  List<PeriodizationTarget> weeks,
+) {
+  if (boundary.isBefore(phaseStart) || boundary.isAfter(phaseEnd)) {
+    throw const PeriodizationValidationException('target_outside_phase');
+  }
+  for (var i = 0; i < weeks.length; i++) {
+    final week = weeks[i];
+    if (!week.isEmpty) _validateTarget(week);
+    if (addDays(boundary, 7 * i).isAfter(phaseEnd)) {
       throw const PeriodizationValidationException('target_outside_phase');
     }
-    for (var i = 0; i < weeks.length; i++) {
-      final week = weeks[i];
-      if (!week.isEmpty) _validateTarget(week);
-      if (boundary.add(Duration(days: 7 * i)).isAfter(phaseEnd)) {
-        throw const PeriodizationValidationException('target_outside_phase');
-      }
-    }
   }
-
-  /// Replaces every target version with `valid_from >= [boundary]` by the
-  /// collapsed representation of [weeks] (one effective target per week,
-  /// starting exactly at [boundary]). Versions before [boundary] — the
-  /// locked history — are left untouched.
-  static Future<void> _replaceTargetsFrom(
-    DatabaseExecutor txn, {
-    required String phaseId,
-    required DateTime phaseEnd,
-    required DateTime boundary,
-    required List<PeriodizationTarget> weeks,
-  }) async {
-    final rows = await txn.query(
-      'phase_targets',
-      where: 'phase_id = ?',
-      whereArgs: [phaseId],
-    );
-    final history = rows.map(PeriodizationTarget.fromMap).toList();
-    final retained = history
-        .where((target) => target.validFrom.isBefore(boundary))
-        .toList();
-    final baseline = _targetForDate(
-      retained,
-      boundary.subtract(const Duration(days: 1)),
-    );
-    final nextVersion = history.isEmpty
-        ? 1
-        : history.map((target) => target.version).reduce(math.max) + 1;
-    await txn.delete(
-      'phase_targets',
-      where: 'phase_id = ? AND valid_from >= ?',
-      whereArgs: [phaseId, dateKey(boundary)],
-    );
-    await _insertWeeklyTargets(
-      txn,
-      phaseId: phaseId,
-      weeks: weeks,
-      firstValidFrom: boundary,
-      firstVersion: nextVersion,
-      baseline: baseline,
-    );
-  }
-
-  static Future<void> _insertWeeklyTargets(
-    DatabaseExecutor txn, {
-    required String phaseId,
-    required List<PeriodizationTarget> weeks,
-    required DateTime firstValidFrom,
-    required int firstVersion,
-    PeriodizationTarget? baseline,
-  }) async {
-    await _validateRoutineReferences(txn, weeks);
-    // A null baseline (no retained history) behaves like an empty target so
-    // leading empty weeks never create versions.
-    var previous =
-        baseline ??
-        PeriodizationTarget(
-          id: '',
-          phaseId: phaseId,
-          version: 0,
-          validFrom: firstValidFrom,
-          createdAt: DateTime.now(),
-        );
-    var version = firstVersion;
-    for (var i = 0; i < weeks.length; i++) {
-      final week = weeks[i];
-      if (!_sameTargets(week, previous)) {
-        await txn.insert(
-          'phase_targets',
-          _targetMap(
-            week,
-            phaseId: phaseId,
-            version: version,
-            validFrom: firstValidFrom.add(Duration(days: 7 * i)),
-          ),
-        );
-        version++;
-      }
-      previous = week;
-    }
-  }
-
-  static bool _sameTargets(PeriodizationTarget a, PeriodizationTarget b) =>
-      a.nutritionJson.toString() == b.nutritionJson.toString() &&
-      a.trainingJson.toString() == b.trainingJson.toString() &&
-      a.bodyJson.toString() == b.bodyJson.toString() &&
-      a.sleepJson.toString() == b.sleepJson.toString();
-
-  /// Rejects targets that reference a routine that no longer exists in the
-  /// library (the weekly targets store only the routine id, with no FK).
-  static Future<void> _validateRoutineReferences(
-    DatabaseExecutor txn,
-    Iterable<PeriodizationTarget> targets,
-  ) async {
-    final routineIds = targets
-        .expand((target) => target.routineIds)
-        .where((id) => id.isNotEmpty)
-        .toSet();
-    if (routineIds.isEmpty) return;
-    final rows = await txn.query(
-      'routines',
-      columns: ['id'],
-      where: 'id IN (${List.filled(routineIds.length, '?').join(', ')})',
-      whereArgs: routineIds.toList(),
-    );
-    final found = rows.map((row) => row['id']).toSet();
-    if (routineIds.difference(found).isNotEmpty) {
-      throw const PeriodizationValidationException('routine_not_found');
-    }
-  }
-
-  static double _adherenceScore(
-    double? actual,
-    double expected, {
-    double toleranceFloor = 1,
-  }) {
-    if (actual == null || !actual.isFinite || !expected.isFinite) return 0;
-    final denominator = math.max(expected.abs(), toleranceFloor);
-    return math.max(0, 1 - (actual - expected).abs() / denominator);
-  }
-
-  static double? _weightKg(Map<String, Object?> row) {
-    final value = (row['value'] as num?)?.toDouble();
-    if (value == null) return null;
-    final unit = (row['unit'] as String? ?? 'kg').toLowerCase();
-    return unit == 'lb' || unit == 'lbs' ? value * 0.45359237 : value;
-  }
-
-  /// Exclusive upper bound for "started on or before [date]" on a
-  /// `started_at` text column: the day after, as `yyyy-MM-dd`.
-  static String _dayAfter(DateTime date) =>
-      dateKey(addDays(date, 1));
 }
+
+/// Replaces every target version with `valid_from >= [boundary]` by the
+/// collapsed representation of [weeks] (one effective target per week,
+/// starting exactly at [boundary]). Versions before [boundary] — the
+/// locked history — are left untouched.
+Future<void> _replaceTargetsFrom(
+  DatabaseExecutor txn, {
+  required String phaseId,
+  required DateTime phaseEnd,
+  required DateTime boundary,
+  required List<PeriodizationTarget> weeks,
+}) async {
+  final rows = await txn.query(
+    'phase_targets',
+    where: 'phase_id = ?',
+    whereArgs: [phaseId],
+  );
+  final history = rows.map(PeriodizationTarget.fromMap).toList();
+  final retained = history
+      .where((target) => target.validFrom.isBefore(boundary))
+      .toList();
+  final baseline = _targetForDate(retained, addDays(boundary, -1));
+  final nextVersion = history.isEmpty
+      ? 1
+      : history.map((target) => target.version).reduce(math.max) + 1;
+  await txn.delete(
+    'phase_targets',
+    where: 'phase_id = ? AND valid_from >= ?',
+    whereArgs: [phaseId, dateKey(boundary)],
+  );
+  await _insertWeeklyTargets(
+    txn,
+    phaseId: phaseId,
+    weeks: weeks,
+    firstValidFrom: boundary,
+    firstVersion: nextVersion,
+    baseline: baseline,
+  );
+}
+
+Future<void> _insertWeeklyTargets(
+  DatabaseExecutor txn, {
+  required String phaseId,
+  required List<PeriodizationTarget> weeks,
+  required DateTime firstValidFrom,
+  required int firstVersion,
+  PeriodizationTarget? baseline,
+}) async {
+  await _validateRoutineReferences(txn, weeks);
+  // A null baseline (no retained history) behaves like an empty target so
+  // leading empty weeks never create versions.
+  var previous =
+      baseline ??
+      PeriodizationTarget(
+        id: '',
+        phaseId: phaseId,
+        version: 0,
+        validFrom: firstValidFrom,
+        createdAt: DateTime.now(),
+      );
+  var version = firstVersion;
+  for (var i = 0; i < weeks.length; i++) {
+    final week = weeks[i];
+    if (!_sameTargets(week, previous)) {
+      await txn.insert(
+        'phase_targets',
+        _targetMap(
+          week,
+          phaseId: phaseId,
+          version: version,
+          validFrom: addDays(firstValidFrom, 7 * i),
+        ),
+      );
+      version++;
+    }
+    previous = week;
+  }
+}
+
+bool _sameTargets(PeriodizationTarget a, PeriodizationTarget b) =>
+    a.nutritionJson.toString() == b.nutritionJson.toString() &&
+    a.trainingJson.toString() == b.trainingJson.toString() &&
+    a.bodyJson.toString() == b.bodyJson.toString() &&
+    a.sleepJson.toString() == b.sleepJson.toString();
+
+/// Rejects targets that reference a routine that no longer exists in the
+/// library (the weekly targets store only the routine id, with no FK).
+Future<void> _validateRoutineReferences(
+  DatabaseExecutor txn,
+  Iterable<PeriodizationTarget> targets,
+) async {
+  final routineIds = targets
+      .expand((target) => target.routineIds)
+      .where((id) => id.isNotEmpty)
+      .toSet();
+  if (routineIds.isEmpty) return;
+  final rows = await txn.query(
+    'routines',
+    columns: ['id'],
+    where: 'id IN (${List.filled(routineIds.length, '?').join(', ')})',
+    whereArgs: routineIds.toList(),
+  );
+  final found = rows.map((row) => row['id']).toSet();
+  if (routineIds.difference(found).isNotEmpty) {
+    throw const PeriodizationValidationException('routine_not_found');
+  }
+}
+
+/// Exclusive upper bound for "started on or before [date]" on a
+/// `started_at` text column: the day after, as `yyyy-MM-dd`.
+String _dayAfter(DateTime date) => dateKey(addDays(date, 1));
+
+const _uuid = Uuid();
 
 class PeriodizationValidationException implements Exception {
   final String code;

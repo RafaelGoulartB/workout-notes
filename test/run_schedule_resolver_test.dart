@@ -51,7 +51,8 @@ void main() {
       startDate: phaseStart,
       endDate: phaseEnd,
     );
-    final phase = await addPhaseFixture(periodization, 
+    final phase = await addPhaseFixture(
+      periodization,
       planId: plan.id,
       name: 'Acumulação',
       color: 0xFF00FF00,
@@ -255,7 +256,8 @@ void main() {
       );
       await seedPhase(runPlanIds: [plan.id]);
       // Moved from Tuesday to Wednesday.
-      final scheduled = await scheduleRunFixture(runPlans, 
+      final scheduled = await scheduleRunFixture(
+        runPlans,
         date: DateTime(2026, 1, 7),
         runPlanId: plan.id,
         runPlanWorkoutId: session.id,
@@ -390,18 +392,21 @@ void main() {
       expect(metrics.runVolumeAdherencePercent, isNull);
     });
 
-    test('weekly targets are not multiplied across the days of a phase', () async {
-      final phaseId = await seedPhase(runWeeklyDistanceMeters: 30000);
-      final phase = (await periodization.getPhase(phaseId))!;
+    test(
+      'weekly targets are not multiplied across the days of a phase',
+      () async {
+        final phaseId = await seedPhase(runWeeklyDistanceMeters: 30000);
+        final phase = (await periodization.getPhase(phaseId))!;
 
-      // Two full weeks of the phase → 60 km planned, not 30 km x 14 days.
-      final metrics = await periodization.getPhaseMetrics(
-        phase,
-        rangeStart: DateTime(2026, 1, 5),
-        rangeEnd: DateTime(2026, 1, 18),
-      );
-      expect(metrics.plannedRunDistanceMeters, closeTo(60000, 0.01));
-    });
+        // Two full weeks of the phase → 60 km planned, not 30 km x 14 days.
+        final metrics = await periodization.getPhaseMetrics(
+          phase,
+          rangeStart: DateTime(2026, 1, 5),
+          rangeEnd: DateTime(2026, 1, 18),
+        );
+        expect(metrics.plannedRunDistanceMeters, closeTo(60000, 0.01));
+      },
+    );
   });
 
   group('run targets persistence', () {
@@ -627,10 +632,10 @@ void main() {
 
       expect(result.weeksCovered, 2);
       final scheduled = await runPlans.getScheduledRuns(phaseStart, phaseEnd);
-      expect(
-        scheduled.map((run) => run.date).toList(),
-        [DateTime(2026, 1, 20), DateTime(2026, 1, 27)],
-      );
+      expect(scheduled.map((run) => run.date).toList(), [
+        DateTime(2026, 1, 20),
+        DateTime(2026, 1, 27),
+      ]);
     });
 
     test('does nothing when the phase links no plan', () async {

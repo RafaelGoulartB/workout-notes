@@ -2,6 +2,8 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 import 'package:workout_notes/database/database_schema.dart';
 import 'package:workout_notes/repositories/ai_chat_repository.dart';
+import 'package:workout_notes/repositories/ai_memory_repository.dart';
+import 'package:workout_notes/repositories/ai_proposal_repository.dart';
 import 'package:workout_notes/repositories/ai_routine_mutation_repository.dart';
 import 'package:workout_notes/repositories/analytics_repository.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
@@ -27,7 +29,7 @@ import 'package:workout_notes/repositories/workout_repository.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 60;
+  static const _dbVersion = 61;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -62,6 +64,8 @@ class DatabaseHelper {
   late final RunInsightsRepository runInsightsRepo = RunInsightsRepository();
   late final MedicationRepository medicationRepo = MedicationRepository();
   late final AiChatRepository aiChatRepo = AiChatRepository();
+  late final AiMemoryRepository aiMemoryRepo = AiMemoryRepository();
+  late final AiProposalRepository aiProposalRepo = AiProposalRepository();
   late final AiRoutineMutationRepository aiRoutineMutationRepo =
       AiRoutineMutationRepository();
 

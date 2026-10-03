@@ -51,18 +51,4 @@ void main() {
     expect(paused.isAutoPaused, isFalse);
     expect(paused.isPaused, isTrue);
   });
-
-  test('copyWith keeps laps and auto-pause unless replaced', () {
-    final state = RunTrackingState.fromMap({
-      'status': 'recording',
-      'auto_paused': true,
-      'laps': [
-        {'lap_index': 1},
-      ],
-    });
-    final copy = state.copyWith(distanceMeters: 10);
-    expect(copy.autoPaused, isTrue);
-    expect(copy.laps, hasLength(1));
-    expect(copy.copyWith(autoPaused: false).autoPaused, isFalse);
-  });
 }

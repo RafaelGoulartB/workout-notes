@@ -61,7 +61,11 @@ class _BarcodeScanScreenState extends State<BarcodeScanScreen> {
             children: [
               Icon(icon, size: 64, color: theme.colorScheme.primary),
               const SizedBox(height: 24),
-              Text(message, textAlign: TextAlign.center, style: theme.textTheme.bodyLarge),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyLarge,
+              ),
               const SizedBox(height: 24),
               if (_failed || !supported)
                 FilledButton(

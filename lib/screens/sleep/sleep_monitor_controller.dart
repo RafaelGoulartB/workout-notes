@@ -66,6 +66,7 @@ class SleepMonitorController extends ChangeNotifier {
   bool _globalSnoozeEnabled = true;
   bool _isBusy = false;
   bool _loading = true;
+  bool _loadFailed = false;
   bool _openingResult = false;
   bool _disposed = false;
   String? _pendingAlarmResultId;
@@ -86,6 +87,7 @@ class SleepMonitorController extends ChangeNotifier {
   bool get globalSnoozeEnabled => _globalSnoozeEnabled;
   bool get isBusy => _isBusy;
   bool get loading => _loading;
+  bool get loadFailed => _loadFailed;
   bool get missionReady => missions.config.isReady;
   AlarmWakeSettings get wakeSettings => _wake;
 
@@ -132,6 +134,22 @@ class SleepMonitorController extends ChangeNotifier {
   // ------------------------------------------------------------------
 
   Future<void> initialize() async {
+    if (_loadFailed) {
+      _loadFailed = false;
+      _loading = true;
+      _notify();
+    }
+    try {
+      await _readState();
+    } catch (error, stack) {
+      debugPrint('Sleep monitor failed to initialize: $error\n$stack');
+      _loadFailed = true;
+      _loading = false;
+      _notify();
+    }
+  }
+
+  Future<void> _readState() async {
     await service.initialize();
     // Opening the screen re-reads the native state (initialize() runs once).
     await service.refresh();

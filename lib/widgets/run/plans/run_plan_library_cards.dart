@@ -36,11 +36,7 @@ String _subtitle(AppLocalizations loc, RunPlan plan) => [
 /// Days from today to the race, or null when the race has passed / is unset.
 int? _raceCountdown(DateTime? raceDate, DateTime today) {
   if (raceDate == null) return null;
-  final days = DateTime(
-    raceDate.year,
-    raceDate.month,
-    raceDate.day,
-  ).difference(dayOf(today)).inDays;
+  final days = daysBetween(today, raceDate);
   return days < 0 ? null : days;
 }
 

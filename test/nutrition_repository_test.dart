@@ -1,11 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-
 import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/food_variant.dart';
+import 'package:workout_notes/models/nutrition/manual_serving_input.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/utils/nutrition_conversion.dart';
+
 import 'support/test_db.dart';
 
 void main() {
@@ -505,37 +506,7 @@ void main() {
           ),
         ),
       );
-      expect(
-        await repository.getFoodWithDetails('food-b'),
-        isNull,
-      );
-    });
-
-    test('upsertFoodWithDetails rolls back on failure', () async {
-      // Insert a parent food with a controlled id, then attempt an
-      // upsert that references an invalid foreign key for the variant.
-      // The repository should not leave the foods row in a partial
-      // state.
-      try {
-        await database.transaction((txn) async {
-          await txn.insert('foods', {
-            'id': 'a',
-            'source': 'gateway',
-            'external_id': 'a',
-            'name': 'A',
-            'search_name': 'a',
-            'fetched_at': DateTime.now().toIso8601String(),
-          });
-          // Force a failure
-          throw Exception('boom');
-        });
-      } catch (_) {}
-      final rows = await database.query(
-        'foods',
-        where: 'id = ?',
-        whereArgs: ['a'],
-      );
-      expect(rows, isEmpty);
+      expect(await repository.getFoodWithDetails('food-b'), isNull);
     });
   });
 

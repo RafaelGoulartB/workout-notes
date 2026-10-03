@@ -126,7 +126,10 @@ class NativeRunTrackingBackend implements RunTrackingBackend {
       }, timeout: const Duration(seconds: 8));
       if (!ready) {
         if (_sink.state.errorCode == null) {
-          _sink.reportError('start_timeout', 'Run service did not start in time');
+          _sink.reportError(
+            'start_timeout',
+            'Run service did not start in time',
+          );
         }
         return _sink.state.isActive;
       }

@@ -35,7 +35,10 @@ class StrengthRepository extends BaseRepository {
     final dateFilter =
         '${from == null ? '' : 'AND w.date >= ?'} '
         '${to == null ? '' : 'AND w.date <= ?'}';
-    final dateArgs = [if (from != null) dateKey(from), if (to != null) dateKey(to)];
+    final dateArgs = [
+      if (from != null) dateKey(from),
+      if (to != null) dateKey(to),
+    ];
 
     final rows = await database.rawQuery(
       '''

@@ -113,6 +113,7 @@ class RunPlanWizardPreviewStep extends StatelessWidget {
           Row(
             children: [
               IconButton(
+                tooltip: loc.commonPreviousWeek,
                 icon: const Icon(Icons.chevron_left),
                 onPressed: weekIndex > 0
                     ? () => controller.setPreviewWeek(weekIndex - 1)
@@ -132,6 +133,7 @@ class RunPlanWizardPreviewStep extends StatelessWidget {
                 ),
               ),
               IconButton(
+                tooltip: loc.commonNextWeek,
                 icon: const Icon(Icons.chevron_right),
                 onPressed: weekIndex < total - 1
                     ? () => controller.setPreviewWeek(weekIndex + 1)

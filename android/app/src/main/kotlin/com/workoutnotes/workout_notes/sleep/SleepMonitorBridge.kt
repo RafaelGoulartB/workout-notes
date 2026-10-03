@@ -14,6 +14,8 @@ import androidx.core.content.ContextCompat
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 import java.util.UUID
 
@@ -31,6 +33,21 @@ class SleepMonitorBridge(private val context: Context) :
     private val pendingPermission = AtomicReference<MethodChannel.Result?>(null)
     private val pendingScan = AtomicReference<MethodChannel.Result?>(null)
     private val spool by lazy { SleepSessionSpool(context.applicationContext) }
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    // Spool reads, listings and deletions touch the disk (a night's segments
+    // can be large), so they run on one sequential worker, in call order, and
+    // the reply goes back to the platform thread.
+    private val spoolExecutor: ExecutorService = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "sleep-spool").apply { isDaemon = true }
+    }
+
+    private fun <T> onSpool(work: () -> T, done: (Result<T>) -> Unit) {
+        spoolExecutor.execute {
+            val outcome = runCatching(work)
+            mainHandler.post { done(outcome) }
+        }
+    }
 
     fun attachActivity(value: Activity) { activity = value }
     fun detachActivity() { activity = null }
@@ -96,22 +113,37 @@ class SleepMonitorBridge(private val context: Context) :
             "discardSession" -> {
                 SleepMonitoringService.discardCurrent()
                 val id = call.arguments as? String
-                if (id != null) spool.delete(id)
-                result.success(null)
+                onSpool({ if (id != null) spool.delete(id) }) { outcome ->
+                    outcome.fold(
+                        { result.success(null) },
+                        { error -> result.error("delete_failed", error.message, null) },
+                    )
+                }
             }
-            "listPendingSessions" -> result.success(spool.listPending())
+            "listPendingSessions" -> onSpool({ spool.listPending() }) { outcome ->
+                outcome.fold(
+                    { sessions -> result.success(sessions) },
+                    { error -> result.error("list_failed", error.message, null) },
+                )
+            }
             "readSession" -> {
                 val id = call.arguments as? String
                 if (id == null) result.error("invalid_id", "Missing session id", null)
-                else {
-                    try { result.success(spool.read(id)) }
-                    catch (error: Throwable) { result.error("read_failed", error.message, null) }
+                else onSpool({ spool.read(id) }) { outcome ->
+                    outcome.fold(
+                        { session -> result.success(session) },
+                        { error -> result.error("read_failed", error.message, null) },
+                    )
                 }
             }
             "deleteSpool" -> {
                 val id = call.arguments as? String
-                if (id != null) spool.delete(id)
-                result.success(null)
+                onSpool({ if (id != null) spool.delete(id) }) { outcome ->
+                    outcome.fold(
+                        { result.success(null) },
+                        { error -> result.error("delete_failed", error.message, null) },
+                    )
+                }
             }
             else -> result.notImplemented()
         }
@@ -230,59 +262,65 @@ class SleepMonitorBridge(private val context: Context) :
             result.error("mission_not_configured", "A valid barcode mission is required", null)
             return
         }
-        val activeSpool = spool.listPending().any {
-            it["status"] == "starting" || it["status"] == "running" || it["status"] == "stopping"
-        }
-        if (activeSpool) {
-            result.error("already_active", "A monitoring session is already active", null)
-            return
-        }
-        val sessionId = UUID.randomUUID().toString()
-        try {
-            if (monitorMode != "monitoring_only") {
-                SleepAlarmScheduler.schedule(
-                    context,
-                    alarmAt!!,
-                    sessionId,
-                    monitorMode,
-                    missionType,
-                    missionHash,
-                    missionSalt,
-                    missionFormat,
-                    maxSnoozes,
-                    smartWindowMinutes = smartWindowMinutes,
-                    smartThreshold = smartThreshold,
+        // The check for a session still in the spool reads the disk: off the platform thread.
+        onSpool({ spool.listPending() }) { outcome ->
+            val activeSpool = outcome.getOrElse { error ->
+                result.error("spool_unavailable", error.message, null)
+                return@onSpool
+            }.any {
+                it["status"] == "starting" || it["status"] == "running" || it["status"] == "stopping"
+            }
+            if (activeSpool) {
+                result.error("already_active", "A monitoring session is already active", null)
+                return@onSpool
+            }
+            val sessionId = UUID.randomUUID().toString()
+            try {
+                if (monitorMode != "monitoring_only") {
+                    SleepAlarmScheduler.schedule(
+                        context,
+                        alarmAt!!,
+                        sessionId,
+                        monitorMode,
+                        missionType,
+                        missionHash,
+                        missionSalt,
+                        missionFormat,
+                        maxSnoozes,
+                        smartWindowMinutes = smartWindowMinutes,
+                        smartThreshold = smartThreshold,
+                    )
+                }
+                val intent = Intent(context, SleepMonitoringService::class.java).apply {
+                    if (alarmAt != null) putExtra(SleepAlarmScheduler.EXTRA_ALARM_AT, alarmAt)
+                    putExtra(SleepAlarmScheduler.EXTRA_SESSION_ID, sessionId)
+                    putExtra(SleepAlarmScheduler.EXTRA_MONITOR_MODE, monitorMode)
+                    putExtra(SleepAlarmScheduler.EXTRA_MISSION_TYPE, missionType)
+                    putExtra(SleepAlarmScheduler.EXTRA_MISSION_HASH, missionHash)
+                    putExtra(SleepAlarmScheduler.EXTRA_MISSION_SALT, missionSalt)
+                    putExtra(SleepAlarmScheduler.EXTRA_MISSION_FORMAT, missionFormat)
+                    putExtra(SleepAlarmScheduler.EXTRA_SMART_WINDOW_MINUTES, smartWindowMinutes)
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+                result.success(
+                    SleepMonitoringService.startResponse(
+                        context,
+                        sessionId,
+                        alarmAt ?: 0L,
+                        monitorMode,
+                    ),
                 )
+            } catch (error: SecurityException) {
+                if (monitorMode != "monitoring_only") SleepAlarmScheduler.cancel(context)
+                result.error("exact_alarm_denied", error.message, null)
+            } catch (error: Throwable) {
+                if (monitorMode != "monitoring_only") SleepAlarmScheduler.cancel(context)
+                result.error("alarm_schedule_failed", error.message, null)
             }
-            val intent = Intent(context, SleepMonitoringService::class.java).apply {
-                if (alarmAt != null) putExtra(SleepAlarmScheduler.EXTRA_ALARM_AT, alarmAt)
-                putExtra(SleepAlarmScheduler.EXTRA_SESSION_ID, sessionId)
-                putExtra(SleepAlarmScheduler.EXTRA_MONITOR_MODE, monitorMode)
-                putExtra(SleepAlarmScheduler.EXTRA_MISSION_TYPE, missionType)
-                putExtra(SleepAlarmScheduler.EXTRA_MISSION_HASH, missionHash)
-                putExtra(SleepAlarmScheduler.EXTRA_MISSION_SALT, missionSalt)
-                putExtra(SleepAlarmScheduler.EXTRA_MISSION_FORMAT, missionFormat)
-                putExtra(SleepAlarmScheduler.EXTRA_SMART_WINDOW_MINUTES, smartWindowMinutes)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
-            result.success(
-                SleepMonitoringService.startResponse(
-                    context,
-                    sessionId,
-                    alarmAt ?: 0L,
-                    monitorMode,
-                ),
-            )
-        } catch (error: SecurityException) {
-            if (monitorMode != "monitoring_only") SleepAlarmScheduler.cancel(context)
-            result.error("exact_alarm_denied", error.message, null)
-        } catch (error: Throwable) {
-            if (monitorMode != "monitoring_only") SleepAlarmScheduler.cancel(context)
-            result.error("alarm_schedule_failed", error.message, null)
         }
     }
 

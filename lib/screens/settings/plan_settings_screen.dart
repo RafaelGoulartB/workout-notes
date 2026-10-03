@@ -39,7 +39,10 @@ class _PlanSettingsScreenState extends State<PlanSettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
-          AppSectionHeader(loc.settingsSectionPlan, padding: AppSectionHeader.compactPadding),
+          AppSectionHeader(
+            loc.settingsSectionPlan,
+            padding: AppSectionHeader.compactPadding,
+          ),
           SettingsCard(
             children: [
               SettingsSwitchTile(

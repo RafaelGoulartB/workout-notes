@@ -31,6 +31,7 @@ jobs:
   release:
     name: Build and publish APK
     runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     steps:
       - name: Check out repository
@@ -54,13 +55,17 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Run static analysis
         run: flutter analyze --no-pub
 
       - name: Run tests
         run: flutter test --no-pub
+
+      - name: Run Android unit tests
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest
 
       - name: Calculate release version
         id: version
@@ -199,3 +204,10 @@ jobs:
           --target "${{ github.sha }}"
           --title "Workout Notes ${{ steps.version.outputs.version }}"
           --generate-notes
+
+      # Never leave the signing material on the runner, even when a step fails.
+      - name: Remove signing material
+        if: always()
+        shell: bash
+        run: |
+          rm -f android/key.properties "$RUNNER_TEMP/upload-keystore.jks"

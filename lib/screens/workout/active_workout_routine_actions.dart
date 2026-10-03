@@ -132,69 +132,69 @@ mixin _ActiveWorkoutRoutineActions
                 final routine = routines[i];
                 final routineId = routine['id'] as String;
                 final isPlanned = plannedRoutineIds.contains(routineId);
-                return Container(
-                  decoration: isPlanned
-                      ? BoxDecoration(
-                          color: theme.colorScheme.primaryContainer.withAlpha(
-                            100,
-                          ),
+                // Colour and border on the ListTile itself, so its ink
+                // splash stays visible on the highlighted row.
+                return ListTile(
+                  tileColor: isPlanned
+                      ? theme.colorScheme.primaryContainer.withAlpha(100)
+                      : null,
+                  shape: isPlanned
+                      ? RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
+                          side: BorderSide(
                             color: theme.colorScheme.primary.withAlpha(110),
                           ),
                         )
                       : null,
-                  child: ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isPlanned
-                            ? theme.colorScheme.primaryContainer
-                            : theme.colorScheme.secondaryContainer,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        isPlanned ? Icons.star_rounded : Icons.repeat,
-                        color: isPlanned
-                            ? theme.colorScheme.onPrimaryContainer
-                            : theme.colorScheme.onSecondaryContainer,
-                        size: 20,
-                      ),
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isPlanned
+                          ? theme.colorScheme.primaryContainer
+                          : theme.colorScheme.secondaryContainer,
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    title: Row(
-                      children: [
-                        Expanded(
+                    child: Icon(
+                      isPlanned ? Icons.star_rounded : Icons.repeat,
+                      color: isPlanned
+                          ? theme.colorScheme.onPrimaryContainer
+                          : theme.colorScheme.onSecondaryContainer,
+                      size: 20,
+                    ),
+                  ),
+                  title: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          routine['name'] as String,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      if (isPlanned)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
                           child: Text(
-                            routine['name'] as String,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
+                            AppLocalizations.of(
+                              context,
+                            )!.activeWorkoutPlanRoutine,
+                            style: TextStyle(
+                              color: theme.colorScheme.onPrimary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
-                        if (isPlanned)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primary,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              AppLocalizations.of(
-                                context,
-                              )!.activeWorkoutPlanRoutine,
-                              style: TextStyle(
-                                color: theme.colorScheme.onPrimary,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.pop(ctx, routineId),
+                    ],
                   ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.pop(ctx, routineId),
                 );
               },
             ),
@@ -406,7 +406,10 @@ mixin _ActiveWorkoutRoutineActions
     );
   }
 
-  Future<void> _updateRestTimeAndClose(ExerciseWithSets exercise, int seconds) async {
+  Future<void> _updateRestTimeAndClose(
+    ExerciseWithSets exercise,
+    int seconds,
+  ) async {
     await _workoutRepo.updateExerciseEntryRestTime(exercise.entryId, seconds);
     await _loadExercises();
     if (mounted) setState(() {});

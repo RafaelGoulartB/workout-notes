@@ -9,6 +9,7 @@ import android.net.Uri
 import android.util.Log
 import com.workoutnotes.workout_notes.MainActivity
 import com.workoutnotes.workout_notes.common.AlarmRestorePolicy
+import com.workoutnotes.workout_notes.common.AlarmTimePolicy
 import com.workoutnotes.workout_notes.sleep.SleepAlarmScheduler
 import java.util.UUID
 import org.json.JSONArray
@@ -148,9 +149,19 @@ object MedicationReminderScheduler {
                 slot.state, slot.pendingDoseKey, doseKey, slot.confirmedKeys,
             )
         ) return
-        persist(context, slot.copy(state = MedicationReminderPolicy.STATE_RINGING))
+        val ringing = slot.copy(state = MedicationReminderPolicy.STATE_RINGING)
+        persist(context, ringing)
         notifications(context).cancel(notificationId(id))
-        MedicationAlarmService.start(context, id)
+        try {
+            MedicationAlarmService.start(context, id)
+        } catch (error: Throwable) {
+            // Android refused the foreground start: never leave the slot
+            // "ringing" with nothing ringing. Escalate again shortly (the
+            // reminder notification comes back so the dose stays visible).
+            Log.w(TAG, "Medication alarm refused to start", error)
+            rearmEscalation(context, ringing, System.currentTimeMillis(), afterBoot = true)
+            MedicationNotifications.showReminder(context, ringing)
+        }
     }
 
     /**
@@ -248,6 +259,43 @@ object MedicationReminderScheduler {
             else -> try {
                 setEscalationAlarm(context, updated)
             } catch (_: Throwable) { }
+        }
+    }
+
+    /**
+     * Arms the reminders again after a time zone or clock change, or when the
+     * exact-alarm permission was granted. With [refreshLocalTimes] each
+     * slot's next reminder is derived again from its local hour and minute
+     * (see [AlarmTimePolicy]). A reminder already due, a dose in progress
+     * and a ringing alarm are left alone (the system fires what is due);
+     * nothing is rung from here.
+     */
+    @Synchronized
+    fun rearmPending(context: Context, refreshLocalTimes: Boolean) {
+        val now = System.currentTimeMillis()
+        ids(context).forEach { id ->
+            try {
+                val slot = read(context, id) ?: return@forEach
+                val nextAt = if (refreshLocalTimes) {
+                    AlarmTimePolicy.refreshedAt(
+                        slot.nextAt, now, slot.hour, slot.minute, slot.weekdays, snoozed = false,
+                    )
+                } else {
+                    slot.nextAt
+                }
+                val updated = slot.copy(nextAt = nextAt)
+                if (nextAt > now) {
+                    if (nextAt != slot.nextAt) persist(context, updated)
+                    setReminderAlarm(context, updated)
+                }
+                if (slot.state == MedicationReminderPolicy.STATE_AWAITING &&
+                    slot.escalationAt > now
+                ) {
+                    setEscalationAlarm(context, updated)
+                }
+            } catch (error: Throwable) {
+                Log.w(TAG, "Could not re-arm medication slot $id", error)
+            }
         }
     }
 

@@ -57,12 +57,8 @@ class StrengthHistoryFilter {
   String? fromDay(DateTime now) {
     final DateTime? from = switch (period) {
       StrengthHistoryPeriod.all => null,
-      StrengthHistoryPeriod.last30Days => now.subtract(
-        const Duration(days: 30),
-      ),
-      StrengthHistoryPeriod.last90Days => now.subtract(
-        const Duration(days: 90),
-      ),
+      StrengthHistoryPeriod.last30Days => addDays(now, -30),
+      StrengthHistoryPeriod.last90Days => addDays(now, -90),
       StrengthHistoryPeriod.thisYear => DateTime(now.year),
     };
     return from == null ? null : dateKey(from);

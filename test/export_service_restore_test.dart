@@ -77,7 +77,8 @@ void main() {
       expect(data, isNot(contains('sleep_stage_epochs')));
       expect(data, isNot(contains('ai_chat_threads')));
       expect(data, isNot(contains('ai_chat_messages')));
-      expect(data, isNot(contains('ai_routine_proposals')));
+      expect(data, isNot(contains('ai_proposals')));
+      expect(data, isNot(contains('ai_memories')));
       expect(data, isNot(contains('ai_chat_thread_summaries')));
       expect(data['preferences'], {'accent_color': 123, 'app_locale': 'pt'});
       expect(

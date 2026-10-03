@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:sqflite/sqflite.dart';
+import 'package:workout_notes/database/database_seed.dart';
 import 'package:workout_notes/database/migrations/database_migrations.dart';
 import 'package:workout_notes/repositories/base_repository.dart';
 import 'package:workout_notes/services/run_route_codec.dart';
@@ -94,8 +95,15 @@ class ExportImportRepository extends BaseRepository {
   // ------------------------------------------------------------------
 
   /// Exports all user-modifiable data as a JSON-serialisable map.
+  ///
+  /// Every table is read inside one transaction so the snapshot is consistent
+  /// even if a background import (sleep spool, run spool) writes meanwhile.
   Future<Map<String, dynamic>> exportAllData() async {
     final db = await this.db;
+    return db.transaction(_readSnapshot);
+  }
+
+  Future<Map<String, dynamic>> _readSnapshot(DatabaseExecutor db) async {
     final nutrition = await _exportNutrition(db);
     final data = <String, dynamic>{
       'backup_type': backupType,
@@ -161,7 +169,8 @@ class ExportImportRepository extends BaseRepository {
         'ai_chat_threads',
         'ai_chat_messages',
         'ai_chat_thread_summaries',
-        'ai_routine_proposals',
+        'ai_proposals',
+        'ai_memories',
         'unused_remote_food_cache',
       ],
     };
@@ -194,7 +203,10 @@ class ExportImportRepository extends BaseRepository {
 
       // 1. Clear all tables (order matters because of FKs)
       for (final table in [
-        'ai_routine_proposals',
+        // AI conversations are not part of backups; they are cleared so no
+        // conversation refers to data that no longer exists. Memories are
+        // kept (facts about the user, not about the restored records).
+        'ai_proposals',
         'ai_chat_thread_summaries',
         'ai_chat_messages',
         'ai_chat_threads',
@@ -435,7 +447,7 @@ class ExportImportRepository extends BaseRepository {
   /// the low-priority sleep-stage analysis. The database defaults the restored
   /// session to `legacy_unavailable`, matching the intentionally absent epochs.
   static Future<List<Map<String, Object?>>> _exportSleepSessions(
-    Database database,
+    DatabaseExecutor database,
   ) async {
     final rows = await database.query('sleep_monitor_sessions');
     const stageAnalysisColumns = {
@@ -470,7 +482,7 @@ class ExportImportRepository extends BaseRepository {
   /// cache rows. Referenced variants and servings are retained with parents so
   /// meal history and saved meals remain fully usable after restoration.
   static Future<Map<String, List<Map<String, Object?>>>> _exportNutrition(
-    Database database,
+    DatabaseExecutor database,
   ) async {
     final foods = await database.query('foods');
     final variants = await database.query('food_variants');
@@ -529,7 +541,7 @@ class ExportImportRepository extends BaseRepository {
   }
 
   static Future<List<Map<String, Object?>>> _exportRunRoutes(
-    Database database,
+    DatabaseExecutor database,
   ) async {
     final rows = await database.query('run_route_data');
     return rows
@@ -546,77 +558,107 @@ class ExportImportRepository extends BaseRepository {
         .toList(growable: false);
   }
 
-  /// Inserts [rows] into [table], returning the count.
-  Future<int> _insertAll(Transaction txn, String table, dynamic rows) async {
+  /// Rows written per `Batch` commit; keeps the pending statements bounded.
+  static const _insertChunkSize = 200;
+
+  /// Column names of [table] as SQLite reports them. The identifier always
+  /// comes from this file, never from the backup.
+  static Future<Set<String>> _tableColumns(
+    DatabaseExecutor executor,
+    String table,
+  ) async {
+    final info = await executor.rawQuery('PRAGMA table_info("$table")');
+    return info.map((row) => row['name'] as String).toSet();
+  }
+
+  /// Inserts [rows] into [table], returning the count. Keys that are not
+  /// columns of the current schema (older backups, crafted files) are dropped.
+  Future<int> _insertAll(
+    Transaction txn,
+    String table,
+    dynamic rows, {
+    void Function(Map<String, dynamic> row)? prepare,
+  }) async {
     if (rows == null || rows is! List || rows.isEmpty) return 0;
-    int count = 0;
-    for (final row in rows) {
-      await txn.insert(
-        table,
-        row as Map<String, dynamic>,
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+    final columns = await _tableColumns(txn, table);
+    return _insertRows(txn, table, columns, rows.cast<Map>(), prepare: prepare);
+  }
+
+  /// Writes [rows] in chunks of [chunkSize] through `Batch.commit`
+  /// (`noResult`), which avoids one awaited round trip per row.
+  static Future<int> _insertRows(
+    Transaction txn,
+    String table,
+    Set<String> columns,
+    Iterable<Map> rows, {
+    void Function(Map<String, dynamic> row)? prepare,
+    int chunkSize = _insertChunkSize,
+  }) async {
+    var count = 0;
+    var batch = txn.batch();
+    var pending = 0;
+    for (final raw in rows) {
+      final row = <String, dynamic>{
+        for (final entry in raw.entries)
+          if (entry.key is String) entry.key as String: entry.value,
+      };
+      prepare?.call(row);
+      row.removeWhere((key, _) => !columns.contains(key));
+      batch.insert(table, row, conflictAlgorithm: ConflictAlgorithm.replace);
       count++;
+      if (++pending >= chunkSize) {
+        await batch.commit(noResult: true);
+        batch = txn.batch();
+        pending = 0;
+      }
     }
+    if (pending > 0) await batch.commit(noResult: true);
     return count;
   }
 
   Future<int> _insertRunRoutes(Transaction txn, dynamic rows) async {
     if (rows == null || rows is! List || rows.isEmpty) return 0;
-    var count = 0;
-    for (final raw in rows) {
-      final row = Map<String, dynamic>.from(raw as Map);
-      final encoded = row.remove('payload_base64');
-      if (encoded is! String) {
-        throw const FormatException('Invalid compact run route backup.');
-      }
-      try {
-        row['payload'] = base64Decode(encoded);
-      } on FormatException {
-        throw const FormatException('Invalid compact run route backup.');
-      }
-      final expectedChecksum = row['checksum'];
-      final payload = row['payload'];
-      if (expectedChecksum is! int ||
-          payload is! List<int> ||
-          RunRouteCodec.checksum(
-                payload is Uint8List ? payload : Uint8List.fromList(payload),
-              ) !=
-              expectedChecksum) {
-        throw const FormatException('Invalid compact run route checksum.');
-      }
-      await txn.insert(
-        'run_route_data',
-        row,
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-      count++;
-    }
-    return count;
+    final columns = await _tableColumns(txn, 'run_route_data');
+    return _insertRows(
+      txn,
+      'run_route_data',
+      columns,
+      rows.cast<Map>(),
+      // Payloads are large: commit smaller chunks.
+      chunkSize: 25,
+      prepare: (row) {
+        final encoded = row.remove('payload_base64');
+        if (encoded is! String) {
+          throw const FormatException('Invalid compact run route backup.');
+        }
+        final Uint8List payload;
+        try {
+          payload = base64Decode(encoded);
+        } on FormatException {
+          throw const FormatException('Invalid compact run route backup.');
+        }
+        final expectedChecksum = row['checksum'];
+        if (expectedChecksum is! int ||
+            RunRouteCodec.checksum(payload) != expectedChecksum) {
+          throw const FormatException('Invalid compact run route checksum.');
+        }
+        row['payload'] = payload;
+      },
+    );
   }
 
-  Future<int> _insertSleepSessions(Transaction txn, dynamic rows) async {
-    if (rows == null || rows is! List || rows.isEmpty) return 0;
-    final columns = (await txn.rawQuery(
-      'PRAGMA table_info(sleep_monitor_sessions)',
-    )).map((row) => row['name'] as String).toSet();
-    var count = 0;
-    for (final raw in rows) {
-      final row = Map<String, dynamic>.from(raw as Map);
+  Future<int> _insertSleepSessions(Transaction txn, dynamic rows) => _insertAll(
+    txn,
+    'sleep_monitor_sessions',
+    rows,
+    // Older backups may carry columns this schema no longer has (dropped
+    // by _insertAll) and lack the mode, which is derived from the alarm.
+    prepare: (row) {
       row['monitor_mode'] ??= row['alarm_at'] == null
           ? 'monitoring_only'
           : 'alarm_without_mission';
-      // Older backups may carry columns this schema no longer has.
-      row.removeWhere((key, _) => !columns.contains(key));
-      await txn.insert(
-        'sleep_monitor_sessions',
-        row,
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-      count++;
-    }
-    return count;
-  }
+    },
+  );
 
   Future<int> _insertMissingSleepSettings(Transaction txn) async {
     const defaults = <String, String>{
@@ -651,63 +693,80 @@ class ExportImportRepository extends BaseRepository {
   // Delete all user data (keeps seed categories & exercises)
   // ------------------------------------------------------------------
 
-  Future<void> deleteAllWorkoutData() async {
+  /// Deletes every workout, run, sleep, medication, alarm and nutrition row in
+  /// one transaction (all or nothing) and restores the default meal types the
+  /// diary needs; those are only seeded when the database is created.
+  Future<void> deleteAllData() async {
     final db = await this.db;
     await db.transaction((txn) async {
-      for (final table in [
-        'periodization_checkins',
-        'phase_targets',
-        'periodization_phases',
-        'periodization_plans',
-        // Children before parents: schedule and step rows reference both the
-        // plan sessions and the recorded activities.
-        'run_activity_steps',
-        'scheduled_runs',
-        'run_workout_steps',
-        'run_plan_workouts',
-        'run_plan_adaptations',
-        'run_plans',
-        'run_laps',
-        'run_splits',
-        'run_route_data',
-        'run_activities',
-        'run_gear',
-      ]) {
-        await txn.delete(table);
-      }
-      await txn.delete('predefined_sets');
-      await txn.delete('routine_exercises');
-      await txn.delete('routine_days');
-      await txn.delete('routines');
-      await txn.delete('sets');
-      await txn.delete('exercise_entries');
-      await txn.delete('workouts');
-      await txn.delete('body_measurements');
-      await txn.delete('sleep_monitor_sessions');
-      await txn.delete('sleep_entries');
-      await txn.delete('traditional_alarms');
-      for (final table in ['medication_doses', 'medications']) {
-        await txn.delete(table);
-      }
+      await _deleteWorkoutRows(txn);
+      await _deleteNutritionRows(txn);
     });
+  }
+
+  Future<void> deleteAllWorkoutData() async {
+    final db = await this.db;
+    await db.transaction(_deleteWorkoutRows);
+  }
+
+  static Future<void> _deleteWorkoutRows(Transaction txn) async {
+    for (final table in [
+      'periodization_checkins',
+      'phase_targets',
+      'periodization_phases',
+      'periodization_plans',
+      // Children before parents: schedule and step rows reference both the
+      // plan sessions and the recorded activities.
+      'run_activity_steps',
+      'scheduled_runs',
+      'run_workout_steps',
+      'run_plan_workouts',
+      'run_plan_adaptations',
+      'run_plans',
+      'run_laps',
+      'run_splits',
+      'run_route_data',
+      'run_activities',
+      'run_gear',
+    ]) {
+      await txn.delete(table);
+    }
+    await txn.delete('predefined_sets');
+    await txn.delete('routine_exercises');
+    await txn.delete('routine_days');
+    await txn.delete('routines');
+    await txn.delete('sets');
+    await txn.delete('exercise_entries');
+    await txn.delete('workouts');
+    await txn.delete('body_measurements');
+    await txn.delete('sleep_monitor_sessions');
+    await txn.delete('sleep_entries');
+    await txn.delete('traditional_alarms');
+    for (final table in ['medication_doses', 'medications']) {
+      await txn.delete(table);
+    }
   }
 
   /// Removes user-generated nutrition data (foods, meal logs, goals).
   /// Food cache rows created from manual entries are also dropped, but
   /// the user can re-enter them. Used by the "delete everything" path
-  /// so the action really represents full app reset.
+  /// so the action really represents full app reset. The default meal types
+  /// are seeded again so the diary keeps working.
   Future<void> deleteAllNutritionData() async {
     final db = await this.db;
-    await db.transaction((txn) async {
-      await txn.delete('meal_log_items');
-      await txn.delete('meal_logs');
-      await txn.delete('meal_types');
-      await txn.delete('food_servings');
-      await txn.delete('food_variants');
-      await txn.delete('foods');
-      await txn.delete('nutrition_goals');
-      await txn.delete('saved_meal_items');
-      await txn.delete('saved_meals');
-    });
+    await db.transaction(_deleteNutritionRows);
+  }
+
+  static Future<void> _deleteNutritionRows(Transaction txn) async {
+    await txn.delete('meal_log_items');
+    await txn.delete('meal_logs');
+    await txn.delete('meal_types');
+    await txn.delete('food_servings');
+    await txn.delete('food_variants');
+    await txn.delete('foods');
+    await txn.delete('nutrition_goals');
+    await txn.delete('saved_meal_items');
+    await txn.delete('saved_meals');
+    await DatabaseSeed.seedMealTypes(txn);
   }
 }

@@ -1,6 +1,7 @@
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
+import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/strength_repository.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 
@@ -108,7 +109,7 @@ abstract final class StrengthTodayResolver {
     if (strengthDays.isEmpty) return null;
     final day = dayOf(today);
     for (var i = 1; i <= 7; i++) {
-      final date = day.add(Duration(days: i));
+      final date = addDays(day, i);
       if (strengthDays.contains(date.weekday)) return date;
     }
     return null;

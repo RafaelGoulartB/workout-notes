@@ -68,8 +68,9 @@ Future<Map<String, Object>> schemaSnapshot(Database database) async {
         .where((c) => c['key'] == 1)
         .map((c) => '${c['name']}${c['desc'] == 1 ? ' DESC' : ''}')
         .join(', ');
-    final unique = (await database.rawQuery('PRAGMA index_list("${row['tbl_name']}")'))
-        .firstWhere((i) => i['name'] == name)['unique'];
+    final unique = (await database.rawQuery(
+      'PRAGMA index_list("${row['tbl_name']}")',
+    )).firstWhere((i) => i['name'] == name)['unique'];
     snapshot['index:$name'] = '${row['tbl_name']}($keyColumns) unique=$unique';
   }
   return snapshot;

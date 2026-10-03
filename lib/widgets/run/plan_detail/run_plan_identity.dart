@@ -22,11 +22,7 @@ class RunPlanIdentity extends StatelessWidget {
     final race = plan.raceDate;
     int? countdown;
     if (race != null) {
-      final days = DateTime(
-        race.year,
-        race.month,
-        race.day,
-      ).difference(dayOf(today)).inDays;
+      final days = daysBetween(today, race);
       countdown = days < 0 ? null : days;
     }
     return Padding(

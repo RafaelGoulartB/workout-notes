@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
+import 'package:workout_notes/models/nutrition/calorie_analytics.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
-import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 
 /// Calendar window analysed by the nutrition progress screen.
@@ -144,8 +145,7 @@ class NutritionProgressCalculator {
   }
 
   static int periodDays(BalancePeriod period, DateTime anchor) =>
-      periodEnd(period, anchor).difference(periodStart(period, anchor)).inDays +
-      1;
+      daysBetween(periodStart(period, anchor), periodEnd(period, anchor)) + 1;
 
   /// Anchor [delta] periods away from [anchor].
   static DateTime shiftAnchor(
@@ -297,17 +297,17 @@ class NutritionProgressCalculator {
 
   // ---- formatting -------------------------------------------------------
 
-  static String formatKcal(double v) => v.toStringAsFixed(0);
+  static String formatKcal(double v) => AppNumberFormat.decimal(v, 0);
 
   static String signedKcal(double value) {
     final sign = value > 0 ? '+' : '';
-    return '$sign${value.abs().toStringAsFixed(0)}';
+    return '$sign${AppNumberFormat.decimal(value.abs(), 0)}';
   }
 
   static String formatFatKg(double absKcal) {
     final kg = absKcal / kcalPerKgFat;
     if (kg < 0.1) return '< 0,1';
-    if (kg >= 10) return kg.toStringAsFixed(0);
-    return kg.toStringAsFixed(1);
+    if (kg >= 10) return AppNumberFormat.decimal(kg, 0);
+    return AppNumberFormat.decimal(kg, 1);
   }
 }

@@ -6,6 +6,8 @@ import 'package:workout_notes/models/traditional_alarm_runtime_state.dart';
 import 'package:workout_notes/screens/alarms/medication_reminders_tab.dart';
 import 'package:workout_notes/services/medication_reminder_service.dart';
 import 'package:workout_notes/services/traditional_alarm_service.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class TraditionalAlarmsScreen extends StatefulWidget {
@@ -20,10 +22,9 @@ class TraditionalAlarmsScreen extends StatefulWidget {
 }
 
 class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
-    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin, GuardedLoad {
   final _service = TraditionalAlarmService.instance;
   late final TabController _tabs;
-  bool _loading = true;
   bool _busy = false;
 
   @override
@@ -61,10 +62,10 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
     MaterialPageRoute(builder: (_) => const MedicationEditorScreen()),
   );
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     await _service.initialize();
-    if (mounted) setState(() => _loading = false);
-  }
+    if (mounted) setState(() => isLoading = false);
+  });
 
   void _changed() {
     if (mounted) setState(() {});
@@ -83,13 +84,18 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
     try {
       if (enabled && !await _service.preparePermissions()) {
         if (mounted) {
-          _message(AppLocalizations.of(context)!.alarmPermissionRequired);
+          showAppSnack(
+            context,
+            AppLocalizations.of(context)!.alarmPermissionRequired,
+          );
         }
         return;
       }
       await _service.setEnabled(alarm, enabled);
     } catch (_) {
-      if (mounted) _message(AppLocalizations.of(context)!.alarmUpdateError);
+      if (mounted) {
+        showAppSnack(context, AppLocalizations.of(context)!.alarmUpdateError);
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -102,6 +108,7 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
       title: loc.alarmDeleteTitle,
       message: loc.alarmDeleteBody,
       confirmLabel: loc.alarmDelete,
+      destructive: true,
     );
     if (confirmed != true) return;
     await _service.delete(alarm);
@@ -125,15 +132,15 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
         // Keep the original action feedback even if refresh also fails.
       }
       if (mounted) {
-        _message(AppLocalizations.of(context)!.alarmSnoozeActionError);
+        showAppSnack(
+          context,
+          AppLocalizations.of(context)!.alarmSnoozeActionError,
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
-
-  void _message(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   @override
   Widget build(BuildContext context) {
@@ -176,8 +183,10 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
   }
 
   Widget _buildAlarms() {
-    return _loading
+    return isLoading
         ? const Center(child: CircularProgressIndicator())
+        : loadFailed
+        ? LoadErrorView(onRetry: _load)
         : _service.alarms.isEmpty
         ? AppEmptyState(
             compact: true,
@@ -614,7 +623,7 @@ class _AlarmEditorScreenState extends State<_AlarmEditorScreen> {
                     .map(
                       (value) => DropdownMenuItem(
                         value: value,
-                        child: Text('$value min'),
+                        child: Text(loc.commonMinutesShort(value)),
                       ),
                     )
                     .toList(),

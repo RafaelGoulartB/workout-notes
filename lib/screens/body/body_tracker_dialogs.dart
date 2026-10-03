@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/body_tracker_utils.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/body_tracker/body_tracker_badges.dart';
@@ -20,6 +21,7 @@ Future<void> showAddMeasurementSheet(
   required MeasureType currentType,
   required String typeId,
   required VoidCallback onSaved,
+  String? initialSide,
 }) async {
   final valueCtl = TextEditingController();
   final secondaryValueCtl = TextEditingController();
@@ -27,7 +29,11 @@ Future<void> showAddMeasurementSheet(
   var date = DateTime.now();
   String? timeOfDay;
   bool isFasted = false;
-  String? side;
+  // A bilateral measurement always has a side: the one the screen is showing,
+  // otherwise left.
+  String? side = currentType.isBilateral
+      ? (initialSide == 'right' ? 'right' : 'left')
+      : null;
   final formKey = GlobalKey<FormState>();
 
   await showModalBottomSheet(
@@ -220,9 +226,8 @@ Future<void> showAddMeasurementSheet(
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    DateFormat(
-                                      'd MMM yyyy',
-                                      'pt_BR',
+                                    DateFormat.yMMMd(
+                                      Intl.defaultLocale,
                                     ).format(date),
                                     style: theme.textTheme.bodyMedium,
                                   ),
@@ -524,9 +529,8 @@ Future<void> showQuickMeasureSheet(
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
-                                      DateFormat(
-                                        'd MMM yyyy',
-                                        'pt_BR',
+                                      DateFormat.yMMMd(
+                                        Intl.defaultLocale,
                                       ).format(date),
                                       style: theme.textTheme.bodySmall,
                                       overflow: TextOverflow.ellipsis,
@@ -632,10 +636,7 @@ Future<void> showQuickMeasureSheet(
                                       'value': systolic,
                                       'secondary_value': diastolic,
                                       'unit': t.unit,
-                                      'date': date.toIso8601String().substring(
-                                        0,
-                                        10,
-                                      ),
+                                      'date': dateKey(date),
                                       'comment': commentCtl.text.isNotEmpty
                                           ? commentCtl.text
                                           : null,
@@ -675,10 +676,7 @@ Future<void> showQuickMeasureSheet(
                                       'type': t.id,
                                       'value': val,
                                       'unit': t.unit,
-                                      'date': date.toIso8601String().substring(
-                                        0,
-                                        10,
-                                      ),
+                                      'date': dateKey(date),
                                       'comment': commentCtl.text.isNotEmpty
                                           ? commentCtl.text
                                           : null,
@@ -708,6 +706,14 @@ Future<void> showQuickMeasureSheet(
                                     );
                                   }
                                   onSaved();
+                                } else if (ctx.mounted) {
+                                  // Something was typed but nothing is a
+                                  // complete, positive value (for example
+                                  // only the systolic pressure).
+                                  showAppSnack(
+                                    ctx,
+                                    loc.bodyTrackerInvalidValue,
+                                  );
                                 }
                               }
                             : null,
@@ -978,8 +984,10 @@ Future<void> showMeasurementDetailSheet(
                 Text(
                   type.id == 'bloodPressure'
                       ? formatMeasurementValue(measurement, type)
-                      : ((measurement['value'] as num).toDouble())
-                            .toStringAsFixed(1),
+                      : AppNumberFormat.decimal(
+                          (measurement['value'] as num).toDouble(),
+                          1,
+                        ),
                   style: theme.textTheme.displaySmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     letterSpacing: -1,
@@ -1007,14 +1015,16 @@ Future<void> showMeasurementDetailSheet(
                   Icon(
                     delta > 0 ? Icons.trending_up : Icons.trending_down,
                     size: 16,
-                    color: delta > 0 ? Colors.green : Colors.red,
+                    // Direction only: whether up is good depends on the metric
+                    // (body fat vs. muscle), so no green/red judgement.
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    '${delta > 0 ? '+' : ''}${delta.toStringAsFixed(1)} ${type.unit}',
+                    '${delta > 0 ? '+' : ''}${AppNumberFormat.decimal(delta, 1)} ${type.unit}',
                     style: TextStyle(
                       fontSize: 13,
-                      color: delta > 0 ? Colors.green : Colors.red,
+                      color: theme.colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

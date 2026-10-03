@@ -7,6 +7,7 @@ import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
+import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_route_map_screen.dart';
@@ -120,10 +121,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
       activityAvgPaceSecPerKm: activity.avgPaceSecPerKm,
       profile: profile,
     );
-    _elevation = RunElevationProfile.fromTrackPoints(
-      _points,
-      profile: profile,
-    );
+    _elevation = RunElevationProfile.fromTrackPoints(_points, profile: profile);
     _loadContext();
   }
 
@@ -143,6 +141,16 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
   }
 
   Future<void> _loadContext() async {
+    try {
+      await _readContext();
+    } catch (error, stack) {
+      // The review stays usable without its plan context and history.
+      debugPrint('Run review context failed: $error\n$stack');
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _readContext() async {
     final activity = _draft.activity;
     final scheduledId = _draft.scheduledRunId;
     final workoutId = _draft.planWorkoutId;
@@ -182,9 +190,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
   ) async {
     // The week and the month of the run, with a day of slack; the pure
     // function does the exact filtering.
-    final since = RunReviewInsights.weekStart(
-      activity.startedAt,
-    ).subtract(const Duration(days: 40));
+    final since = addDays(RunReviewInsights.weekStart(activity.startedAt), -40);
     final (ranking, recent, next, gear) = await (
       activity.isRun
           ? _runRepository.listActivitiesForRanking()
@@ -220,7 +226,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
     final today = dayOf(now);
     final upcoming = await _planRepository.getScheduledRuns(
       today,
-      today.add(const Duration(days: 28)),
+      addDays(today, 28),
     );
     for (final run in upcoming) {
       if (run.id != exclude &&
@@ -303,12 +309,13 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
     final confirmed = await showConfirmDialog(
       context,
       title: _isStationaryBike
-              ? loc.stationaryBikeReviewDiscardTitle
-              : loc.runReviewDiscardTitle,
+          ? loc.stationaryBikeReviewDiscardTitle
+          : loc.runReviewDiscardTitle,
       message: _isStationaryBike
-              ? loc.stationaryBikeReviewDiscardBody
-              : loc.runReviewDiscardBody,
+          ? loc.stationaryBikeReviewDiscardBody
+          : loc.runReviewDiscardBody,
       confirmLabel: loc.runReviewDiscard,
+      destructive: true,
       cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
     );
     return confirmed == true;

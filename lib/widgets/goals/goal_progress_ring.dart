@@ -48,4 +48,3 @@ class GoalProgressRing extends StatelessWidget {
     );
   }
 }
-

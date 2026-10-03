@@ -58,7 +58,7 @@ abstract final class RunPlanWeekView {
     final anchorMonday = mondayOf(anchor);
     var offset = week;
     if (plan.repeats) {
-      final elapsed = mondayOf(today).difference(anchorMonday).inDays ~/ 7;
+      final elapsed = daysBetween(anchorMonday, mondayOf(today)) ~/ 7;
       final cycle = elapsed < 0 ? 0 : elapsed ~/ plan.weeks;
       offset = (cycle + cycleShift) * plan.weeks + week;
     }

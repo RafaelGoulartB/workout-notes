@@ -1,4 +1,5 @@
 import 'package:uuid/uuid.dart';
+import 'package:workout_notes/services/ai_service.dart';
 
 const _uuid = Uuid();
 
@@ -27,6 +28,16 @@ class AiProvider {
   final Map<String, AiReasoningEffort> reasoningEffortByModel;
   final DateTime createdAt;
 
+  /// Optional cheaper model for background work (conversation summaries,
+  /// titles). Empty means the selected model does it.
+  final String utilityModel;
+
+  /// Wire protocol: Chat Completions (any provider) or OpenAI Responses.
+  final AiApiStyle apiStyle;
+
+  /// Outcome of the last connection test, if any.
+  final AiProviderCheck? lastCheck;
+
   const AiProvider({
     required this.id,
     required this.name,
@@ -35,6 +46,9 @@ class AiProvider {
     required this.selectedModel,
     this.reasoningEffortByModel = const {},
     required this.createdAt,
+    this.utilityModel = '',
+    this.apiStyle = AiApiStyle.chatCompletions,
+    this.lastCheck,
   });
 
   factory AiProvider.create({
@@ -59,6 +73,10 @@ class AiProvider {
     List<String>? availableModels,
     String? selectedModel,
     Map<String, AiReasoningEffort>? reasoningEffortByModel,
+    String? utilityModel,
+    AiApiStyle? apiStyle,
+    AiProviderCheck? lastCheck,
+    bool clearLastCheck = false,
   }) {
     return AiProvider(
       id: id,
@@ -69,6 +87,9 @@ class AiProvider {
       reasoningEffortByModel:
           reasoningEffortByModel ?? this.reasoningEffortByModel,
       createdAt: createdAt,
+      utilityModel: utilityModel ?? this.utilityModel,
+      apiStyle: apiStyle ?? this.apiStyle,
+      lastCheck: clearLastCheck ? null : (lastCheck ?? this.lastCheck),
     );
   }
 
@@ -87,6 +108,9 @@ class AiProvider {
       (model, effort) => MapEntry(model, effort.storageKey),
     ),
     'createdAt': createdAt.toIso8601String(),
+    if (utilityModel.isNotEmpty) 'utilityModel': utilityModel,
+    'apiStyle': apiStyle.storageKey,
+    if (lastCheck != null) 'lastCheck': lastCheck!.toMap(),
   };
 
   factory AiProvider.fromMap(Map<String, dynamic> m) {
@@ -107,6 +131,11 @@ class AiProvider {
           const {},
       createdAt:
           DateTime.tryParse(m['createdAt'] as String? ?? '') ?? DateTime.now(),
+      utilityModel: (m['utilityModel'] as String?) ?? '',
+      apiStyle: AiApiStyle.fromStorageKey(m['apiStyle'] as String?),
+      lastCheck: m['lastCheck'] is Map
+          ? AiProviderCheck.fromMap((m['lastCheck'] as Map).cast())
+          : null,
     );
   }
 
@@ -118,40 +147,44 @@ class AiProvider {
   int get hashCode => id.hashCode;
 }
 
-enum AiContextMode { minimal, standard, full }
+/// What the last connection test found for the provider's selected model.
+class AiProviderCheck {
+  final String model;
+  final bool ok;
+  final bool toolsSupported;
+  final bool streamingSupported;
+  final int latencyMs;
+  final String? errorCode;
+  final DateTime checkedAt;
 
-extension AiContextModeX on AiContextMode {
-  String get storageKey {
-    switch (this) {
-      case AiContextMode.minimal:
-        return 'minimal';
-      case AiContextMode.standard:
-        return 'standard';
-      case AiContextMode.full:
-        return 'full';
-    }
-  }
+  const AiProviderCheck({
+    required this.model,
+    required this.ok,
+    required this.toolsSupported,
+    required this.streamingSupported,
+    required this.latencyMs,
+    required this.checkedAt,
+    this.errorCode,
+  });
 
-  String get label {
-    switch (this) {
-      case AiContextMode.minimal:
-        return 'Minimal';
-      case AiContextMode.standard:
-        return 'Standard';
-      case AiContextMode.full:
-        return 'Full';
-    }
-  }
+  Map<String, dynamic> toMap() => {
+    'model': model,
+    'ok': ok,
+    'toolsSupported': toolsSupported,
+    'streamingSupported': streamingSupported,
+    'latencyMs': latencyMs,
+    if (errorCode != null) 'errorCode': errorCode,
+    'checkedAt': checkedAt.toIso8601String(),
+  };
 
-  static AiContextMode fromStorageKey(String? value) {
-    switch (value) {
-      case 'minimal':
-        return AiContextMode.minimal;
-      case 'full':
-        return AiContextMode.full;
-      case 'standard':
-      default:
-        return AiContextMode.standard;
-    }
-  }
+  factory AiProviderCheck.fromMap(Map<String, dynamic> m) => AiProviderCheck(
+    model: (m['model'] as String?) ?? '',
+    ok: m['ok'] == true,
+    toolsSupported: m['toolsSupported'] == true,
+    streamingSupported: m['streamingSupported'] == true,
+    latencyMs: (m['latencyMs'] as num?)?.toInt() ?? 0,
+    errorCode: m['errorCode'] as String?,
+    checkedAt:
+        DateTime.tryParse(m['checkedAt'] as String? ?? '') ?? DateTime.now(),
+  );
 }

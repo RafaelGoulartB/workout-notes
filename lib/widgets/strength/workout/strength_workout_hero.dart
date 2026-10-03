@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/repositories/strength_history_repository.dart';
+import 'package:workout_notes/utils/clock_format.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
@@ -29,7 +30,7 @@ class StrengthWorkoutHero extends StatelessWidget {
         start ??
         DateTime.now();
     final isActive = end == null;
-    final clock = DateFormat('HH:mm', locale);
+    final clock = ClockFormat.of(context);
     final date = DateFormat.yMMMMEEEEd(locale).format(day);
     final dateLine = [
       toBeginningOfSentenceCase(date, locale),

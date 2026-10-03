@@ -1,10 +1,37 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show SocketException;
+import 'dart:typed_data' show BytesBuilder;
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:workout_notes/models/ai_tool_call.dart';
+import 'package:workout_notes/utils/ai_endpoint_policy.dart';
 import 'package:workout_notes/utils/text_sanitizer.dart';
+
+part 'ai_model_compatibility.dart';
+part 'ai_service_errors.dart';
+part 'ai_service_payloads.dart';
+part 'ai_service_responses.dart';
+part 'ai_service_streaming.dart';
+
+/// Wire protocol spoken to a provider.
+enum AiApiStyle {
+  /// OpenAI-compatible `/chat/completions` (every provider).
+  chatCompletions,
+
+  /// OpenAI `/responses`. Keeps reasoning between tool calls (encrypted
+  /// reasoning items are sent back), which Chat Completions discards.
+  responses;
+
+  String get storageKey => name;
+
+  static AiApiStyle fromStorageKey(String? value) => values.firstWhere(
+    (style) => style.name == value,
+    orElse: () => AiApiStyle.chatCompletions,
+  );
+}
 
 class AiChatCompletion {
   final String? text;
@@ -13,23 +40,64 @@ class AiChatCompletion {
   final int? promptTokens;
   final int? completionTokens;
 
+  /// Prompt tokens the provider served from its prompt cache, when reported.
+  final int? cachedTokens;
+
+  /// Opaque assistant-message fields to send back verbatim within the same
+  /// turn (`reasoning_content`, `reasoning`, `reasoning_details`, Responses
+  /// reasoning items…). Empty when the provider returned none.
+  final Map<String, dynamic> providerExtras;
+  final String? finishReason;
+
+  /// The answer was cut off: the provider hit its output limit
+  /// (`finish_reason: length`), filtered the content, reported an incomplete
+  /// response, or the stream ended without its terminal marker (or hit the
+  /// local safety cap). The text is what arrived; it is never re-requested.
+  final bool truncated;
+
   const AiChatCompletion({
     this.text,
     this.toolCalls = const [],
     this.hadReferencePlaceholders = false,
     this.promptTokens,
     this.completionTokens,
+    this.cachedTokens,
+    this.providerExtras = const {},
+    this.finishReason,
+    this.truncated = false,
   });
+}
 
-  bool get hasToolCalls => toolCalls.isNotEmpty;
+/// Incremental progress of a streamed completion.
+class AiStreamDelta {
+  /// Visible answer text received so far (cumulative, sanitized).
+  final String text;
+
+  /// True while the provider streams reasoning before any answer text.
+  final bool reasoning;
+
+  /// Names of the tool calls the model has started so far.
+  final List<String> toolNames;
+
+  const AiStreamDelta({
+    this.text = '',
+    this.reasoning = false,
+    this.toolNames = const [],
+  });
 }
 
 class AiServiceException implements Exception {
   final String message;
+
+  /// Stable code: invalid_token, payment_required, forbidden, not_found,
+  /// payload_too_large, context_length_exceeded, bad_request, rate_limited,
+  /// provider_unavailable, timeout, connection_error, cancelled,
+  /// invalid_response, empty_choices, vision_not_supported, …
   final String? code;
   final int? statusCode;
   final String? endpoint;
   final int? attemptCount;
+  final Duration? retryAfter;
   final List<String> compatibilityAdjustments;
   const AiServiceException(
     this.message, {
@@ -37,6 +105,7 @@ class AiServiceException implements Exception {
     this.statusCode,
     this.endpoint,
     this.attemptCount,
+    this.retryAfter,
     this.compatibilityAdjustments = const [],
   });
 
@@ -44,45 +113,166 @@ class AiServiceException implements Exception {
   String toString() => 'AiServiceException($code): $message';
 }
 
+/// Where learned per-model compatibility flags are kept between launches.
+abstract interface class AiCompatibilityStore {
+  Map<String, Map<String, dynamic>> load();
+  Future<void> save(Map<String, Map<String, dynamic>> value);
+}
+
+/// Result of a provider connection test.
+class AiProbeResult {
+  final bool ok;
+  final bool toolsSupported;
+  final bool streamingSupported;
+  final int latencyMs;
+  final String? errorCode;
+  final String? errorMessage;
+
+  const AiProbeResult({
+    required this.ok,
+    this.toolsSupported = false,
+    this.streamingSupported = false,
+    this.latencyMs = 0,
+    this.errorCode,
+    this.errorMessage,
+  });
+}
+
 /// OpenAI-compatible HTTP client. Safe to share.
 ///
-/// Ownership: the app uses one long-lived [AiService.shared] (settings, chat
-/// and food-label analysis all talk to the same provider), which lives for the
-/// process and is never closed. An instance closes its `http.Client` in
-/// [close] only when it created that client itself; a client injected through
-/// the constructor stays with whoever owns it.
+/// - Requests can be streamed (SSE) with an *idle* timeout instead of a total
+///   one, and aborted for real through `abortTrigger`.
+/// - Opaque provider fields (reasoning, signatures) are surfaced in
+///   [AiChatCompletion.providerExtras] / [AiToolCall.extras] so the caller can
+///   send them back inside the same turn.
+/// - Parameters a model rejects (temperature, reasoning_effort, streaming…)
+///   are learned per endpoint+model and persisted through an
+///   [AiCompatibilityStore], so the next launch does not fail again.
+///
+/// Ownership: the app uses one long-lived [AiService.shared]; it is never
+/// closed. An instance closes its `http.Client` in [close] only when it
+/// created that client itself.
 class AiService {
   /// The app-wide instance. Do not [close] it.
   static final AiService shared = AiService();
 
   final http.Client _client;
+
   final bool _ownsClient;
+
   final Future<void> Function(Duration) _delay;
+
+  /// Total timeout of a non-streamed request.
   final Duration timeout;
+
+  /// Streamed requests: longest wait for the first byte (reasoning models
+  /// think before answering) and between two chunks afterwards.
+  final Duration firstByteTimeout;
+
+  final Duration idleTimeout;
+
+  /// Safety cap on the text (answer plus reasoning) of one streamed answer.
+  /// Far above any real answer; a runaway stream ends as truncated instead of
+  /// filling memory.
+  final int maxStreamedChars;
+
+  /// Longest error body read from a failed request.
+  static const int maxErrorBodyBytes = 64 * 1024;
+
+  /// Longest successful non-streamed body accepted.
+  static const int maxResponseBodyBytes = 16 * 1024 * 1024;
+
   final Map<String, _ModelCompatibility> _modelCompatibility = {};
+
+  AiCompatibilityStore? _store;
 
   AiService({
     http.Client? client,
     this.timeout = const Duration(seconds: 180),
+    this.firstByteTimeout = const Duration(seconds: 180),
+    this.idleTimeout = const Duration(seconds: 60),
+    this.maxStreamedChars = 2000000,
     Future<void> Function(Duration)? delay,
   }) : _client = client ?? http.Client(),
        _ownsClient = client == null,
        _delay = delay ?? (Future<void>.delayed);
 
-  /// Releases the HTTP client if this instance created it (see the class
-  /// docs). Instances built with an injected client leave it open.
+  /// Releases the HTTP client if this instance created it.
   void close() {
     if (_ownsClient) _client.close();
   }
 
-  /// Normalises a user-provided base URL to end with `/v1`.
+  /// Loads persisted compatibility flags and keeps saving new ones there.
+  void attachCompatibilityStore(AiCompatibilityStore store) {
+    _store = store;
+    try {
+      for (final entry in store.load().entries) {
+        _modelCompatibility[entry.key] = _ModelCompatibility.fromJson(
+          entry.value,
+        );
+      }
+    } catch (error) {
+      debugPrint('Loading AI compatibility flags failed: $error');
+    }
+  }
+
+  /// Forgets what was learned about [baseUrl]+[model] (used after the user
+  /// edits a provider).
+  Future<void> resetCompatibility(String baseUrl, String model) async {
+    _modelCompatibility.remove(_compatibilityKey(baseUrl, model));
+    await _persistCompatibility();
+  }
+
+  /// Learned adjustments for [baseUrl]+[model], for diagnostics.
+  List<String> compatibilityAdjustments(String baseUrl, String model) =>
+      _modelCompatibility[_compatibilityKey(baseUrl, model)]?.adjustments
+          .toList() ??
+      const [];
+
+  /// Normalises a user-provided base URL: trims, drops credentials, query and
+  /// fragment, removes the trailing slash and adds `/v1` only when the URL
+  /// has no path at all (so `.../v1beta/openai` stays as typed).
   static String normalizeBaseUri(String input) {
     var base = input.trim();
-    if (base.endsWith('/')) {
+    if (base.isEmpty) return '';
+    final parsed = Uri.tryParse(base);
+    if (parsed != null && parsed.hasScheme && parsed.host.isNotEmpty) {
+      base = Uri(
+        scheme: parsed.scheme,
+        host: parsed.host,
+        port: parsed.hasPort ? parsed.port : null,
+        path: parsed.path,
+      ).toString();
+    }
+    while (base.endsWith('/')) {
       base = base.substring(0, base.length - 1);
     }
-    if (base.endsWith('/v1')) return base;
-    return '$base/v1';
+    final uri = Uri.tryParse(base);
+    if (uri != null && (uri.path.isEmpty || uri.path == '/')) {
+      return '$base/v1';
+    }
+    return base;
+  }
+
+  /// Whether [input] is an absolute http(s) URL with a host.
+  static bool isValidBaseUri(String input) {
+    final uri = Uri.tryParse(input.trim());
+    return uri != null &&
+        (uri.scheme == 'https' || uri.scheme == 'http') &&
+        uri.host.isNotEmpty;
+  }
+
+  /// Throws `insecure_endpoint` unless [baseUrl] is `https`, or `http` on a
+  /// local host ([AiEndpointPolicy]). Providers saved before this rule hit it
+  /// at send time.
+  static void requireAllowedEndpoint(String baseUrl) {
+    if (AiEndpointPolicy.isAllowed(baseUrl)) return;
+    throw AiServiceException(
+      'Plain http:// is only allowed for local or private-network hosts; use '
+      'https:// for this provider.',
+      code: 'insecure_endpoint',
+      endpoint: baseUrl,
+    );
   }
 
   /// Fetches available models from `${baseUrl}/models`.
@@ -90,41 +280,58 @@ class AiService {
     required String baseUrl,
     required String token,
   }) async {
+    requireAllowedEndpoint(baseUrl);
     final uri = Uri.parse('$baseUrl/models');
-    final res = await _client
-        .get(uri, headers: _headers(token: token))
-        .timeout(timeout);
-    if (res.statusCode != 200) {
+    final http.Response res;
+    try {
+      res = await _client
+          .get(uri, headers: _headers(token: token))
+          .timeout(const Duration(seconds: 30));
+    } on TimeoutException {
       throw AiServiceException(
-        'Failed to list models (${res.statusCode})',
-        code: 'list_models_failed',
+        'Listing models timed out.',
+        code: 'timeout',
+        endpoint: uri.toString(),
+      );
+    } on http.ClientException catch (error) {
+      throw AiServiceException(
+        'Connection failed: ${error.message}',
+        code: 'connection_error',
+        endpoint: uri.toString(),
       );
     }
-    final body = jsonDecode(res.body);
-    if (body is! Map) {
-      throw const AiServiceException(
-        'Invalid models response',
-        code: 'invalid_response',
+    if (res.statusCode != 200) {
+      throw _httpException(
+        statusCode: res.statusCode,
+        body: res.body,
+        headers: res.headers,
+        uri: uri,
+        attempts: 1,
+        adjustments: const [],
       );
     }
-    final data = body['data'];
+    final body = _decodeJson(res.body);
+    final data = body is Map ? body['data'] : null;
     if (data is! List) {
       throw const AiServiceException(
         'Invalid models response',
         code: 'invalid_response',
       );
     }
-    final ids = <String>[];
-    for (final item in data) {
-      if (item is Map && item['id'] is String) {
-        ids.add(item['id'] as String);
-      }
-    }
-    ids.sort();
+    final ids = <String>[
+      for (final item in data)
+        if (item is Map && item['id'] is String) item['id'] as String,
+    ]..sort();
     return ids;
   }
 
-  /// Sends a chat completion request. `tools` follows the OpenAI function-calling schema.
+  /// Sends one completion request.
+  ///
+  /// [messages] use the OpenAI Chat Completions shape; assistant messages may
+  /// carry provider extras (they are passed through untouched). With
+  /// [stream] the answer is read as Server-Sent Events and [onDelta] receives
+  /// progress; providers that reject streaming fall back to a plain request
+  /// (remembered per model). [abortTrigger] cancels the HTTP request.
   Future<AiChatCompletion> sendChat({
     required String baseUrl,
     required String token,
@@ -132,69 +339,95 @@ class AiService {
     required List<Map<String, dynamic>> messages,
     List<Map<String, dynamic>>? tools,
     Object? toolChoice,
-    double temperature = 0.3,
+    double? temperature = 0.3,
     String? reasoningEffort,
+    AiApiStyle apiStyle = AiApiStyle.chatCompletions,
+    bool stream = false,
+    void Function(AiStreamDelta delta)? onDelta,
+    Future<void>? abortTrigger,
+    String? cacheKey,
+    int? maxOutputTokens,
   }) async {
-    final uri = Uri.parse('$baseUrl/chat/completions');
-    final compatibility = _modelCompatibility.putIfAbsent(
-      _compatibilityKey(baseUrl, model),
-      _ModelCompatibility.new,
+    requireAllowedEndpoint(baseUrl);
+    final compatibility = _compatibilityFor(baseUrl, model);
+    final responses = apiStyle == AiApiStyle.responses;
+    final uri = Uri.parse(
+      responses ? '$baseUrl/responses' : '$baseUrl/chat/completions',
     );
     var attempts = 0;
     var transientRetries = 0;
-    late http.Response res;
     while (true) {
       attempts++;
-      final payload = <String, dynamic>{
-        'model': model,
-        'messages': messages,
-        if (!compatibility.omitTemperature)
-          'temperature': compatibility.temperatureOverride ?? temperature,
-        if (reasoningEffort != null && !compatibility.omitReasoningEffort)
-          'reasoning_effort': reasoningEffort,
-      };
-      if (tools != null && tools.isNotEmpty) {
-        payload['tools'] = tools;
-        if (!compatibility.omitToolChoice) {
-          final choice = toolChoice ?? 'auto';
-          payload['tool_choice'] =
-              choice == 'required' &&
-                  compatibility.toolChoiceRequiredUnsupported
-              ? 'auto'
-              : choice;
-        }
-      }
+      final streaming = stream && !compatibility.streamUnsupported;
+      final payload = responses
+          ? _responsesPayload(
+              model: model,
+              messages: messages,
+              tools: tools,
+              toolChoice: toolChoice,
+              temperature: temperature,
+              reasoningEffort: reasoningEffort,
+              compatibility: compatibility,
+              stream: streaming,
+              maxOutputTokens: maxOutputTokens,
+              cacheKey: cacheKey,
+              baseUrl: baseUrl,
+            )
+          : _chatPayload(
+              model: model,
+              messages: messages,
+              tools: tools,
+              toolChoice: toolChoice,
+              temperature: temperature,
+              reasoningEffort: reasoningEffort,
+              compatibility: compatibility,
+              stream: streaming,
+              maxOutputTokens: maxOutputTokens,
+              cacheKey: cacheKey,
+              baseUrl: baseUrl,
+            );
+      final abort = Completer<void>();
+      unawaited(
+        abortTrigger?.then((_) {
+          if (!abort.isCompleted) abort.complete();
+        }),
+      );
+      final request =
+          http.AbortableRequest('POST', uri, abortTrigger: abort.future)
+            ..headers.addAll(_headers(token: token, stream: streaming))
+            ..body = jsonEncode(payload);
 
+      http.StreamedResponse res;
       try {
         res = await _client
-            .post(
-              uri,
-              headers: _headers(token: token),
-              body: jsonEncode(payload),
-            )
-            .timeout(timeout);
-      } on TimeoutException catch (error) {
-        // A request that already ran the full timeout is usually too heavy
-        // for this provider; resending it identically two more times only
-        // multiplies the wait. Allow a single retry.
-        if (transientRetries < _maxTimeoutRetries) {
-          await _waitBeforeRetry(transientRetries++);
-          continue;
-        }
+            .send(request)
+            .timeout(streaming ? firstByteTimeout : timeout);
+      } on TimeoutException {
+        if (!abort.isCompleted) abort.complete();
+        // A request that already used the whole timeout is not repeated: the
+        // provider may still be working on it (and billing it).
         throw AiServiceException(
-          'Provider request timed out after $attempts attempts: $error',
+          'The provider did not answer in time.',
           code: 'timeout',
           endpoint: uri.toString(),
           attemptCount: attempts,
           compatibilityAdjustments: compatibility.adjustments.toList(),
         );
+      } on http.RequestAbortedException {
+        throw _cancelled(uri);
       } on http.ClientException catch (error) {
-        if (transientRetries < _maxTransientRetries) {
+        if (abortTrigger != null && abort.isCompleted) throw _cancelled(uri);
+        // Repeating a POST is only safe when the request cannot have reached
+        // the server (nothing connected). A drop after the request went out
+        // may have started a billed generation: surface it instead.
+        if (_failedBeforeSending(error) &&
+            transientRetries < _maxTransientRetries) {
           await _waitBeforeRetry(transientRetries++);
           continue;
         }
         throw AiServiceException(
-          'Provider connection failed after $attempts attempts: $error',
+          'Provider connection failed after $attempts attempts: '
+          '${error.message}',
           code: 'connection_error',
           endpoint: uri.toString(),
           attemptCount: attempts,
@@ -202,114 +435,92 @@ class AiService {
         );
       }
 
-      if (res.statusCode < 400) break;
-      final adjustment = res.statusCode == 401 || res.statusCode == 404
-          ? null
-          : _applyCompatibilityAdjustment(
-              responseBody: res.body,
-              sentPayload: payload,
-              compatibility: compatibility,
-            );
-      if (adjustment != null) continue;
-      if (_isTransientStatus(res.statusCode) &&
-          transientRetries < _maxTransientRetries) {
-        await _waitBeforeRetry(transientRetries++);
-        continue;
-      }
-      throw _httpException(
-        response: res,
-        uri: uri,
-        attempts: attempts,
-        adjustments: compatibility.adjustments.toList(),
-      );
-    }
-
-    final body = jsonDecode(res.body);
-    if (body is! Map) {
-      throw const AiServiceException(
-        'Invalid response body',
-        code: 'invalid_response',
-      );
-    }
-    final choices = body['choices'];
-    if (choices is! List || choices.isEmpty) {
-      throw const AiServiceException(
-        'Empty choices in response',
-        code: 'empty_choices',
-      );
-    }
-    final message = (choices.first as Map)['message'];
-    if (message is! Map) {
-      throw const AiServiceException(
-        'Missing message in choice',
-        code: 'invalid_response',
-      );
-    }
-
-    final rawText = _extractText(message['content']);
-    // Keep reference placeholders intact. The orchestrator must be able to
-    // reject and regenerate an invalid answer with the complete tool context;
-    // deleting markers here loses both their position and the evidence that
-    // the model failed to materialise the data.
-    final text = rawText == null ? null : _sanitizeReasoning(rawText);
-    final calls = <AiToolCall>[];
-    final rawCalls = message['tool_calls'];
-    if (rawCalls is List) {
-      for (final raw in rawCalls) {
-        if (raw is Map) {
-          final parsed = AiToolCall.fromJson(raw.cast<String, dynamic>());
-          calls.add(
-            parsed.id.isEmpty
-                ? AiToolCall(
-                    id: 'call_${calls.length + 1}',
-                    name: parsed.name,
-                    arguments: parsed.arguments,
-                  )
-                : parsed,
-          );
+      if (res.statusCode >= 400) {
+        final body = await _readBody(res, maxBytes: maxErrorBodyBytes);
+        // Only a request the provider refused as invalid (400/422) teaches a
+        // compatibility flag; outages and auth errors never do.
+        final adjustment = res.statusCode != 400 && res.statusCode != 422
+            ? null
+            : _applyCompatibilityAdjustment(
+                responseBody: body,
+                sentPayload: payload,
+                compatibility: compatibility,
+              );
+        if (adjustment != null) {
+          await _persistCompatibility();
+          continue;
         }
+        final retryAfter = _retryAfter(res.headers);
+        if (_isTransientStatus(res.statusCode) &&
+            transientRetries < _maxTransientRetries &&
+            (retryAfter == null || retryAfter <= _maxRetryAfter)) {
+          await _delay(retryAfter ?? _backoff(transientRetries));
+          transientRetries++;
+          continue;
+        }
+        throw _httpException(
+          statusCode: res.statusCode,
+          body: body,
+          headers: res.headers,
+          uri: uri,
+          attempts: attempts,
+          adjustments: compatibility.adjustments.toList(),
+        );
+      }
+
+      try {
+        if (streaming) {
+          return responses
+              ? await _readResponsesStream(res, abort, onDelta, uri)
+              : await _readChatStream(res, abort, onDelta, uri);
+        }
+        final body = await _readBody(
+          res,
+          maxBytes: maxResponseBodyBytes,
+          failWhenOver: true,
+        ).timeout(timeout);
+        return responses ? _parseResponses(body) : _parseChat(body);
+      } on http.RequestAbortedException {
+        throw _cancelled(uri);
+      } on http.ClientException catch (error) {
+        if (abortTrigger != null && abort.isCompleted) throw _cancelled(uri);
+        throw AiServiceException(
+          'The connection dropped while reading the answer: ${error.message}',
+          code: 'connection_error',
+          endpoint: uri.toString(),
+          attemptCount: attempts,
+        );
+      } on TimeoutException {
+        if (!abort.isCompleted) abort.complete();
+        throw AiServiceException(
+          'The provider stopped sending data.',
+          code: 'timeout',
+          endpoint: uri.toString(),
+          attemptCount: attempts,
+        );
       }
     }
-
-    int? promptTokens;
-    int? completionTokens;
-    final usage = body['usage'];
-    if (usage is Map) {
-      promptTokens = (usage['prompt_tokens'] as num?)?.toInt();
-      completionTokens = (usage['completion_tokens'] as num?)?.toInt();
-    }
-
-    return AiChatCompletion(
-      text: text,
-      toolCalls: calls,
-      hadReferencePlaceholders:
-          rawText != null &&
-          TextSanitizer.containsReferencePlaceholder(rawText),
-      promptTokens: promptTokens,
-      completionTokens: completionTokens,
-    );
   }
 
-  /// Sends a multimodal request using the protocol expected by the provider.
+  /// Sends a multimodal request (images in user content) for a one-off
+  /// extraction such as reading a nutrition label.
   ///
-  /// OpenCode exposes its GPT models through the OpenAI Responses API. Its
-  /// Chat Completions compatibility endpoint accepts text but rejects image
-  /// parts with HTTP 400, so vision requests must use `/responses` there.
+  /// OpenCode serves its GPT models through the Responses API for images; the
+  /// chat-completions shape is rejected there, so it is routed accordingly.
   Future<AiChatCompletion> sendVision({
     required String baseUrl,
     required String token,
     required String model,
     required List<Map<String, dynamic>> messages,
-  }) {
-    return sendMultimodalChat(
-      baseUrl: baseUrl,
-      token: token,
-      model: model,
-      messages: messages,
-    );
-  }
+  }) => sendMultimodalChat(
+    baseUrl: baseUrl,
+    token: token,
+    model: model,
+    messages: messages,
+  );
 
-  /// Sends a multimodal chat while preserving tool calling support.
+  /// Multimodal chat preserving tool calling. Maps a provider rejection of
+  /// the image parts to `vision_not_supported`.
   Future<AiChatCompletion> sendMultimodalChat({
     required String baseUrl,
     required String token,
@@ -318,19 +529,13 @@ class AiService {
     List<Map<String, dynamic>>? tools,
     Object? toolChoice,
     String? reasoningEffort,
+    AiApiStyle apiStyle = AiApiStyle.chatCompletions,
+    bool stream = false,
+    void Function(AiStreamDelta delta)? onDelta,
+    Future<void>? abortTrigger,
+    String? cacheKey,
   }) async {
     try {
-      if (_usesResponsesApiForVision(baseUrl: baseUrl, model: model)) {
-        return await _sendResponsesVision(
-          baseUrl: baseUrl,
-          token: token,
-          model: model,
-          messages: messages,
-          tools: tools,
-          toolChoice: toolChoice,
-          reasoningEffort: reasoningEffort,
-        );
-      }
       return await sendChat(
         baseUrl: baseUrl,
         token: token,
@@ -339,19 +544,29 @@ class AiService {
         tools: tools,
         toolChoice: toolChoice,
         reasoningEffort: reasoningEffort,
+        apiStyle: usesResponsesApiForVision(baseUrl: baseUrl, model: model)
+            ? AiApiStyle.responses
+            : apiStyle,
+        stream: stream,
+        onDelta: onDelta,
+        abortTrigger: abortTrigger,
+        cacheKey: cacheKey,
       );
     } on AiServiceException catch (error) {
-      if (error.code == 'http_error' || error.code == 'invalid_response') {
-        throw const AiServiceException(
+      if (error.code == 'bad_request' || error.code == 'invalid_response') {
+        throw AiServiceException(
           'The provider rejected the multimodal request.',
           code: 'vision_not_supported',
+          statusCode: error.statusCode,
+          endpoint: error.endpoint,
         );
       }
       rethrow;
     }
   }
 
-  bool _usesResponsesApiForVision({
+  /// OpenCode's chat-completions endpoint rejects image parts for GPT models.
+  static bool usesResponsesApiForVision({
     required String baseUrl,
     required String model,
   }) {
@@ -360,383 +575,101 @@ class AiService {
     return isOpenCode && model.toLowerCase().startsWith('gpt-');
   }
 
-  Future<AiChatCompletion> _sendResponsesVision({
+  /// Small connection test: one streamed request with a trivial tool the
+  /// model must call. Reports what worked.
+  Future<AiProbeResult> probe({
     required String baseUrl,
     required String token,
     required String model,
-    required List<Map<String, dynamic>> messages,
-    List<Map<String, dynamic>>? tools,
-    Object? toolChoice,
-    String? reasoningEffort,
+    AiApiStyle apiStyle = AiApiStyle.chatCompletions,
   }) async {
-    final instructions = messages
-        .where((message) => message['role'] == 'system')
-        .map((message) => message['content'])
-        .whereType<String>()
-        .join('\n\n');
-    final input = <Map<String, dynamic>>[];
-    for (final message in messages.where(
-      (message) => message['role'] != 'system',
-    )) {
-      final role = message['role'];
-      if (role == 'tool') {
-        input.add({
-          'type': 'function_call_output',
-          'call_id': message['tool_call_id'],
-          'output': message['content'] ?? '',
-        });
-        continue;
-      }
-      final content = message['content'];
-      final parts = <Map<String, dynamic>>[];
-      if (content is String) {
-        parts.add({'type': 'input_text', 'text': content});
-      } else if (content is List) {
-        for (final rawPart in content) {
-          if (rawPart is! Map) continue;
-          if (rawPart['type'] == 'text' && rawPart['text'] is String) {
-            parts.add({'type': 'input_text', 'text': rawPart['text']});
-          } else if (rawPart['type'] == 'image_url') {
-            final image = rawPart['image_url'];
-            final url = image is Map ? image['url'] : image;
-            if (url is String && url.isNotEmpty) {
-              parts.add({'type': 'input_image', 'image_url': url});
-            }
-          }
-        }
-      }
-      if (parts.isNotEmpty) {
-        input.add({'role': role, 'content': parts});
-      }
-      final toolCalls = message['tool_calls'];
-      if (toolCalls is List) {
-        for (final rawCall in toolCalls) {
-          if (rawCall is! Map) continue;
-          final function = rawCall['function'];
-          if (function is! Map) continue;
-          input.add({
-            'type': 'function_call',
-            'call_id': rawCall['id'],
-            'name': function['name'],
-            'arguments': function['arguments'] ?? '{}',
-          });
-        }
-      }
-    }
-
-    final uri = Uri.parse('$baseUrl/responses');
-    final payload = <String, dynamic>{
-      'model': model,
-      if (instructions.isNotEmpty) 'instructions': instructions,
-      'input': input,
-      if (tools != null && tools.isNotEmpty)
-        'tools': tools.map(_responsesTool).toList(),
-      if (tools != null && tools.isNotEmpty)
-        'tool_choice': _responsesToolChoice(toolChoice),
-      if (reasoningEffort != null) 'reasoning': {'effort': reasoningEffort},
-    };
-    final res = await _client
-        .post(
-          uri,
-          headers: _headers(token: token),
-          body: jsonEncode(payload),
-        )
-        .timeout(timeout);
-
-    if (res.statusCode == 401) {
-      throw AiServiceException(
-        'Invalid or missing API token.',
-        code: 'invalid_token',
-        statusCode: res.statusCode,
-        endpoint: uri.toString(),
-      );
-    }
-    if (res.statusCode == 404) {
-      throw AiServiceException(
-        'Model or endpoint not found (404).',
-        code: 'not_found',
-        statusCode: res.statusCode,
-        endpoint: uri.toString(),
-      );
-    }
-    if (res.statusCode >= 400) {
-      throw AiServiceException(
-        'Request failed (${res.statusCode}): ${_truncate(res.body)}',
-        code: 'http_error',
-        statusCode: res.statusCode,
-        endpoint: uri.toString(),
-      );
-    }
-
-    final body = jsonDecode(res.body);
-    if (body is! Map) {
-      throw const AiServiceException(
-        'Invalid response body',
-        code: 'invalid_response',
-      );
-    }
-    final rawText = _extractResponsesText(body);
-    final text = rawText == null ? null : _sanitizeReasoning(rawText);
-    final usage = body['usage'];
-    return AiChatCompletion(
-      text: text,
-      toolCalls: _extractResponsesToolCalls(body),
-      hadReferencePlaceholders:
-          rawText != null &&
-          TextSanitizer.containsReferencePlaceholder(rawText),
-      promptTokens: usage is Map
-          ? (usage['input_tokens'] as num?)?.toInt()
-          : null,
-      completionTokens: usage is Map
-          ? (usage['output_tokens'] as num?)?.toInt()
-          : null,
-    );
-  }
-
-  Map<String, dynamic> _responsesTool(Map<String, dynamic> tool) {
-    final function = tool['function'];
-    if (function is! Map) return tool;
-    return {
-      'type': 'function',
-      'name': function['name'],
-      if (function['description'] != null)
-        'description': function['description'],
-      'parameters': function['parameters'] ?? const <String, dynamic>{},
-    };
-  }
-
-  Object _responsesToolChoice(Object? choice) {
-    if (choice is! Map) return choice ?? 'auto';
-    final function = choice['function'];
-    if (choice['type'] == 'function' && function is Map) {
-      return {'type': 'function', 'name': function['name']};
-    }
-    return choice;
-  }
-
-  List<AiToolCall> _extractResponsesToolCalls(Map<dynamic, dynamic> body) {
-    final output = body['output'];
-    if (output is! List) return const [];
-    final calls = <AiToolCall>[];
-    for (final item in output) {
-      if (item is! Map || item['type'] != 'function_call') continue;
-      calls.add(
-        AiToolCall.fromJson({
-          'id': item['call_id'] ?? item['id'] ?? '',
-          'type': 'function',
-          'function': {
-            'name': item['name'] ?? '',
-            'arguments': item['arguments'] ?? '{}',
+    final watch = Stopwatch()..start();
+    try {
+      final completion = await sendChat(
+        baseUrl: baseUrl,
+        token: token,
+        model: model,
+        apiStyle: apiStyle,
+        stream: true,
+        maxOutputTokens: 512,
+        messages: const [
+          {
+            'role': 'system',
+            'content':
+                'Connection test. Call the tool `ping` with value 1, nothing else.',
           },
-        }),
+          {'role': 'user', 'content': 'ping'},
+        ],
+        tools: const [
+          {
+            'type': 'function',
+            'function': {
+              'name': 'ping',
+              'description': 'Connection test tool.',
+              'parameters': {
+                'type': 'object',
+                'properties': {
+                  'value': {'type': 'integer'},
+                },
+              },
+            },
+          },
+        ],
+      );
+      final compatibility = _compatibilityFor(baseUrl, model);
+      return AiProbeResult(
+        ok: true,
+        toolsSupported: completion.toolCalls.any((c) => c.name == 'ping'),
+        streamingSupported: !compatibility.streamUnsupported,
+        latencyMs: watch.elapsedMilliseconds,
+      );
+    } on AiServiceException catch (error) {
+      return AiProbeResult(
+        ok: false,
+        latencyMs: watch.elapsedMilliseconds,
+        errorCode: error.code,
+        errorMessage: error.message,
       );
     }
-    return calls;
   }
 
-  String? _extractResponsesText(Map<dynamic, dynamic> body) {
-    final direct = body['output_text'];
-    if (direct is String && direct.isNotEmpty) return direct;
-    final output = body['output'];
-    if (output is! List) return null;
-    final buffer = StringBuffer();
-    for (final item in output) {
-      if (item is! Map || item['type'] != 'message') continue;
-      final content = item['content'];
-      if (content is! List) continue;
-      for (final part in content) {
-        if (part is Map && part['type'] == 'output_text') {
-          final text = part['text'];
-          if (text is String) buffer.write(text);
-        }
-      }
-    }
-    final text = buffer.toString();
-    return text.isEmpty ? null : text;
-  }
-
-  String _compatibilityKey(String baseUrl, String model) {
-    final uri = Uri.tryParse(baseUrl);
-    final endpoint = uri == null
-        ? baseUrl.trim().toLowerCase()
-        : '${uri.scheme.toLowerCase()}://${uri.host.toLowerCase()}'
-              '${uri.hasPort ? ':${uri.port}' : ''}${uri.path}';
-    return '$endpoint|${model.trim().toLowerCase()}';
-  }
-
-  String? _applyCompatibilityAdjustment({
-    required String responseBody,
-    required Map<String, dynamic> sentPayload,
-    required _ModelCompatibility compatibility,
-  }) {
-    final error = responseBody.toLowerCase();
-    final mentionsReasoningEffort =
-        error.contains('reasoning_effort') ||
-        (error.contains('reasoning') && error.contains('effort'));
-    final reasoningEffortUnsupported =
-        mentionsReasoningEffort &&
-        (error.contains('unsupported') ||
-            error.contains('not supported') ||
-            error.contains('unknown') ||
-            error.contains('unrecognized') ||
-            error.contains('not allowed') ||
-            error.contains('extra inputs'));
-    if (reasoningEffortUnsupported &&
-        sentPayload.containsKey('reasoning_effort') &&
-        !compatibility.omitReasoningEffort) {
-      compatibility.omitReasoningEffort = true;
-      return compatibility.record('reasoning_effort omitted');
-    }
-    final mentionsTemperature = error.contains('temperature');
-    final temperatureMustBeOne =
-        mentionsTemperature &&
-        (RegExp(
-              r'(only|must be|has to be|required|allowed|support(?:ed|s)?)\D{0,24}1(?:\.0+)?\b',
-            ).hasMatch(error) ||
-            RegExp(r'1(?:\.0+)?\D{0,24}(only|temperature)').hasMatch(error));
-    if (temperatureMustBeOne &&
-        sentPayload['temperature'] != 1 &&
-        compatibility.temperatureOverride != 1) {
-      compatibility.temperatureOverride = 1;
-      return compatibility.record('temperature=1');
-    }
-    final temperatureUnsupported =
-        mentionsTemperature &&
-        (error.contains('unsupported') ||
-            error.contains('not supported') ||
-            error.contains('unknown parameter') ||
-            error.contains('unrecognized') ||
-            error.contains('not allowed'));
-    if (temperatureUnsupported &&
-        sentPayload.containsKey('temperature') &&
-        !compatibility.omitTemperature) {
-      compatibility.omitTemperature = true;
-      return compatibility.record('temperature omitted');
-    }
-    // `tool_choice: "required"` is the newest of these knobs and the one most
-    // often missing from OpenAI-compatible backends. Any 4xx while it was
-    // sent first falls back to `auto` for this model; only a further failure
-    // that names tool_choice drops the field entirely.
-    if (sentPayload['tool_choice'] == 'required' &&
-        !compatibility.toolChoiceRequiredUnsupported) {
-      compatibility.toolChoiceRequiredUnsupported = true;
-      return compatibility.record('tool_choice required→auto');
-    }
-    final toolChoiceUnsupported =
-        error.contains('tool_choice') &&
-        (error.contains('unsupported') ||
-            error.contains('not supported') ||
-            error.contains('unknown') ||
-            error.contains('unrecognized') ||
-            error.contains('not allowed') ||
-            error.contains('invalid'));
-    if (toolChoiceUnsupported &&
-        sentPayload.containsKey('tool_choice') &&
-        !compatibility.omitToolChoice) {
-      compatibility.omitToolChoice = true;
-      return compatibility.record('tool_choice omitted');
-    }
-    return null;
-  }
-
-  AiServiceException _httpException({
-    required http.Response response,
-    required Uri uri,
-    required int attempts,
-    required List<String> adjustments,
-  }) {
-    if (response.statusCode == 401) {
-      return AiServiceException(
-        'Invalid or missing API token.',
-        code: 'invalid_token',
-        statusCode: response.statusCode,
-        endpoint: uri.toString(),
-        attemptCount: attempts,
-        compatibilityAdjustments: adjustments,
-      );
-    }
-    if (response.statusCode == 404) {
-      return AiServiceException(
-        'Model or endpoint not found (404).',
-        code: 'not_found',
-        statusCode: response.statusCode,
-        endpoint: uri.toString(),
-        attemptCount: attempts,
-        compatibilityAdjustments: adjustments,
-      );
-    }
-    final unavailable = const {502, 503, 504}.contains(response.statusCode);
-    return AiServiceException(
-      'Request failed (${response.statusCode}) after $attempts attempt(s): '
-      '${_truncate(response.body)}',
-      code: unavailable ? 'provider_unavailable' : 'http_error',
-      statusCode: response.statusCode,
-      endpoint: uri.toString(),
-      attemptCount: attempts,
-      compatibilityAdjustments: adjustments,
-    );
-  }
-
-  bool _isTransientStatus(int statusCode) =>
-      statusCode == 408 ||
-      statusCode == 425 ||
-      statusCode == 429 ||
-      statusCode == 502 ||
-      statusCode == 503 ||
-      statusCode == 504;
-
-  Future<void> _waitBeforeRetry(int retryIndex) =>
-      _delay(Duration(milliseconds: retryIndex == 0 ? 350 : 900));
-
-  Map<String, String> _headers({required String token}) => {
-    // Local providers (e.g. Ollama) have no token; sending an empty
-    // Bearer header can make some servers reject the request.
-    if (token.isNotEmpty) 'Authorization': 'Bearer $token',
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  };
-
-  String? _extractText(dynamic content) {
-    if (content == null) return null;
-    if (content is String) {
-      return content;
-    }
-    if (content is List) {
-      final buf = StringBuffer();
-      for (final part in content) {
-        if (part is Map) {
-          final type = part['type'];
-          if (type == 'text') {
-            final t = part['text'];
-            if (t is String) buf.write(t);
-          }
-        }
-      }
-      final out = buf.toString();
-      return out.isEmpty ? null : out;
-    }
-    return null;
-  }
-
-  String _sanitizeReasoning(String input) =>
-      TextSanitizer.stripReasoning(input);
-
-  String _truncate(String s) => s.length > 200 ? '${s.substring(0, 200)}…' : s;
-
-  static const int _maxTransientRetries = 2;
-  static const int _maxTimeoutRetries = 1;
+  /// Whether the provider for [baseUrl]+[model] honours `tool_choice`.
+  bool supportsToolChoice(String baseUrl, String model) =>
+      !_compatibilityFor(baseUrl, model).omitToolChoice;
 }
 
-class _ModelCompatibility {
-  double? temperatureOverride;
-  bool omitTemperature = false;
-  bool omitToolChoice = false;
-  bool toolChoiceRequiredUnsupported = false;
-  bool omitReasoningEffort = false;
-  final Set<String> adjustments = {};
+/// Minimal RFC 7231 date parser for `Retry-After`.
+abstract final class HttpDateParser {
+  static const _months = {
+    'jan': 1,
+    'feb': 2,
+    'mar': 3,
+    'apr': 4,
+    'may': 5,
+    'jun': 6,
+    'jul': 7,
+    'aug': 8,
+    'sep': 9,
+    'oct': 10,
+    'nov': 11,
+    'dec': 12,
+  };
 
-  String record(String adjustment) {
-    adjustments.add(adjustment);
-    return adjustment;
+  static DateTime parse(String value) {
+    final match = RegExp(
+      r'(\d{1,2}) ([A-Za-z]{3}) (\d{4}) (\d{2}):(\d{2}):(\d{2})',
+    ).firstMatch(value);
+    final month = match == null ? null : _months[match.group(2)!.toLowerCase()];
+    if (match == null || month == null) {
+      throw const FormatException('Not an HTTP date');
+    }
+    return DateTime.utc(
+      int.parse(match.group(3)!),
+      month,
+      int.parse(match.group(1)!),
+      int.parse(match.group(4)!),
+      int.parse(match.group(5)!),
+      int.parse(match.group(6)!),
+    );
   }
 }

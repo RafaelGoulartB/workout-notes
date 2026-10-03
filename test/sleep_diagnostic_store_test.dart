@@ -23,7 +23,10 @@ void main() {
         'session': {'id': 'night'},
         'segments': [],
       });
-      expect(((await store.readSession('night'))!['session'] as Map)['id'], 'night');
+      expect(
+        ((await store.readSession('night'))!['session'] as Map)['id'],
+        'night',
+      );
       expect(await store.readSession('../night'), isNull);
       expect(await store.readSession('missing'), isNull);
       final file = File('${root.path}/night.json');

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'package:workout_notes/repositories/base_repository.dart';
 import 'package:workout_notes/utils/date_utils.dart';
@@ -59,6 +60,64 @@ class BodyMeasurementRepository extends BaseRepository {
       });
     }
   }
+
+  /// Inserts [measurements] on [executor] (so callers can fold them into their
+  /// own transaction). Every row must carry its `id`: callers that need
+  /// idempotent writes derive it from what they are applying, and a repeated
+  /// insert then fails on the primary key instead of duplicating.
+  Future<void> insertMeasurementsIn(
+    DatabaseExecutor executor,
+    List<Map<String, dynamic>> measurements,
+  ) async {
+    final createdAt = DateTime.now().toIso8601String();
+    for (final m in measurements) {
+      await executor.insert('body_measurements', {
+        'id': m['id'],
+        'type': m['type'],
+        'value': m['value'],
+        'secondary_value': m['secondary_value'],
+        'unit': m['unit'],
+        'date': m['date'] ?? dateKey(DateTime.now()),
+        'comment': m['comment'],
+        'time_of_day': m['time_of_day'],
+        'is_fasted': (m['is_fasted'] as bool?) == true ? 1 : 0,
+        'side': m['side'],
+        'created_at': createdAt,
+      });
+    }
+  }
+
+  /// The most recent measurement of [type] (and [side], when given) on or
+  /// before [onOrBefore] (`yyyy-MM-dd`), or null.
+  Future<Map<String, dynamic>?> latestMeasurementOf(
+    DatabaseExecutor executor, {
+    required String type,
+    String? side,
+    String? onOrBefore,
+  }) async {
+    final rows = await executor.query(
+      'body_measurements',
+      where:
+          'type = ?${side == null ? '' : ' AND side = ?'}'
+          '${onOrBefore == null ? '' : ' AND date <= ?'}',
+      whereArgs: [type, ?side, ?onOrBefore],
+      orderBy: 'date DESC, created_at DESC',
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  /// Measurements of [type] already logged on [date] (`yyyy-MM-dd`).
+  Future<List<Map<String, dynamic>>> measurementsOn(
+    DatabaseExecutor executor, {
+    required String type,
+    required String date,
+  }) => executor.query(
+    'body_measurements',
+    where: 'type = ? AND date = ?',
+    whereArgs: [type, date],
+    orderBy: 'created_at ASC',
+  );
 
   Future<List<Map<String, dynamic>>> getBodyMeasurements({
     String? type,
@@ -127,7 +186,7 @@ class BodyMeasurementRepository extends BaseRepository {
     int months = 6,
   }) async {
     final db = await this.db;
-    final start = dateKey(DateTime.now().subtract(Duration(days: months * 30)));
+    final start = dateKey(addDays(DateTime.now(), -(months * 30)));
     return db.rawQuery(
       '''
       SELECT w.date, w.value as weight,

@@ -5,6 +5,7 @@ import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/body_progress_analytics.dart';
 import 'package:workout_notes/utils/body_tracker_utils.dart';
 import 'package:workout_notes/utils/date_utils.dart';
@@ -33,7 +34,8 @@ class BodyStatsController extends ChangeNotifier {
        _types = types.isEmpty ? kBodyMeasureTypes : types,
        _bodyRepo = bodyRepo ?? DatabaseHelper.instance.bodyMeasurementRepo,
        _settingsRepo = settingsRepo ?? DatabaseHelper.instance.settingsRepo,
-       _periodizationRepo = periodizationRepo ?? DatabaseHelper.instance.periodizationRepo;
+       _periodizationRepo =
+           periodizationRepo ?? DatabaseHelper.instance.periodizationRepo;
 
   final BodyMeasurementRepository _bodyRepo;
   final SettingsRepository _settingsRepo;
@@ -45,6 +47,7 @@ class BodyStatsController extends ChangeNotifier {
   BodyChartTab _chartTab = BodyChartTab.weekly;
 
   bool _loading = true;
+  bool _loadFailed = false;
   bool _disposed = false;
 
   /// Every measurement row, newest first.
@@ -65,6 +68,7 @@ class BodyStatsController extends ChangeNotifier {
   BodyStatsPeriod get period => _period;
   BodyChartTab get chartTab => _chartTab;
   bool get loading => _loading;
+  bool get loadFailed => _loadFailed;
   PeriodizationPhase? get phase => _phase;
 
   MeasureType get currentType => _types.firstWhere(
@@ -93,6 +97,7 @@ class BodyStatsController extends ChangeNotifier {
 
   Future<void> load() async {
     _loading = true;
+    _loadFailed = false;
     _notify();
     try {
       final all = await _bodyRepo.getBodyMeasurements(limit: 2000);
@@ -109,9 +114,11 @@ class BodyStatsController extends ChangeNotifier {
       _phaseTargetWeightKg = phase.$2;
       _loading = false;
       _notify();
-    } catch (_) {
+    } catch (error, stack) {
+      debugPrint('Body stats failed to load: $error\n$stack');
       if (_disposed) return;
       _loading = false;
+      _loadFailed = true;
       _notify();
     }
   }
@@ -151,7 +158,7 @@ class BodyStatsController extends ChangeNotifier {
   // ------------------------------------------------------------------
 
   String value(double? v, {int? decimals}) =>
-      v == null ? '--' : v.toStringAsFixed(decimals ?? this.decimals);
+      v == null ? '--' : AppNumberFormat.decimal(v, decimals ?? this.decimals);
 
   String signed(double? v, {int decimals = 1}) {
     if (v == null) return '--';
@@ -160,7 +167,7 @@ class BodyStatsController extends ChangeNotifier {
         : v < 0
         ? '-'
         : '';
-    return '$sign${v.abs().toStringAsFixed(decimals)}';
+    return '$sign${AppNumberFormat.decimal(v.abs(), decimals)}';
   }
 
   /// True when a change of [delta] moves in the direction the user wants.

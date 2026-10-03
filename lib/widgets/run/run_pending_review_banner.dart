@@ -75,6 +75,7 @@ class _RunPendingReviewBannerState extends State<RunPendingReviewBanner> {
       title: loc.runReviewDiscardTitle,
       message: loc.runReviewDiscardBody,
       confirmLabel: loc.runReviewDiscard,
+      destructive: true,
       cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
     );
     if (confirmed != true || !mounted) return;

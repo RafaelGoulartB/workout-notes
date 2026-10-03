@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,6 +18,7 @@ import 'package:workout_notes/models/run_session_goal.dart';
 import 'package:workout_notes/models/run_step_snapshot.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
+import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/screens/run/run_post_run_review_screen.dart';
 import 'package:workout_notes/screens/run/run_voice_settings_screen.dart';
 import 'package:workout_notes/services/indoor_tracking_service.dart';
@@ -149,7 +151,10 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     final fields = await RunDataFieldsStore.instance.load();
     var weight = 70.0;
     try {
-      weight = await DatabaseHelper.instance.bodyMeasurementRepo.getLatestWeightKg() ?? 70;
+      weight =
+          await DatabaseHelper.instance.bodyMeasurementRepo
+              .getLatestWeightKg() ??
+          70;
     } catch (_) {
       // Optional table on partially migrated databases: keep the default.
     }
@@ -206,6 +211,13 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
         goal: context.goal,
         planWorkout: plan,
       );
+    } else if (_indoorService.isActive) {
+      // Back on a running treadmill session: its native coach is still on.
+      await _coach.attachToActiveSession(
+        intervalsOn: false,
+        goal: _goal,
+        planWorkout: plan,
+      );
     }
     if (!mounted) return;
     // A planned session replaces the quick interval preset.
@@ -227,7 +239,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     _service.removeListener(_onChanged);
     _indoorService.removeListener(_onIndoorChanged);
     _coach.removeListener(_onCoachChanged);
-    if (!_service.state.isActive) {
+    if (!_service.state.isActive && !_indoorService.isActive) {
       _coach.endSession();
     }
     super.dispose();
@@ -312,12 +324,12 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     }
   }
 
-  Future<void> _beginVoiceSession({bool debugSim = false}) async {
+  Future<void> _beginVoiceSession({bool nativeVoice = true}) async {
     await _coach.beginSession(
-      intervalsOn: _intervalsOn,
+      intervalsOn: !_isIndoor && _intervalsOn,
       goal: _goal,
       planWorkout: _planWorkout,
-      nativeVoice: !debugSim,
+      nativeVoice: nativeVoice,
     );
   }
 
@@ -510,7 +522,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
         startLng: startLng,
       );
       if (ok) {
-        await _beginVoiceSession(debugSim: true);
+        await _beginVoiceSession(nativeVoice: false);
         _coach.onTrackingUpdate(_service.state);
         if (mounted) {
           final loc = AppLocalizations.of(context)!;
@@ -584,9 +596,14 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     try {
       await _runCountdown();
       if (!mounted) return;
+      final treadmill = _activityType == CardioActivityType.treadmill;
+      // The treadmill coach runs in its own native service; the Dart coach
+      // only holds the set-up (and routes "skip step" to it).
+      if (treadmill) await _beginVoiceSession(nativeVoice: false);
       await _indoorService.start(
         type: _activityType,
         context: _planWorkout == null ? null : _sessionContext(),
+        voice: treadmill ? _coach.indoorVoiceSetup() : null,
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -644,7 +661,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     setState(() => _busy = true);
     try {
       final draft = _isIndoor
-          ? await _indoorService.stopForReview()
+          ? await _finishIndoorForReview()
           : await _finishRunForReview();
       if (!mounted) return;
       if (draft != null) {
@@ -662,6 +679,12 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     }
   }
 
+  Future<RunReviewDraft?> _finishIndoorForReview() async {
+    final draft = await _indoorService.stopForReview();
+    await _coach.endSession();
+    return draft;
+  }
+
   Future<RunReviewDraft?> _finishRunForReview() async {
     await _coach.endSession();
     final stepResults = await _coach.collectStepResults();
@@ -676,21 +699,23 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     final confirmed = !confirm
         ? true
         : await showConfirmDialog(
-          context,
-          title: bike
-                    ? loc.stationaryBikeReviewDiscardTitle
-                    : loc.runRecordDiscardConfirm,
-          message: _isIndoor
-                    ? loc.stationaryBikeReviewDiscardBody
-                    : loc.runRecordDiscardConfirmBody,
-          confirmLabel: loc.runRecordDiscard,
-          cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
-        );
+            context,
+            title: bike
+                ? loc.stationaryBikeReviewDiscardTitle
+                : loc.runRecordDiscardConfirm,
+            message: _isIndoor
+                ? loc.stationaryBikeReviewDiscardBody
+                : loc.runRecordDiscardConfirmBody,
+            confirmLabel: loc.runRecordDiscard,
+            destructive: true,
+            cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
+          );
     if (confirmed != true || !mounted) return;
     setState(() => _busy = true);
     try {
       if (_isIndoor) {
         await _indoorService.discard();
+        await _coach.endSession();
       } else {
         await _coach.endSession();
         await _service.discard();

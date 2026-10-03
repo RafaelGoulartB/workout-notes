@@ -6,6 +6,7 @@ import 'package:workout_notes/screens/run/plan_wizard/run_plan_wizard_controller
 import 'package:workout_notes/screens/run/plan_wizard/run_plan_wizard_warnings.dart';
 import 'package:workout_notes/screens/run/plan_wizard/run_plan_wizard_widgets.dart';
 import 'package:workout_notes/services/run_plan_composer.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Step 1: sessions per week, which days, long-run day, plan length, race date.
 class RunPlanWizardDaysStep extends StatelessWidget {
@@ -204,10 +205,9 @@ class _RaceDateTile extends StatelessWidget {
     final picked = await showDatePicker(
       context: context,
       initialDate:
-          controller.raceDate ??
-          today.add(Duration(days: 7 * controller.template.weeks)),
+          controller.raceDate ?? addDays(today, 7 * controller.template.weeks),
       firstDate: today,
-      lastDate: today.add(const Duration(days: 800)),
+      lastDate: addDays(today, 800),
     );
     if (picked != null) controller.setRaceDate(picked);
   }
@@ -229,10 +229,12 @@ class _RaceDateTile extends StatelessWidget {
         children: [
           if (raceDate != null)
             IconButton(
+              tooltip: loc.commonClear,
               icon: const Icon(Icons.clear),
               onPressed: () => controller.setRaceDate(null),
             ),
           IconButton(
+            tooltip: loc.commonPickDate,
             icon: Icon(
               raceDate == null ? Icons.event_outlined : Icons.event_available,
             ),

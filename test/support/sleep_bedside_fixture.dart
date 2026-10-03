@@ -14,7 +14,8 @@ List<SleepMonitorSegment> quantizedBedsideSegments({
           as Map<String, dynamic>;
   final columns = (fixture['columns'] as List).cast<String>();
   return [
-    for (final (index, row) in (fixture['rows'] as List).cast<List<Object?>>().indexed)
+    for (final (index, row)
+        in (fixture['rows'] as List).cast<List<Object?>>().indexed)
       SleepMonitorSegment.fromMap({
         for (var i = 1; i < columns.length; i++) columns[i]: row[i],
         'id': 'recorded-$index',

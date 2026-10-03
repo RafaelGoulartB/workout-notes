@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.util.Log
 import androidx.core.content.ContextCompat
 import java.time.Instant
 import java.util.UUID
@@ -287,7 +288,8 @@ class RunTrackingService : Service(), LocationListener {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
+        val action = intent?.action
+        when (action) {
             ACTION_START -> startRun(intent.getStringExtra(EXTRA_ACTIVITY_ID))
             ACTION_PAUSE -> pauseRun()
             ACTION_RESUME -> resumeRun()
@@ -306,7 +308,59 @@ class RunTrackingService : Service(), LocationListener {
                 }
             }
         }
-        return START_STICKY
+        val runActive = activeInstance === this && !finished && status != "idle"
+        if (RunStartCommandPolicy.shouldStayAlive(runActive)) {
+            // A repeated startForegroundService on a live service still owes
+            // a startForeground call.
+            if (RunStartCommandPolicy.requiresForeground(action)) {
+                try {
+                    promoteToForeground(status)
+                } catch (error: Throwable) {
+                    Log.w("RunTracking", "re-promote failed: ${error.message}")
+                }
+            }
+            return START_STICKY
+        }
+        // No run to track: answer startForegroundService first, then stop, and
+        // never ask the system to restart an idle service.
+        if (!finished) stopIdleService(RunStartCommandPolicy.requiresForeground(action))
+        return START_NOT_STICKY
+    }
+
+    /**
+     * Stops a service that has no run. When it was started with
+     * `startForegroundService` it first enters the foreground with a minimal
+     * notification, otherwise Android crashes the app a few seconds later.
+     */
+    private fun stopIdleService(owesForeground: Boolean) {
+        if (owesForeground) {
+            try {
+                RunTrackingNotification.ensureChannel(this)
+                val notification = RunTrackingNotification.buildPlaceholder(this)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    // Not the location type: it needs the permission and a
+                    // foreground-visible app on Android 14+, and this service
+                    // is about to stop anyway.
+                    startForeground(
+                        RunTrackingNotification.NOTIFICATION_ID,
+                        notification,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
+                    )
+                } else {
+                    startForeground(RunTrackingNotification.NOTIFICATION_ID, notification)
+                }
+            } catch (error: Throwable) {
+                // Foreground start refused (background restriction): nothing
+                // more can be done, still stop below.
+                Log.w("RunTracking", "placeholder foreground failed: ${error.message}")
+            }
+        }
+        try {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } catch (_: Throwable) {
+            // Not in the foreground.
+        }
+        stopSelf()
     }
 
     private fun startRun(requestedId: String?) {
@@ -320,7 +374,6 @@ class RunTrackingService : Service(), LocationListener {
                 "error_message" to "Precise location permission denied",
             )
             eventSink?.invoke(lastState!!)
-            stopSelf()
             return
         }
 
@@ -360,6 +413,7 @@ class RunTrackingService : Service(), LocationListener {
         activity = session
         spool.createAsync(session)
 
+        RunTrackingNotification.cancelRecoveryNotice(this)
         promoteToForeground("recording")
         acquireWakeLock()
         status = "recording"
@@ -370,7 +424,13 @@ class RunTrackingService : Service(), LocationListener {
             val pendingS = RunVoiceBridge.pendingSettings
             val pendingG = RunVoiceBridge.pendingGoal
             val pendingI = RunVoiceBridge.pendingIntervalsOn
-            voiceController.begin(pendingS, pendingG, pendingI, RunVoiceBridge.pendingPlan)
+            voiceController.begin(
+                pendingS,
+                pendingG,
+                pendingI,
+                RunVoiceBridge.pendingPlan,
+                RunVoiceBridge.pendingWorkout,
+            )
             persistVoicePlan()
         } catch (_: Throwable) {
             voiceController.begin(null, null, null)
@@ -393,20 +453,18 @@ class RunTrackingService : Service(), LocationListener {
             isActiveSpoolStatus(it["status"] as? String)
         }
         val id = orphan?.get("id")?.toString()
-        if (id == null) {
-            stopSelf()
-            return
-        }
+        // The caller (onStartCommand) stops the idle service after it has
+        // entered the foreground, so every early return here just returns.
+        if (id == null) return
         if (!locationGranted(this)) {
             finalizeOrphanActiveSpool(this, "completed")
-            stopSelf()
             return
         }
 
         val data = try {
             spool.blocking { read(id) }
-        } catch (_: Throwable) {
-            stopSelf()
+        } catch (error: Throwable) {
+            Log.w("RunTracking", "spool read failed: ${error.message}")
             return
         }
 
@@ -461,7 +519,20 @@ class RunTrackingService : Service(), LocationListener {
         session["status"] = restoredStatus
         spool.updateActivityAsync(session)
 
-        promoteToForeground(restoredStatus)
+        try {
+            promoteToForeground(restoredStatus)
+        } catch (error: Throwable) {
+            // Android 14+ refuses a location foreground service restarted from
+            // the background. Keep the spool as it is, drop this instance and
+            // ask the user to reopen the app (recoverActive takes over).
+            Log.w("RunTracking", "restore foreground refused: ${error.message}")
+            activeInstance = null
+            activity = null
+            status = "idle"
+            RunTrackingNotification.postRecoveryNotice(this)
+            return
+        }
+        RunTrackingNotification.cancelRecoveryNotice(this)
         acquireWakeLock()
         // Restore voice: reload settings from DB and resume active flag
         try {
@@ -475,6 +546,7 @@ class RunTrackingService : Service(), LocationListener {
             // Rehydrate the goal, structured plan and execution cursor so a
             // killed process keeps cueing the remaining reps.
             voiceController.restoreGoalJson(session["voice_goal_json"] as? String)
+            voiceController.restoreWorkoutJson(session["voice_workout_json"] as? String)
             val restoredPlan = session["voice_plan_json"] as? String
             voiceController.begin(
                 null,
@@ -601,6 +673,7 @@ class RunTrackingService : Service(), LocationListener {
     private fun cleanupAndStop() {
         releaseWakeLock()
         activeInstance = null
+        RunTrackingNotification.cancelRecoveryNotice(this)
         RunTrackingBridge.pendingSessionContext = null
         try {
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -816,6 +889,7 @@ class RunTrackingService : Service(), LocationListener {
         try {
             session["voice_plan_json"] = voiceController.planStepsJson()
             session["voice_goal_json"] = voiceController.goalJson()
+            session["voice_workout_json"] = voiceController.workoutJson()
             session["voice_intervals_on"] = voiceController.intervalsEnabled
             session["voice_engine_snapshot_json"] = voiceController.engineSnapshotJson()
             session["voice_step_results"] = voiceController.stepResults()

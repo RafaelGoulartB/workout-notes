@@ -4,6 +4,7 @@ import 'package:workout_notes/models/body_measurement_types.dart';
 import 'package:workout_notes/screens/body/body_stats_controller.dart';
 import 'package:workout_notes/widgets/body_tracker/stats/body_stats_cards.dart';
 import 'package:workout_notes/widgets/body_tracker/stats/body_stats_primitives.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Progress statistics for body measurements: Sunday-to-Sunday weekly
@@ -60,6 +61,8 @@ class _BodyStatsScreenState extends State<BodyStatsScreen> {
           appBar: AppBar(title: Text(loc.bodyStatsTitle), centerTitle: true),
           body: c.loading
               ? const Center(child: CircularProgressIndicator())
+              : c.loadFailed
+              ? LoadErrorView(onRetry: c.load)
               : RefreshIndicator(
                   onRefresh: c.load,
                   child: ListView(

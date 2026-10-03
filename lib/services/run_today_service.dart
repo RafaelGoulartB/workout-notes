@@ -4,6 +4,7 @@ import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
+import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/utils/date_utils.dart';
@@ -190,7 +191,9 @@ abstract final class RunTodayResolver {
     final rows = scheduledToday.where((s) => s.workout != null).toList();
     final ranToday =
         todayActivities
-            .where((a) => a.isCompleted && isSameDay(a.startedAt.toLocal(), day))
+            .where(
+              (a) => a.isCompleted && isSameDay(a.startedAt.toLocal(), day),
+            )
             .toList()
           ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
 
@@ -334,7 +337,9 @@ abstract final class RunTodayResolver {
         upcoming
             .where(
               (s) =>
-                  s.isPlanned && s.workout != null && dayOf(s.date).isAfter(day),
+                  s.isPlanned &&
+                  s.workout != null &&
+                  dayOf(s.date).isAfter(day),
             )
             .toList()
           ..sort((a, b) => a.date.compareTo(b.date));
@@ -356,7 +361,7 @@ abstract final class RunTodayResolver {
   }) {
     if (plan == null) return null;
     for (var i = 1; i <= horizonDays; i++) {
-      final date = day.add(Duration(days: i));
+      final date = addDays(day, i);
       final session = _sessionFromPlan(date, plan);
       if (session != null) return session;
     }
@@ -399,7 +404,7 @@ abstract final class RunTodayResolver {
       for (final workout in plan.workoutsForWeek(week))
         if (workout.dayOfWeek != null)
           () {
-            final date = monday.add(Duration(days: workout.dayOfWeek! - 1));
+            final date = addDays(monday, workout.dayOfWeek! - 1);
             return RunPlannedDay(
               date: date,
               kind: workout.kind,
@@ -475,19 +480,11 @@ class RunTodayService {
     );
     final upcoming =
         await _safe(
-          _planRepo.getScheduledRuns(
-            day.add(const Duration(days: 1)),
-            day.add(const Duration(days: 28)),
-          ),
+          _planRepo.getScheduledRuns(addDays(day, 1), addDays(day, 28)),
         ) ??
         const <ScheduledRun>[];
     final weekRows =
-        await _safe(
-          _planRepo.getScheduledRuns(
-            monday,
-            monday.add(const Duration(days: 6)),
-          ),
-        ) ??
+        await _safe(_planRepo.getScheduledRuns(monday, addDays(monday, 6))) ??
         const <ScheduledRun>[];
     final all =
         activities ??
@@ -515,7 +512,7 @@ class RunTodayService {
         followed == null && upcoming.every((s) => !s.isPlanned);
     if (needsSuggestionLookahead && suggestion != null) {
       for (var i = 1; i <= 7 && next == null; i++) {
-        final date = day.add(Duration(days: i));
+        final date = addDays(day, i);
         final future = await _safe(
           helper.periodizationRepo.getRunSuggestion(date),
         );
@@ -564,10 +561,10 @@ class RunTodayService {
       [
         for (var i = 0; i < 7; i++)
           RunDayRuns(
-            monday.add(Duration(days: i)),
+            addDays(monday, i),
             all.where((a) {
               final d = a.startedAt.toLocal();
-              final date = monday.add(Duration(days: i));
+              final date = addDays(monday, i);
               return d.year == date.year &&
                   d.month == date.month &&
                   d.day == date.day;

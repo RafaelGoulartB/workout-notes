@@ -156,4 +156,17 @@ class RunStepResult {
 
   double? get actualPaceSecPerKm =>
       RunFormatters.paceOrNull(distanceMeters, durationSeconds);
+
+  /// Row stored in the spool's `voice_step_results` (same keys as [fromMap]).
+  Map<String, dynamic> toMap() => {
+    'sequence': sequence,
+    'role': role.value,
+    'repIndex': repIndex,
+    'plannedMetric': plannedMetric.name,
+    'plannedValue': plannedValue,
+    'plannedPaceSecPerKm': plannedPaceSecPerKm,
+    'distanceMeters': distanceMeters,
+    'durationSeconds': durationSeconds,
+    'actualPaceSecPerKm': actualPaceSecPerKm,
+  };
 }

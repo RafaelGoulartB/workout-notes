@@ -5,10 +5,14 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/models/exercise_with_sets.dart';
 import 'package:workout_notes/repositories/workout_repository.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/strength/exercises/exercise_picker_sheet.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
+import 'package:workout_notes/widgets/workout/set_deleted_snack_bar.dart';
 
 /// Screen for editing a completed (or in-progress) workout.
 ///
@@ -28,14 +32,14 @@ class EditWorkoutScreen extends StatefulWidget {
   State<EditWorkoutScreen> createState() => _EditWorkoutScreenState();
 }
 
-class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
+class _EditWorkoutScreenState extends State<EditWorkoutScreen>
+    with GuardedLoad {
   final _workoutRepo = DatabaseHelper.instance.workoutRepo;
   final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
   final _commentController = TextEditingController();
 
   Map<String, dynamic>? _workout;
   List<ExerciseWithSets> _exercises = [];
-  bool _isLoading = true;
 
   DateTime? _startTime;
   DateTime? _endTime;
@@ -54,7 +58,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     _workout = await _workoutRepo.getWorkout(widget.workoutId);
     if (_workout == null) {
       if (mounted) Navigator.pop(context);
@@ -88,7 +92,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
     if (mounted) {
       setState(() {
         _exercises = exercises;
-        _isLoading = false;
+        isLoading = false;
         _workoutDate = dateStr != null
             ? DateTime.parse(dateStr)
             : DateTime.now();
@@ -98,7 +102,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
         _feelingRating = (_workout!['feeling_rating'] as int?) ?? 0;
       });
     }
-  }
+  });
 
   int get _totalSets =>
       _exercises.fold<int>(0, (sum, e) => sum + e.sets.length);
@@ -129,7 +133,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
       context: context,
       initialDate: _workoutDate,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: addDays(DateTime.now(), 365),
       helpText: loc.editWorkoutSelectDate,
     );
     if (picked == null || !mounted) return;
@@ -166,7 +170,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
       context: context,
       initialDate: initial,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: addDays(DateTime.now(), 365),
       helpText: loc.editWorkoutSelectDate,
     );
     if (pickedDate == null || !mounted) return;
@@ -210,7 +214,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
       context: context,
       initialDate: initial,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: addDays(DateTime.now(), 365),
       helpText: loc.editWorkoutSelectDate,
     );
     if (pickedDate == null || !mounted) return;
@@ -383,7 +387,21 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
   }
 
   Future<void> _deleteSet(String setId) async {
-    await _workoutRepo.deleteSet(setId);
+    final deleted = await _workoutRepo.deleteSet(setId);
+    await _load();
+    if (!mounted) return;
+    setState(() {});
+    if (deleted == null) return;
+    showSetDeletedSnackBar(
+      context,
+      messenger: _scaffoldMessengerKey.currentState,
+      onUndo: () => _restoreSet(deleted),
+    );
+  }
+
+  Future<void> _restoreSet(Map<String, dynamic> row) async {
+    final restored = await _workoutRepo.restoreSet(row);
+    if (!restored || !mounted) return;
     await _load();
     if (mounted) setState(() {});
   }
@@ -392,13 +410,17 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
     final loc = AppLocalizations.of(context)!;
     final set = exercise.sets[setIndex];
     final weightCtl = TextEditingController(
-      text: (set['weight'] as num?)?.toStringAsFixed(1) ?? '',
+      text: AppNumberFormat.decimalOrDash(
+        set['weight'] as num?,
+        1,
+        fallback: '',
+      ),
     );
     final repsCtl = TextEditingController(
       text: (set['reps'] as int?)?.toString() ?? '',
     );
     final rpeCtl = TextEditingController(
-      text: (set['rpe'] as num?)?.toStringAsFixed(1) ?? '',
+      text: AppNumberFormat.decimalOrDash(set['rpe'] as num?, 1, fallback: ''),
     );
 
     final result = await showDialog<bool>(
@@ -461,9 +483,9 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
     if (result == true) {
       await _workoutRepo.updateSet(
         set['id'] as String,
-        weight: double.tryParse(weightCtl.text),
+        weight: double.tryParse(weightCtl.text.replaceAll(',', '.')),
         reps: int.tryParse(repsCtl.text),
-        rpe: double.tryParse(rpeCtl.text),
+        rpe: double.tryParse(rpeCtl.text.replaceAll(',', '.')),
       );
       await _load();
       if (mounted) setState(() {});
@@ -481,15 +503,14 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
     final orderedIds = reordered.map((e) => e.entryId).toList();
     try {
       await _workoutRepo.reorderWorkoutExercises(widget.workoutId, orderedIds);
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('edit_workout_screen: action failed: $e\n$stack');
       if (!mounted) return;
       await _load();
       if (!mounted) return;
       _scaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(
-          content: Text(
-            AppLocalizations.of(context)!.commonReorderError(e.toString()),
-          ),
+          content: Text(AppLocalizations.of(context)!.commonReorderError),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -555,8 +576,10 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
             ),
           ],
         ),
-        body: _isLoading
+        body: isLoading
             ? const Center(child: CircularProgressIndicator())
+            : loadFailed
+            ? LoadErrorView(onRetry: _load)
             : Column(
                 children: [
                   Expanded(
@@ -874,7 +897,7 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
             if (ex.sets.isNotEmpty) ...[
               Row(
                 children: [
-                  const SizedBox(width: 28),
+                  const SizedBox(width: 40),
                   Expanded(
                     flex: 3,
                     child: Text(
@@ -917,33 +940,48 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 3),
                 child: Row(
                   children: [
-                    InkWell(
-                      borderRadius: BorderRadius.circular(20),
-                      onTap: () => _deleteSet(s['id'] as String),
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isWarmup
-                              ? colors.tertiary.withAlpha(30)
-                              : colors.surfaceContainerHighest,
-                        ),
-                        child: Text(
-                          isWarmup ? loc.workoutDetailWarmupShort : '${i + 1}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: isWarmup ? colors.tertiary : null,
+                    Tooltip(
+                      message: loc.workoutDeleteSetTooltip,
+                      child: Semantics(
+                        button: true,
+                        label: loc.workoutDeleteSetTooltip,
+                        excludeSemantics: true,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: () => _deleteSet(s['id'] as String),
+                          child: SizedBox(
+                            width: 40,
+                            height: 40,
+                            child: Center(
+                              child: Container(
+                                width: 24,
+                                height: 24,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isWarmup
+                                      ? colors.tertiary.withAlpha(30)
+                                      : colors.surfaceContainerHighest,
+                                ),
+                                child: Text(
+                                  isWarmup
+                                      ? loc.workoutDetailWarmupShort
+                                      : '${i + 1}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: isWarmup ? colors.tertiary : null,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 4),
                     for (final value in [
-                      (s['weight'] as num?)?.toStringAsFixed(1) ?? '-',
+                      AppNumberFormat.decimalOrDash(s['weight'] as num?, 1),
                       (s['reps'] as int?)?.toString() ?? '-',
-                      (s['rpe'] as num?)?.toStringAsFixed(1) ?? '-',
+                      AppNumberFormat.decimalOrDash(s['rpe'] as num?, 1),
                     ])
                       Expanded(
                         flex: 3,

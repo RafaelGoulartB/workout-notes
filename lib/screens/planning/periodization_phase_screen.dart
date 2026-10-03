@@ -8,10 +8,14 @@ import 'package:workout_notes/models/periodization_schedule.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/periodization/week_progress.dart';
+import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/screens/planning/periodization_checkin_flow.dart';
 import 'package:workout_notes/screens/planning/periodization_phase_editor_screen.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// A phase at a glance: what it plans (targets and template week) and how
@@ -31,7 +35,8 @@ class PeriodizationPhaseScreen extends StatefulWidget {
       _PeriodizationPhaseScreenState();
 }
 
-class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
+class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen>
+    with GuardedLoad {
   final _repository = DatabaseHelper.instance.periodizationRepo;
   late PeriodizationPhase _phase = widget.phase;
   late PeriodizationPlan _plan = widget.plan;
@@ -42,7 +47,6 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
   Map<String, String> _routineNames = const {};
   Map<String, List<String>> _routineDays = const {};
   int _selected = 0;
-  bool _loading = true;
   bool _changed = false;
 
   DateTime get _today {
@@ -56,7 +60,7 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     final phase = await _repository.getPhase(widget.phase.id);
     if (phase == null) {
       if (mounted) Navigator.pop(context, true);
@@ -80,8 +84,7 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
     // can show how each went; later weeks load when opened.
     final started = [
       for (var week = 0; week < phase.totalWeeks; week++)
-        if (!phase.startDate.add(Duration(days: 7 * week)).isAfter(_today))
-          week,
+        if (!addDays(phase.startDate, 7 * week).isAfter(_today)) week,
     ];
     final progress = await Future.wait([
       for (final week in {...started, currentWeek})
@@ -105,10 +108,10 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
       _progress
         ..clear()
         ..addEntries(progress.map((item) => MapEntry(item.weekIndex, item)));
-      if (_loading) _selected = currentWeek;
-      _loading = false;
+      if (isLoading) _selected = currentWeek;
+      isLoading = false;
     });
-  }
+  });
 
   Future<void> _select(int week) async {
     setState(() => _selected = week);
@@ -166,6 +169,7 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
       title: loc.planningDeletePhaseTitle,
       message: loc.planningDeletePhaseBody(_phase.name),
       confirmLabel: loc.planningDelete,
+      destructive: true,
     );
     if (confirmed != true) return;
     final remaining = _planPhases.where((p) => p.id != _phase.id).toList();
@@ -208,7 +212,7 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
             IconButton(
               key: const Key('phaseScreenEdit'),
               tooltip: loc.planningEditPhase,
-              onPressed: _loading ? null : _edit,
+              onPressed: isLoading || loadFailed ? null : _edit,
               icon: const Icon(Icons.edit_outlined),
             ),
             PopupMenuButton<String>(
@@ -233,8 +237,10 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
             ),
           ],
         ),
-        body: _loading
+        body: isLoading
             ? const Center(child: CircularProgressIndicator())
+            : loadFailed
+            ? LoadErrorView(onRetry: _load)
             : RefreshIndicator(
                 onRefresh: _load,
                 child: ListView(
@@ -273,7 +279,7 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
                       progress: _progress[_selected],
                       checkin:
                           _checkins[_key(
-                            _phase.startDate.add(Duration(days: 7 * _selected)),
+                            addDays(_phase.startDate, 7 * _selected),
                           )],
                       today: _today,
                       strengthLabels: [
@@ -361,7 +367,7 @@ class _Header extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              loc.planningDaysLeft(phase.endDate.difference(today).inDays),
+              loc.planningDaysLeft(daysBetween(today, phase.endDate)),
               style: theme.textTheme.labelSmall?.copyWith(
                 color: scheme.onSurfaceVariant,
               ),
@@ -447,7 +453,7 @@ class _TargetsCard extends StatelessWidget {
             if (target.runDays.isNotEmpty)
               loc.planningRunsPerWeek(target.runDays.length),
             if (target.runWeeklyDistanceMeters != null)
-              '${(target.runWeeklyDistanceMeters! / 1000).toStringAsFixed(0)} km',
+              '${AppNumberFormat.decimal(target.runWeeklyDistanceMeters! / 1000, 0)} km',
           ].join(' · '),
         ),
       if (target.weeklyWeightChangePercent != null ||
@@ -461,7 +467,7 @@ class _TargetsCard extends StatelessWidget {
               ),
             if (target.targetWeightKg != null)
               loc.planningTargetWeightValue(
-                target.targetWeightKg!.toStringAsFixed(1),
+                AppNumberFormat.decimal(target.targetWeightKg!, 1),
               ),
           ].join(' · '),
         ),
@@ -469,9 +475,10 @@ class _TargetsCard extends StatelessWidget {
         _TargetRow(
           icon: Icons.bedtime_outlined,
           title: loc.planningSleepValue(
-            target.sleepHours!
-                .toStringAsFixed(target.sleepHours! % 1 == 0 ? 0 : 1)
-                .replaceAll('.', ','),
+            AppNumberFormat.decimal(
+              target.sleepHours!,
+              target.sleepHours! % 1 == 0 ? 0 : 1,
+            ),
           ),
         ),
     ];
@@ -512,7 +519,7 @@ class _TargetsCard extends StatelessWidget {
         : value < 0
         ? '−'
         : '';
-    return '$sign${value.abs().toString().replaceAll('.', ',')}%';
+    return '$sign${AppNumberFormat.decimal(value.abs(), 2, trimZeros: true)}%';
   }
 }
 
@@ -610,7 +617,7 @@ class _WeekStripState extends State<_WeekStrip> {
         itemCount: widget.phase.totalWeeks,
         itemExtent: _tileWidth,
         itemBuilder: (context, week) {
-          final start = widget.phase.startDate.add(Duration(days: 7 * week));
+          final start = addDays(widget.phase.startDate, 7 * week);
           final started = !start.isAfter(widget.today);
           final current =
               widget.phase.contains(widget.today) &&
@@ -724,8 +731,8 @@ class _WeekDetail extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final color = Color(phase.color);
-    final start = phase.startDate.add(Duration(days: 7 * week));
-    final end = start.add(const Duration(days: 6));
+    final start = addDays(phase.startDate, 7 * week);
+    final end = addDays(start, 6);
     final started = !start.isAfter(today);
     final current = !today.isBefore(start) && !today.isAfter(end);
     final progress = this.progress;
@@ -841,13 +848,13 @@ class _PlannedDone extends StatelessWidget {
           done: progress.plannedRunKm == null
               ? '${progress.doneRuns}'
               : '${progress.doneRuns} · '
-                    '${progress.doneRunKm.toStringAsFixed(1).replaceAll('.', ',')} km',
+                    '${AppNumberFormat.decimal(progress.doneRunKm, 1)} km',
           planned: progress.plannedRuns == 0
               ? null
               : progress.plannedRunKm == null
               ? '${progress.plannedRuns}'
               : '${progress.plannedRuns} · '
-                    '${progress.plannedRunKm!.toStringAsFixed(1).replaceAll('.', ',')} km',
+                    '${AppNumberFormat.decimal(progress.plannedRunKm!, 1)} km',
           ratio: progress.plannedRuns == 0
               ? null
               : progress.doneRuns / progress.plannedRuns,
@@ -871,10 +878,10 @@ class _PlannedDone extends StatelessWidget {
           label: loc.planningAverageSleep,
           done: metrics.averageSleepHours == null
               ? '—'
-              : '${metrics.averageSleepHours!.toStringAsFixed(1).replaceAll('.', ',')} h',
+              : '${AppNumberFormat.decimal(metrics.averageSleepHours!, 1)} h',
           planned: progress.target?.sleepHours == null
               ? null
-              : '${progress.target!.sleepHours!.toStringAsFixed(1).replaceAll('.', ',')} h',
+              : '${AppNumberFormat.decimal(progress.target!.sleepHours!, 1)} h',
           ratio: metrics.sleepAdherencePercent == null
               ? null
               : metrics.sleepAdherencePercent! / 100,
@@ -885,7 +892,7 @@ class _PlannedDone extends StatelessWidget {
           label: loc.planningWeightChange,
           done:
               '${metrics.weightChangeKg! > 0 ? '+' : ''}'
-              '${metrics.weightChangeKg!.toStringAsFixed(1).replaceAll('.', ',')} kg',
+              '${AppNumberFormat.decimal(metrics.weightChangeKg!, 1)} kg',
         ),
     ];
     if (rows.isEmpty) {

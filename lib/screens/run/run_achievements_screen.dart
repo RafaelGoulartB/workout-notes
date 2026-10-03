@@ -10,6 +10,8 @@ import 'package:workout_notes/utils/run_achievement_engine.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/run/run_achievements_section.dart';
 import 'package:workout_notes/widgets/run/run_medal_badge.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Complete, all-time personal-record board for outdoor GPS runs.
@@ -20,10 +22,10 @@ class RunAchievementsScreen extends StatefulWidget {
   State<RunAchievementsScreen> createState() => _RunAchievementsScreenState();
 }
 
-class _RunAchievementsScreenState extends State<RunAchievementsScreen> {
+class _RunAchievementsScreenState extends State<RunAchievementsScreen>
+    with GuardedLoad {
   final _repository = DatabaseHelper.instance.runRepo;
   RunAchievementBoard _board = RunAchievementBoard.empty;
-  bool _loading = true;
 
   @override
   void initState() {
@@ -31,15 +33,15 @@ class _RunAchievementsScreenState extends State<RunAchievementsScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     await _repository.backfillMissingEfforts(limit: 60);
     final activities = await _repository.listActivities(limit: null);
     if (!mounted) return;
     setState(() {
       _board = RunAchievementEngine.build(activities);
-      _loading = false;
+      isLoading = false;
     });
-  }
+  });
 
   Future<void> _openActivity(String activityId) async {
     await Navigator.push(
@@ -65,8 +67,10 @@ class _RunAchievementsScreenState extends State<RunAchievementsScreen> {
     final hasRecords = _board.nonEmptyCategories.isNotEmpty;
     return Scaffold(
       appBar: AppBar(title: Text(loc.runAchievementsTitle)),
-      body: _loading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _load)
           : !hasRecords
           ? AppEmptyState(
               icon: Icons.emoji_events_outlined,
@@ -144,7 +148,11 @@ class _AchievementHero extends StatelessWidget {
         children: [
           Row(
             children: [
-              const AppIconBadge(Icons.emoji_events_rounded, size: 48, iconSize: 28),
+              const AppIconBadge(
+                Icons.emoji_events_rounded,
+                size: 48,
+                iconSize: 28,
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(

@@ -8,6 +8,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/models/exercise_with_sets.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
+import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/screens/workout/rest_timer_screen.dart';
 import 'package:workout_notes/services/notification_service.dart';
 import 'package:workout_notes/services/rest_timer_service.dart';
@@ -17,9 +18,11 @@ import 'package:workout_notes/utils/workout_volume_comparison.dart';
 import 'package:workout_notes/widgets/strength/exercises/exercise_picker_sheet.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_today_card.dart';
 import 'package:workout_notes/widgets/strength/workout/active_workout_header.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 import 'package:workout_notes/widgets/workout/exercise_card.dart';
 import 'package:workout_notes/widgets/workout/finish_workout_sheet.dart';
+import 'package:workout_notes/widgets/workout/set_deleted_snack_bar.dart';
 import 'package:workout_notes/widgets/workout/set_editor_fields.dart';
 
 part 'active_workout_controller.dart';
@@ -178,6 +181,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
         ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
+            : _loadFailed
+            ? LoadErrorView(onRetry: _initialize)
             : _exercises.isEmpty && _timerStart == null
             ? _buildEmptyState(theme)
             : _buildWorkoutView(theme),

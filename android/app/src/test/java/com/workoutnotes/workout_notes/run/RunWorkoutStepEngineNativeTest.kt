@@ -123,29 +123,104 @@ class RunWorkoutStepEngineNativeTest {
     }
 
     @Test
-    fun emitsThirtySecondCueOnLongTimeSteps() {
+    fun emitsOneMinuteCueOnLongTimeSteps() {
         val engine = RunWorkoutStepEngineNative()
         engine.configure(listOf(step(RunStepRole.steady, 300, RunIntervalMetric.time)))
         engine.start()
         assertTrue(engine.tick(true, 500.0, 200).isEmpty())
-        val events = engine.tick(true, 800.0, 280)
-        assertEquals(1, events.size)
-        assertEquals(RunStepEventKind.timeRemainingCue, events[0].kind)
-        assertEquals(30, events[0].remainingSeconds)
-        assertTrue(engine.tick(true, 820.0, 285).isEmpty())
+        val events = engine.tick(true, 800.0, 245)
+        assertEquals(listOf(RunStepEventKind.timeRemainingCue), events.map { it.kind })
+        assertEquals(60, events[0].remainingSeconds)
+        assertTrue(engine.tick(true, 820.0, 250).isEmpty())
     }
 
     @Test
-    fun warnsOnceWhenSlowerThanTargetPace() {
+    fun timedStepsCountDownTheirLastThreeSeconds() {
         val engine = RunWorkoutStepEngineNative()
-        engine.configure(listOf(step(RunStepRole.work, 1000, paceMin = 230.0, paceMax = 250.0)))
+        engine.configure(listOf(step(RunStepRole.work, 30, RunIntervalMetric.time), step(RunStepRole.recovery, 60, RunIntervalMetric.time)))
         engine.start()
-        // 200 m in 60 s → 300 s/km, slower than the 250 s/km ceiling.
-        val events = engine.tick(true, 200.0, 60)
-        assertEquals(1, events.size)
-        assertEquals(RunStepEventKind.paceTooSlow, events[0].kind)
-        assertEquals(300.0, events[0].paceSecPerKm!!, 1.0)
-        assertTrue(engine.tick(true, 260.0, 80).none { it.kind == RunStepEventKind.paceTooSlow })
+        val ticks = (1..30).map { second -> engine.tick(true, second * 4.0, second) }
+        val countdown = ticks.flatten().filter { it.kind == RunStepEventKind.countdown }
+        assertEquals(listOf(3, 2, 1), countdown.map { it.remainingSeconds })
+        // The last tick both completes the step and starts the next one.
+        assertEquals(RunStepEventKind.stepStarted, ticks.last().last().kind)
+    }
+
+    @Test
+    fun longEffortsGetAHalfwayCall() {
+        val engine = RunWorkoutStepEngineNative()
+        engine.configure(listOf(step(RunStepRole.steady, 2000)))
+        engine.start()
+        assertTrue(engine.tick(true, 900.0, 270).none { it.kind == RunStepEventKind.halfway })
+        assertEquals(1, engine.tick(true, 1000.0, 300).count { it.kind == RunStepEventKind.halfway })
+        assertTrue(engine.tick(true, 1100.0, 330).none { it.kind == RunStepEventKind.halfway })
+    }
+
+    /** Ticks once per second at [pace] from [from] to [to]. */
+    private fun RunWorkoutStepEngineNative.runAt(
+        pace: Double,
+        from: Int,
+        to: Int,
+        startMeters: Double,
+    ): Pair<Double, List<RunStepEventNative>> {
+        var meters = startMeters
+        val events = mutableListOf<RunStepEventNative>()
+        for (second in from + 1..to) {
+            meters += 1000.0 / pace
+            events.addAll(tick(true, meters, second))
+        }
+        return meters to events
+    }
+
+    @Test
+    fun paceWarningUsesARollingWindowAndReArms() {
+        val engine = RunWorkoutStepEngineNative()
+        engine.configure(listOf(step(RunStepRole.steady, 1200, RunIntervalMetric.time, paceMin = 290.0, paceMax = 310.0)))
+        engine.start()
+        var (meters, events) = engine.runAt(340.0, 0, 120, 0.0)
+        val slow = events.filter { it.kind == RunStepEventKind.paceTooSlow }
+        assertEquals(1, slow.size)
+        assertEquals(340.0, slow.single().paceSecPerKm!!, 5.0)
+
+        val back = engine.runAt(300.0, 120, 160, meters)
+        meters = back.first
+        assertEquals(1, back.second.count { it.kind == RunStepEventKind.paceBackInRange })
+
+        val again = engine.runAt(340.0, 160, 300, meters)
+        assertEquals(1, again.second.count { it.kind == RunStepEventKind.paceTooSlow })
+    }
+
+    @Test
+    fun noPaceWarningDuringTheAccelerationOfARep() {
+        val engine = RunWorkoutStepEngineNative()
+        engine.configure(listOf(step(RunStepRole.work, 400, repeatGroup = 1, repeatCount = 4, paceMin = 230.0, paceMax = 250.0)))
+        engine.start()
+        // A slow first 20 s, then on pace: the window forgets the start.
+        val (meters, start) = engine.runAt(400.0, 0, 20, 0.0)
+        val (_, rest) = engine.runAt(240.0, 20, 95, meters)
+        assertTrue((start + rest).none { it.kind == RunStepEventKind.paceTooSlow })
+    }
+
+    @Test
+    fun easyEffortStepsOnlyWarnWhenTooFast() {
+        val engine = RunWorkoutStepEngineNative()
+        engine.configure(listOf(step(RunStepRole.steady, 6000, paceMin = 330.0, paceMax = 360.0)), easyEffort = true)
+        engine.start()
+        val (meters, slow) = engine.runAt(450.0, 0, 300, 0.0)
+        assertTrue(slow.none { it.kind == RunStepEventKind.paceTooSlow })
+        val (_, fast) = engine.runAt(290.0, 300, 400, meters)
+        assertEquals(1, fast.count { it.kind == RunStepEventKind.paceTooFast })
+    }
+
+    @Test
+    fun completedStepCarriesWhatWasRun() {
+        val engine = RunWorkoutStepEngineNative()
+        engine.configure(listOf(step(RunStepRole.work, 400), step(RunStepRole.cooldown, 400)))
+        engine.start()
+        val events = engine.tick(true, 400.0, 92)
+        val done = events.first { it.kind == RunStepEventKind.stepCompleted }
+        assertEquals(92, done.stepDurationSeconds)
+        assertEquals(400.0, done.stepDistanceMeters!!, 0.001)
     }
 
     @Test

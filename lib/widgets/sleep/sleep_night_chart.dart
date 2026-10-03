@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_night_timeline.dart';
 import 'package:workout_notes/models/sleep_stage_type.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
 
 /// The night minute by minute: estimated state, the model's chance of sleep
@@ -261,7 +262,7 @@ class _NightPainter extends CustomPainter {
       canvas.drawLine(Offset(gx, bandTop), Offset(gx, soundBottom), gridPaint);
       _text(
         canvas,
-        '${hour.toString().padLeft(2, '0')}:00',
+        DurationFormat.hhmm(hour * 60),
         Offset(gx, soundBottom + 4),
         center: true,
       );

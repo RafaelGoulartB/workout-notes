@@ -147,7 +147,7 @@ class RunPlan {
   int? _elapsedWeeks(DateTime date) {
     final anchor = activatedAt;
     if (anchor == null || weeks < 1) return null;
-    return mondayOf(date).difference(mondayOf(anchor)).inDays ~/ 7;
+    return daysBetween(mondayOf(anchor), mondayOf(date)) ~/ 7;
   }
 
   /// Sessions of [weekIndex] (zero-based), ordered by weekday then order.
@@ -268,7 +268,6 @@ class RunPlan {
       return null;
     }
   }
-
 }
 
 const Object _sentinel = Object();

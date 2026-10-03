@@ -70,6 +70,7 @@ class RunDataFieldsGrid extends StatelessWidget {
                 now: now,
                 activityType: activityType,
                 bodyWeightKg: bodyWeightKg,
+                use24Hour: MediaQuery.alwaysUse24HourFormatOf(context),
               ),
               // Two big cells per row read from an arm's length; three need
               // a smaller numeral to fit 360 dp.
@@ -319,6 +320,7 @@ class _FieldsEditorState extends State<_FieldsEditor> {
                     ),
                     title: Text(runDataFieldLabel(loc, _fields[i])),
                     trailing: IconButton(
+                      tooltip: loc.commonRemove,
                       icon: const Icon(Icons.remove_circle_outline_rounded),
                       onPressed: () => _remove(_fields[i]),
                     ),

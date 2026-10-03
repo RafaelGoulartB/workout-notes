@@ -15,8 +15,7 @@ class BodySparkline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final reversed = measurements.reversed.toList();
-    final values =
-        reversed.map((m) => (m['value'] as num).toDouble()).toList();
+    final values = reversed.map((m) => (m['value'] as num).toDouble()).toList();
     final minVal = values.reduce((a, b) => a < b ? a : b);
     final maxVal = values.reduce((a, b) => a > b ? a : b);
     final range = maxVal - minVal;
@@ -31,7 +30,9 @@ class BodySparkline extends StatelessWidget {
         lineTouchData: const LineTouchData(enabled: false),
         lineBarsData: [
           LineChartBarData(
-            spots: values.asMap().entries
+            spots: values
+                .asMap()
+                .entries
                 .map((e) => FlSpot(e.key.toDouble(), e.value))
                 .toList(),
             isCurved: true,
@@ -41,10 +42,7 @@ class BodySparkline extends StatelessWidget {
             belowBarData: BarAreaData(
               show: true,
               gradient: LinearGradient(
-                colors: [
-                  lineColor.withAlpha(50),
-                  lineColor.withAlpha(0),
-                ],
+                colors: [lineColor.withAlpha(50), lineColor.withAlpha(0)],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),

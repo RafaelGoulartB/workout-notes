@@ -125,7 +125,7 @@ class _RecordRow extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
-    final date = DateFormat('dd/MM/yy');
+    final date = DateFormat.yMd(Intl.defaultLocale);
     final r = record;
 
     Widget metric(String label, String value, String caption) => Expanded(

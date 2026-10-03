@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Full-size trend chart for the selected measurement type.
@@ -20,8 +21,7 @@ class BodyChartCard extends StatelessWidget {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
     final reversed = measurements.reversed.toList();
-    final values =
-        reversed.map((m) => (m['value'] as num).toDouble()).toList();
+    final values = reversed.map((m) => (m['value'] as num).toDouble()).toList();
     final minVal = values.reduce((a, b) => a < b ? a : b);
     final maxVal = values.reduce((a, b) => a > b ? a : b);
     final range = maxVal - minVal;
@@ -54,11 +54,9 @@ class BodyChartCard extends StatelessWidget {
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
-                    horizontalInterval:
-                        range > 0 ? niceInterval(range / 4) : 1,
+                    horizontalInterval: range > 0 ? niceInterval(range / 4) : 1,
                     getDrawingHorizontalLine: (v) => FlLine(
-                      color: theme.colorScheme.outlineVariant
-                          .withAlpha(40),
+                      color: theme.colorScheme.outlineVariant.withAlpha(40),
                       strokeWidth: 0.5,
                     ),
                   ),
@@ -68,7 +66,7 @@ class BodyChartCard extends StatelessWidget {
                         showTitles: true,
                         reservedSize: 36,
                         getTitlesWidget: (v, _) => Text(
-                          v.toStringAsFixed(v >= 100 ? 0 : 1),
+                          AppNumberFormat.decimal(v, v >= 100 ? 0 : 1),
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontSize: 9,
                             color: theme.colorScheme.onSurfaceVariant,
@@ -86,30 +84,33 @@ class BodyChartCard extends StatelessWidget {
                           if (idx < 0 || idx >= reversed.length) {
                             return const SizedBox.shrink();
                           }
-                          final d =
-                              reversed[idx]['date'] as String? ?? '';
+                          final d = reversed[idx]['date'] as String? ?? '';
                           return Padding(
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
                               d.length >= 10 ? d.substring(5) : d,
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(fontSize: 9),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 9,
+                              ),
                             ),
                           );
                         },
                       ),
                     ),
                     topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                     rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                   ),
                   borderData: FlBorderData(show: false),
                   lineBarsData: [
                     LineChartBarData(
-                      spots: values.asMap().entries
-                          .map((e) =>
-                              FlSpot(e.key.toDouble(), e.value))
+                      spots: values
+                          .asMap()
+                          .entries
+                          .map((e) => FlSpot(e.key.toDouble(), e.value))
                           .toList(),
                       isCurved: true,
                       color: type.color,
@@ -117,10 +118,7 @@ class BodyChartCard extends StatelessWidget {
                       dotData: FlDotData(
                         show: values.length <= 30,
                         getDotPainter: (s, p, b, i) =>
-                            FlDotCirclePainter(
-                          radius: 3,
-                          color: type.color,
-                        ),
+                            FlDotCirclePainter(radius: 3, color: type.color),
                       ),
                       belowBarData: BarAreaData(
                         show: true,
@@ -143,7 +141,7 @@ class BodyChartCard extends StatelessWidget {
                             ? (reversed[idx]['date'] as String? ?? '')
                             : '';
                         return LineTooltipItem(
-                          '$date\n${s.y.toStringAsFixed(1)} ${type.unit}',
+                          '$date\n${AppNumberFormat.decimal(s.y, 1)} ${type.unit}',
                           TextStyle(
                             color: theme.colorScheme.onSurface,
                             fontWeight: FontWeight.bold,
@@ -193,10 +191,9 @@ class BodyBilateralChartCard extends StatelessWidget {
     final minVal = allValues.reduce((a, b) => a < b ? a : b);
     final maxVal = allValues.reduce((a, b) => a > b ? a : b);
     final range = maxVal - minVal;
-    final maxLen =
-        leftValues.length > rightValues.length
-            ? leftValues.length
-            : rightValues.length;
+    final maxLen = leftValues.length > rightValues.length
+        ? leftValues.length
+        : rightValues.length;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -238,11 +235,9 @@ class BodyBilateralChartCard extends StatelessWidget {
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
-                    horizontalInterval:
-                        range > 0 ? niceInterval(range / 4) : 1,
+                    horizontalInterval: range > 0 ? niceInterval(range / 4) : 1,
                     getDrawingHorizontalLine: (v) => FlLine(
-                      color: theme.colorScheme.outlineVariant
-                          .withAlpha(40),
+                      color: theme.colorScheme.outlineVariant.withAlpha(40),
                       strokeWidth: 0.5,
                     ),
                   ),
@@ -252,7 +247,7 @@ class BodyBilateralChartCard extends StatelessWidget {
                         showTitles: true,
                         reservedSize: 36,
                         getTitlesWidget: (v, _) => Text(
-                          v.toStringAsFixed(v >= 100 ? 0 : 1),
+                          AppNumberFormat.decimal(v, v >= 100 ? 0 : 1),
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontSize: 9,
                             color: theme.colorScheme.onSurfaceVariant,
@@ -279,25 +274,29 @@ class BodyBilateralChartCard extends StatelessWidget {
                               leftDate.length >= 10
                                   ? leftDate.substring(5)
                                   : leftDate,
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(fontSize: 9),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 9,
+                              ),
                             ),
                           );
                         },
                       ),
                     ),
                     topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                     rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                   ),
                   borderData: FlBorderData(show: false),
                   lineBarsData: [
                     // Left line
                     LineChartBarData(
-                      spots: leftValues.asMap().entries
-                          .map((e) =>
-                              FlSpot(e.key.toDouble(), e.value))
+                      spots: leftValues
+                          .asMap()
+                          .entries
+                          .map((e) => FlSpot(e.key.toDouble(), e.value))
                           .toList(),
                       isCurved: true,
                       color: Colors.blue,
@@ -307,9 +306,10 @@ class BodyBilateralChartCard extends StatelessWidget {
                     ),
                     // Right line
                     LineChartBarData(
-                      spots: rightValues.asMap().entries
-                          .map((e) =>
-                              FlSpot(e.key.toDouble(), e.value))
+                      spots: rightValues
+                          .asMap()
+                          .entries
+                          .map((e) => FlSpot(e.key.toDouble(), e.value))
                           .toList(),
                       isCurved: true,
                       color: Colors.red,
@@ -325,20 +325,16 @@ class BodyBilateralChartCard extends StatelessWidget {
                         final idx = s.spotIndex;
                         final date = isLeft
                             ? (idx < leftRev.length
-                                ? (leftRev[idx]['date']
-                                        as String? ??
-                                    '')
-                                : '')
+                                  ? (leftRev[idx]['date'] as String? ?? '')
+                                  : '')
                             : (idx < rightRev.length
-                                ? (rightRev[idx]['date']
-                                        as String? ??
-                                    '')
-                                : '');
+                                  ? (rightRev[idx]['date'] as String? ?? '')
+                                  : '');
                         final side = isLeft
                             ? loc.bodyTrackerLeft
                             : loc.bodyTrackerRight;
                         return LineTooltipItem(
-                          '$date\n$side: ${s.y.toStringAsFixed(1)} ${type.unit}',
+                          '$date\n$side: ${AppNumberFormat.decimal(s.y, 1)} ${type.unit}',
                           TextStyle(
                             color: theme.colorScheme.onSurface,
                             fontWeight: FontWeight.bold,
@@ -364,10 +360,7 @@ class BodyBilateralChartCard extends StatelessWidget {
         Container(
           width: 10,
           height: 10,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 4),
         Text(label, style: const TextStyle(fontSize: 11)),

@@ -4,6 +4,7 @@ import 'package:workout_notes/models/periodization_schedule.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/periodization/phase_week_plan.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
+import 'package:workout_notes/utils/date_utils.dart';
 
 /// Planned vs done for one phase week: what the template week asked for and
 /// what was logged, plus the weekdays that got ticked off.
@@ -78,8 +79,8 @@ class WeekProgress {
     PeriodizationPhase phase,
     int weekIndex,
   ) async {
-    final start = phase.startDate.add(Duration(days: 7 * weekIndex));
-    final nominalEnd = start.add(const Duration(days: 6));
+    final start = addDays(phase.startDate, 7 * weekIndex);
+    final nominalEnd = addDays(start, 6);
     final end = nominalEnd.isAfter(phase.endDate) ? phase.endDate : nominalEnd;
     final target = await repository.getEffectiveTarget(phase.id, date: start);
     final results = await Future.wait<Object>([

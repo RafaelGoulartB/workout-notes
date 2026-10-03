@@ -5,10 +5,7 @@ class SleepNightSummary {
   final SleepEntry entry;
   final SleepMonitorSession? session;
 
-  const SleepNightSummary({
-    required this.entry,
-    required this.session,
-  });
+  const SleepNightSummary({required this.entry, required this.session});
 
   bool get hasStages =>
       session != null &&

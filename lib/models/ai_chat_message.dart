@@ -3,6 +3,28 @@ import 'dart:convert';
 import 'package:workout_notes/models/ai_image_attachment.dart';
 import 'package:workout_notes/models/ai_message_role.dart';
 import 'package:workout_notes/models/ai_tool_call.dart';
+import 'package:workout_notes/utils/text_fold.dart';
+
+/// Lifecycle of a user turn, stored on the user message that started it.
+enum AiTurnStatus {
+  running,
+  done,
+  failed,
+  cancelled,
+  interrupted;
+
+  static AiTurnStatus? fromStorage(String? value) {
+    for (final status in values) {
+      if (status.name == value) return status;
+    }
+    return null;
+  }
+}
+
+/// Key in [AiChatMessage.providerExtras] set by the app (never by a provider)
+/// on an answer that arrived cut off. It lives in the existing extras column
+/// so no schema change is needed, and it is never sent back to a provider.
+const String kAiCutOffExtra = 'app_cut_off';
 
 /// A single chat message, persisted in `ai_chat_messages`.
 class AiChatMessage {
@@ -17,6 +39,14 @@ class AiChatMessage {
   final List<AiImageAttachment> attachments;
   final DateTime createdAt;
 
+  /// Opaque provider fields of an assistant message (reasoning content,
+  /// reasoning details, Responses reasoning items) echoed back inside the
+  /// turn that produced them.
+  final Map<String, dynamic> providerExtras;
+
+  /// Set on user messages: how the turn they started ended.
+  final AiTurnStatus? turnStatus;
+
   const AiChatMessage({
     required this.id,
     required this.threadId,
@@ -28,17 +58,25 @@ class AiChatMessage {
     this.toolCalls = const [],
     this.toolResult,
     this.attachments = const [],
+    this.providerExtras = const {},
+    this.turnStatus,
   });
 
   bool get isUser => role == AiMessageRole.user;
   bool get isAssistant => role == AiMessageRole.assistant;
   bool get isTool => role == AiMessageRole.tool;
+  bool get isEvent => role == AiMessageRole.event;
+
+  /// The answer was cut off (output limit, filter, dropped connection) and is
+  /// shown with a notice; the text is only what arrived.
+  bool get isCutOff => isAssistant && providerExtras[kAiCutOffExtra] == true;
 
   AiChatMessage copyWith({
     String? content,
     List<AiToolCall>? toolCalls,
     AiToolResult? toolResult,
     List<AiImageAttachment>? attachments,
+    AiTurnStatus? turnStatus,
   }) {
     return AiChatMessage(
       id: id,
@@ -51,6 +89,8 @@ class AiChatMessage {
       toolCalls: toolCalls ?? this.toolCalls,
       toolResult: toolResult ?? this.toolResult,
       attachments: attachments ?? this.attachments,
+      providerExtras: providerExtras,
+      turnStatus: turnStatus ?? this.turnStatus,
     );
   }
 
@@ -68,6 +108,13 @@ class AiChatMessage {
         ? null
         : jsonEncode(attachments.map((item) => item.toJson()).toList()),
     'created_at': createdAt.toIso8601String(),
+    'provider_extras': providerExtras.isEmpty
+        ? null
+        : jsonEncode(providerExtras),
+    'turn_status': turnStatus?.name,
+    'search_text': (isUser || isAssistant) && (content?.isNotEmpty ?? false)
+        ? foldForSearch(content!)
+        : null,
   };
 
   static AiChatMessage fromRow(Map<String, dynamic> row) {
@@ -117,6 +164,18 @@ class AiChatMessage {
       toolCalls: calls,
       attachments: attachments,
       createdAt: DateTime.parse(row['created_at'] as String),
+      providerExtras: _decodeMap(row['provider_extras']),
+      turnStatus: AiTurnStatus.fromStorage(row['turn_status'] as String?),
     );
+  }
+
+  static Map<String, dynamic> _decodeMap(Object? raw) {
+    if (raw is! String || raw.isEmpty) return const {};
+    try {
+      final decoded = jsonDecode(raw);
+      return decoded is Map ? decoded.cast<String, dynamic>() : const {};
+    } on FormatException {
+      return const {};
+    }
   }
 }

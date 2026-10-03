@@ -20,9 +20,7 @@ class _NutritionReplicateDayDialogState
   static final DateTime _firstDate = DateTime(2018, 1, 1);
 
   late final DateTime _sourceDate = dayOf(widget.sourceDate);
-  late final DateTime _lastDate = dayOf(
-    DateTime.now().add(const Duration(days: 365)),
-  );
+  late final DateTime _lastDate = dayOf(addDays(DateTime.now(), 365));
   late DateTime _focusedMonth = DateTime(_sourceDate.year, _sourceDate.month);
   final Set<DateTime> _selectedDates = <DateTime>{};
 
@@ -104,9 +102,7 @@ class _NutritionReplicateDayDialogState
                   ),
                   itemCount: 42,
                   itemBuilder: (context, index) {
-                    final date = dayOf(
-                      gridStart.add(Duration(days: index)),
-                    );
+                    final date = dayOf(addDays(gridStart, index));
                     return _buildDay(
                       date,
                       locale,

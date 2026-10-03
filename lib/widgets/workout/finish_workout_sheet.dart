@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/duration_format.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
@@ -38,16 +39,6 @@ class WorkoutSummary {
     return DurationFormat.elapsed(durationSeconds);
   }
 
-  String get formattedVolume {
-    if (totalVolume >= 1000000) {
-      return '${(totalVolume / 1000000).toStringAsFixed(1)}M';
-    }
-    if (totalVolume >= 1000) {
-      return '${(totalVolume / 1000).toStringAsFixed(1)}k';
-    }
-    return totalVolume.toStringAsFixed(0);
-  }
-
   double? get densityKgPerMinute {
     if (durationSeconds <= 0 || totalVolume <= 0) return null;
     return totalVolume / (durationSeconds / 60.0);
@@ -56,12 +47,12 @@ class WorkoutSummary {
   String get formattedDensity {
     final density = densityKgPerMinute;
     if (density == null) return '--';
-    return density.toStringAsFixed(density >= 10 ? 0 : 1);
+    return AppNumberFormat.decimal(density, density >= 10 ? 0 : 1);
   }
 
   String get formattedDistance {
     if (totalDistance <= 0) return '--';
-    return '${totalDistance.toStringAsFixed(1)} km';
+    return '${AppNumberFormat.decimal(totalDistance, 1)} km';
   }
 
   String get formattedCardioTime {

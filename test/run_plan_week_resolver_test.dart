@@ -33,10 +33,7 @@ void main() {
   group('plan week mapping', () {
     test('offset 0 keeps the historic behaviour', () {
       for (var week = 0; week < 14; week++) {
-        expect(
-          resolver.planWeekFor(phaseWeek: week, planWeeks: 12),
-          week % 12,
-        );
+        expect(resolver.planWeekFor(phaseWeek: week, planWeeks: 12), week % 12);
       }
     });
 

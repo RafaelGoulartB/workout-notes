@@ -457,4 +457,100 @@ void main() {
       expect(await count('sets'), 0);
     });
   });
+  group('deleteSet and restoreSet', () {
+    Future<String> seedThreeSets() async {
+      await repo.createWorkout(
+        exercises: [
+          {
+            'exercise_id': 'bench',
+            'sets': [
+              {'weight': 60.0, 'reps': 10},
+              {'weight': 62.5, 'reps': 8, 'is_warmup': true},
+              {'weight': 65.0, 'reps': 6},
+            ],
+          },
+        ],
+      );
+      return (await db.query('exercise_entries')).single['id']! as String;
+    }
+
+    test(
+      'restoreSet brings back the exact row in its original position',
+      () async {
+        final entryId = await seedThreeSets();
+        final before = await repo.getExerciseSets(entryId);
+        final middle = before[1];
+
+        final deleted = await repo.deleteSet(middle['id']! as String);
+
+        expect(deleted, middle);
+        expect(await count('sets'), 2);
+
+        expect(await repo.restoreSet(deleted!), isTrue);
+
+        expect(await repo.getExerciseSets(entryId), before);
+      },
+    );
+
+    test('deleteSet returns null for an unknown set', () async {
+      expect(await repo.deleteSet('missing'), isNull);
+    });
+
+    test(
+      'restoreSet is a no-op when its entry is gone or it is back',
+      () async {
+        final entryId = await seedThreeSets();
+        final first = (await repo.getExerciseSets(entryId)).first;
+        final deleted = (await repo.deleteSet(first['id']! as String))!;
+
+        expect(await repo.restoreSet(deleted), isTrue);
+        expect(await repo.restoreSet(deleted), isFalse);
+        expect(await count('sets'), 3);
+
+        await repo.deleteExerciseEntry(entryId);
+        expect(await repo.restoreSet(deleted), isFalse);
+        expect(await count('sets'), 0);
+      },
+    );
+  });
+
+  group('month queries', () {
+    Future<void> workoutOn(String id, String date) => db.insert('workouts', {
+      'id': id,
+      'date': date,
+      'created_at': '${date}T08:00:00.000',
+    });
+
+    test('use exact month bounds, including December and January', () async {
+      await workoutOn('nov', '2025-11-30');
+      await workoutOn('dec1', '2025-12-01');
+      await workoutOn('dec31', '2025-12-31');
+      await workoutOn('jan', '2026-01-01');
+      await db.insert('exercise_entries', {
+        'id': 'ee-dec',
+        'workout_id': 'dec31',
+        'exercise_id': 'bench',
+        'order_index': 0,
+      });
+      await db.insert('exercise_entries', {
+        'id': 'ee-jan',
+        'workout_id': 'jan',
+        'exercise_id': 'squat',
+        'order_index': 0,
+      });
+
+      final december = await repo.getWorkoutsByMonth(2025, 12);
+      expect(december.map((w) => w['id']), ['dec31', 'dec1']);
+      expect((await repo.getWorkoutsByMonth(2026, 1)).map((w) => w['id']), [
+        'jan',
+      ]);
+      expect(await repo.getWorkoutsByMonth(2026, 2), isEmpty);
+
+      final categories = await repo.getWorkoutCategoriesByDate(2025, 12);
+      expect(categories.keys, ['2025-12-31']);
+      expect((await repo.getWorkoutCategoriesByDate(2026, 1)).keys, [
+        '2026-01-01',
+      ]);
+    });
+  });
 }

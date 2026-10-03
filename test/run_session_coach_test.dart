@@ -54,32 +54,35 @@ void main() {
     'duration_seconds': movingTimeSeconds,
   });
 
-  test('begin hands settings, goal and plan to the native controller', () async {
-    final previousLocale = Intl.defaultLocale;
-    Intl.defaultLocale = 'pt_BR';
-    addTearDown(() => Intl.defaultLocale = previousLocale);
-    final coach = RunSessionCoach();
+  test(
+    'begin hands settings, goal and plan to the native controller',
+    () async {
+      final previousLocale = Intl.defaultLocale;
+      Intl.defaultLocale = 'pt_BR';
+      addTearDown(() => Intl.defaultLocale = previousLocale);
+      final coach = RunSessionCoach();
 
-    await coach.beginSession(
-      intervalsOn: true,
-      goal: const RunSessionGoal(
-        enabled: true,
-        metric: RunIntervalMetric.distance,
-        value: 5000,
-      ),
-      planWorkout: continuousPlan(),
-    );
+      await coach.beginSession(
+        intervalsOn: true,
+        goal: const RunSessionGoal(
+          enabled: true,
+          metric: RunIntervalMetric.distance,
+          value: 5000,
+        ),
+        planWorkout: continuousPlan(),
+      );
 
-    final begin = calls.singleWhere((call) => call.method == 'beginSession');
-    final args = Map<String, dynamic>.from(begin.arguments as Map);
-    expect((args['settings'] as Map)['resolvedLanguage'], 'pt');
-    expect((args['goal'] as Map)['value'], 5000);
-    // A structured plan replaces the quick interval preset.
-    expect(args['intervalsOn'], isFalse);
-    expect(args['plan'], hasLength(1));
-    expect(coach.hasPlan, isTrue);
-    expect(coach.isActive, isTrue);
-  });
+      final begin = calls.singleWhere((call) => call.method == 'beginSession');
+      final args = Map<String, dynamic>.from(begin.arguments as Map);
+      expect((args['settings'] as Map)['resolvedLanguage'], 'pt');
+      expect((args['goal'] as Map)['value'], 5000);
+      // A structured plan replaces the quick interval preset.
+      expect(args['intervalsOn'], isFalse);
+      expect(args['plan'], hasLength(1));
+      expect(coach.hasPlan, isTrue);
+      expect(coach.isActive, isTrue);
+    },
+  );
 
   test('a session without native tracking never touches the channel', () async {
     final coach = RunSessionCoach();
@@ -157,7 +160,10 @@ void main() {
     final coach = RunSessionCoach();
     await coach.beginSession(intervalsOn: false, planWorkout: continuousPlan());
     await coach.announceManualCompletion();
-    expect(calls.where((call) => call.method == 'speakWorkoutComplete'), isEmpty);
+    expect(
+      calls.where((call) => call.method == 'speakWorkoutComplete'),
+      isEmpty,
+    );
 
     final free = RunSessionCoach();
     await free.beginSession(intervalsOn: false);
@@ -178,6 +184,9 @@ void main() {
 
     expect(ok, isTrue);
     final call = calls.singleWhere((c) => c.method == 'speakTest');
-    expect(((call.arguments as Map)['settings'] as Map)['resolvedLanguage'], 'pt');
+    expect(
+      ((call.arguments as Map)['settings'] as Map)['resolvedLanguage'],
+      'pt',
+    );
   });
 }

@@ -12,6 +12,8 @@ import 'package:workout_notes/models/periodization_schedule.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/periodization/phase_seed.dart';
 import 'package:workout_notes/periodization/week_progress.dart';
+import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/screens/body/body_tracker_screen.dart';
 import 'package:workout_notes/screens/planning/periodization_checkin_flow.dart';
 import 'package:workout_notes/screens/planning/periodization_phase_editor_screen.dart';
@@ -23,6 +25,7 @@ import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/screens/settings/settings_screen.dart';
 import 'package:workout_notes/screens/workout/active_workout_screen.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 import 'package:workout_notes/utils/load_generation.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
@@ -153,9 +156,7 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
         _safe(_repository.getDayPlan(day)),
         _safe(EffectiveNutritionGoalService.resolve(date: day)),
         _safe(
-          DatabaseHelper.instance.nutritionRepo.getDailySummary(
-            dateKey(day),
-          ),
+          DatabaseHelper.instance.nutritionRepo.getDailySummary(dateKey(day)),
         ),
         _safe(_repository.getRoutineSuggestion(day)),
         _safe(_repository.getRunSuggestion(day)),
@@ -737,7 +738,7 @@ class _TodayCard extends StatelessWidget {
           icon: Icons.bedtime_outlined,
           color: color,
           title: loc.planningSleepTonight(
-            sleep.toStringAsFixed(sleep % 1 == 0 ? 0 : 1).replaceAll('.', ','),
+            AppNumberFormat.decimal(sleep, sleep % 1 == 0 ? 0 : 1),
           ),
         ),
     ];
@@ -903,6 +904,7 @@ class _TodayRow extends StatelessWidget {
           ),
           if (onStart != null && !done)
             IconButton.filledTonal(
+              tooltip: AppLocalizations.of(context)!.commonStart,
               key: startKey,
               onPressed: onStart,
               icon: const Icon(Icons.play_arrow_rounded),

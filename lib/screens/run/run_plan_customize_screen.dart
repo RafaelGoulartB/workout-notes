@@ -162,11 +162,12 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
           // The plan stands on its own; strength can be set up later.
         }
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('run_plan_customize_screen: action failed: $e\n$stack');
       if (!mounted) return;
       setState(() => _creating = false);
       messenger.showSnackBar(
-        SnackBar(content: Text(loc.commonError(e.toString()))),
+        SnackBar(content: Text(loc.commonSomethingWentWrong)),
       );
       return;
     }

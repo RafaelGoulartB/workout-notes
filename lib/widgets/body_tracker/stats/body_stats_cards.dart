@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/screens/body/body_stats_controller.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/body_progress_analytics.dart';
 import 'package:workout_notes/widgets/body_tracker/body_stats_charts.dart';
 import 'package:workout_notes/widgets/body_tracker/stats/body_stats_primitives.dart';
@@ -434,7 +435,7 @@ class BodyStatsRateCard extends StatelessWidget {
                       icon: Icons.accessibility_new_rounded,
                       color: colors.secondary,
                       label: loc.bodyStatsBmi,
-                      value: bmi.toStringAsFixed(1),
+                      value: AppNumberFormat.decimal(bmi, 1),
                       unit: _bmiLabel(loc, bmi),
                     ),
                   ),
@@ -507,7 +508,7 @@ class BodyStatsGoalCard extends StatelessWidget {
                 label: progress.achieved
                     ? loc.bodyStatsGoalReached
                     : loc.bodyStatsGoalRemaining(
-                        '${progress.remaining.toStringAsFixed(1)} $c.unit',
+                        '${AppNumberFormat.decimal(progress.remaining, 1)} $c.unit',
                       ),
                 icon: progress.achieved
                     ? Icons.emoji_events_outlined
@@ -645,7 +646,7 @@ class BodyStatsConsistencyCard extends StatelessWidget {
                   icon: Icons.receipt_long_outlined,
                   color: colors.secondary,
                   label: loc.bodyStatsEntriesPerWeek,
-                  value: a.entriesPerWeek.toStringAsFixed(1),
+                  value: AppNumberFormat.decimal(a.entriesPerWeek, 1),
                 ),
               ),
               AppStatDivider(

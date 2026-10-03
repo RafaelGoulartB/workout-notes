@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -13,8 +13,10 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/l10n_exercises.dart';
 import 'package:workout_notes/repositories/export_import_repository.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/services/ai_service.dart';
 import 'package:workout_notes/services/backup_exception.dart';
 import 'package:workout_notes/services/backup_media_service.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/csv_writer.dart';
 
 typedef SaveFileCallback =
@@ -43,9 +45,9 @@ class BackupFileInfo {
   String get sizeFormatted {
     if (sizeBytes < 1024) return '$sizeBytes B';
     if (sizeBytes < 1024 * 1024) {
-      return '${(sizeBytes / 1024).toStringAsFixed(1)} KB';
+      return '${AppNumberFormat.decimal(sizeBytes / 1024, 1)} KB';
     }
-    return '${(sizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${AppNumberFormat.decimal(sizeBytes / (1024 * 1024), 1)} MB';
   }
 }
 
@@ -57,6 +59,8 @@ class ExportService {
   final BackupMediaService _backupMedia;
   final Future<SharedPreferences> Function() _preferencesProvider;
   final Future<Directory> Function()? backupsDirectoryProvider;
+  final Future<Directory> Function()? temporaryDirectoryProvider;
+  final Future<void> Function(String key) _deleteSecret;
 
   ExportService({
     ExportImportRepository? exportRepo,
@@ -65,7 +69,12 @@ class ExportService {
     BackupMediaService? backupMedia,
     Future<SharedPreferences> Function()? preferencesProvider,
     this.backupsDirectoryProvider,
-  }) : _exportRepo = exportRepo ?? DatabaseHelper.instance.exportImportRepo,
+    this.temporaryDirectoryProvider,
+    Future<void> Function(String key)? deleteSecret,
+  }) : _deleteSecret =
+           deleteSecret ??
+           ((key) => const FlutterSecureStorage().delete(key: key)),
+       _exportRepo = exportRepo ?? DatabaseHelper.instance.exportImportRepo,
        _saveFile = saveFile ?? _saveFileWithPicker,
        _shareFile = shareFile ?? _shareFileWithSheet,
        _backupMedia = backupMedia ?? BackupMediaService(),
@@ -187,11 +196,64 @@ class ExportService {
     await write(utf8.encode(']}'));
   }
 
+  /// Streams the backup into [file] (chunk by chunk, waiting for the disk), so
+  /// the whole backup, photos included, never sits in memory. A failure
+  /// removes the partial file.
+  Future<void> _streamBackupToFile(File file) async {
+    final sink = file.openWrite();
+    try {
+      await _writeBackup((chunk) {
+        sink.add(chunk);
+        // Wait for the disk so queued chunks never pile up in memory.
+        return sink.flush();
+      });
+      await sink.close();
+    } catch (_) {
+      try {
+        await sink.close();
+      } catch (_) {
+        // The original error is rethrown below.
+      }
+      await _deleteQuietly(file);
+      rethrow;
+    }
+  }
+
+  Future<void> _deleteQuietly(File file) async {
+    try {
+      if (await file.exists()) await file.delete();
+    } catch (error) {
+      debugPrint('Could not delete ${file.path}: $error');
+    }
+  }
+
+  Future<Directory> _temporaryDirectory() async {
+    final provider = temporaryDirectoryProvider;
+    if (provider != null) return provider();
+    try {
+      return await getTemporaryDirectory();
+    } catch (_) {
+      // No path_provider / platform binding (unit tests on the desktop VM).
+      return Directory.systemTemp;
+    }
+  }
+
   /// Generates the current backup format as UTF-8 JSON bytes.
+  ///
+  /// The backup is streamed to a temporary file first and read back once, so
+  /// the peak is the final byte array instead of the chunks plus a
+  /// concatenated copy.
   Future<Uint8List> exportBackupBytes() async {
-    final out = BytesBuilder(copy: false);
-    await _writeBackup((chunk) async => out.add(chunk));
-    return out.takeBytes();
+    final dir = await _temporaryDirectory();
+    final temp = File(
+      '${dir.path}/workout_notes_backup_${DateTime.now().microsecondsSinceEpoch}.json.tmp',
+    );
+    await _streamBackupToFile(temp);
+    try {
+      return await temp.readAsBytes();
+    } finally {
+      await _deleteQuietly(temp);
+    }
   }
 
   /// Exports all data to JSON and returns the file path.
@@ -203,22 +265,11 @@ class ExportService {
     final dateStr = DateFormat('yyyy-MM-dd_HHmmss').format(DateTime.now());
     final path = '${dir.path}/workout_notes_backup_$dateStr.json';
     final partial = File('$path.part');
-    final sink = partial.openWrite();
+    await _streamBackupToFile(partial);
     try {
-      await _writeBackup((chunk) {
-        sink.add(chunk);
-        // Wait for the disk so queued chunks never pile up in memory.
-        return sink.flush();
-      });
-      await sink.close();
       await partial.rename(path);
     } catch (_) {
-      try {
-        await sink.close();
-      } catch (_) {}
-      try {
-        if (await partial.exists()) await partial.delete();
-      } catch (_) {}
+      await _deleteQuietly(partial);
       rethrow;
     }
     return path;
@@ -234,6 +285,9 @@ class ExportService {
   }
 
   /// Opens the native save dialog with the backup bytes.
+  ///
+  /// The backup is built in a temporary file; only the final read hands the
+  /// bytes to the picker, whose API takes a byte array.
   ///
   /// Returns the selected path, or `null` when the user cancels.
   Future<String?> saveJsonBackup({required String dialogTitle}) async {
@@ -324,6 +378,12 @@ class ExportService {
     final previousPreferences = await _readPortablePreferences(
       stripAiModelCache: false,
     );
+    final untrustedTokenIds = _untrustedAiTokenIds(
+      previous: previousPreferences['ai_providers_v1'],
+      restored: data['preferences'] is Map
+          ? (data['preferences'] as Map)['ai_providers_v1']
+          : null,
+    );
     final restoreDirectory = await _backupMedia.materializeForRestore(data);
     var preferencesChanged = false;
     try {
@@ -333,6 +393,9 @@ class ExportService {
       }
       final count = await _exportRepo.restoreFromBackup(data);
       await _backupMedia.commitRestore(restoreDirectory);
+      // Only once the restore is committed, so a failed one keeps the user's
+      // tokens (the preferences are rolled back below).
+      await _forgetAiTokens(untrustedTokenIds);
       return count;
     } catch (_) {
       if (preferencesChanged) {
@@ -413,6 +476,59 @@ class ExportService {
     }
   }
 
+  /// Ids of restored AI providers whose locally stored token must not be
+  /// kept. Tokens live in secure storage under `ai_token:<id>` and are not in
+  /// backups, so a backup that reuses a local provider id with another base
+  /// URL (or an id that never existed here) would otherwise make the app send
+  /// the local secret to that URL. A provider that keeps its id *and* its URL
+  /// keeps its token.
+  static List<String> _untrustedAiTokenIds({
+    required Object? previous,
+    required Object? restored,
+  }) {
+    final restoredProviders = _providerBaseUrls(restored);
+    final previousProviders = _providerBaseUrls(previous);
+    return [
+      for (final entry in restoredProviders.entries)
+        if (!_sameBaseUrl(previousProviders[entry.key], entry.value)) entry.key,
+    ];
+  }
+
+  /// Provider id -> base URL from the `ai_providers_v1` JSON string.
+  static Map<String, String?> _providerBaseUrls(Object? raw) {
+    if (raw is! String || raw.isEmpty) return const {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const {};
+      return {
+        for (final provider in decoded)
+          if (provider is Map && provider['id'] is String)
+            provider['id'] as String: provider['baseUrl'] as String?,
+      };
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  static bool _sameBaseUrl(String? local, String? restored) {
+    if (local == null || restored == null) return false;
+    return AiService.normalizeBaseUri(local) ==
+        AiService.normalizeBaseUri(restored);
+  }
+
+  Future<void> _forgetAiTokens(List<String> providerIds) async {
+    for (final id in providerIds) {
+      try {
+        await _deleteSecret('ai_token:$id');
+      } catch (error) {
+        debugPrint(
+          'Removing the token of a restored AI provider failed: '
+          '${error.runtimeType}',
+        );
+      }
+    }
+  }
+
   static String _withoutAiModelCache(String raw) {
     try {
       final providers = jsonDecode(raw);
@@ -437,7 +553,8 @@ class ExportService {
   // Nutrition CSV export
   // ===================================================================
 
-  final NutritionRepository _nutritionRepo = DatabaseHelper.instance.nutritionRepo;
+  final NutritionRepository _nutritionRepo =
+      DatabaseHelper.instance.nutritionRepo;
 
   /// Writes the meal log history to a CSV file in the temp directory
   /// and returns the path.
@@ -639,5 +756,5 @@ Future<Object?> _decodeBackupFile(String path) async {
 
 Object? _decodeBackupString(String content) => jsonDecode(content);
 
-Object? _decodeBackupBytes(Uint8List bytes) =>
-    jsonDecode(utf8.decode(bytes, allowMalformed: false));
+/// Decodes straight from the bytes, without an intermediate copy of the text.
+Object? _decodeBackupBytes(Uint8List bytes) => json.fuse(utf8).decode(bytes);

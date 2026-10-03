@@ -319,11 +319,12 @@ abstract final class RunPlanComposer {
     // From Friday on, what is left of this week cannot hold a training
     // week, so week 1 is next week.
     final today = config.startDate ?? DateTime.now();
-    final start = mondayOf(
-      today,
-    ).add(Duration(days: today.weekday >= DateTime.friday ? 7 : 0));
+    final start = addDays(
+      mondayOf(today),
+      today.weekday >= DateTime.friday ? 7 : 0,
+    );
     final raceWeek = mondayOf(raceDate);
-    final weeksToRace = (raceWeek.difference(start).inDays / 7).round() + 1;
+    final weeksToRace = (daysBetween(start, raceWeek) / 7).round() + 1;
     if (weeksToRace >= templateWeeks) {
       // More runway than the plan needs: start later so race week lands on
       // the race, instead of racing in the middle of a build.
@@ -334,7 +335,7 @@ abstract final class RunPlanComposer {
         hasRace: true,
         minWeeks: minWeeks,
         weeksToRace: weeksToRace,
-        startWeek: raceWeek.subtract(Duration(days: 7 * (templateWeeks - 1))),
+        startWeek: addDays(raceWeek, -(7 * (templateWeeks - 1))),
         raceWeekday: raceDate.weekday,
       );
     }
@@ -352,7 +353,7 @@ abstract final class RunPlanComposer {
       weeksToRace: weeksToRace,
       startWeek: weeksToRace >= minWeeks || remaining != null
           ? start
-          : raceWeek.subtract(Duration(days: 7 * (weeks - 1))),
+          : addDays(raceWeek, -(7 * (weeks - 1))),
       raceWeekday: raceDate.weekday,
       raceTooSoon: weeksToRace < minWeeks,
     );

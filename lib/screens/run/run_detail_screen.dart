@@ -8,6 +8,7 @@ import 'package:workout_notes/models/run_lap.dart';
 import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
+import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/screens/run/run_replay_screen.dart';
 import 'package:workout_notes/screens/run/run_route_map_screen.dart';
 import 'package:workout_notes/services/run_export_service.dart';
@@ -23,6 +24,8 @@ import 'package:workout_notes/widgets/run/run_gear_row.dart';
 import 'package:workout_notes/widgets/run/run_route_map.dart';
 import 'package:workout_notes/widgets/run/run_share_card.dart';
 import 'package:workout_notes/widgets/run/run_splits_list.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 enum _MenuAction { exportGpx, delete }
@@ -43,7 +46,7 @@ class RunDetailScreen extends StatefulWidget {
   State<RunDetailScreen> createState() => _RunDetailScreenState();
 }
 
-class _RunDetailScreenState extends State<RunDetailScreen> {
+class _RunDetailScreenState extends State<RunDetailScreen> with GuardedLoad {
   final _repo = DatabaseHelper.instance.runRepo;
   final _planRepo = DatabaseHelper.instance.runPlanRepo;
   final _exportService = RunExportService();
@@ -64,7 +67,6 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     bestSplitPaceSecPerKm: null,
   );
   RunElevationProfile _elevation = RunElevationProfile.empty;
-  bool _loading = true;
 
   @override
   void initState() {
@@ -78,8 +80,8 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  Future<void> _load() => guardedLoad(() async {
+    setState(() => isLoading = true);
     final activity =
         await _repo.ensureEffortMetrics(widget.activityId) ??
         await _repo.getActivity(widget.activityId);
@@ -87,7 +89,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
       if (!mounted) return;
       setState(() {
         _activity = null;
-        _loading = false;
+        isLoading = false;
       });
       return;
     }
@@ -141,9 +143,9 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
           ? RunElevationProfile.fromTrackPoints(points, profile: profile)
           : RunElevationProfile.empty;
       _medals = medals;
-      _loading = false;
+      isLoading = false;
     });
-  }
+  });
 
   // ---------------------------------------------------------------- actions
 
@@ -213,14 +215,15 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     final confirmed = await showConfirmDialog(
       context,
       title: activity.isStationaryBike
-              ? loc.stationaryBikeDeleteConfirm
-              : loc.runDetailDeleteConfirm,
+          ? loc.stationaryBikeDeleteConfirm
+          : loc.runDetailDeleteConfirm,
       message: activity.isStationaryBike
-              ? loc.stationaryBikeDeleteConfirmBody
-              : loc.runDetailDeleteConfirmBody,
+          ? loc.stationaryBikeDeleteConfirmBody
+          : loc.runDetailDeleteConfirmBody,
       confirmLabel: activity.isStationaryBike
-                  ? loc.stationaryBikeDelete
-                  : loc.runDetailDelete,
+          ? loc.stationaryBikeDelete
+          : loc.runDetailDelete,
+      destructive: true,
       cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
     );
     if (confirmed != true || !mounted) return;
@@ -384,10 +387,16 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     final loc = AppLocalizations.of(context)!;
     final activity = _activity;
 
-    if (_loading && activity == null) {
+    if (isLoading && activity == null) {
       return Scaffold(
         appBar: AppBar(title: Text(loc.runDetailTitle)),
         body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (loadFailed && activity == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(loc.runDetailTitle)),
+        body: LoadErrorView(onRetry: _load),
       );
     }
     if (activity == null) {

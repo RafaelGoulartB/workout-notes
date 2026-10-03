@@ -50,7 +50,8 @@ void main() {
       weekIndex: 0,
       name: 'Rodagem',
     );
-    final scheduled = await scheduleRunFixture(planRepository, 
+    final scheduled = await scheduleRunFixture(
+      planRepository,
       date: DateTime(2026, 8, 25),
       runPlanId: plan.id,
       runPlanWorkoutId: workout.id,

@@ -3,6 +3,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/food_search_result.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/saved_meal.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 
 class FoodCard extends StatelessWidget {
   final FoodSearchResult result;
@@ -23,12 +24,12 @@ class FoodCard extends StatelessWidget {
     final variant = result.primaryVariant;
     final details = <String>[
       if (variant?.values.calories != null)
-        '${variant!.values.calories!.toStringAsFixed(0)} kcal',
+        '${AppNumberFormat.decimal(variant!.values.calories!, 0)} kcal',
       if (result.food.brand != null && result.food.brand!.isNotEmpty)
         result.food.brand!,
       if (variant != null)
         loc.nutritionPer100g(
-          variant.referenceAmount.toStringAsFixed(0),
+          AppNumberFormat.decimal(variant.referenceAmount, 0),
           variant.referenceUnit,
         ),
     ].join(' · ');
@@ -243,7 +244,9 @@ class SavedMealCard extends StatelessWidget {
   }
 
   static String _format(double value) {
-    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
-    return value.toStringAsFixed(1);
+    if (value == value.roundToDouble()) {
+      return AppNumberFormat.decimal(value, 0);
+    }
+    return AppNumberFormat.decimal(value, 1);
   }
 }

@@ -14,11 +14,7 @@ enum RunAchievementKind {
   bestEffortMarathon,
 }
 
-enum RunMedalTier {
-  gold,
-  silver,
-  bronze,
-}
+enum RunMedalTier { gold, silver, bronze }
 
 extension RunMedalTierRank on RunMedalTier {
   /// 1 = gold, 2 = silver, 3 = bronze.
@@ -45,10 +41,7 @@ class RunAchievementCategory {
   final RunAchievementKind kind;
   final List<RunAchievementPlacement> placements;
 
-  const RunAchievementCategory({
-    required this.kind,
-    required this.placements,
-  });
+  const RunAchievementCategory({required this.kind, required this.placements});
 
   bool get isEmpty => placements.isEmpty;
 }
@@ -63,10 +56,7 @@ class RunAchievementBoard {
     required this.byActivityId,
   });
 
-  static const empty = RunAchievementBoard(
-    categories: [],
-    byActivityId: {},
-  );
+  static const empty = RunAchievementBoard(categories: [], byActivityId: {});
 
   List<RunAchievementPlacement> forActivity(String activityId) =>
       byActivityId[activityId] ?? const [];

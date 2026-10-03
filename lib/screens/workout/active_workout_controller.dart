@@ -8,6 +8,7 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
   final _summaryService = WorkoutSummaryService();
   final _timerService = RestTimerService.instance;
   bool _isLoading = true;
+  bool _loadFailed = false;
   String? _workoutId;
 
   /// The exercises came from a routine day (opened or picked here) and the
@@ -66,7 +67,8 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
     final orderedIds = reordered.map((e) => e.entryId).toList(growable: false);
     try {
       await _workoutRepo.reorderWorkoutExercises(_workoutId!, orderedIds);
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('active_workout_controller: action failed: $e\n$stack');
       // Roll back to the persisted order on failure.
       if (!mounted) return;
       await _loadExercises();
@@ -74,9 +76,7 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
       setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            AppLocalizations.of(context)!.commonReorderError(e.toString()),
-          ),
+          content: Text(AppLocalizations.of(context)!.commonReorderError),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -127,10 +127,31 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
   void _refreshElapsed() {
     final start = _timerStart;
     if (!mounted || start == null || _timerEnd != null) return;
-    _elapsed.value = DurationFormat.elapsed(DateTime.now().difference(start).inSeconds);
+    _elapsed.value = DurationFormat.elapsed(
+      DateTime.now().difference(start).inSeconds,
+    );
   }
 
   Future<void> _initialize() async {
+    if (_loadFailed) {
+      setState(() {
+        _loadFailed = false;
+        _isLoading = true;
+      });
+    }
+    try {
+      await _openWorkout();
+    } catch (error, stack) {
+      debugPrint('Active workout failed to open: $error\n$stack');
+      if (!mounted) return;
+      setState(() {
+        _loadFailed = true;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _openWorkout() async {
     // Load settings
     final settings = await _settingsRepo.getAllSettings();
     _autoStartTimer = settings['auto_start_workout_timer'] == 'true';
@@ -220,7 +241,9 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
       return;
     }
     final end = _timerEnd ?? DateTime.now();
-    _elapsed.value = DurationFormat.elapsed(end.difference(_timerStart!).inSeconds);
+    _elapsed.value = DurationFormat.elapsed(
+      end.difference(_timerStart!).inSeconds,
+    );
   }
 
   Future<void> _createFromRoutine() async {
@@ -779,8 +802,8 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
       context,
       title: AppLocalizations.of(context)!.activeWorkoutRemoveExercise,
       message: AppLocalizations.of(context)!.activeWorkoutRemoveExerciseContent(
-            exercise.localizedName(AppLocalizations.of(context)!),
-          ),
+        exercise.localizedName(AppLocalizations.of(context)!),
+      ),
       confirmLabel: AppLocalizations.of(context)!.activeWorkoutRemove,
       cancelLabel: AppLocalizations.of(context)!.commonCancel,
       destructive: true,
@@ -813,11 +836,32 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
   }
 
   Future<void> _deleteSet(String setId) async {
-    await _workoutRepo.deleteSet(setId);
+    final deleted = await _workoutRepo.deleteSet(setId);
     if (!mounted) return;
     setState(() {
       for (final exercise in _exercises) {
         exercise.sets.removeWhere((s) => s['id'] == setId);
+      }
+      _refreshComparisons();
+    });
+    if (deleted == null) return;
+    showSetDeletedSnackBar(context, onUndo: () => _restoreSet(deleted));
+  }
+
+  /// Puts a deleted set back with its original id, position and values.
+  Future<void> _restoreSet(Map<String, dynamic> row) async {
+    final restored = await _workoutRepo.restoreSet(row);
+    if (!restored || !mounted) return;
+    setState(() {
+      for (final exercise in _exercises) {
+        if (exercise.entryId != row['exercise_entry_id']) continue;
+        exercise.sets
+          ..add(row)
+          ..sort(
+            (a, b) => ((a['order_index'] as int?) ?? 0).compareTo(
+              (b['order_index'] as int?) ?? 0,
+            ),
+          );
       }
       _refreshComparisons();
     });

@@ -25,8 +25,6 @@ class MacroBreakdown {
     required this.energyConflict,
   });
 
-  int get proteinRounded => proteinG.round();
-  int get fatRounded => fatG.round();
   int get carbsRounded => carbsG.round();
 
   int get proteinKcal => (proteinG * 4).round();

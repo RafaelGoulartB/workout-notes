@@ -37,6 +37,7 @@ class RunRecordTopBar extends StatelessWidget {
               color: surface,
               shape: const CircleBorder(),
               child: IconButton(
+                tooltip: loc.commonClose,
                 icon: const Icon(Icons.close),
                 onPressed: onClose,
               ),

@@ -1,10 +1,9 @@
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/models/exercise_with_sets.dart';
+import 'package:workout_notes/utils/clock_format.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
@@ -53,7 +52,7 @@ class ActiveWorkoutHeader extends StatelessWidget {
     final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
     final hasComparison = totalSets > 0 && categories.isNotEmpty;
-    final clock = DateFormat('HH:mm');
+    final clock = ClockFormat.of(context);
     final muted = theme.textTheme.bodySmall?.copyWith(
       color: colors.onSurfaceVariant,
       fontFeatures: AppUi.tabular,

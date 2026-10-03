@@ -36,7 +36,7 @@ class PeriodizationPlan {
     required this.updatedAt,
   });
 
-  int get totalDays => endDate.difference(startDate).inDays + 1;
+  int get totalDays => daysBetween(startDate, endDate) + 1;
 
   bool contains(DateTime date) {
     final day = dayOf(date);
@@ -46,7 +46,7 @@ class PeriodizationPlan {
   double progressAt(DateTime date) {
     if (date.isBefore(startDate)) return 0;
     if (date.isAfter(endDate)) return 1;
-    return ((date.difference(startDate).inDays + 1) / totalDays).clamp(0, 1);
+    return ((daysBetween(startDate, date) + 1) / totalDays).clamp(0, 1);
   }
 
   PeriodizationPlan copyWith({
@@ -89,7 +89,6 @@ class PeriodizationPlan {
         createdAt: DateTime.parse(map['created_at'] as String),
         updatedAt: DateTime.parse(map['updated_at'] as String),
       );
-
 }
 
 const Object _sentinel = Object();

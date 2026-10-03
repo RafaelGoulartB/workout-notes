@@ -103,10 +103,21 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen> {
   Future<void> _delete() async {
     final loc = AppLocalizations.of(context)!;
     final name = _displayName(loc);
+    final impact = await _exerciseRepo.getDeletionImpact(widget.exerciseId);
+    if (!mounted) return;
     final confirm = await showConfirmDialog(
       context,
       title: loc.exerciseDetailDeleteTitle,
-      message: loc.exerciseDetailDeleteBody(name),
+      message: impact.workouts > 0 || impact.sets > 0
+          ? loc.exerciseDetailDeleteBodyHistory(
+              name,
+              impact.workouts,
+              impact.sets,
+              impact.routines,
+            )
+          : impact.routines > 0
+          ? loc.exerciseDetailDeleteBodyRoutines(name, impact.routines)
+          : loc.exerciseDetailDeleteBody(name),
       confirmLabel: loc.commonDelete,
       destructive: true,
     );

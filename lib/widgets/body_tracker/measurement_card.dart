@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/body_tracker_utils.dart';
 import 'package:workout_notes/widgets/body_tracker/body_tracker_badges.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
@@ -58,14 +59,18 @@ class BodyMeasurementCard extends StatelessWidget {
                   child: Column(
                     children: [
                       Text(
-                        DateFormat('d', 'pt_BR').format(DateTime.parse(date)),
+                        DateFormat.d(
+                          Intl.defaultLocale,
+                        ).format(DateTime.parse(date)),
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           fontSize: 19,
                         ),
                       ),
                       Text(
-                        DateFormat('MMM', 'pt_BR').format(DateTime.parse(date)),
+                        DateFormat.MMM(
+                          Intl.defaultLocale,
+                        ).format(DateTime.parse(date)),
                         style: theme.textTheme.bodySmall?.copyWith(
                           fontSize: 10,
                           color: theme.colorScheme.onSurfaceVariant,
@@ -149,7 +154,7 @@ class BodyMeasurementCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 2),
                         Text(
-                          delta!.abs().toStringAsFixed(1),
+                          AppNumberFormat.decimal(delta!.abs(), 1),
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,

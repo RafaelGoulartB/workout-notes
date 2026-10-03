@@ -53,7 +53,7 @@ abstract final class RunTrainingLoadAnalytics {
     double sumBack(Map<DateTime, double> map, DateTime end, int length) {
       var total = 0.0;
       for (var i = 0; i < length; i++) {
-        total += map[end.subtract(Duration(days: i))] ?? 0;
+        total += map[addDays(end, -i)] ?? 0;
       }
       return total;
     }
@@ -61,7 +61,7 @@ abstract final class RunTrainingLoadAnalytics {
     final series = <RunLoadDay>[
       for (var i = days - 1; i >= 0; i--)
         () {
-          final d = today.subtract(Duration(days: i));
+          final d = addDays(today, -i);
           return RunLoadDay(
             date: d,
             load: loadByDay[d] ?? 0,
@@ -73,7 +73,7 @@ abstract final class RunTrainingLoadAnalytics {
 
     var activeDays = 0;
     for (var i = 0; i < 28; i++) {
-      if ((loadByDay[today.subtract(Duration(days: i))] ?? 0) > 0) {
+      if ((loadByDay[addDays(today, -i)] ?? 0) > 0) {
         activeDays++;
       }
     }
@@ -83,11 +83,7 @@ abstract final class RunTrainingLoadAnalytics {
         : null;
 
     final last7 = sumBack(distanceByDay, today, 7);
-    final prev7 = sumBack(
-      distanceByDay,
-      today.subtract(const Duration(days: 7)),
-      7,
-    );
+    final prev7 = sumBack(distanceByDay, addDays(today, -7), 7);
     return RunTrainingLoad(
       days: series,
       acwr: acwr,
@@ -112,8 +108,7 @@ abstract final class RunTrainingLoadAnalytics {
   }) {
     final thisWeek = mondayOf(now ?? DateTime.now());
     final starts = [
-      for (var i = weeks - 1; i >= 0; i--)
-        thisWeek.subtract(Duration(days: 7 * i)),
+      for (var i = weeks - 1; i >= 0; i--) addDays(thisWeek, -(7 * i)),
     ];
     final index = {for (var i = 0; i < starts.length; i++) starts[i]: i};
     final seconds = List.generate(weeks, (_) => List<double>.filled(5, 0));
@@ -160,8 +155,7 @@ abstract final class RunTrainingLoadAnalytics {
   }) {
     final thisWeek = mondayOf(now ?? DateTime.now());
     final starts = [
-      for (var i = weeks - 1; i >= 0; i--)
-        thisWeek.subtract(Duration(days: 7 * i)),
+      for (var i = weeks - 1; i >= 0; i--) addDays(thisWeek, -(7 * i)),
     ];
     final index = {for (var i = 0; i < starts.length; i++) starts[i]: i};
     final rpeSum = List<double>.filled(weeks, 0);

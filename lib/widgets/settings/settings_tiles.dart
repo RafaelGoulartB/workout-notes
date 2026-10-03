@@ -29,7 +29,8 @@ class SettingsLinkTile extends StatelessWidget {
     final effectiveIconColor = destructive
         ? theme.colorScheme.error
         : (iconColor ?? theme.colorScheme.primary);
-    final fg = titleColor ??
+    final fg =
+        titleColor ??
         (destructive ? theme.colorScheme.error : theme.colorScheme.onSurface);
     return InkWell(
       onTap: onTap,

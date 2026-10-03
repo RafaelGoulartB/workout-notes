@@ -44,7 +44,10 @@ void main() {
       for (var i = 0; i < 60; i++) {
         cursor.add(bedsideSegment(i));
       }
-      expect(cursor.add(bedsideSegment(60)).epoch.stage, SleepStageType.sleeping);
+      expect(
+        cursor.add(bedsideSegment(60)).epoch.stage,
+        SleepStageType.sleeping,
+      );
       // A turn in bed: a few seconds of sound in two windows.
       for (var i = 61; i < 63; i++) {
         final decision = cursor.add(brief(i, 3));
@@ -65,10 +68,7 @@ void main() {
 
     test('a steady loud background carries no evidence', () {
       final result = runNight([for (var i = 0; i < 120; i++) steady(i)]);
-      expect(
-        result.decisionReasons.values.toSet(),
-        {'steady_background'},
-      );
+      expect(result.decisionReasons.values.toSet(), {'steady_background'});
       // 60 minutes without evidence is longer than any bridge: unknown.
       expect(
         result.epochs.every((e) => e.stage == SleepStageType.unknown),
@@ -200,23 +200,28 @@ void main() {
       expect(v5.add(hissy).reason, 'periodic_breathing');
     });
 
-    test('invalid zero-sample fractions and near-total silence are rejected', () {
-      for (final zeros in [double.nan, double.infinity, -0.1, 0.98, 1.0]) {
-        final decision = SleepWakeCursor(sessionId: 'bedside').add(
-          SleepMonitorSegment.fromMap({
-            ...bedsideSegment(0).toMap(),
-            'digital_silence_fraction': zeros,
-          }),
-        );
-        expect(decision.validSignal, false);
-        expect(decision.epoch.stage, SleepStageType.unknown);
-      }
-    });
+    test(
+      'invalid zero-sample fractions and near-total silence are rejected',
+      () {
+        for (final zeros in [double.nan, double.infinity, -0.1, 0.98, 1.0]) {
+          final decision = SleepWakeCursor(sessionId: 'bedside').add(
+            SleepMonitorSegment.fromMap({
+              ...bedsideSegment(0).toMap(),
+              'digital_silence_fraction': zeros,
+            }),
+          );
+          expect(decision.validSignal, false);
+          expect(decision.epoch.stage, SleepStageType.unknown);
+        }
+      },
+    );
   });
 
   group('timing', () {
     test('a quiet night is estimable without audible breathing', () {
-      final result = runNight([for (var i = 0; i < 960; i++) bedsideSegment(i)]);
+      final result = runNight([
+        for (var i = 0; i < 960; i++) bedsideSegment(i),
+      ]);
       expect(result.ran, true);
       expect(result.epochs.first.stage, SleepStageType.awake);
       final onset = firstSleep(result.epochs);
@@ -235,29 +240,35 @@ void main() {
       expect(summary.finalWakeAt, isNull);
     });
 
-    test('offline onset lands after the last activity, before live confirms', () {
-      final segments = [
-        for (var i = 0; i < 120; i++)
-          i < 20 ? sustainedBedsideActivity(i) : bedsideSegment(i),
-      ];
-      final smoothed = firstSleep(runNight(segments).epochs);
-      final causal = firstSleep(runNight(segments, smooth: false).epochs);
-      expect(smoothed, greaterThanOrEqualTo(20));
-      expect(smoothed, lessThan(causal));
-    });
+    test(
+      'offline onset lands after the last activity, before live confirms',
+      () {
+        final segments = [
+          for (var i = 0; i < 120; i++)
+            i < 20 ? sustainedBedsideActivity(i) : bedsideSegment(i),
+        ];
+        final smoothed = firstSleep(runNight(segments).epochs);
+        final causal = firstSleep(runNight(segments, smooth: false).epochs);
+        expect(smoothed, greaterThanOrEqualTo(20));
+        expect(smoothed, lessThan(causal));
+      },
+    );
 
-    test('a wake is dated to its first sustained sound, not its confirmation', () {
-      final segments = [
-        for (var i = 0; i < 80; i++) bedsideSegment(i),
-        for (var i = 80; i < 90; i++) sustainedBedsideActivity(i),
-        for (var i = 90; i < 200; i++) bedsideSegment(i),
-      ];
-      final smoothed = runNight(segments).epochs;
-      final causal = runNight(segments, smooth: false).epochs;
-      expect(smoothed[80].stage, SleepStageType.awake);
-      expect(causal[80].stage, SleepStageType.sleeping);
-      expect(smoothed.skip(80).take(10).every((e) => !e.isSleep), true);
-    });
+    test(
+      'a wake is dated to its first sustained sound, not its confirmation',
+      () {
+        final segments = [
+          for (var i = 0; i < 80; i++) bedsideSegment(i),
+          for (var i = 80; i < 90; i++) sustainedBedsideActivity(i),
+          for (var i = 90; i < 200; i++) bedsideSegment(i),
+        ];
+        final smoothed = runNight(segments).epochs;
+        final causal = runNight(segments, smooth: false).epochs;
+        expect(smoothed[80].stage, SleepStageType.awake);
+        expect(causal[80].stage, SleepStageType.sleeping);
+        expect(smoothed.skip(80).take(10).every((e) => !e.isSleep), true);
+      },
+    );
 
     test('falling back asleep is faster than the first sleep onset', () {
       final segments = [
@@ -313,8 +324,7 @@ void main() {
   group('capture', () {
     test('invalid capture is unknown without erasing the night', () {
       final result = runNight([
-        for (var i = 0; i < 120; i++)
-          bedsideSegment(i, invalid: i == 80),
+        for (var i = 0; i < 120; i++) bedsideSegment(i, invalid: i == 80),
       ]);
       expect(result.epochs[80].stage, SleepStageType.unknown);
       expect(result.decisionReasons[result.epochs[80].id], 'invalid_capture');
@@ -334,10 +344,7 @@ void main() {
           .toList();
       expect(missing.fold<int>(0, (s, e) => s + e.durationSeconds), 600);
       expect(missing.every((e) => e.stage == SleepStageType.unknown), true);
-      expect(
-        result.epochs.fold<int>(0, (s, e) => s + e.durationSeconds),
-        3600,
-      );
+      expect(result.epochs.fold<int>(0, (s, e) => s + e.durationSeconds), 3600);
       expect(result.epochs.last.stage, SleepStageType.sleeping);
     });
 
@@ -363,20 +370,23 @@ void main() {
       expect(result.window.onsetAt, isNull);
     });
 
-    test('duplicates, overlapping windows and input order do not double count', () {
-      final a = bedsideSegment(0, periodic: true, seconds: 60);
-      final b = bedsideSegment(1, periodic: true, seconds: 60);
-      final result = engine.run(
-        session: bedsideSession(minutes: 2),
-        segments: [b, a, a],
-      );
-      expect(
-        result.epochs.fold<int>(0, (sum, e) => sum + e.durationSeconds),
-        120,
-      );
-      expect(result.epochs.where((e) => e.isSleep), isEmpty);
-      expect(result.epochs.last.stage, SleepStageType.unknown);
-    });
+    test(
+      'duplicates, overlapping windows and input order do not double count',
+      () {
+        final a = bedsideSegment(0, periodic: true, seconds: 60);
+        final b = bedsideSegment(1, periodic: true, seconds: 60);
+        final result = engine.run(
+          session: bedsideSession(minutes: 2),
+          segments: [b, a, a],
+        );
+        expect(
+          result.epochs.fold<int>(0, (sum, e) => sum + e.durationSeconds),
+          120,
+        );
+        expect(result.epochs.where((e) => e.isSleep), isEmpty);
+        expect(result.epochs.last.stage, SleepStageType.unknown);
+      },
+    );
 
     for (final offsetMs in [-502, 69, 900]) {
       test('a first window ${offsetMs}ms off the session start is aligned', () {
@@ -420,7 +430,8 @@ void main() {
       expect(known.every((e) => e.awakeProbability != null), true);
       expect(
         known.every(
-          (e) => (e.awakeProbability! + e.sleepingProbability! - 1).abs() < 1e-9,
+          (e) =>
+              (e.awakeProbability! + e.sleepingProbability! - 1).abs() < 1e-9,
         ),
         true,
       );
@@ -442,7 +453,10 @@ void main() {
       ];
       expect(missing.first.epoch.stage, SleepStageType.sleeping);
       expect(missing.last.epoch.stage, SleepStageType.unknown);
-      expect(cursor.add(bedsideSegment(66)).epoch.stage, SleepStageType.sleeping);
+      expect(
+        cursor.add(bedsideSegment(66)).epoch.stage,
+        SleepStageType.sleeping,
+      );
     });
 
     test('a live gap lets the model drift instead of resetting', () {
@@ -451,7 +465,10 @@ void main() {
         cursor.add(bedsideSegment(i));
       }
       // Ten minutes of windows never arrived.
-      expect(cursor.add(bedsideSegment(80)).epoch.stage, SleepStageType.sleeping);
+      expect(
+        cursor.add(bedsideSegment(80)).epoch.stage,
+        SleepStageType.sleeping,
+      );
     });
   });
 
@@ -552,8 +569,14 @@ void main() {
         greaterThan(dawn.length * 0.9),
       );
       // Loud low-frequency activity (local 04:59-05:17, 06:28-06:33) wakes.
-      expect(span(135, 150).every((e) => e.stage == SleepStageType.awake), true);
-      expect(span(222, 226).every((e) => e.stage == SleepStageType.awake), true);
+      expect(
+        span(135, 150).every((e) => e.stage == SleepStageType.awake),
+        true,
+      );
+      expect(
+        span(222, 226).every((e) => e.stage == SleepStageType.awake),
+        true,
+      );
       expect(summary.awakeMinutes, inInclusiveRange(30, 90));
       expect(summary.awakeningCount, greaterThanOrEqualTo(2));
       expect(summary.restlessSleepMinutes, lessThan(summary.sleepingMinutes));

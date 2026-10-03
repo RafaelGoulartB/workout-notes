@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/screens/planning/periodization_home_screen.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/nutrition_goal_suggest.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
@@ -186,8 +187,10 @@ class GoalPreviewCard extends StatelessWidget {
   }
 
   static String _formatNum(double value) {
-    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
-    return value.toStringAsFixed(1);
+    if (value == value.roundToDouble()) {
+      return AppNumberFormat.decimal(value, 0);
+    }
+    return AppNumberFormat.decimal(value, 1);
   }
 }
 
@@ -265,8 +268,8 @@ class PlanOverrideBanner extends StatelessWidget {
     String formatGoal(double? value) {
       if (value == null) return '—';
       return value == value.roundToDouble()
-          ? value.toStringAsFixed(0)
-          : value.toStringAsFixed(1);
+          ? AppNumberFormat.decimal(value, 0)
+          : AppNumberFormat.decimal(value, 1);
     }
 
     return Material(

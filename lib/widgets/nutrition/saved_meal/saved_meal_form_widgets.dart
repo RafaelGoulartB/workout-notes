@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/screens/nutrition/saved_meal_editor_controller.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class SavedMealDetailsCard extends StatelessWidget {
@@ -291,7 +292,7 @@ class SavedMealIngredientCard extends StatelessWidget {
                   padding: const EdgeInsets.only(left: 8),
                   child: Text(
                     loc.nutritionConsumedKcal(
-                      calories.toStringAsFixed(calories < 10 ? 1 : 0),
+                      AppNumberFormat.decimal(calories, calories < 10 ? 1 : 0),
                     ),
                     style: theme.textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w700,

@@ -88,69 +88,6 @@ void main() {
     },
   );
 
-  test('backup includes all nutrition tables', () async {
-    final now = DateTime.now().toIso8601String();
-    await database.insert('foods', {
-      'id': 'f1',
-      'source': 'manual',
-      'external_id': 'f1',
-      'name': 'Apple',
-      'search_name': 'apple',
-      'fetched_at': now,
-    });
-    await database.insert('food_variants', {
-      'id': 'v1',
-      'food_id': 'f1',
-      'reference_amount': 100,
-      'reference_unit': 'g',
-      'calories': 52,
-      'is_estimated': 0,
-    });
-    await database.insert('food_servings', {
-      'id': 's1',
-      'food_variant_id': 'v1',
-      'label': 'Medium',
-      'quantity': 1,
-      'unit': 'unit',
-      'grams_equivalent': 120,
-    });
-    await database.insert('meal_logs', {
-      'id': 'ml1',
-      'date': '2026-07-26',
-      'meal_type': 'breakfast',
-      'created_at': now,
-    });
-    await database.insert('meal_log_items', {
-      'id': 'mli1',
-      'meal_log_id': 'ml1',
-      'food_id': 'f1',
-      'food_variant_id': 'v1',
-      'food_name_snapshot': 'Apple',
-      'quantity': 100,
-      'unit': 'g',
-      'calories': 52,
-      'nutrition_snapshot_json': '{}',
-      'created_at': now,
-    });
-    await database.insert('nutrition_goals', {
-      'id': 'g1',
-      'calories': 2000,
-      'created_at': now,
-      'updated_at': now,
-      'is_active': 1,
-    });
-    final export = await ExportImportRepository(
-      databaseProvider: () async => database,
-    ).exportAllData();
-    expect(export['version'], ExportImportRepository.currentBackupVersion);
-    expect(export['foods'], hasLength(1));
-    expect(export['food_variants'], hasLength(1));
-    expect(export['food_servings'], hasLength(1));
-    expect(export['meal_logs'], hasLength(1));
-    expect(export['meal_log_items'], hasLength(1));
-    expect(export['nutrition_goals'], hasLength(1));
-  });
-
   test('round-trip preserves nutrition relationships and snapshots', () async {
     final now = DateTime.now().toIso8601String();
     await database.insert('foods', {

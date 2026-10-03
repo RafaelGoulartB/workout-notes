@@ -36,7 +36,7 @@ abstract final class PeriodizationCheckinFlow {
         final monday = mondayOf(DateTime.now());
         final next = DateFormat.MMMd(
           Intl.defaultLocale,
-        ).format(monday.add(const Duration(days: 7)));
+        ).format(addDays(monday, 7));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(loc.periodizationNextReview(next))),
         );
@@ -56,7 +56,9 @@ abstract final class PeriodizationCheckinFlow {
           confirmLabel: loc.planningEndPhaseConfirm,
         );
         if (confirmed == true) {
-          await DatabaseHelper.instance.periodizationRepo.endPhaseThisWeek(phase.id);
+          await DatabaseHelper.instance.periodizationRepo.endPhaseThisWeek(
+            phase.id,
+          );
         }
     }
     return true;

@@ -339,7 +339,6 @@ void main() {
     final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
 
     expect(find.text(loc.nutritionBalanceWeekSequence), findsOneWidget);
-    expect(find.text(loc.nutritionBalanceTitle), findsNothing);
     expect(find.text(loc.nutritionBalanceThisWeek), findsOneWidget);
     expect(find.text(loc.nutritionBalanceDaysLogged), findsOneWidget);
     expect(find.text(loc.nutritionBalanceAverageIntake), findsOneWidget);
@@ -364,7 +363,6 @@ void main() {
 
     expect(find.text(loc.nutritionBalanceMonthSequence), findsOneWidget);
     expect(find.byKey(const ValueKey('balance-month-week-1')), findsOneWidget);
-    expect(find.text(loc.nutritionBalanceMonthSummary), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

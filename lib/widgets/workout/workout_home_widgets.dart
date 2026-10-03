@@ -346,12 +346,10 @@ class _WeekDots extends StatelessWidget {
   }
 }
 
-/// One day's sport circles; a second sport overlaps the first, which is cut
-/// around it so the pair reads on any background.
+/// One day's sport circles; a second sport overlaps the first.
 class _DayMarks extends StatelessWidget {
   static const double _size = 22;
   static const double _overlap = 5;
-  static const double _gap = 1.5;
 
   final WorkoutDayMark day;
   final Color strengthColor;
@@ -414,13 +412,7 @@ class _DayMarks extends StatelessWidget {
               top: 0,
               width: _size,
               height: _size,
-              child: ClipPath(
-                clipper: const _CircleCutout(
-                  center: Offset(offset + _size / 2, _size / 2),
-                  radius: _size / 2 + _gap,
-                ),
-                child: marks[0],
-              ),
+              child: marks[0],
             ),
             Positioned(
               left: offset,
@@ -466,26 +458,6 @@ class _SportMark extends StatelessWidget {
       child: Icon(icon, size: 11, color: color.withAlpha(170)),
     );
   }
-}
-
-/// Everything except a circle, used to cut the back sport circle around the
-/// front one.
-class _CircleCutout extends CustomClipper<Path> {
-  final Offset center;
-  final double radius;
-
-  const _CircleCutout({required this.center, required this.radius});
-
-  @override
-  Path getClip(Size size) => Path.combine(
-    PathOperation.difference,
-    Path()..addRect(Offset.zero & size),
-    Path()..addOval(Rect.fromCircle(center: center, radius: radius)),
-  );
-
-  @override
-  bool shouldReclip(_CircleCutout old) =>
-      old.center != center || old.radius != radius;
 }
 
 /// One activity in the "Today" agenda.

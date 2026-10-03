@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="run_recovery_channel_name">Run recovery</string>
+    <string name="run_recovery_title">Run paused — tap to resume</string>
+    <string name="run_recovery_text">Android stopped GPS tracking in the background. Open the app to continue your run.</string>
+    <string name="run_placeholder_title">Run tracking</string>
+    <string name="run_placeholder_text">Nothing to record</string>
+</resources>

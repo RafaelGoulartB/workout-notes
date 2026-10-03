@@ -1,26 +1,50 @@
 package com.workoutnotes.workout_notes.sleep
 
-import android.app.Activity
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.os.UserManager
 import android.text.format.DateFormat
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
+import androidx.core.content.ContextCompat
 import com.workoutnotes.workout_notes.R
 import java.util.Date
 
-class TraditionalAlarmActivity : Activity() {
+class TraditionalAlarmActivity : ComponentActivity() {
     private var id: String? = null
     private var error: String? = null
 
-    override fun onCreate(state: Bundle?) { super.onCreate(state); lockScreen(); id = intent.getStringExtra(TraditionalAlarmScheduler.EXTRA_ID); render() }
+    // A ringing alarm has to be answered: back does nothing. (A dispatcher
+    // callback, because onBackPressed() is not called with predictive back.)
+    private val backCallback = object : OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() { }
+    }
+
+    // The ring ended without this screen (timeout, notification action).
+    private val ringEnded = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.getStringExtra(TraditionalAlarmScheduler.EXTRA_ID) == id) finishAndRemoveTask()
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        onBackPressedDispatcher.addCallback(this, backCallback)
+        ContextCompat.registerReceiver(this, ringEnded, IntentFilter(TraditionalAlarmRingingService.ACTION_RING_ENDED), ContextCompat.RECEIVER_NOT_EXPORTED)
+        lockScreen(); id = intent.getStringExtra(TraditionalAlarmScheduler.EXTRA_ID); render()
+    }
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); id = intent.getStringExtra(TraditionalAlarmScheduler.EXTRA_ID); render() }
-    override fun onBackPressed() { }
+    override fun onDestroy() { unregisterReceiver(ringEnded); super.onDestroy() }
 
     @Deprecated("Deprecated in Android SDK")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -52,6 +76,8 @@ class TraditionalAlarmActivity : Activity() {
     private fun render() {
         val alarmId = id ?: run { finish(); return }
         val snapshot = TraditionalAlarmScheduler.read(this, alarmId) ?: run { finish(); return }
+        // Already answered or timed out while this screen was away.
+        if (snapshot.state != "ringing") { finishAndRemoveTask(); return }
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(28), dp(48), dp(28), dp(36)); setBackgroundColor(Color.rgb(19, 24, 54)) }
         root.addView(TextView(this).apply { text = "⏰"; textSize = 56f; gravity = Gravity.CENTER })
         root.addView(TextView(this).apply { text = getString(R.string.traditional_alarm_wake_title); textSize = 26f; gravity = Gravity.CENTER; setTextColor(Color.WHITE) })
@@ -60,8 +86,19 @@ class TraditionalAlarmActivity : Activity() {
         if (error != null) root.addView(TextView(this).apply { text = error; gravity = Gravity.CENTER; setTextColor(Color.rgb(255, 180, 180)) })
         root.addView(TextView(this), LinearLayout.LayoutParams(1, 0, 1f))
         if (snapshot.snoozeEnabled && snapshot.snoozeCount < snapshot.maxSnoozes) root.addView(Button(this).apply { text = getString(R.string.traditional_alarm_snooze_detail, snapshot.snoozeMinutes, snapshot.snoozeCount + 1, snapshot.maxSnoozes); setOnClickListener { TraditionalAlarmRingingService.snooze(this@TraditionalAlarmActivity, alarmId); finishAndRemoveTask() } }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(54)))
-        root.addView(Button(this).apply { text = getString(if (snapshot.requiresMission) R.string.traditional_alarm_open_mission else R.string.traditional_alarm_dismiss); setOnClickListener { if (snapshot.requiresMission) startActivityForResult(Intent(this@TraditionalAlarmActivity, BarcodeScannerActivity::class.java).apply { putExtra(BarcodeScannerActivity.EXTRA_ENROLLMENT, false) }, 9911) else { TraditionalAlarmRingingService.dismiss(this@TraditionalAlarmActivity, alarmId); finishAndRemoveTask() } } }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56)).apply { topMargin = dp(12) })
+        root.addView(Button(this).apply { text = getString(if (snapshot.requiresMission) R.string.traditional_alarm_open_mission else R.string.traditional_alarm_dismiss); setOnClickListener { if (snapshot.requiresMission) openScanner() else { TraditionalAlarmRingingService.dismiss(this@TraditionalAlarmActivity, alarmId); finishAndRemoveTask() } } }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56)).apply { topMargin = dp(12) })
         setContentView(root)
     }
+
+    private fun openScanner() {
+        // The scanner (camera, ML Kit) is not available before the first unlock after a reboot.
+        if (!getSystemService(UserManager::class.java).isUserUnlocked) {
+            error = getString(R.string.alarm_mission_unlock_required)
+            render()
+            return
+        }
+        startActivityForResult(Intent(this, BarcodeScannerActivity::class.java).apply { putExtra(BarcodeScannerActivity.EXTRA_ENROLLMENT, false) }, 9911)
+    }
+
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 }

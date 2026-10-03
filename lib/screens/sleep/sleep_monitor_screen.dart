@@ -12,6 +12,7 @@ import 'package:workout_notes/widgets/sleep/monitor/monitor_sections.dart';
 import 'package:workout_notes/widgets/sleep/monitor/monitor_status_widgets.dart';
 import 'package:workout_notes/widgets/sleep/monitor/sleep_monitor_texts.dart';
 import 'package:workout_notes/widgets/sleep/monitor/smart_wake_widgets.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class SleepMonitorScreen extends StatefulWidget {
@@ -129,7 +130,10 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         actions: [
-          if (!controller.loading && !active && !pending)
+          if (!controller.loading &&
+              !controller.loadFailed &&
+              !active &&
+              !pending)
             IconButton(
               tooltip: loc.sleepMonitorTipsTitle,
               icon: const Icon(Icons.lightbulb_outline_rounded),
@@ -154,11 +158,13 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
       ),
       body: controller.loading
           ? const Center(child: CircularProgressIndicator())
+          : controller.loadFailed
+          ? LoadErrorView(onRetry: controller.initialize)
           : MonitorNightBackground(
               dim: active,
               child: SafeArea(bottom: false, child: content),
             ),
-      bottomNavigationBar: controller.loading
+      bottomNavigationBar: controller.loading || controller.loadFailed
           ? null
           : SafeArea(
               minimum: EdgeInsets.fromLTRB(
@@ -211,12 +217,6 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
         )
       : Icon(fallback);
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-
   static String _pendingAlarmLabel(
     AppLocalizations loc,
     SleepMonitorState state,
@@ -233,7 +233,10 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
   Future<void> _handlePendingAlarm() async {
     final succeeded = await _controller.handlePendingAlarm();
     if (!succeeded && mounted) {
-      _showMessage(AppLocalizations.of(context)!.sleepMonitorAlarmActionError);
+      showAppSnack(
+        context,
+        AppLocalizations.of(context)!.sleepMonitorAlarmActionError,
+      );
     }
   }
 
@@ -249,9 +252,13 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     if (!mounted) return;
     switch (result) {
       case AlarmTimeResult.invalidWindow:
-        _showMessage(AppLocalizations.of(context)!.sleepAlarmInvalidWindow);
+        showAppSnack(
+          context,
+          AppLocalizations.of(context)!.sleepAlarmInvalidWindow,
+        );
       case AlarmTimeResult.updateFailed:
-        _showMessage(
+        showAppSnack(
+          context,
           sleepMonitorErrorMessage(
             AppLocalizations.of(context)!,
             _controller.state.errorCode,
@@ -265,7 +272,10 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
 
   void _shiftAlarmTime(int minutes) {
     if (_controller.shiftAlarmTime(minutes) == AlarmShiftResult.invalidWindow) {
-      _showMessage(AppLocalizations.of(context)!.sleepAlarmInvalidWindow);
+      showAppSnack(
+        context,
+        AppLocalizations.of(context)!.sleepAlarmInvalidWindow,
+      );
     }
   }
 
@@ -277,17 +287,18 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
       case SleepStartResult.started:
         break;
       case SleepStartResult.invalidWindow:
-        _showMessage(loc.sleepAlarmInvalidWindow);
+        showAppSnack(context, loc.sleepAlarmInvalidWindow);
       case SleepStartResult.microphoneDenied:
-        _showMessage(loc.sleepMonitorMicrophoneDenied);
+        showAppSnack(context, loc.sleepMonitorMicrophoneDenied);
       case SleepStartResult.notificationsDenied:
-        _showMessage(loc.sleepAlarmNotificationRequired);
+        showAppSnack(context, loc.sleepAlarmNotificationRequired);
       case SleepStartResult.exactAlarmRequired:
-        _showMessage(loc.sleepAlarmExactPermission);
+        showAppSnack(context, loc.sleepAlarmExactPermission);
       case SleepStartResult.missionUnavailable:
-        _showMessage(loc.sleepMonitorModeMissionUnavailable);
+        showAppSnack(context, loc.sleepMonitorModeMissionUnavailable);
       case SleepStartResult.failed:
-        _showMessage(
+        showAppSnack(
+          context,
           sleepMonitorErrorMessage(loc, _controller.service.state.errorCode),
         );
     }
@@ -312,6 +323,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
       title: loc.sleepMonitorDiscardTitle,
       message: loc.sleepMonitorDiscardBody,
       confirmLabel: loc.commonDiscard,
+      destructive: true,
     );
     if (confirmed != true) return;
     await _controller.discard();

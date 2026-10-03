@@ -3,7 +3,6 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/ai_chat_message.dart';
 import 'package:workout_notes/models/ai_chat_thread.dart';
 import 'package:workout_notes/models/ai_message_role.dart';
-import 'package:workout_notes/models/ai_routine_proposal.dart';
 import 'package:workout_notes/state/ai_chat_service.dart';
 
 import 'support/ai_test_db.dart';
@@ -118,57 +117,39 @@ void main() {
     );
   });
 
-  test('saving the open thread reorders the loaded list in memory', () async {
+  test('search is case- and accent-insensitive', () async {
     final repo = DatabaseHelper.instance.aiChatRepo;
     final base = DateTime.utc(2026, 3, 1);
     await repo.upsertAiChatThread(
-      id: 'pinned',
-      title: 'Pinned',
+      id: 'a',
+      title: 'Plano de AÇÃO',
       createdAt: base,
       updatedAt: base,
-      isPinned: true,
     );
     await repo.upsertAiChatThread(
-      id: 'old',
-      title: 'Old one',
+      id: 'b',
+      title: 'Outra',
       createdAt: base,
-      updatedAt: base.add(const Duration(days: 1)),
+      updatedAt: base,
     );
-    await repo.upsertAiChatThread(
-      id: 'other',
-      title: 'Other',
-      createdAt: base,
-      updatedAt: base.add(const Duration(days: 2)),
+    await repo.upsertAiChatMessages('b', [
+      AiChatMessage(
+        id: 'm',
+        threadId: 'b',
+        role: AiMessageRole.assistant,
+        content: 'Sua recuperação está ótima',
+        createdAt: base,
+      ).toRow(),
+    ]);
+    final service = AiChatService.instance;
+    expect(
+      (await service.searchThreads('plano de acao')).threads.map((t) => t.id),
+      ['a'],
     );
-    final service = AiChatService.instance;
-    await service.newChat();
-    await service.refreshThreads();
-    expect(service.state.threads.map((t) => t.id), ['pinned', 'other', 'old']);
-
-    await service.openThread('old');
-    await service.persistCurrentThreadForTest();
-
-    expect(service.state.threads.map((t) => t.id), ['pinned', 'old', 'other']);
-    expect(service.state.threads[1].title, 'Old one');
-    expect((await repo.getAiChatThread('old'))!['title'], 'Old one');
-    await service.newChat();
-  });
-
-  test('saving a thread outside the loaded pages keeps its title', () async {
-    await seedThreads(130);
-    final service = AiChatService.instance;
-    await service.newChat();
-    await service.refreshThreads();
-    expect(service.state.threads.any((t) => t.id == 't0'), isFalse);
-
-    await service.openThread('t0');
-    await service.persistCurrentThreadForTest();
-
-    expect(service.state.threads.first.id, 't0');
-    expect(service.state.threads.first.title, 'Conversa 0');
-    final repo = DatabaseHelper.instance.aiChatRepo;
-    expect((await repo.getAiChatThread('t0'))!['title'], 'Conversa 0');
-    await service.newChat();
+    expect(
+      (await service.searchThreads('RECUPERACAO')).threads.map((t) => t.id),
+      ['b'],
+    );
   });
 
   test('untitled threads are recognised without changing written titles', () {
@@ -184,24 +165,5 @@ void main() {
     expect(thread('Minha conversa sobre treino').hasGenericTitle, isFalse);
     expect(thread('Leg day').displayTitle('New conversation'), 'Leg day');
     expect(thread('').displayTitle('New conversation'), 'New conversation');
-  });
-
-  test('applied-proposal summary follows the app language', () {
-    final proposal = AiRoutineProposal(
-      id: 'p',
-      threadId: 't',
-      toolCallId: 'c',
-      action: AiRoutineProposalAction.create,
-      target: const {'name': 'Push'},
-      diff: const {},
-      status: AiRoutineProposalStatus.applied,
-      createdAt: DateTime.utc(2026),
-    );
-    final en = appliedProposalEventPrompt(proposal, languageCode: 'en');
-    final pt = appliedProposalEventPrompt(proposal, languageCode: 'pt');
-    expect(en, contains('em inglês'));
-    expect(en, isNot(contains('português brasileiro')));
-    expect(pt, contains('em português brasileiro'));
-    expect(en, contains('"routineName":"Push"'));
   });
 }

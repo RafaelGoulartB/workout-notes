@@ -6,8 +6,10 @@ enum GoalScope {
   final String value;
   const GoalScope(this.value);
 
-  static GoalScope fromString(String value) =>
-      values.firstWhere((e) => e.value == value, orElse: () => GoalScope.anaerobic);
+  static GoalScope fromString(String value) => values.firstWhere(
+    (e) => e.value == value,
+    orElse: () => GoalScope.anaerobic,
+  );
 }
 
 /// What kind of metric the goal tracks.
@@ -20,8 +22,10 @@ enum GoalMetric {
   final String value;
   const GoalMetric(this.value);
 
-  static GoalMetric fromString(String value) =>
-      values.firstWhere((e) => e.value == value, orElse: () => GoalMetric.volume);
+  static GoalMetric fromString(String value) => values.firstWhere(
+    (e) => e.value == value,
+    orElse: () => GoalMetric.volume,
+  );
 
   /// Which metrics are valid for a given scope.
   static List<GoalMetric> forScope(GoalScope scope) {
@@ -40,8 +44,10 @@ enum GoalPeriod {
   final String value;
   const GoalPeriod(this.value);
 
-  static GoalPeriod fromString(String value) =>
-      values.firstWhere((e) => e.value == value, orElse: () => GoalPeriod.weekly);
+  static GoalPeriod fromString(String value) => values.firstWhere(
+    (e) => e.value == value,
+    orElse: () => GoalPeriod.weekly,
+  );
 }
 
 /// A user-defined goal with target value and reset cadence.
@@ -143,16 +149,16 @@ class Goal {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        title,
-        scope,
-        metric,
-        period,
-        targetValue,
-        createdAt,
-        isActive,
-        color,
-      );
+    id,
+    title,
+    scope,
+    metric,
+    period,
+    targetValue,
+    createdAt,
+    isActive,
+    color,
+  );
 
   @override
   String toString() =>
@@ -182,15 +188,15 @@ class GoalProgress {
   });
 
   static GoalProgress empty(DateTime now) => GoalProgress(
-        currentValue: 0,
-        targetValue: 0,
-        percent: 0,
-        isComplete: false,
-        periodStart: now,
-        periodEnd: now,
-        daysRemaining: 0,
-        daysElapsed: 0,
-      );
+    currentValue: 0,
+    targetValue: 0,
+    percent: 0,
+    isComplete: false,
+    periodStart: now,
+    periodEnd: now,
+    daysRemaining: 0,
+    daysElapsed: 0,
+  );
 }
 
 /// A historical period result for a goal.

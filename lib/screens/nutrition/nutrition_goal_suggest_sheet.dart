@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/nutrition_goal_suggest.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
@@ -250,7 +251,7 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
     return value >= 1 ? value : null;
   }
 
-  static String _formatRatio(double value) => value.toStringAsFixed(1);
+  static String _formatRatio(double value) => AppNumberFormat.decimal(value, 1);
 
   static String _activityLabel(AppLocalizations loc, ActivityLevel level) {
     switch (level) {
@@ -569,9 +570,11 @@ class _MacroRatioControllers {
     const defaults = NutritionMacroRatios.defaults;
     return _MacroRatioControllers(
       protein: TextEditingController(
-        text: defaults.proteinPerKg.toStringAsFixed(1),
+        text: AppNumberFormat.decimal(defaults.proteinPerKg, 1),
       ),
-      fat: TextEditingController(text: defaults.fatPerKg.toStringAsFixed(1)),
+      fat: TextEditingController(
+        text: AppNumberFormat.decimal(defaults.fatPerKg, 1),
+      ),
     );
   }
 
@@ -830,9 +833,9 @@ class _SuggestionPreviewCard extends StatelessWidget {
 
   static String _format(double value) {
     if (value == value.roundToDouble()) {
-      return value.toStringAsFixed(0);
+      return AppNumberFormat.decimal(value, 0);
     }
-    return value.toStringAsFixed(1);
+    return AppNumberFormat.decimal(value, 1);
   }
 }
 
@@ -893,9 +896,9 @@ class _MacroStat extends StatelessWidget {
 
   static String _format(double value) {
     if (value == value.roundToDouble()) {
-      return value.toStringAsFixed(0);
+      return AppNumberFormat.decimal(value, 0);
     }
-    return value.toStringAsFixed(1);
+    return AppNumberFormat.decimal(value, 1);
   }
 }
 

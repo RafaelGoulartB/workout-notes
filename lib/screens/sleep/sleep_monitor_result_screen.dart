@@ -6,6 +6,8 @@ import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/widgets/sleep/sleep_stage_card.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_wake_up_card.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Detail of one monitored night: headline sleep and efficiency, the night's
@@ -20,11 +22,11 @@ class SleepMonitorResultScreen extends StatefulWidget {
       _SleepMonitorResultScreenState();
 }
 
-class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
+class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen>
+    with GuardedLoad {
   final _repository = DatabaseHelper.instance.sleepMonitorRepo;
   SleepMonitorSession? _session;
   SleepEntry? _entry;
-  bool _isLoading = true;
 
   @override
   void initState() {
@@ -32,22 +34,24 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     final session = await _repository.getSession(widget.sessionId);
     SleepEntry? entry;
     if (session != null && session.sleepEntryId != null) {
       // The entry is an extra: a failed read must not hide the session.
       try {
         entry = await _repository.getSleepEntry(session.sleepEntryId!);
-      } catch (_) {}
+      } catch (error) {
+        debugPrint('Could not load the linked sleep entry: $error');
+      }
     }
     if (!mounted) return;
     setState(() {
       _session = session;
       _entry = entry;
-      _isLoading = false;
+      isLoading = false;
     });
-  }
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -74,8 +78,10 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
             ),
         ],
       ),
-      body: _isLoading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _load)
           : session == null
           ? Center(child: Text(loc.sleepMonitorResultMissing))
           : _buildResult(context, loc, session),
@@ -217,6 +223,7 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
       title: loc.sleepMonitorDeleteSession,
       message: loc.sleepMonitorDeleteSessionBody,
       confirmLabel: loc.commonDelete,
+      destructive: true,
     );
     if (confirmed != true) return;
     await _repository.deleteSession(widget.sessionId);

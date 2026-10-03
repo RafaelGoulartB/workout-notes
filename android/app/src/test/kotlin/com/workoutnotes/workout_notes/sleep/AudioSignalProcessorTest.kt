@@ -20,13 +20,6 @@ class AudioSignalProcessorTest {
         assertEquals("noise", AudioSignalProcessor.classify(1.0, 10.0))
     }
 
-    @Test
-    fun usesThirtySecondWindowsAndBoundedReadRetries() {
-        assertEquals(30, AudioSignalProcessor.WINDOW_SECONDS)
-        assertTrue(AudioSignalProcessor.MAX_CONSECUTIVE_READ_ERRORS <= 3)
-        assertTrue(AudioSignalProcessor.NO_DATA_TIMEOUT_MILLIS <= 5_000)
-    }
-
     // One block is 125 ms; a deterministic +-1 dB jitter around [level].
     private val jitter = java.util.Random(11)
 

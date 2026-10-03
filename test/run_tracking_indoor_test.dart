@@ -1,12 +1,17 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/database/database_schema.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
+import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_review_draft.dart';
+import 'package:workout_notes/models/run_voice_settings.dart';
+import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/services/indoor_tracking_service.dart';
+import 'package:workout_notes/services/run_native_voice_service.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
 
 import 'support/test_db.dart';
@@ -137,5 +142,151 @@ void main() {
         expect(running.map((a) => a.id), ['treadmill-1']);
       },
     );
+  });
+
+  group('treadmill voice coach', () {
+    RunPlanWorkout intervals() => RunPlanWorkout(
+      id: 'w1',
+      runPlanId: 'p1',
+      weekIndex: 0,
+      orderIndex: 0,
+      kind: RunWorkoutKind.interval,
+      name: '6x400',
+      targetPaceSecPerKm: 240,
+      createdAt: DateTime(2026),
+      steps: const [
+        RunWorkoutStep(
+          id: 's1',
+          runPlanWorkoutId: 'w1',
+          orderIndex: 0,
+          role: RunStepRole.warmup,
+          metric: RunIntervalMetric.time,
+          value: 600,
+        ),
+        RunWorkoutStep(
+          id: 's2',
+          runPlanWorkoutId: 'w1',
+          orderIndex: 1,
+          role: RunStepRole.work,
+          metric: RunIntervalMetric.distance,
+          value: 400,
+          repeatGroup: 1,
+          repeatCount: 6,
+          targetPaceMinSecPerKm: 230,
+          targetPaceMaxSecPerKm: 250,
+        ),
+        RunWorkoutStep(
+          id: 's3',
+          runPlanWorkoutId: 'w1',
+          orderIndex: 2,
+          role: RunStepRole.cooldown,
+          metric: RunIntervalMetric.distance,
+          value: 1000,
+        ),
+      ],
+    );
+
+    test('distance steps become time at their target pace', () {
+      final steps = intervals().treadmillStepsJson();
+      expect(steps.map((s) => s['metric']), everyElement('time'));
+      expect(steps[0]['value'], 600);
+      // 400 m at the 4:00 band midpoint.
+      expect(steps[1]['value'], 96);
+      expect(steps[1]['targetPaceMinSecPerKm'], 230);
+      // No band: the workout pace.
+      expect(steps[2]['value'], 240);
+    });
+
+    test('the voice profile carries the kind and headline targets', () {
+      final profile = intervals().voiceProfile();
+      expect(profile['kind'], 'interval');
+      expect(profile['targetPaceSecPerKm'], 240);
+    });
+
+    test('drives the native coach and keeps its step results', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      final calls = <MethodCall>[];
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      const channel = MethodChannel('workout_notes/run_voice/methods');
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        return switch (call.method) {
+          'indoorStart' => true,
+          'indoorStop' => [
+            {
+              'sequence': 0,
+              'role': 'warmup',
+              'repIndex': 1,
+              'plannedMetric': 'time',
+              'plannedValue': 600,
+              'distanceMeters': 0.0,
+              'durationSeconds': 600,
+            },
+          ],
+          _ => null,
+        };
+      });
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(channel, null);
+        debugDefaultTargetPlatformOverride = null;
+      });
+
+      final workout = intervals();
+      final service = IndoorTrackingService.instance;
+      await service.start(
+        type: CardioActivityType.treadmill,
+        voice: RunIndoorVoiceSetup(
+          settings: const RunVoiceSettings.defaults(),
+          goal: const {'enabled': false},
+          plan: workout.treadmillStepsJson(),
+          workout: workout.voiceProfile(),
+        ),
+      );
+      final start = calls.singleWhere((c) => c.method == 'indoorStart');
+      final args = Map<String, dynamic>.from(start.arguments as Map);
+      expect((args['plan'] as List).length, 3);
+      expect((args['workout'] as Map)['kind'], 'interval');
+
+      await service.pause();
+      await service.resume();
+      expect(
+        calls.map((c) => c.method),
+        containsAllInOrder(['indoorStart', 'indoorPause', 'indoorResume']),
+      );
+
+      final draft = await service.stopForReview();
+      expect(calls.last.method, 'indoorStop');
+      final results = (draft!.spool['activity'] as Map)['voice_step_results'];
+      expect(results, hasLength(1));
+      expect(draft.stepResults, hasLength(1));
+    });
+
+    test('the bike never starts the coach', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      final calls = <MethodCall>[];
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      const channel = MethodChannel('workout_notes/run_voice/methods');
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        return null;
+      });
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(channel, null);
+        debugDefaultTargetPlatformOverride = null;
+      });
+
+      await IndoorTrackingService.instance.start(
+        voice: const RunIndoorVoiceSetup(
+          settings: RunVoiceSettings.defaults(),
+          goal: {},
+          plan: [],
+        ),
+      );
+      expect(calls, isEmpty);
+    });
   });
 }

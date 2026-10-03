@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:workout_notes/database/database_ai_schema.dart';
 import 'package:workout_notes/database/database_medication_schema.dart';
 import 'package:workout_notes/database/database_nutrition_schema.dart';
 import 'package:workout_notes/database/database_periodization_schema.dart';
@@ -317,27 +318,6 @@ abstract final class DatabaseSchema {
       )
     ''');
 
-    // AI routine proposals (v17). These are drafts only until user approval.
-    await db.execute('''
-      CREATE TABLE ai_routine_proposals (
-        id TEXT PRIMARY KEY,
-        thread_id TEXT NOT NULL,
-        tool_call_id TEXT NOT NULL,
-        action TEXT NOT NULL,
-        routine_id TEXT,
-        before_json TEXT,
-        target_json TEXT NOT NULL,
-        diff_json TEXT NOT NULL,
-        status TEXT NOT NULL,
-        applied_routine_id TEXT,
-        error_code TEXT,
-        error_message TEXT,
-        created_at TEXT NOT NULL,
-        resolved_at TEXT,
-        FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE
-      )
-    ''');
-
     // Running activities (v41) — separate from gym workouts.
     await db.execute('''
       CREATE TABLE run_activities (
@@ -384,6 +364,10 @@ abstract final class DatabaseSchema {
     await DatabaseRunRouteSchema.create(db);
     await DatabaseRunExtrasSchema.create(db);
     await DatabaseMedicationSchema.create(db);
+    for (final statement in DatabaseAiSchema.v61Columns) {
+      await db.execute(statement);
+    }
+    await DatabaseAiSchema.create(db);
 
     // Nutrition module (v22). Foods, variants, servings, meal logs and
     // goals share a single helper so `_onCreate` and `_onUpgrade` use
@@ -415,19 +399,10 @@ abstract final class DatabaseSchema {
       'CREATE INDEX idx_sleep_monitor_sessions_entry ON sleep_monitor_sessions(sleep_entry_id)',
     );
     await db.execute(
-      'CREATE INDEX idx_ai_chat_messages_thread ON ai_chat_messages(thread_id, created_at ASC)',
-    );
-    await db.execute(
       'CREATE INDEX idx_traditional_alarms_next_trigger ON traditional_alarms(enabled, next_trigger_at ASC)',
     );
     await db.execute(
-      'CREATE INDEX idx_ai_chat_threads_updated ON ai_chat_threads(updated_at DESC)',
-    );
-    await db.execute(
       'CREATE INDEX idx_ai_chat_threads_pinned_updated ON ai_chat_threads(is_pinned DESC, updated_at DESC)',
-    );
-    await db.execute(
-      'CREATE INDEX idx_ai_routine_proposals_thread_status ON ai_routine_proposals(thread_id, status, created_at ASC)',
     );
     await db.execute(
       'CREATE INDEX idx_run_activities_started ON run_activities(started_at DESC)',
@@ -464,7 +439,7 @@ abstract final class DatabaseSchema {
   /// implicit `DELETE` of `DROP TABLE` never trips a foreign key check.
   static Future<void> _dropEverything(Database db) async {
     final rows = await db.rawQuery(
-      "SELECT name FROM sqlite_master "
+      'SELECT name FROM sqlite_master '
       "WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
     );
     final remaining = {for (final row in rows) row['name'] as String};

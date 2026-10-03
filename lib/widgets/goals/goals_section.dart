@@ -142,13 +142,12 @@ class _GoalsSectionState extends State<GoalsSection> {
         SnackBar(content: Text(AppLocalizations.of(context)!.goalSaved)),
       );
       await _load();
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('goals_section: action failed: $e\n$stack');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            AppLocalizations.of(context)!.commonError(e.toString()),
-          ),
+          content: Text(AppLocalizations.of(context)!.commonSomethingWentWrong),
         ),
       );
     }
@@ -169,13 +168,12 @@ class _GoalsSectionState extends State<GoalsSection> {
         SnackBar(content: Text(AppLocalizations.of(context)!.goalSaved)),
       );
       await _load();
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('goals_section: action failed: $e\n$stack');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            AppLocalizations.of(context)!.commonError(e.toString()),
-          ),
+          content: Text(AppLocalizations.of(context)!.commonSomethingWentWrong),
         ),
       );
     }
@@ -286,7 +284,10 @@ class _GoalsSectionState extends State<GoalsSection> {
     final body = _loadFailed
         ? Column(
             mainAxisSize: MainAxisSize.min,
-            children: [LoadErrorBanner(onRetry: _load), list],
+            children: [
+              LoadErrorBanner(onRetry: _load),
+              list,
+            ],
           )
         : list;
     if (!widget.framed) return body;
@@ -355,7 +356,11 @@ class _GoalUnavailableRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
       child: Row(
         children: [
-          const AppIconBadge(Icons.error_outline_rounded, size: 44, iconSize: 22),
+          const AppIconBadge(
+            Icons.error_outline_rounded,
+            size: 44,
+            iconSize: 22,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

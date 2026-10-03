@@ -45,12 +45,12 @@ class _MainShellState extends State<MainShell> {
   }
 
   Widget _createTab(int index) => switch (index) {
-        0 => const WorkoutHomeScreen(),
-        1 => const SleepTrackerScreen(),
-        2 => const NutritionHomeScreen(),
-        3 => const PeriodizationHomeScreen(),
-        _ => const SizedBox.shrink(),
-      };
+    0 => const WorkoutHomeScreen(),
+    1 => const SleepTrackerScreen(),
+    2 => const NutritionHomeScreen(),
+    3 => const PeriodizationHomeScreen(),
+    _ => const SizedBox.shrink(),
+  };
 
   void _selectTab(int index) {
     setState(() {

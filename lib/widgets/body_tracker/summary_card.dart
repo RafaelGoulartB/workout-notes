@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/body_tracker_utils.dart';
 import 'package:workout_notes/widgets/body_tracker/body_sparkline.dart';
 import 'package:workout_notes/widgets/body_tracker/body_tracker_badges.dart';
@@ -96,7 +97,7 @@ class BodySummaryCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 2),
                         Text(
-                          '${delta! > 0 ? '+' : ''}${delta!.toStringAsFixed(1)}',
+                          '${delta! > 0 ? '+' : ''}${AppNumberFormat.decimal(delta!, 1)}',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: deltaColor,
@@ -114,7 +115,9 @@ class BodySummaryCard extends StatelessWidget {
                 Text(
                   latestMeasurement != null && type.id == 'bloodPressure'
                       ? formatMeasurementValue(latestMeasurement!, type)
-                      : (value != null ? value!.toStringAsFixed(1) : '--'),
+                      : (value != null
+                            ? AppNumberFormat.decimal(value!, 1)
+                            : '--'),
                   style: theme.textTheme.displaySmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     letterSpacing: -2,

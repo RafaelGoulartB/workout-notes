@@ -36,14 +36,14 @@ class RunTrackPoint {
   }
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'activity_id': activityId,
-        'seq': seq,
-        'lat': lat,
-        'lng': lng,
-        'altitude': altitude,
-        'accuracy': accuracy,
-        'speed': speed,
-        'recorded_at': recordedAt.toIso8601String(),
-      };
+    'id': id,
+    'activity_id': activityId,
+    'seq': seq,
+    'lat': lat,
+    'lng': lng,
+    'altitude': altitude,
+    'accuracy': accuracy,
+    'speed': speed,
+    'recorded_at': recordedAt.toIso8601String(),
+  };
 }

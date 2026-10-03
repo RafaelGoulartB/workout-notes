@@ -13,6 +13,8 @@ import 'package:workout_notes/utils/run_achievement_engine.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/run/history/run_history_filter_bar.dart';
 import 'package:workout_notes/widgets/run/history/run_history_row.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class RunHistoryScreen extends StatefulWidget {
@@ -37,7 +39,7 @@ class _ActivityEntry extends _Entry {
   const _ActivityEntry(this.activity);
 }
 
-class _RunHistoryScreenState extends State<RunHistoryScreen> {
+class _RunHistoryScreenState extends State<RunHistoryScreen> with GuardedLoad {
   static const _pageSize = 30;
 
   final _repo = DatabaseHelper.instance.runRepo;
@@ -51,7 +53,6 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> {
   RunActivityTotals _totals = RunActivityTotals.empty;
   Map<String, RunActivityTotals> _monthTotals = const {};
   RunAchievementBoard _board = RunAchievementBoard.empty;
-  bool _loading = true;
   bool _loadingMore = false;
   bool _hasMore = false;
   bool _backfilled = false;
@@ -74,9 +75,9 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> {
 
   RunActivityFilter get _query => _filter.toQuery(DateTime.now());
 
-  Future<void> _load({bool showSpinner = true}) async {
+  Future<void> _load({bool showSpinner = true}) => guardedLoad(() async {
     final generation = ++_generation;
-    if (showSpinner && _activities.isEmpty) setState(() => _loading = true);
+    if (showSpinner && _activities.isEmpty) setState(() => isLoading = true);
     if (!_backfilled) {
       _backfilled = true;
       await _repo.backfillMissingEfforts(limit: 40);
@@ -99,12 +100,12 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> {
       _board = RunAchievementEngine.build(results[3] as List<RunActivity>);
       _hasMore = page.length >= _pageSize;
       _entries = _buildEntries();
-      _loading = false;
+      isLoading = false;
     });
-  }
+  });
 
   Future<void> _loadMore() async {
-    if (_loadingMore || !_hasMore || _loading) return;
+    if (_loadingMore || !_hasMore || isLoading) return;
     final generation = _generation;
     setState(() => _loadingMore = true);
     final page = await _repo.searchActivities(
@@ -182,7 +183,8 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final isEmptyHistory = !_loading && !_filter.isActive && _totals.count == 0;
+    final isEmptyHistory =
+        !isLoading && !_filter.isActive && _totals.count == 0;
 
     return Scaffold(
       appBar: AppBar(title: Text(loc.runHistoryTitle)),
@@ -191,8 +193,10 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> {
         icon: const Icon(Icons.directions_run),
         label: Text(loc.runRecordStart),
       ),
-      body: _loading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _load)
           : isEmptyHistory
           ? AppEmptyState(
               icon: Icons.directions_run,

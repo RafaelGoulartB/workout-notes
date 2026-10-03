@@ -300,9 +300,7 @@ class RunProgressAnalytics {
     int weekCount;
     if (fixedWeeks != null) {
       weekCount = fixedWeeks;
-      windowStart = thisWeekStart.subtract(
-        Duration(days: 7 * (fixedWeeks - 1)),
-      );
+      windowStart = addDays(thisWeekStart, -7 * (fixedWeeks - 1));
     } else if (completed.isEmpty) {
       weekCount = 1;
     } else {
@@ -310,7 +308,7 @@ class RunProgressAnalytics {
           .map((a) => dayOf(a.startedAt.toLocal()))
           .reduce((a, b) => a.isBefore(b) ? a : b);
       windowStart = mondayOf(first);
-      weekCount = thisWeekStart.difference(windowStart).inDays ~/ 7 + 1;
+      weekCount = daysBetween(windowStart, thisWeekStart) ~/ 7 + 1;
     }
 
     final activities = completed.where((a) {
@@ -363,8 +361,8 @@ class RunProgressAnalytics {
       }
     }
 
-    final nextWeekStart = thisWeekStart.add(const Duration(days: 7));
-    final lastWeekStart = thisWeekStart.subtract(const Duration(days: 7));
+    final nextWeekStart = addDays(thisWeekStart, 7);
+    final lastWeekStart = addDays(thisWeekStart, -7);
     var thisWeekDistance = 0.0;
     var lastWeekDistance = 0.0;
     var thisWeekRuns = 0;
@@ -377,7 +375,7 @@ class RunProgressAnalytics {
       if (!d.isBefore(thisWeekStart) && d.isBefore(nextWeekStart)) {
         thisWeekDistance += a.distanceMeters;
         thisWeekRuns++;
-        final index = d.difference(thisWeekStart).inDays;
+        final index = daysBetween(thisWeekStart, d);
         if (index >= 0 && index < 7) {
           dayCounts[index]++;
           dayDistances[index] += a.distanceMeters;
@@ -416,7 +414,7 @@ class RunProgressAnalytics {
         ? RunWindowTotals.empty
         : _windowTotals(
             completed,
-            start: windowStart.subtract(Duration(days: 7 * weekCount)),
+            start: addDays(windowStart, -(7 * weekCount)),
             end: windowStart,
           );
 
@@ -451,7 +449,7 @@ class RunProgressAnalytics {
       thisWeekDays: [
         for (var i = 0; i < 7; i++)
           RunDayBucket(
-            date: thisWeekStart.add(Duration(days: i)),
+            date: addDays(thisWeekStart, i),
             runCount: dayCounts[i],
             distanceMeters: dayDistances[i],
           ),
@@ -509,11 +507,11 @@ class RunProgressAnalytics {
 
     var cursor = weeksWithRuns.contains(thisWeekStart)
         ? thisWeekStart
-        : thisWeekStart.subtract(const Duration(days: 7));
+        : addDays(thisWeekStart, -7);
     var streak = 0;
     while (weeksWithRuns.contains(cursor)) {
       streak++;
-      cursor = cursor.subtract(const Duration(days: 7));
+      cursor = addDays(cursor, -7);
     }
     return streak;
   }
@@ -524,8 +522,7 @@ class RunProgressAnalytics {
     required DateTime thisWeekStart,
   }) {
     final starts = <DateTime>[
-      for (var i = weekCount - 1; i >= 0; i--)
-        thisWeekStart.subtract(Duration(days: 7 * i)),
+      for (var i = weekCount - 1; i >= 0; i--) addDays(thisWeekStart, -(7 * i)),
     ];
     final indexByStart = <DateTime, int>{
       for (var i = 0; i < starts.length; i++) starts[i]: i,
@@ -586,7 +583,7 @@ class RunProgressAnalytics {
             runCount: counts[i],
             distanceMeters: distances[i],
             movingTimeSeconds: times[i],
-            spanDays: next.difference(start).inDays,
+            spanDays: daysBetween(start, next),
           );
         }(),
     ];

@@ -1,10 +1,11 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:workout_notes/models/nutrition/ai_food_label_draft.dart';
 import 'package:workout_notes/services/ai_service.dart';
 import 'package:workout_notes/state/ai_settings_notifier.dart';
+import 'package:workout_notes/utils/ai_endpoint_policy.dart';
+import 'package:workout_notes/utils/ai_json.dart';
 import 'package:workout_notes/utils/base64_encoder.dart';
 
 /// Thrown when the label extraction cannot be completed.
@@ -35,9 +36,18 @@ class AiFoodLabelService {
   final AiService service;
 
   AiFoodLabelService({required this.settings, AiService? service})
-      : service = service ?? AiService.shared;
+    : service = service ?? AiService.shared;
 
-  static const String _systemPrompt = r'''
+  /// Extraction prompt. The nutrient list is generated from the same keys the
+  /// parser reads ([AiFoodLabelDraft.nutrientKeys]), so a new nutrient is added
+  /// in one place.
+  static final String _systemPrompt = _buildSystemPrompt();
+
+  static String _buildSystemPrompt() {
+    final perBlock = AiFoodLabelDraft.nutrientKeys
+        .map((key) => '    "$key": null')
+        .join(',\n');
+    return '''
 Você é um extrator de tabelas nutricionais. Analise todas as imagens enviadas e extraia os dados delas.
 Responda APENAS com JSON válido, sem markdown, sem comentários, exatamente neste formato:
 {
@@ -47,38 +57,21 @@ Responda APENAS com JSON válido, sem markdown, sem comentários, exatamente nes
   "reference_amount": 100,
   "reference_unit": "g",
   "per": {
-    "calories": null,
-    "protein_g": null,
-    "carbs_g": null,
-    "fat_g": null,
-    "saturated_fat_g": null,
-    "monounsaturated_fat_g": null,
-    "polyunsaturated_fat_g": null,
-    "trans_fat_g": null,
-    "fiber_g": null,
-    "sugars_g": null,
-    "sodium_mg": null,
-    "potassium_mg": null,
-    "calcium_mg": null,
-    "iron_mg": null,
-    "magnesium_mg": null,
-    "zinc_mg": null,
-    "vitamin_a_ug": null,
-    "vitamin_c_mg": null,
-    "vitamin_d_ug": null,
-    "vitamin_b12_ug": null
+$perBlock
   },
   "servings": []
 }
 Regras:
 - Todas as imagens pertencem ao mesmo alimento. Elas podem mostrar partes diferentes da mesma tabela, embalagem ou rótulo.
 - Combine as informações complementares das imagens em um único alimento. Não some nem duplique valores repetidos; quando o mesmo campo aparecer mais de uma vez, use a imagem mais nítida e consistente.
-- "per" contém os valores POR 100 g ou 100 ml da tabela. Se a tabela só mostrar valores "por porção", converta para 100 g/ml usando o peso da porção; se a conversão não for possível, use os valores por porção e adicione uma serving com quantity 1, unit "porção" e grams_equivalent com o peso da porção.
-- Use null para valores ilegíveis; nunca invente números.
+- "per" contém os valores POR 100 g ou 100 ml da tabela. Se a tabela só mostrar valores "por porção", converta para 100 g/ml usando o peso da porção; se a conversão não for possível, use os valores por porção, informe em reference_amount/reference_unit o peso ou volume da porção e adicione uma serving com quantity 1, unit "porção" e grams_equivalent com o peso da porção.
+- "reference_amount" e "reference_unit" são obrigatórios e nunca devem ser omitidos nem presumidos.
+- Use null para valores ilegíveis; nunca invente números e nunca escreva a palavra "null" entre aspas.
 - Gordura total e cada subtipo são campos independentes. Não calcule um subtipo ausente por diferença e não use gordura total como gordura saturada.
 - Preserve as unidades do formato: minerais em mg, vitamina A/D/B12 em µg e vitamina C em mg. Converta quando o rótulo usar outra unidade.
 - "servings" é uma lista opcional de porções com {label, quantity, unit, grams_equivalent}.
 - Responda somente o JSON.''';
+  }
 
   /// Analyzes [imageBytes] and returns the extracted food data.
   ///
@@ -88,10 +81,9 @@ Regras:
   Future<AiFoodLabelDraft> analyze({
     required Uint8List imageBytes,
     String mimeType = 'image/jpeg',
-  }) =>
-      analyzeImages(
-        images: [AiFoodLabelImage(bytes: imageBytes, mimeType: mimeType)],
-      );
+  }) => analyzeImages(
+    images: [AiFoodLabelImage(bytes: imageBytes, mimeType: mimeType)],
+  );
 
   /// Analyzes multiple photos of different parts of the same food label.
   Future<AiFoodLabelDraft> analyzeImages({
@@ -111,11 +103,20 @@ Regras:
     if (model.isEmpty) {
       throw const AiFoodLabelException('no_model', 'No model selected');
     }
+    // Same consent rule as the coach: nothing is sent before the user allows
+    // sharing data with the provider.
+    if (!settings.settings.dataSharingAccepted) {
+      throw const AiFoodLabelException(
+        'consent_required',
+        'Data sharing with the AI provider is not allowed',
+      );
+    }
     final token = await settings.getToken(provider.id) ?? '';
     // Keep this flow consistent with AiChatService. Without this check a
     // secure-storage read failure became an unauthenticated request and the
     // screen hid the resulting 401 behind a generic label-analysis error.
-    if (token.isEmpty) {
+    // Local endpoints (a LAN Ollama) work without a token, as in the chat.
+    if (token.isEmpty && !AiEndpointPolicy.isLocalEndpoint(provider.baseUrl)) {
       throw const AiFoodLabelException('missing_token', 'Missing API token');
     }
 
@@ -185,7 +186,7 @@ Regras:
       throw const AiFoodLabelException('no_content', 'Empty AI response');
     }
     try {
-      return AiFoodLabelDraft.fromJson(_parseJson(text));
+      return AiFoodLabelDraft.fromJson(AiJson.parseObject(text));
     } on AiFoodLabelException {
       rethrow;
     } on FormatException {
@@ -197,38 +198,6 @@ Regras:
       throw const AiFoodLabelException(
         'parse_failed',
         'Invalid label JSON in response',
-      );
-    }
-  }
-
-  static Map<String, dynamic> _parseJson(String raw) {
-    var cleaned = raw.trim();
-    final fence = RegExp(r'```(?:json)?\s*([\s\S]*?)```').firstMatch(cleaned);
-    if (fence != null) cleaned = fence.group(1)!.trim();
-    final start = cleaned.indexOf('{');
-    final end = cleaned.lastIndexOf('}');
-    if (start >= 0 && end > start) {
-      cleaned = cleaned.substring(start, end + 1);
-    }
-    try {
-      final decoded = jsonDecode(cleaned);
-      if (decoded is Map<String, dynamic>) return decoded;
-      if (decoded is Map) return decoded.cast<String, dynamic>();
-      throw const AiFoodLabelException(
-        'parse_failed',
-        'Response is not a JSON object',
-      );
-    } on AiFoodLabelException {
-      rethrow;
-    } on FormatException {
-      throw const AiFoodLabelException(
-        'parse_failed',
-        'Invalid JSON in response',
-      );
-    } on TypeError {
-      throw const AiFoodLabelException(
-        'parse_failed',
-        'Invalid JSON in response',
       );
     }
   }

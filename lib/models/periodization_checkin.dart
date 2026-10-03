@@ -80,5 +80,4 @@ class PeriodizationCheckin {
     final decoded = jsonDecode(raw);
     return decoded is Map ? Map<String, dynamic>.from(decoded) : {};
   }
-
 }

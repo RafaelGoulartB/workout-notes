@@ -29,6 +29,7 @@ import 'package:workout_notes/widgets/strength/home/strength_home_records_sectio
 import 'package:workout_notes/widgets/strength/home/strength_home_today_card.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_trends_card.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_week_card.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 enum _HomeMenu { routines, exercises, history, records, calendar }
@@ -57,6 +58,7 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
   List<StrengthRecordEvent> _records = const [];
   List<Map<String, dynamic>> _active = const [];
   bool _loading = true;
+  bool _loadFailed = false;
   RunStatsPeriod _period = RunStatsPeriod.weeks12;
 
   @override
@@ -66,7 +68,10 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
   }
 
   Future<void> _reload() async {
-    setState(() => _loading = _analytics == null);
+    setState(() {
+      _loading = _analytics == null;
+      _loadFailed = false;
+    });
     try {
       final now = DateTime.now();
       final today = dayOf(now);
@@ -96,8 +101,14 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
         );
         _loading = false;
       });
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
+    } catch (error, stack) {
+      debugPrint('Strength home failed to load: $error\n$stack');
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadFailed = _analytics == null;
+        });
+      }
     }
   }
 
@@ -256,6 +267,8 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
+          : _loadFailed
+          ? LoadErrorView(onRetry: _reload)
           : RefreshIndicator(
               onRefresh: _reload,
               child: ListView(

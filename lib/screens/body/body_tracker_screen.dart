@@ -14,6 +14,8 @@ import 'package:workout_notes/widgets/body_tracker/derived_stats_card.dart';
 import 'package:workout_notes/widgets/body_tracker/measurement_card.dart';
 import 'package:workout_notes/widgets/body_tracker/quick_stats.dart';
 import 'package:workout_notes/widgets/body_tracker/summary_card.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class BodyTrackerScreen extends StatefulWidget {
@@ -23,7 +25,8 @@ class BodyTrackerScreen extends StatefulWidget {
   State<BodyTrackerScreen> createState() => _BodyTrackerScreenState();
 }
 
-class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
+class _BodyTrackerScreenState extends State<BodyTrackerScreen>
+    with GuardedLoad {
   final _bodyRepo = DatabaseHelper.instance.bodyMeasurementRepo;
   final _settingsRepo = DatabaseHelper.instance.settingsRepo;
 
@@ -32,7 +35,6 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
   List<Map<String, dynamic>> _measurements = [];
   List<Map<String, dynamic>> _allMeasurements = [];
   Map<String, Map<String, dynamic>?> _latestByType = {};
-  bool _isLoading = true;
   bool _fabOpen = false;
 
   // ── Bilateral state ───────────────────────────────────────────────
@@ -52,6 +54,8 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
 
   // ── Measurement type definitions ───────────────────────────────────
   static const _allTypes = kBodyMeasureTypes;
+  static const _enabledTypesKey = 'body_tracker_enabled_types';
+  static const _knownTypesKey = 'body_tracker_known_types';
 
   MeasureType get _currentType {
     if (_activeTypes.isEmpty) return _allTypes.first;
@@ -68,64 +72,62 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
   }
 
   Future<void> _loadEnabledTypes() async {
-    final raw = await _settingsRepo.getSetting('body_tracker_enabled_types');
-    if (raw != null) {
-      try {
-        final list = raw.split(',');
-        _enabledTypeIds = list.toSet();
-      } catch (_) {
-        _enabledTypeIds = {};
-      }
-    } else {
-      _enabledTypeIds = {};
+    final raw = await _settingsRepo.getSetting(_enabledTypesKey);
+    final known = await _settingsRepo.getSetting(_knownTypesKey);
+    if (raw == null) {
+      _enabledTypeIds = {for (final t in _allTypes) t.id};
+      return;
     }
-    // Ensure every type exists in the set (handles newly added types)
+    _enabledTypeIds = raw.split(',').where((id) => id.isNotEmpty).toSet();
+    // Types added to the app after the user last customized the list start
+    // enabled; types the user hid stay hidden. Without the known list (saved
+    // before it existed) every current type counts as known.
+    final knownIds = known == null
+        ? {for (final t in _allTypes) t.id}
+        : known.split(',').toSet();
     for (final t in _allTypes) {
-      _enabledTypeIds.add(t.id);
+      if (!knownIds.contains(t.id)) _enabledTypeIds.add(t.id);
     }
   }
 
   Future<void> _saveEnabledTypes() async {
+    await _settingsRepo.setSetting(_enabledTypesKey, _enabledTypeIds.join(','));
     await _settingsRepo.setSetting(
-      'body_tracker_enabled_types',
-      _enabledTypeIds.join(','),
+      _knownTypesKey,
+      _allTypes.map((t) => t.id).join(','),
     );
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     setState(() {
-      _isLoading = true;
+      isLoading = true;
       _historyDisplayCount = 5;
     });
-    try {
-      final all = await _bodyRepo.getBodyMeasurements(limit: 500);
-      final summary = await _bodyRepo.getBodyMeasurementsSummary();
-      final latestMap = <String, Map<String, dynamic>?>{};
-      for (final t in _allTypes) {
-        try {
-          latestMap[t.id] = summary.firstWhere((s) => s['type'] == t.id);
-        } catch (_) {
-          latestMap[t.id] = null;
-        }
+    final all = await _bodyRepo.getBodyMeasurements(limit: 500);
+    final summary = await _bodyRepo.getBodyMeasurementsSummary();
+    final latestMap = <String, Map<String, dynamic>?>{};
+    for (final t in _allTypes) {
+      try {
+        latestMap[t.id] = summary.firstWhere((s) => s['type'] == t.id);
+      } catch (_) {
+        latestMap[t.id] = null;
       }
-      // Ensure selected type is still enabled
-      final activeIds = _activeTypes.map((t) => t.id).toList();
-      if (!activeIds.contains(_selectedType)) {
-        _selectedType = activeIds.isNotEmpty ? activeIds.first : 'weight';
-      }
-      final filtered = all.where((m) => m['type'] == _selectedType).toList();
-      if (!mounted) return;
-      setState(() {
-        _allMeasurements = all;
-        _latestByType = latestMap;
-        _measurements = filtered;
-        _updateBilateralData(filtered);
-        _isLoading = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
     }
-  }
+    // Ensure selected type is still enabled
+    final activeIds = _activeTypes.map((t) => t.id).toList();
+    if (!activeIds.contains(_selectedType)) {
+      _selectedType = activeIds.isNotEmpty ? activeIds.first : 'weight';
+    }
+    final filtered = all.where((m) => m['type'] == _selectedType).toList();
+    if (!mounted) return;
+    setState(() {
+      _allMeasurements = all;
+      _latestByType = latestMap;
+      _measurements = filtered;
+      _updateBilateralData(filtered);
+      isLoading = false;
+    });
+  });
 
   void _updateBilateralData(List<Map<String, dynamic>> filtered) {
     if (_currentType.isBilateral) {
@@ -176,7 +178,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
     final newIds = enabled.map((t) => t.id).toSet();
     if (newIds.isEmpty) return;
     _enabledTypeIds = newIds;
-    _saveEnabledTypes();
+    unawaited(_saveEnabledTypes());
     // Ensure current selection is still valid
     final activeIds = _activeTypes.map((t) => t.id).toList();
     if (!activeIds.contains(_selectedType)) {
@@ -313,6 +315,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
                       currentType: _currentType,
                       typeId: _selectedType,
                       onSaved: _load,
+                      initialSide: _selectedSide,
                     );
                   },
                 ),
@@ -369,8 +372,10 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
       ),
       body: Stack(
         children: [
-          _isLoading
+          isLoading
               ? const Center(child: CircularProgressIndicator())
+              : loadFailed
+              ? LoadErrorView(onRetry: _load)
               : RefreshIndicator(
                   onRefresh: _load,
                   displacement: 40,
@@ -386,7 +391,9 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
             ),
         ],
       ),
-      floatingActionButton: _isLoading ? null : _buildSpeedDial(theme, loc),
+      floatingActionButton: isLoading || loadFailed
+          ? null
+          : _buildSpeedDial(theme, loc),
     );
   }
 

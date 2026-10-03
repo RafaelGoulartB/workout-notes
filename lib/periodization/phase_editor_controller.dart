@@ -14,6 +14,7 @@ import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 import 'package:workout_notes/utils/date_utils.dart';
 
 /// Per-week deviation from the phase targets: a label ("Deload", "Refeed")
@@ -131,13 +132,18 @@ class PhaseEditorController extends ChangeNotifier {
     NutritionRepository? nutritionRepository,
     BodyMeasurementRepository? bodyRepository,
   }) async {
-    final routineRepo = routineRepository ?? DatabaseHelper.instance.routineRepo;
+    final routineRepo =
+        routineRepository ?? DatabaseHelper.instance.routineRepo;
     final results = await Future.wait<Object?>([
       routineRepo.getRoutines(),
       routineRepo.getRoutineDayNames(),
-      (runPlanRepository ?? DatabaseHelper.instance.runPlanRepo).listPlans(hydrate: true),
-      (nutritionRepository ?? DatabaseHelper.instance.nutritionRepo).getActiveGoal(),
-      (bodyRepository ?? DatabaseHelper.instance.bodyMeasurementRepo).getLatestWeightKg(),
+      (runPlanRepository ?? DatabaseHelper.instance.runPlanRepo).listPlans(
+        hydrate: true,
+      ),
+      (nutritionRepository ?? DatabaseHelper.instance.nutritionRepo)
+          .getActiveGoal(),
+      (bodyRepository ?? DatabaseHelper.instance.bodyMeasurementRepo)
+          .getLatestWeightKg(),
       _repository.getWeeklyTargets(_phase),
       _repository.getPhases(_phase.planId),
     ]);
@@ -238,8 +244,7 @@ class PhaseEditorController extends ChangeNotifier {
 
   bool isLocked(int week) => week < editableFrom;
 
-  DateTime weekStart(int week) =>
-      _phase.startDate.add(Duration(days: 7 * week));
+  DateTime weekStart(int week) => addDays(_phase.startDate, 7 * week);
 
   /// Plan week that phase week [week] maps onto, or null without a plan.
   int? runPlanWeekFor(int week) {
@@ -602,6 +607,6 @@ class PhaseEditorController extends ChangeNotifier {
     if (decimals == 0 || value == value.roundToDouble()) {
       return value.round().toString();
     }
-    return value.toStringAsFixed(decimals);
+    return AppNumberFormat.decimal(value, decimals);
   }
 }

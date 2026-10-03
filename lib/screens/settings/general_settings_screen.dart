@@ -61,7 +61,10 @@ class _GeneralSettingsScreenState extends State<GeneralSettingsScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
               // ===== APARÊNCIA =====
-              AppSectionHeader(loc.settingsSectionAppearance, padding: AppSectionHeader.compactPadding),
+              AppSectionHeader(
+                loc.settingsSectionAppearance,
+                padding: AppSectionHeader.compactPadding,
+              ),
               SettingsCard(
                 title: loc.settingsThemeMode,
                 icon: Icons.dark_mode_outlined,

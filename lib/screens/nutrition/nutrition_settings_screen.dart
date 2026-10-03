@@ -12,6 +12,7 @@ import 'package:workout_notes/widgets/nutrition/settings/goal_preview_card.dart'
 import 'package:workout_notes/widgets/nutrition/settings/meal_type_widgets.dart';
 import 'package:workout_notes/widgets/nutrition/settings/nutrition_settings_sheets.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Screen for managing the daily nutrition goal and the meal types
@@ -51,12 +52,6 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
     super.dispose();
   }
 
-  void _showSnack(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-
   // ===================================================================
   // Goal saving
   // ===================================================================
@@ -83,10 +78,11 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
         adjustmentPercent: adjustmentPercent,
       );
       if (!mounted) return;
-      if (successMessage != null) _showSnack(successMessage);
-    } catch (e) {
+      if (successMessage != null) showAppSnack(context, successMessage);
+    } catch (e, stack) {
+      debugPrint('nutrition_settings_screen: action failed: $e\n$stack');
       if (!mounted) return;
-      _showSnack(loc.commonError(e.toString()));
+      showAppSnack(context, loc.commonSomethingWentWrong);
     }
   }
 
@@ -118,7 +114,7 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
     if (confirm != true) return;
     await _controller.clearGoal();
     if (!mounted) return;
-    _showSnack(loc.nutritionSettingsCleared);
+    showAppSnack(context, loc.nutritionSettingsCleared);
   }
 
   // ===================================================================
@@ -230,10 +226,11 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
         fatG: fatG,
       );
       if (!mounted) return;
-      if (successMessage != null) _showSnack(successMessage);
-    } catch (e) {
+      if (successMessage != null) showAppSnack(context, successMessage);
+    } catch (e, stack) {
+      debugPrint('nutrition_settings_screen: action failed: $e\n$stack');
       if (!mounted) return;
-      _showSnack(loc.commonError(e.toString()));
+      showAppSnack(context, loc.commonSomethingWentWrong);
     }
   }
 
@@ -249,10 +246,11 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
     try {
       await _controller.addMealType(name);
       if (!mounted) return;
-      _showSnack(loc.nutritionMealAdded);
-    } catch (e) {
+      showAppSnack(context, loc.nutritionMealAdded);
+    } catch (e, stack) {
+      debugPrint('nutrition_settings_screen: action failed: $e\n$stack');
       if (!mounted) return;
-      _showSnack(loc.commonError(e.toString()));
+      showAppSnack(context, loc.commonSomethingWentWrong);
     }
   }
 
@@ -266,9 +264,10 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
     if (!mounted) return;
     try {
       await _controller.renameMealType(type, name);
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('nutrition_settings_screen: action failed: $e\n$stack');
       if (!mounted) return;
-      _showSnack(loc.commonError(e.toString()));
+      showAppSnack(context, loc.commonSomethingWentWrong);
     }
   }
 
@@ -286,9 +285,10 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
     if (!mounted) return;
     try {
       await _controller.deleteMealType(type);
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('nutrition_settings_screen: action failed: $e\n$stack');
       if (!mounted) return;
-      _showSnack(loc.commonError(e.toString()));
+      showAppSnack(context, loc.commonSomethingWentWrong);
     }
   }
 
@@ -360,6 +360,9 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
           if (_controller.isLoading) {
             return const Center(child: CircularProgressIndicator());
           }
+          if (_controller.loadFailed) {
+            return LoadErrorView(onRetry: _controller.load);
+          }
           final effective = _controller.effective;
           final mealTypes = _controller.mealTypes;
           return ListView(
@@ -382,7 +385,10 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                   padding: const EdgeInsets.only(top: 10, bottom: 4),
                   child: PlanOverrideBanner(planInfo: effective),
                 ),
-              AppSectionHeader(loc.nutritionSettingsSectionDaily, padding: AppSectionHeader.compactPadding),
+              AppSectionHeader(
+                loc.nutritionSettingsSectionDaily,
+                padding: AppSectionHeader.compactPadding,
+              ),
               SettingsCard(
                 children: [
                   SettingsValueTile(
@@ -483,7 +489,10 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                   ),
                 ],
               ),
-              AppSectionHeader(loc.nutritionSettingsSectionTools, padding: AppSectionHeader.compactPadding),
+              AppSectionHeader(
+                loc.nutritionSettingsSectionTools,
+                padding: AppSectionHeader.compactPadding,
+              ),
               SettingsCard(
                 children: [
                   SettingsLinkTile(
@@ -495,7 +504,10 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                   ),
                 ],
               ),
-              AppSectionHeader(loc.nutritionSettingsSectionMeals, padding: AppSectionHeader.compactPadding),
+              AppSectionHeader(
+                loc.nutritionSettingsSectionMeals,
+                padding: AppSectionHeader.compactPadding,
+              ),
               SettingsCard(
                 children: [
                   if (mealTypes.isEmpty)
@@ -521,7 +533,10 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                 ],
               ),
               if (_current != null) ...[
-                AppSectionHeader(loc.nutritionSettingsSectionDanger, padding: AppSectionHeader.compactPadding),
+                AppSectionHeader(
+                  loc.nutritionSettingsSectionDanger,
+                  padding: AppSectionHeader.compactPadding,
+                ),
                 SettingsCard(
                   children: [
                     SettingsLinkTile(

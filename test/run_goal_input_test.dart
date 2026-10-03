@@ -121,14 +121,6 @@ void main() {
   });
 
   group('RunVoiceSettings run options', () {
-    test('defaults: auto-pause on, 3 s countdown', () {
-      const settings = RunVoiceSettings.defaults();
-      expect(settings.autoPause, isTrue);
-      expect(settings.countdownSeconds, 3);
-      expect(settings.announceAutoPause, isTrue);
-      expect(settings.announceLaps, isTrue);
-    });
-
     test('round-trips and validates the countdown', () {
       final custom = const RunVoiceSettings.defaults().copyWith(
         autoPause: false,

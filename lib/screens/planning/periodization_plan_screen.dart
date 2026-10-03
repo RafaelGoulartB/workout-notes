@@ -79,6 +79,7 @@ class _PeriodizationPlanScreenState extends State<PeriodizationPlanScreen> {
       title: loc.planningDeletePlanTitle,
       message: loc.planningDeletePlanBody(widget.plan.name),
       confirmLabel: loc.planningDelete,
+      destructive: true,
     );
     if (confirmed != true) return;
     await _repository.deletePlan(widget.plan.id);

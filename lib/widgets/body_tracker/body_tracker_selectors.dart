@@ -20,16 +20,30 @@ class TimeOfDaySelector extends StatelessWidget {
       decoration: InputDecoration(
         labelText: loc.bodyTrackerTimeOfDay,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
         isDense: true,
       ),
       items: [
         DropdownMenuItem(value: null, child: Text(loc.bodyTrackerNotInformed)),
-        DropdownMenuItem(value: 'morning', child: Text('\u{1F305} ${loc.bodyTrackerMorning}')),
-        DropdownMenuItem(value: 'afternoon', child: Text('\u{2600}\u{FE0F} ${loc.bodyTrackerAfternoon}')),
-        DropdownMenuItem(value: 'evening', child: Text('\u{1F306} ${loc.bodyTrackerEvening}')),
-        DropdownMenuItem(value: 'night', child: Text('\u{1F319} ${loc.bodyTrackerNight}')),
+        DropdownMenuItem(
+          value: 'morning',
+          child: Text('\u{1F305} ${loc.bodyTrackerMorning}'),
+        ),
+        DropdownMenuItem(
+          value: 'afternoon',
+          child: Text('\u{2600}\u{FE0F} ${loc.bodyTrackerAfternoon}'),
+        ),
+        DropdownMenuItem(
+          value: 'evening',
+          child: Text('\u{1F306} ${loc.bodyTrackerEvening}'),
+        ),
+        DropdownMenuItem(
+          value: 'night',
+          child: Text('\u{1F319} ${loc.bodyTrackerNight}'),
+        ),
       ],
       onChanged: onChanged,
     );
@@ -82,18 +96,21 @@ class QuickTimeOfDaySelector extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    Icon(opt.$3,
-                        size: 16,
-                        color: isSelected
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurfaceVariant),
+                    Icon(
+                      opt.$3,
+                      size: 16,
+                      color: isSelected
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
                     const SizedBox(height: 2),
                     Text(
                       opt.$2,
                       style: TextStyle(
                         fontSize: 10,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.w400,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
                         color: isSelected
                             ? theme.colorScheme.primary
                             : theme.colorScheme.onSurfaceVariant,
@@ -115,11 +132,7 @@ class SideSelector extends StatelessWidget {
   final String? value;
   final ValueChanged<String?> onChanged;
 
-  const SideSelector({
-    super.key,
-    required this.value,
-    required this.onChanged,
-  });
+  const SideSelector({super.key, required this.value, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -147,8 +160,10 @@ class SideSelector extends StatelessWidget {
                 children: [
                   const Icon(Icons.arrow_back, size: 16, color: Colors.blue),
                   const SizedBox(width: 6),
-                  Text(loc.bodyTrackerLeft,
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text(
+                    loc.bodyTrackerLeft,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
                 ],
               ),
             ),
@@ -175,8 +190,10 @@ class SideSelector extends StatelessWidget {
                 children: [
                   const Icon(Icons.arrow_forward, size: 16, color: Colors.red),
                   const SizedBox(width: 6),
-                  Text(loc.bodyTrackerRight,
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text(
+                    loc.bodyTrackerRight,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
                 ],
               ),
             ),

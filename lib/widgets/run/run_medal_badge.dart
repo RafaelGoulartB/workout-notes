@@ -7,10 +7,10 @@ abstract final class RunMedalColors {
   static const bronze = Color(0xFFCD7F32);
 
   static Color forTier(RunMedalTier tier) => switch (tier) {
-        RunMedalTier.gold => gold,
-        RunMedalTier.silver => silver,
-        RunMedalTier.bronze => bronze,
-      };
+    RunMedalTier.gold => gold,
+    RunMedalTier.silver => silver,
+    RunMedalTier.bronze => bronze,
+  };
 }
 
 /// Compact circular medal (gold / silver / bronze).
@@ -18,11 +18,7 @@ class RunMedalDot extends StatelessWidget {
   final RunMedalTier tier;
   final double size;
 
-  const RunMedalDot({
-    super.key,
-    required this.tier,
-    this.size = 18,
-  });
+  const RunMedalDot({super.key, required this.tier, this.size = 18});
 
   @override
   Widget build(BuildContext context) {
@@ -136,11 +132,7 @@ class RunMedalBadgeRow extends StatelessWidget {
       runSpacing: 6,
       children: [
         for (final p in visible)
-          RunMedalBadge(
-            tier: p.tier,
-            label: labelFor(p.kind),
-            compact: true,
-          ),
+          RunMedalBadge(tier: p.tier, label: labelFor(p.kind), compact: true),
         if (overflow > 0)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

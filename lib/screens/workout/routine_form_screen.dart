@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/screens/workout/active_workout_screen.dart';
 import 'package:workout_notes/screens/workout/routine_day_editor_screen.dart';
 import 'package:workout_notes/utils/strength_routine_summary.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_day_card.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_muscle_widgets.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_sheets.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// One routine: summary hero, sets per muscle against the recommended range
@@ -19,11 +22,11 @@ class RoutineFormScreen extends StatefulWidget {
   State<RoutineFormScreen> createState() => _RoutineFormScreenState();
 }
 
-class _RoutineFormScreenState extends State<RoutineFormScreen> {
+class _RoutineFormScreenState extends State<RoutineFormScreen>
+    with GuardedLoad {
   final _repo = DatabaseHelper.instance.routineRepo;
   RoutineSummary? _routine;
   String? _nextDayId;
-  bool _loading = true;
 
   @override
   void initState() {
@@ -31,19 +34,13 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
     _load();
   }
 
-  Future<void> _load() async {
-    RoutineSummary? routine;
-    try {
-      routine = await _repo.getRoutineSummary(widget.routineId);
-    } catch (_) {
-      // Shown as an empty screen; the routine may have been deleted.
-    }
+  Future<void> _load() => guardedLoad(() async {
+    final routine = await _repo.getRoutineSummary(widget.routineId);
     String? nextDayId;
     if (routine != null) {
       try {
-        final suggestion = await DatabaseHelper.instance.periodizationRepo.getRoutineSuggestion(
-          DateTime.now(),
-        );
+        final suggestion = await DatabaseHelper.instance.periodizationRepo
+            .getRoutineSuggestion(DateTime.now());
         if (suggestion?.routineId == widget.routineId) {
           nextDayId = suggestion?.routineDayId;
         }
@@ -56,9 +53,9 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
     setState(() {
       _routine = routine;
       _nextDayId = nextDayId;
-      _loading = false;
+      isLoading = false;
     });
-  }
+  });
 
   Future<void> _addDay() async {
     final loc = AppLocalizations.of(context)!;
@@ -186,8 +183,10 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
               icon: const Icon(Icons.add),
               label: Text(loc.routinesAddDay),
             ),
-      body: _loading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _load)
           : routine == null
           ? const SizedBox.shrink()
           : routine.days.isEmpty

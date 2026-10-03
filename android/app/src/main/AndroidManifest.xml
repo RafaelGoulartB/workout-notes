@@ -12,15 +12,24 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Exact alarms: the user grants SCHEDULE_EXACT_ALARM on Android 12 and 12L
+         (API 31-32); from Android 13 USE_EXACT_ALARM is granted at install for
+         alarm clock apps. AlarmManager.canScheduleExactAlarms() covers both. -->
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
+        android:networkSecurityConfig="@xml/network_security_config"
         android:label="Workout Notes"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher_round">
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -50,10 +59,12 @@
             android:value="2" />
         <service
             android:name=".sleep.TraditionalAlarmRingingService"
+            android:directBootAware="true"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
         <activity
             android:name=".sleep.TraditionalAlarmActivity"
+            android:directBootAware="true"
             android:excludeFromRecents="true"
             android:exported="false"
             android:showWhenLocked="true"
@@ -61,6 +72,7 @@
             android:theme="@android:style/Theme.Material.NoActionBar" />
         <receiver
             android:name=".sleep.TraditionalAlarmReceiver"
+            android:directBootAware="true"
             android:exported="false" />
         <service
             android:name=".sleep.SleepMonitoringService"
@@ -71,11 +83,17 @@
             android:exported="false"
             android:foregroundServiceType="location|mediaPlayback" />
         <service
+            android:name=".run.RunIndoorVoiceService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+        <service
             android:name=".sleep.SleepAlarmRingingService"
+            android:directBootAware="true"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
         <activity
             android:name=".sleep.SleepAlarmActivity"
+            android:directBootAware="true"
             android:excludeFromRecents="true"
             android:exported="false"
             android:showWhenLocked="true"
@@ -83,6 +101,7 @@
             android:theme="@android:style/Theme.Material.NoActionBar" />
         <activity
             android:name=".sleep.SleepEmergencyChallengeActivity"
+            android:directBootAware="true"
             android:excludeFromRecents="true"
             android:exported="false"
             android:showWhenLocked="true"
@@ -95,6 +114,7 @@
             android:theme="@android:style/Theme.Material.NoActionBar" />
         <receiver
             android:name=".sleep.SleepAlarmReceiver"
+            android:directBootAware="true"
             android:exported="false" />
         <receiver
             android:name=".medication.MedicationReminderReceiver"
@@ -107,6 +127,7 @@
             android:foregroundServiceType="mediaPlayback" />
         <activity
             android:name=".medication.MedicationConfirmActivity"
+            android:directBootAware="true"
             android:excludeFromRecents="true"
             android:exported="false"
             android:launchMode="singleTop"
@@ -122,6 +143,18 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+        <!-- Time zone / clock changes and the exact-alarm permission: alarms are
+             armed for absolute instants and must follow the local time. -->
+        <receiver
+            android:name=".sleep.AlarmClockChangeReceiver"
+            android:directBootAware="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
             </intent-filter>
         </receiver>
         <receiver

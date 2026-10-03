@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/ai_food_label_draft.dart';
 import 'package:workout_notes/models/nutrition/food.dart';
+import 'package:workout_notes/models/nutrition/food_lookup.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/screens/nutrition/manual_food_controller.dart';
 import 'package:workout_notes/widgets/nutrition/manual_food/manual_food_form_sections.dart';
@@ -60,12 +60,13 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
       final food = await _form.save();
       if (!mounted) return;
       Navigator.of(context).pop(food);
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('manual_food_screen: action failed: $e\n$stack');
       if (!mounted) return;
       final loc = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
+      ).showSnackBar(SnackBar(content: Text(loc.commonSomethingWentWrong)));
     }
   }
 

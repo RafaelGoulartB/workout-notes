@@ -25,8 +25,10 @@ class TimeOfDayBadge extends StatelessWidget {
         children: [
           Icon(icon, size: 10, color: Colors.blueGrey),
           const SizedBox(width: 2),
-          Text(label,
-              style: TextStyle(fontSize: 9, color: Colors.blueGrey.shade700)),
+          Text(
+            label,
+            style: TextStyle(fontSize: 9, color: Colors.blueGrey.shade700),
+          ),
         ],
       ),
     );
@@ -49,8 +51,11 @@ class FastedBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.nightlight_round,
-              size: 10, color: Colors.deepPurple.shade400),
+          Icon(
+            Icons.nightlight_round,
+            size: 10,
+            color: Colors.deepPurple.shade400,
+          ),
           const SizedBox(width: 2),
           Text(
             loc.bodyTrackerFasted,
@@ -133,7 +138,11 @@ class FastedChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     return Chip(
-      avatar: const Icon(Icons.nightlight_round, size: 16, color: Colors.deepPurple),
+      avatar: const Icon(
+        Icons.nightlight_round,
+        size: 16,
+        color: Colors.deepPurple,
+      ),
       label: Text(loc.bodyTrackerFasting),
       visualDensity: VisualDensity.compact,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -196,23 +205,29 @@ class SpeedDialOption extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(20),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+        // The label is part of the target too: a tap on it must not fall
+        // through to the scrim and close the dial.
+        GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(20),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Text(
+              label,
+              style: theme.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w600,
               ),
-            ],
-          ),
-          child: Text(
-            label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              fontWeight: FontWeight.w600,
             ),
           ),
         ),

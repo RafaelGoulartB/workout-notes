@@ -2,10 +2,45 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/ai_chat_message.dart';
+import 'package:workout_notes/widgets/ai/ai_markdown.dart';
 import 'package:workout_notes/widgets/ai/ai_thumbnail.dart';
+
+/// Lays out one assistant-side row: the coach avatar (only on the first row
+/// of an answer, otherwise an equal gap) and the content.
+class AiAssistantFrame extends StatelessWidget {
+  final bool showAvatar;
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  const AiAssistantFrame({
+    super.key,
+    required this.child,
+    this.showAvatar = true,
+    this.padding = const EdgeInsets.fromLTRB(8, 4, 12, 4),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: padding,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 28,
+            child: showAvatar
+                ? _CoachAvatar(colors: Theme.of(context).colorScheme)
+                : null,
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: child),
+        ],
+      ),
+    );
+  }
+}
 
 class AiMessageBubble extends StatelessWidget {
   final AiChatMessage message;
@@ -13,12 +48,26 @@ class AiMessageBubble extends StatelessWidget {
   final VoidCallback? onCopy;
   final bool showTimestamp;
 
+  /// Assistant: show the avatar and the coach name (the first row of an
+  /// answer). Later text of the same answer sets it to false.
+  final bool showHeader;
+
+  /// Assistant: text written before a tool step. It has no copy/time row.
+  final bool intermediate;
+
+  /// User: restarts the turn this message started. Shown with the "Stopped" /
+  /// "Interrupted" label of a turn that did not finish.
+  final VoidCallback? onRetryTurn;
+
   const AiMessageBubble({
     super.key,
     required this.message,
     this.onRetry,
     this.onCopy,
     this.showTimestamp = true,
+    this.showHeader = true,
+    this.intermediate = false,
+    this.onRetryTurn,
   });
 
   @override
@@ -67,10 +116,11 @@ class AiMessageBubble extends StatelessWidget {
                 ],
               ),
             ),
+            _TurnStatusLine(status: message.turnStatus, onRetry: onRetryTurn),
             if (showTimestamp || onCopy != null)
               _MessageMeta(
                 timestamp: showTimestamp
-                    ? _formatTime(message.createdAt)
+                    ? _formatTime(context, message.createdAt)
                     : null,
                 onCopy: onCopy,
                 onRetry: null,
@@ -87,44 +137,111 @@ class AiMessageBubble extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final l10n = AppLocalizations.of(context)!;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 12, 12, 6),
-      child: Row(
+    final showMeta =
+        !intermediate && (showTimestamp || onCopy != null || onRetry != null);
+    return AiAssistantFrame(
+      showAvatar: showHeader,
+      padding: EdgeInsets.fromLTRB(8, showHeader ? 12 : 4, 12, 6),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _CoachAvatar(colors: colors),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 2, bottom: 7),
-                  child: Text(
-                    l10n.aiChatCoachName,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: colors.onSurface,
+          if (showHeader)
+            Padding(
+              padding: const EdgeInsets.only(top: 2, bottom: 7),
+              child: Text(
+                l10n.aiChatCoachName,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: colors.onSurface,
+                ),
+              ),
+            ),
+          if (message.content?.isNotEmpty == true)
+            AiMarkdown(text: message.content!, textColor: colors.onSurface),
+          if (message.isCutOff)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 15,
+                    color: colors.outline,
+                  ),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      l10n.aiChatAnswerCutOff,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
                     ),
                   ),
-                ),
-                if (message.content?.isNotEmpty == true)
-                  _MarkdownBody(
-                    text: message.content!,
-                    textColor: colors.onSurface,
-                  ),
-                if (showTimestamp || onCopy != null || onRetry != null)
-                  _MessageMeta(
-                    timestamp: showTimestamp
-                        ? _formatTime(message.createdAt)
-                        : null,
-                    onCopy: onCopy,
-                    onRetry: onRetry,
-                    alignEnd: false,
-                  ),
-              ],
+                ],
+              ),
+            ),
+          if (showMeta)
+            _MessageMeta(
+              timestamp: showTimestamp
+                  ? _formatTime(context, message.createdAt)
+                  : null,
+              onCopy: onCopy,
+              onRetry: onRetry,
+              alignEnd: false,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Stopped" / "Interrupted" / "Not answered" under a user message whose turn
+/// did not finish, with the retry action.
+class _TurnStatusLine extends StatelessWidget {
+  final AiTurnStatus? status;
+  final VoidCallback? onRetry;
+
+  const _TurnStatusLine({required this.status, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = switch (status) {
+      AiTurnStatus.cancelled => AppLocalizations.of(context)!.aiChatTurnStopped,
+      AiTurnStatus.interrupted => AppLocalizations.of(
+        context,
+      )!.aiChatTurnInterrupted,
+      AiTurnStatus.failed => AppLocalizations.of(context)!.aiChatTurnFailed,
+      _ => null,
+    };
+    if (label == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.info_outline_rounded, size: 15, color: colors.outline),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: colors.onSurfaceVariant,
             ),
           ),
+          if (onRetry != null) ...[
+            const SizedBox(width: 4),
+            TextButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: Text(AppLocalizations.of(context)!.aiChatRetry),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -333,71 +450,11 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-class _MarkdownBody extends StatelessWidget {
-  final String text;
-  final Color textColor;
-  const _MarkdownBody({required this.text, required this.textColor});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final body = theme.textTheme.bodyLarge?.copyWith(
-      color: textColor,
-      height: 1.45,
+String _formatTime(BuildContext context, DateTime t) =>
+    MaterialLocalizations.of(context).formatTimeOfDay(
+      TimeOfDay.fromDateTime(t),
+      alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
     );
-    return MarkdownBody(
-      data: text,
-      selectable: true,
-      softLineBreak: true,
-      shrinkWrap: true,
-      styleSheet: MarkdownStyleSheet(
-        p: body,
-        strong: body?.copyWith(fontWeight: FontWeight.w700),
-        em: body?.copyWith(fontStyle: FontStyle.italic),
-        h1: theme.textTheme.headlineSmall?.copyWith(
-          color: textColor,
-          fontWeight: FontWeight.w700,
-        ),
-        h2: theme.textTheme.titleLarge?.copyWith(
-          color: textColor,
-          fontWeight: FontWeight.w700,
-        ),
-        h3: theme.textTheme.titleMedium?.copyWith(
-          color: textColor,
-          fontWeight: FontWeight.w700,
-        ),
-        listBullet: body?.copyWith(fontWeight: FontWeight.w700),
-        blockquote: body?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-        blockquoteDecoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(8),
-          border: Border(
-            left: BorderSide(color: theme.colorScheme.primary, width: 3),
-          ),
-        ),
-        code: body?.copyWith(
-          fontFamily: 'monospace',
-          fontSize: 13,
-          backgroundColor: theme.colorScheme.surfaceContainerHighest,
-        ),
-        codeblockDecoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: theme.colorScheme.outlineVariant),
-        ),
-        pPadding: const EdgeInsets.only(bottom: 7),
-        listIndent: 22,
-        blockSpacing: 9,
-      ),
-    );
-  }
-}
-
-String _formatTime(DateTime t) {
-  final h = t.hour.toString().padLeft(2, '0');
-  final m = t.minute.toString().padLeft(2, '0');
-  return '$h:$m';
-}
 
 class MessageCopyAction {
   static Future<void> copy(BuildContext context, String text) async {

@@ -1,37 +1,46 @@
 import 'package:intl/intl.dart';
 import 'package:workout_notes/models/goal.dart';
+import 'package:workout_notes/utils/app_number_format.dart';
 
 /// Format helpers for goal values, periods, etc.
 class GoalFormatters {
   /// Formats a raw value into a human-friendly string with the right unit.
-  static String formatValue(GoalMetric metric, double value, {bool isKm = true}) {
+  static String formatValue(
+    GoalMetric metric,
+    double value, {
+    bool isKm = true,
+  }) {
     switch (metric) {
       case GoalMetric.volume:
         if (value >= 1000) {
-          return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}t';
+          return '${AppNumberFormat.decimal(value / 1000, value >= 10000 ? 0 : 1)}t';
         }
-        return '${value.toStringAsFixed(0)} kg';
+        return '${AppNumberFormat.decimal(value, 0)} kg';
       case GoalMetric.days:
-        return value.toStringAsFixed(0);
+        return AppNumberFormat.decimal(value, 0);
       case GoalMetric.distance:
-        return '${value.toStringAsFixed(value >= 100 ? 0 : 1)} ${isKm ? 'km' : 'mi'}';
+        return '${AppNumberFormat.decimal(value, value >= 100 ? 0 : 1)} ${isKm ? 'km' : 'mi'}';
       case GoalMetric.time:
         return _formatDuration(value.toInt());
     }
   }
 
   /// Short version of [formatValue] (used inside the ring).
-  static String formatValueShort(GoalMetric metric, double value, {bool isKm = true}) {
+  static String formatValueShort(
+    GoalMetric metric,
+    double value, {
+    bool isKm = true,
+  }) {
     switch (metric) {
       case GoalMetric.volume:
         if (value >= 1000) {
-          return '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1)}t';
+          return '${AppNumberFormat.decimal(value / 1000, value >= 10000 ? 0 : 1)}t';
         }
-        return '${value.toStringAsFixed(0)}kg';
+        return '${AppNumberFormat.decimal(value, 0)}kg';
       case GoalMetric.days:
-        return '${value.toStringAsFixed(0)}d';
+        return '${AppNumberFormat.decimal(value, 0)}d';
       case GoalMetric.distance:
-        return '${value.toStringAsFixed(value >= 100 ? 0 : 1)}${isKm ? 'k' : 'm'}';
+        return '${AppNumberFormat.decimal(value, value >= 100 ? 0 : 1)}${isKm ? 'k' : 'm'}';
       case GoalMetric.time:
         final totalSec = value.toInt();
         if (totalSec >= 3600) {
@@ -55,8 +64,12 @@ class GoalFormatters {
   }
 
   /// Period range label (e.g. "01–07 Jun" or "Junho 2026").
-  static String periodRangeLabel(GoalPeriod period, DateTime start, DateTime end,
-      {bool isPortuguese = true}) {
+  static String periodRangeLabel(
+    GoalPeriod period,
+    DateTime start,
+    DateTime end, {
+    bool isPortuguese = true,
+  }) {
     final loc = isPortuguese ? 'pt_BR' : 'en_US';
     if (period == GoalPeriod.weekly) {
       final fmt = DateFormat('d MMM', loc);

@@ -5,9 +5,11 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/daily_nutrition_summary.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/meal_log_item.dart';
+import 'package:workout_notes/models/nutrition/meal_log_with_items.dart';
 import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
+import 'package:workout_notes/models/nutrition/saved_meal_item_draft.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/screens/nutrition/food_quantity_sheet.dart';
 import 'package:workout_notes/screens/nutrition/food_search_screen.dart';
@@ -139,7 +141,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
 
   Future<void> _changeDay(int delta) async {
     setState(() {
-      _selectedDate = dayOf(_selectedDate.add(Duration(days: delta)));
+      _selectedDate = dayOf(addDays(_selectedDate, delta));
     });
     await _load();
   }
@@ -154,7 +156,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2018),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: addDays(DateTime.now(), 365),
     );
     if (picked == null || !mounted) return;
     setState(() => _selectedDate = dayOf(picked));
@@ -224,11 +226,12 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(loc.nutritionItemSaved)));
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('nutrition_day_detail_screen: action failed: $e\n$stack');
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
+      ).showSnackBar(SnackBar(content: Text(loc.commonSomethingWentWrong)));
     } finally {
       if (mounted) setState(() => _isMutating = false);
       await _load();
@@ -278,11 +281,12 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(loc.nutritionItemUpdated)));
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('nutrition_day_detail_screen: action failed: $e\n$stack');
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
+      ).showSnackBar(SnackBar(content: Text(loc.commonSomethingWentWrong)));
     } finally {
       if (mounted) setState(() => _isMutating = false);
       await _load();
@@ -362,9 +366,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
   /// user picks which meal types to carry over via a checkbox dialog.
   Future<void> _copyPreviousDay() async {
     final loc = AppLocalizations.of(context)!;
-    final yesterday = dateKey(
-      dayOf(_selectedDate.subtract(const Duration(days: 1))),
-    );
+    final yesterday = dateKey(dayOf(addDays(_selectedDate, -1)));
     final source = (await _repository.getDayMeals(
       yesterday,
     )).where((m) => m.items.isNotEmpty).toList();
@@ -464,11 +466,12 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(loc.nutritionReplicatedDays(count))),
       );
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('nutrition_day_detail_screen: action failed: $e\n$stack');
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
+      ).showSnackBar(SnackBar(content: Text(loc.commonSomethingWentWrong)));
     } finally {
       if (mounted) setState(() => _isMutating = false);
       await _load();
@@ -804,5 +807,4 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
       items: const [],
     );
   }
-
 }

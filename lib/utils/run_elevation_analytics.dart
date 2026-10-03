@@ -62,8 +62,8 @@ class RunElevationProfile {
     RunTrackProfile? profile,
   }) {
     if (points.length < 2) return empty;
-    final cumulative = (profile ?? RunTrackProfile.fromPoints(points))
-        .cumulativeMeters;
+    final cumulative =
+        (profile ?? RunTrackProfile.fromPoints(points)).cumulativeMeters;
 
     final distances = <double>[];
     final altitudes = <double>[];

@@ -113,7 +113,20 @@ data class RunExpandedStepNative(
 enum class RunStepEnginePhase { idle, running, done }
 
 enum class RunStepEventKind {
-    stepStarted, stepCompleted, timeRemainingCue, distanceRemainingCue, paceTooSlow, paceTooFast, workoutCompleted
+    stepStarted,
+    stepCompleted,
+    halfway,
+    timeRemainingCue,
+    distanceRemainingCue,
+
+    /** One tick of the 3-2-1 countdown before a timed step ends. */
+    countdown,
+    paceTooSlow,
+    paceTooFast,
+
+    /** Pace is back inside the band after a warning. */
+    paceBackInRange,
+    workoutCompleted,
 }
 
 data class RunStepEventNative(
@@ -128,6 +141,11 @@ data class RunStepEventNative(
     val remainingSeconds: Int? = null,
     val remainingMeters: Int? = null,
     val paceSecPerKm: Double? = null,
+    /** What was actually run in the step ([RunStepEventKind.stepCompleted]). */
+    val stepDistanceMeters: Double? = null,
+    val stepDurationSeconds: Int? = null,
+    val targetPaceMinSecPerKm: Double? = null,
+    val targetPaceMaxSecPerKm: Double? = null,
 )
 
 data class RunStepSnapshotNative(
@@ -205,19 +223,34 @@ data class RunStepResultNative(
  * the tracking state. [expand] mirrors `RunPlanWorkout.expand` in Dart, which
  * the plan screens use for the same repeat blocks — keep both in sync
  * (test/run_workout_steps_test.dart and RunWorkoutStepEngineNativeTest).
+ *
+ * Besides step changes it emits the in-step cues the coach may speak: halfway,
+ * time/distance left, the 3-2-1 countdown of timed steps, and pace warnings
+ * measured over a rolling window (never the step average, which still holds
+ * the acceleration of the first seconds).
  */
 class RunWorkoutStepEngineNative {
     private var steps: List<RunExpandedStepNative> = emptyList()
     private var phase: RunStepEnginePhase = RunStepEnginePhase.idle
     private var index: Int = 0
     private var accum: Double = 0.0
-    private var remainingCueSpoken: Boolean = false
-    private var paceCueSpoken: Boolean = false
     private var lastDistance: Double = 0.0
     private var lastMovingSeconds: Int = 0
     private var stepDistance: Double = 0.0
     private var stepSeconds: Int = 0
     private val stepResults = mutableListOf<RunStepResultNative>()
+
+    /** Easy-effort workout: continuous steps only warn when too fast. */
+    private var easyEffort: Boolean = false
+
+    // Per-step cue state.
+    private val firedCues = mutableSetOf<Int>()
+    private val samples = ArrayDeque<Pair<Int, Double>>()
+    private var paceAlerts: Int = 0
+    private var lastAlertAt: Int = -1
+    private var outSince: Int = -1
+    private var outDirection: Int = 0
+    private var alertedDirection: Int = 0
 
     val totalSteps: Int get() = steps.size
 
@@ -227,16 +260,18 @@ class RunWorkoutStepEngineNative {
 
     /** Full durable execution state, excluding the plan definition itself. */
     fun stateJson(): String = JSONObject().apply {
-        put("version", 1)
+        put("version", 2)
         put("phase", phase.name)
         put("index", index)
         put("accum", accum)
-        put("remainingCueSpoken", remainingCueSpoken)
-        put("paceCueSpoken", paceCueSpoken)
         put("lastDistance", lastDistance)
         put("lastMovingSeconds", lastMovingSeconds)
         put("stepDistance", stepDistance)
         put("stepSeconds", stepSeconds)
+        put("firedCues", JSONArray().apply { for (cue in firedCues) put(cue) })
+        put("paceAlerts", paceAlerts)
+        put("lastAlertAt", lastAlertAt)
+        put("alertedDirection", alertedDirection)
         put("results", JSONArray().apply {
             for (result in stepResults) put(result.toJson())
         })
@@ -264,12 +299,17 @@ class RunWorkoutStepEngineNative {
                 else -> restoredIndex.coerceIn(0, steps.lastIndex)
             }
             accum = json.optDouble("accum", 0.0).coerceAtLeast(0.0)
-            remainingCueSpoken = json.optBoolean("remainingCueSpoken", false)
-            paceCueSpoken = json.optBoolean("paceCueSpoken", false)
             lastDistance = json.optDouble("lastDistance", 0.0).coerceAtLeast(0.0)
             lastMovingSeconds = json.optInt("lastMovingSeconds", 0).coerceAtLeast(0)
             stepDistance = json.optDouble("stepDistance", 0.0).coerceAtLeast(0.0)
             stepSeconds = json.optInt("stepSeconds", 0).coerceAtLeast(0)
+            resetStepCues()
+            json.optJSONArray("firedCues")?.let { fired ->
+                for (i in 0 until fired.length()) firedCues.add(fired.optInt(i))
+            }
+            paceAlerts = json.optInt("paceAlerts", 0)
+            lastAlertAt = json.optInt("lastAlertAt", -1)
+            alertedDirection = json.optInt("alertedDirection", 0)
             stepResults.clear()
             val results = json.optJSONArray("results") ?: JSONArray()
             for (i in 0 until results.length()) {
@@ -307,7 +347,7 @@ class RunWorkoutStepEngineNative {
 
     /** What comes after the running step, for the "up next" preview. */
     private fun nextStepMap(): Map<String, Any?> {
-        val next = if (phase == RunStepEnginePhase.running) steps.getOrNull(index + 1) else null
+        val next = upcoming()
         return mapOf(
             "nextRole" to next?.step?.role?.name,
             "nextMetric" to next?.step?.metric?.name,
@@ -317,13 +357,48 @@ class RunWorkoutStepEngineNative {
         )
     }
 
+    /** The step being run, or null outside a running session. */
+    fun current(): RunExpandedStepNative? =
+        if (phase == RunStepEnginePhase.running) steps.getOrNull(index) else null
+
+    /** The step after the running one, or null at the end. */
+    fun upcoming(): RunExpandedStepNative? =
+        if (phase == RunStepEnginePhase.running) steps.getOrNull(index + 1) else null
+
+    /** The executed step at [sequence] (the event's stepIndex). */
+    fun stepAt(sequence: Int): RunExpandedStepNative? = steps.getOrNull(sequence)
+
+    /** The steps after [sequence], in order. */
+    fun stepsAfter(sequence: Int): List<RunExpandedStepNative> =
+        if (sequence + 1 >= steps.size) emptyList() else steps.subList(sequence + 1, steps.size)
+
+    /**
+     * How soon the running step ends: exact for timed steps, estimated from the
+     * recent speed for distance steps. Null when unknown.
+     */
+    fun secondsToTransition(): Double? {
+        val current = current() ?: return null
+        val remaining = (current.step.value - accum).coerceAtLeast(0.0)
+        if (current.step.metric == RunIntervalMetric.time) return remaining
+        val first = samples.firstOrNull() ?: return null
+        val span = stepSeconds - first.first
+        val distance = stepDistance - first.second
+        if (span < 5 || distance < 10) return null
+        return remaining / (distance / span)
+    }
+
     val workRepsTotal: Int get() = steps.count { it.step.role == RunStepRole.work }
 
     private val workRepsDone: Int
         get() = steps.take(index.coerceIn(0, steps.size)).count { it.step.role == RunStepRole.work }
 
-    fun configure(rawSteps: List<RunWorkoutStepNative>) {
+    /**
+     * Loads the plan. [easyEffort] marks an easy-day workout (easy, long,
+     * recovery): its continuous steps only warn when the runner goes too fast.
+     */
+    fun configure(rawSteps: List<RunWorkoutStepNative>, easyEffort: Boolean = false) {
         steps = expand(rawSteps.filter { it.value > 0 })
+        this.easyEffort = easyEffort
         reset()
     }
 
@@ -331,13 +406,22 @@ class RunWorkoutStepEngineNative {
         phase = RunStepEnginePhase.idle
         index = 0
         accum = 0.0
-        remainingCueSpoken = false
-        paceCueSpoken = false
         lastDistance = 0.0
         lastMovingSeconds = 0
         stepDistance = 0.0
         stepSeconds = 0
+        resetStepCues()
         stepResults.clear()
+    }
+
+    private fun resetStepCues() {
+        firedCues.clear()
+        samples.clear()
+        paceAlerts = 0
+        lastAlertAt = -1
+        outSince = -1
+        outDirection = 0
+        alertedDirection = 0
     }
 
     val snapshot: RunStepSnapshotNative
@@ -379,10 +463,9 @@ class RunWorkoutStepEngineNative {
         accum = 0.0
         stepDistance = 0.0
         stepSeconds = 0
-        remainingCueSpoken = false
-        paceCueSpoken = false
         lastDistance = 0.0
         lastMovingSeconds = 0
+        resetStepCues()
         stepResults.clear()
         phase = RunStepEnginePhase.running
         return listOf(event(RunStepEventKind.stepStarted, steps[0]))
@@ -403,58 +486,25 @@ class RunWorkoutStepEngineNative {
         var current = steps[index]
         accum += if (current.step.metric == RunIntervalMetric.distance) distanceDelta else timeDelta.toDouble()
 
-        val target = current.step.value.toDouble()
-        if (current.step.metric == RunIntervalMetric.time && !remainingCueSpoken && target > 15) {
-            val cueAt = if (target <= 120) 10 else 30
-            val remaining = target - accum
-            if (remaining <= cueAt && remaining > 0) {
-                remainingCueSpoken = true
-                events.add(event(RunStepEventKind.timeRemainingCue, current, remainingSeconds = cueAt))
-            }
-        } else if (current.step.metric == RunIntervalMetric.distance && !remainingCueSpoken && target >= 300) {
-            val remaining = target - accum
-            if (remaining <= 100 && remaining > 0) {
-                remainingCueSpoken = true
-                events.add(event(RunStepEventKind.distanceRemainingCue, current, remainingMeters = 100))
-            }
-        }
+        samples.addLast(stepSeconds to stepDistance)
+        while (samples.size > 1 && stepSeconds - samples.first().first > PACE_WINDOW_S) samples.removeFirst()
 
-        if (!paceCueSpoken && current.step.role.isEffort) {
-            val pace = currentStepPace()
-            if (pace != null && stepSeconds >= 20) {
-                val min = current.step.targetPaceMinSecPerKm
-                val max = current.step.targetPaceMaxSecPerKm
-                if (max != null && pace > max) {
-                    paceCueSpoken = true
-                    events.add(event(RunStepEventKind.paceTooSlow, current, paceSecPerKm = pace))
-                } else if (min != null && pace < min) {
-                    paceCueSpoken = true
-                    events.add(event(RunStepEventKind.paceTooFast, current, paceSecPerKm = pace))
-                }
-            }
+        val remaining = current.step.value - accum
+        if (remaining > 1e-6) {
+            events.addAll(progressCues(current, remaining))
+            paceCue(current)?.let { events.add(it) }
         }
 
         while (phase == RunStepEnginePhase.running &&
             (current.step.value <= 0 || accum + 1e-6 >= current.step.value)
         ) {
             val overflow = accum - current.step.value
-            events.add(event(RunStepEventKind.stepCompleted, current))
+            events.add(completedEvent(current))
             recordResult(current)
             if (index >= steps.size - 1) {
                 phase = RunStepEnginePhase.done
                 index = steps.size
-                events.add(
-                    RunStepEventNative(
-                        kind = RunStepEventKind.workoutCompleted,
-                        stepIndex = -1,
-                        totalSteps = steps.size,
-                        role = current.step.role,
-                        repIndex = current.repIndex,
-                        repTotal = current.repTotal,
-                        metric = current.step.metric,
-                        target = current.step.value,
-                    )
-                )
+                events.add(workoutCompletedEvent(current))
                 break
             }
             val previousMetric = current.step.metric
@@ -463,8 +513,7 @@ class RunWorkoutStepEngineNative {
             accum = if (current.step.metric == previousMetric) overflow.coerceAtLeast(0.0) else 0.0
             stepDistance = 0.0
             stepSeconds = 0
-            remainingCueSpoken = false
-            paceCueSpoken = false
+            resetStepCues()
             events.add(event(RunStepEventKind.stepStarted, current))
         }
         return events
@@ -478,23 +527,12 @@ class RunWorkoutStepEngineNative {
         if (phase != RunStepEnginePhase.running || index !in steps.indices) return emptyList()
         val events = mutableListOf<RunStepEventNative>()
         val current = steps[index]
-        events.add(event(RunStepEventKind.stepCompleted, current))
+        events.add(completedEvent(current))
         recordResult(current)
         if (index >= steps.size - 1) {
             phase = RunStepEnginePhase.done
             index = steps.size
-            events.add(
-                RunStepEventNative(
-                    kind = RunStepEventKind.workoutCompleted,
-                    stepIndex = -1,
-                    totalSteps = steps.size,
-                    role = current.step.role,
-                    repIndex = current.repIndex,
-                    repTotal = current.repTotal,
-                    metric = current.step.metric,
-                    target = current.step.value,
-                )
-            )
+            events.add(workoutCompletedEvent(current))
             return events
         }
         index++
@@ -502,8 +540,7 @@ class RunWorkoutStepEngineNative {
         accum = 0.0
         stepDistance = 0.0
         stepSeconds = 0
-        remainingCueSpoken = false
-        paceCueSpoken = false
+        resetStepCues()
         events.add(event(RunStepEventKind.stepStarted, next))
         return events
     }
@@ -519,10 +556,111 @@ class RunWorkoutStepEngineNative {
         phase = RunStepEnginePhase.done
     }
 
-    private fun currentStepPace(): Double? {
-        if (stepDistance < 50 || stepSeconds <= 0) return null
-        return stepSeconds / (stepDistance / 1000.0)
+    /** Halfway, "N left" and the 3-2-1 countdown, each at most once per step. */
+    private fun progressCues(current: RunExpandedStepNative, remaining: Double): List<RunStepEventNative> {
+        val out = mutableListOf<RunStepEventNative>()
+        val step = current.step
+        val target = step.value
+        if (halfwayEligible(step) && accum * 2 >= target && firedCues.add(CUE_HALFWAY)) {
+            out.add(event(RunStepEventKind.halfway, current))
+        }
+        val crossed = remainingThresholds(step).filter { remaining <= it && firedCues.add(it) }
+        crossed.minOrNull()?.let { threshold ->
+            out.add(
+                if (step.metric == RunIntervalMetric.time) {
+                    event(RunStepEventKind.timeRemainingCue, current, remainingSeconds = threshold)
+                } else {
+                    event(RunStepEventKind.distanceRemainingCue, current, remainingMeters = threshold)
+                },
+            )
+        }
+        if (step.metric == RunIntervalMetric.time && target >= COUNTDOWN_MIN_STEP_S) {
+            var tick: Int? = null
+            for (k in 3 downTo 1) {
+                if (remaining <= k && firedCues.add(CUE_COUNTDOWN + k)) tick = k
+            }
+            tick?.let { out.add(event(RunStepEventKind.countdown, current, remainingSeconds = it)) }
+        }
+        return out
     }
+
+    /**
+     * Pace warning over the last [PACE_WINDOW_S] seconds. Only for effort steps
+     * long enough for GPS pace to mean something, after a grace period, when
+     * the drift lasts a few seconds; re-armed after a cooldown, capped per step,
+     * and followed by "back on pace" once the runner corrects.
+     */
+    private fun paceCue(current: RunExpandedStepNative): RunStepEventNative? {
+        val step = current.step
+        if (!step.role.isEffort) return null
+        val (fast, slow) = paceBand(step) ?: return null
+        val longEnough = if (step.metric == RunIntervalMetric.time) step.value >= 60 else step.value >= 300
+        if (!longEnough) return null
+        val graceOver = if (step.metric == RunIntervalMetric.time) {
+            stepSeconds >= (step.value * 0.25).coerceIn(20.0, 60.0)
+        } else {
+            stepSeconds >= 20 && stepDistance >= (step.value * 0.25).coerceIn(100.0, 400.0)
+        }
+        if (!graceOver) return null
+        val first = samples.first()
+        val span = stepSeconds - first.first
+        val distance = stepDistance - first.second
+        if (span < 12 || distance < 30) return null
+        val pace = span / (distance / 1000.0)
+
+        val ceilingOnly = easyEffort && step.role == RunStepRole.steady
+        val direction = when {
+            pace < fast -> -1
+            pace > slow && !ceilingOnly -> 1
+            else -> 0
+        }
+        if (direction == 0) {
+            outSince = -1
+            outDirection = 0
+            if (alertedDirection != 0) {
+                alertedDirection = 0
+                return event(RunStepEventKind.paceBackInRange, current, paceSecPerKm = pace)
+            }
+            return null
+        }
+        if (direction != outDirection) {
+            outDirection = direction
+            outSince = stepSeconds
+            return null
+        }
+        if (stepSeconds - outSince < PACE_PERSIST_S) return null
+        val repeated = current.repTotal > 1
+        if (paceAlerts >= (if (repeated) 2 else 5)) return null
+        // Still off since the last warning (never back in range): wait longer.
+        val cooldown = (if (repeated) 40 else 75) * (if (alertedDirection == direction) 2 else 1)
+        if (lastAlertAt >= 0 && stepSeconds - lastAlertAt < cooldown) return null
+        paceAlerts++
+        lastAlertAt = stepSeconds
+        alertedDirection = direction
+        return event(
+            if (direction > 0) RunStepEventKind.paceTooSlow else RunStepEventKind.paceTooFast,
+            current,
+            paceSecPerKm = pace,
+        )
+    }
+
+    private fun completedEvent(current: RunExpandedStepNative) = event(
+        RunStepEventKind.stepCompleted,
+        current,
+        stepDistanceMeters = stepDistance,
+        stepDurationSeconds = stepSeconds,
+    )
+
+    private fun workoutCompletedEvent(current: RunExpandedStepNative) = RunStepEventNative(
+        kind = RunStepEventKind.workoutCompleted,
+        stepIndex = -1,
+        totalSteps = steps.size,
+        role = current.step.role,
+        repIndex = current.repIndex,
+        repTotal = current.repTotal,
+        metric = current.step.metric,
+        target = current.step.value,
+    )
 
     private fun recordResult(expanded: RunExpandedStepNative) {
         stepResults.add(
@@ -545,6 +683,8 @@ class RunWorkoutStepEngineNative {
         remainingSeconds: Int? = null,
         remainingMeters: Int? = null,
         paceSecPerKm: Double? = null,
+        stepDistanceMeters: Double? = null,
+        stepDurationSeconds: Int? = null,
     ) = RunStepEventNative(
         kind = kind,
         stepIndex = expanded.sequence,
@@ -557,9 +697,67 @@ class RunWorkoutStepEngineNative {
         remainingSeconds = remainingSeconds,
         remainingMeters = remainingMeters,
         paceSecPerKm = paceSecPerKm,
+        stepDistanceMeters = stepDistanceMeters,
+        stepDurationSeconds = stepDurationSeconds,
+        targetPaceMinSecPerKm = expanded.step.targetPaceMinSecPerKm,
+        targetPaceMaxSecPerKm = expanded.step.targetPaceMaxSecPerKm,
     )
 
     companion object {
+        const val PACE_WINDOW_S = 20
+        const val PACE_PERSIST_S = 6
+        const val COUNTDOWN_MIN_STEP_S = 15
+        private const val CUE_HALFWAY = 1_000_000
+        private const val CUE_COUNTDOWN = 2_000_000
+
+        /** Slack around a band so GPS jitter at the edge does not nag. */
+        private const val BAND_SLACK = 0.015
+
+        /**
+         * The (fastest, slowest) acceptable pace of a step. A single bound is a
+         * target point and gets a ±3% band.
+         */
+        fun paceBand(step: RunWorkoutStepNative): Pair<Double, Double>? {
+            val min = step.targetPaceMinSecPerKm?.takeIf { it > 0 }
+            val max = step.targetPaceMaxSecPerKm?.takeIf { it > 0 }
+            val (fast, slow) = when {
+                min != null && max != null -> minOf(min, max) to maxOf(min, max)
+                min != null -> min * 0.97 to min * 1.03
+                max != null -> max * 0.97 to max * 1.03
+                else -> return null
+            }
+            return fast * (1 - BAND_SLACK) to slow * (1 + BAND_SLACK)
+        }
+
+        /** "N left" thresholds of a step (seconds or meters). */
+        fun remainingThresholds(step: RunWorkoutStepNative): List<Int> {
+            val value = step.value
+            return if (step.metric == RunIntervalMetric.time) {
+                when {
+                    value >= 1200 -> listOf(300, 60)
+                    value >= 240 -> listOf(60)
+                    value > 90 -> listOf(30)
+                    value >= 40 -> listOf(10)
+                    else -> emptyList()
+                }
+            } else {
+                when {
+                    value >= 3000 -> listOf(1000, 200)
+                    value >= 1000 -> listOf(200)
+                    value >= 300 -> listOf(100)
+                    else -> emptyList()
+                }
+            }
+        }
+
+        /** Long efforts get a "halfway" call. */
+        fun halfwayEligible(step: RunWorkoutStepNative): Boolean =
+            step.role.isEffort && if (step.metric == RunIntervalMetric.time) {
+                step.value >= 480
+            } else {
+                step.value >= 1600
+            }
+
         /**
          * Flattens steps into the execution sequence. Consecutive steps sharing
          * a `repeatGroup` form a block repeated `repeatCount` times.

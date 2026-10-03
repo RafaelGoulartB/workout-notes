@@ -11,6 +11,8 @@ import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'package:workout_notes/services/traditional_alarm_service.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
 import 'package:workout_notes/widgets/sleep/monitor/smart_wake_widgets.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 class SleepSettingsScreen extends StatefulWidget {
@@ -20,12 +22,12 @@ class SleepSettingsScreen extends StatefulWidget {
   State<SleepSettingsScreen> createState() => _SleepSettingsScreenState();
 }
 
-class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
+class _SleepSettingsScreenState extends State<SleepSettingsScreen>
+    with GuardedLoad {
   final _missions = SleepMissionService();
   final _monitor = SleepMonitorService.instance;
   final _sleepGoalService = SleepGoalService();
   final _alarmService = TraditionalAlarmService.instance;
-  bool _loading = true;
   bool _busy = false;
   int _goalMinutes = SleepGoalService.defaultGoalMinutes;
   int _globalMaxSnoozes = TraditionalAlarmService.defaultMaxSnoozes;
@@ -41,7 +43,7 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     await _missions.load();
     final goalMinutes = await _sleepGoalService.load();
     final globalMaxSnoozes = await _alarmService.getGlobalMaxSnoozes();
@@ -55,17 +57,22 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
         _globalMaxSnoozes = globalMaxSnoozes;
         _globalSnoozeEnabled = globalSnoozeEnabled;
         _diagnosticsEnabled = diagnosticsEnabled;
-        _loading = false;
+        isLoading = false;
       });
     }
-  }
+  });
 
   Future<void> _setDiagnostics(bool enabled) async {
     try {
       await _diagnostics.setEnabled(enabled);
       if (mounted) setState(() => _diagnosticsEnabled = enabled);
     } catch (_) {
-      if (mounted) _message(AppLocalizations.of(context)!.sleepDiagnosticError);
+      if (mounted) {
+        showAppSnack(
+          context,
+          AppLocalizations.of(context)!.sleepDiagnosticError,
+        );
+      }
     }
   }
 
@@ -75,7 +82,7 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
       final file = await _diagnostics.latest();
       if (!mounted) return;
       if (file == null) {
-        _message(loc.sleepDiagnosticMissing);
+        showAppSnack(context, loc.sleepDiagnosticMissing);
         return;
       }
       final bytes = await file.readAsBytes();
@@ -88,7 +95,7 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
         bytes: bytes,
       );
     } catch (_) {
-      if (mounted) _message(loc.sleepDiagnosticError);
+      if (mounted) showAppSnack(context, loc.sleepDiagnosticError);
     }
   }
 
@@ -113,10 +120,13 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
       }
       await _missions.saveScanResult(result);
       if (!mounted) return;
-      _message(AppLocalizations.of(context)!.sleepMissionSaved);
+      showAppSnack(context, AppLocalizations.of(context)!.sleepMissionSaved);
     } catch (_) {
       if (mounted) {
-        _message(AppLocalizations.of(context)!.sleepMissionScanError);
+        showAppSnack(
+          context,
+          AppLocalizations.of(context)!.sleepMissionScanError,
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -188,7 +198,7 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
     await _sleepGoalService.save(selected);
     if (!mounted) return;
     setState(() => _goalMinutes = selected);
-    _message(loc.sleepGoalSaved);
+    showAppSnack(context, loc.sleepGoalSaved);
   }
 
   static String _formatGoal(int minutes, AppLocalizations loc) =>
@@ -297,15 +307,12 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
       title: loc.sleepMissionRemove,
       message: loc.sleepMissionRemoveConfirm,
       confirmLabel: loc.sleepMissionRemove,
+      destructive: true,
     );
     if (confirmed == true) {
       await _missions.clear();
-      if (mounted) _message(loc.sleepMissionRemoved);
+      if (mounted) showAppSnack(context, loc.sleepMissionRemoved);
     }
-  }
-
-  void _message(String value) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value)));
   }
 
   @override
@@ -314,8 +321,10 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: SettingsAppBar(title: loc.sleepSettingsTitle),
-      body: _loading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _load)
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [

@@ -10,6 +10,8 @@ import 'package:workout_notes/widgets/strength/exercises/exercise_picker_sheet.d
 import 'package:workout_notes/widgets/strength/routines/routine_exercise_card.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_set_sheets.dart';
 import 'package:workout_notes/widgets/strength/routines/routine_sheets.dart';
+import 'package:workout_notes/widgets/ui/guarded_load.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Full-screen editor for a routine day.
@@ -33,11 +35,11 @@ class RoutineDayEditorScreen extends StatefulWidget {
   State<RoutineDayEditorScreen> createState() => _RoutineDayEditorScreenState();
 }
 
-class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
+class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen>
+    with GuardedLoad {
   final _routineRepo = DatabaseHelper.instance.routineRepo;
   List<Map<String, dynamic>> _exercises = [];
   Map<String, List<Map<String, dynamic>>> _predefinedSets = {};
-  bool _isLoading = true;
 
   @override
   void initState() {
@@ -45,7 +47,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load() => guardedLoad(() async {
     final exercises = await _routineRepo.getRoutineExercises(
       widget.routineDayId,
     );
@@ -56,9 +58,9 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     setState(() {
       _exercises = exercises;
       _predefinedSets = sets;
-      _isLoading = false;
+      isLoading = false;
     });
-  }
+  });
 
   RoutineDaySummary get _summary => StrengthRoutineSummaryBuilder.buildDay(
     day: {
@@ -99,15 +101,14 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
         widget.routineDayId,
         orderedIds,
       );
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('routine_day_editor_screen: action failed: $e\n$stack');
       if (!mounted) return;
       await _load();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            AppLocalizations.of(context)!.commonReorderError(e.toString()),
-          ),
+          content: Text(AppLocalizations.of(context)!.commonReorderError),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -381,8 +382,10 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
           ),
         ],
       ),
-      body: _isLoading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadFailed
+          ? LoadErrorView(onRetry: _load)
           : _exercises.isEmpty
           ? _buildEmptyState(theme, loc)
           : RefreshIndicator(

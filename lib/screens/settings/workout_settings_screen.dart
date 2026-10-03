@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/screens/settings/settings_preferences_controller.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
+import 'package:workout_notes/widgets/ui/load_error_view.dart';
 import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Workout preferences: units, rest timer, screen and notification options.
@@ -39,6 +40,9 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
           if (_controller.isLoading) {
             return const Center(child: CircularProgressIndicator());
           }
+          if (_controller.loadFailed) {
+            return LoadErrorView(onRetry: _controller.load);
+          }
           final settings = _controller.settings;
           final restTimerNotifications =
               settings['notification_rest_timer_enabled'] != 'false';
@@ -48,7 +52,10 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
               // ===== TREINO =====
-              AppSectionHeader(loc.settingsSectionWorkout, padding: AppSectionHeader.compactPadding),
+              AppSectionHeader(
+                loc.settingsSectionWorkout,
+                padding: AppSectionHeader.compactPadding,
+              ),
               SettingsCard(
                 children: [
                   SettingsSwitchTile(
@@ -120,7 +127,10 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
               ),
 
               // ===== NOTIFICAÇÕES =====
-              AppSectionHeader(loc.settingsSectionNotifications, padding: AppSectionHeader.compactPadding),
+              AppSectionHeader(
+                loc.settingsSectionNotifications,
+                padding: AppSectionHeader.compactPadding,
+              ),
               SettingsCard(
                 children: [
                   SettingsSwitchTile(
