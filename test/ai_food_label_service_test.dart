@@ -548,6 +548,7 @@ class _FailingAiService extends AiService {
     required String token,
     required String model,
     required List<Map<String, dynamic>> messages,
+    AiApiStyle apiStyle = AiApiStyle.chatCompletions,
   }) {
     throw const AiServiceException(
       'Invalid or missing API token.',

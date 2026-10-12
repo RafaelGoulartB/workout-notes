@@ -136,6 +136,40 @@ void main() {
     );
   });
 
+  test('Claude content blocks only inside the current turn, only for the '
+      'Anthropic API', () {
+    const blocks = [
+      {'type': 'thinking', 'thinking': '', 'signature': 's'},
+    ];
+    final old = assistant(
+      null,
+      calls: [call('c1')],
+      extras: const {kAnthropicContentExtra: blocks},
+    );
+    final current = assistant(
+      null,
+      calls: [call('c2')],
+      extras: const {kAnthropicContentExtra: blocks},
+    );
+    List<Map<String, dynamic>> assistantsFor(AiApiStyle style) => chat
+        .buildWireForTest(
+          history: [user('a'), old, tool('c1', '{"ok":true}')],
+          currentUser: user('b'),
+          turnMessages: [current, tool('c2', '{"ok":true}')],
+          apiStyle: style,
+        )
+        .where((m) => m['role'] == 'assistant')
+        .toList();
+
+    final anthropic = assistantsFor(AiApiStyle.anthropicMessages);
+    expect(anthropic.first, isNot(contains(kAnthropicContentExtra)));
+    expect(anthropic.last[kAnthropicContentExtra], blocks);
+    expect(
+      assistantsFor(AiApiStyle.chatCompletions).last,
+      isNot(contains(kAnthropicContentExtra)),
+    );
+  });
+
   test('stored transcripts are repaired: lost results get a stub, orphan '
       'results are dropped', () {
     final wire = chat.buildWireForTest(

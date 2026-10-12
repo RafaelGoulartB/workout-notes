@@ -164,6 +164,7 @@ Regras:
         token: token,
         model: model,
         messages: messages,
+        apiStyle: provider.apiStyle,
       );
     } on AiServiceException catch (error, stackTrace) {
       if (kDebugMode) {

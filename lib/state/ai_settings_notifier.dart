@@ -322,7 +322,11 @@ class AiSettingsNotifier extends ChangeNotifier {
     final p = _providerById(providerId);
     if (p == null) return const [];
     final token = await getToken(providerId) ?? '';
-    final models = await service.listModels(baseUrl: p.baseUrl, token: token);
+    final models = await service.listModels(
+      baseUrl: p.baseUrl,
+      token: token,
+      apiStyle: p.apiStyle,
+    );
     await setProviderModels(providerId, models);
     return models;
   }

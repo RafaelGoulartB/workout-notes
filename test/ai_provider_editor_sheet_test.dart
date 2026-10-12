@@ -19,14 +19,17 @@ class _FakeAiService extends AiService {
   List<String> models = ['gpt-a', 'gpt-b', 'other-model'];
   AiServiceException? modelsError;
   final List<String> fetchedFrom = [];
+  final List<AiApiStyle> fetchedStyles = [];
   final List<String> probed = [];
 
   @override
   Future<List<String>> listModels({
     required String baseUrl,
     required String token,
+    AiApiStyle apiStyle = AiApiStyle.chatCompletions,
   }) async {
     fetchedFrom.add(baseUrl);
+    fetchedStyles.add(apiStyle);
     if (modelsError != null) throw modelsError!;
     return models;
   }
@@ -70,6 +73,8 @@ void main() {
   });
 
   Finder field(String label) => find.widgetWithText(TextField, label);
+  String baseUrl(WidgetTester tester) =>
+      tester.widget<TextField>(field('Base URL')).controller!.text;
 
   testWidgets('refuses an empty name and an invalid base URL', (tester) async {
     await open(tester);
@@ -153,6 +158,45 @@ void main() {
     // The model list is fetched in the background after saving.
     expect(service.fetchedFrom, ['https://api.openai.com/v1']);
     expect(notifier.settings.providers.single.availableModels, service.models);
+  });
+
+  testWidgets('the Anthropic type fills its address and hides the API style', (
+    tester,
+  ) async {
+    await open(tester);
+    expect(find.text('Chat Completions'), findsOneWidget);
+    await tester.tap(find.text('Anthropic'));
+    await tester.pump();
+    expect(baseUrl(tester), 'https://api.anthropic.com/v1');
+    expect(find.text('Chat Completions'), findsNothing);
+    expect(find.text('Responses'), findsNothing);
+
+    // Back and forth: the default address and the OpenAI style return.
+    await tester.tap(find.text('OpenAI-compatible'));
+    await tester.pump();
+    expect(baseUrl(tester), 'https://api.openai.com/v1');
+    await tester.tap(find.text('Anthropic'));
+    await tester.pump();
+
+    await tester.enterText(field('Name'), 'Claude');
+    await tester.enterText(field('API token'), 'sk-ant-test');
+    await tester.enterText(field('Model'), 'claude-sonnet-5-5');
+    await tester.ensureVisible(find.text('Save'));
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    final provider = notifier.settings.providers.single;
+    expect(provider.apiStyle, AiApiStyle.anthropicMessages);
+    expect(provider.baseUrl, 'https://api.anthropic.com/v1');
+    expect(service.fetchedStyles, [AiApiStyle.anthropicMessages]);
+  });
+
+  testWidgets('a typed address stays when the type changes', (tester) async {
+    await open(tester);
+    await tester.enterText(field('Base URL'), 'https://proxy.example.com/v1');
+    await tester.tap(find.text('Anthropic'));
+    await tester.pump();
+    expect(baseUrl(tester), 'https://proxy.example.com/v1');
   });
 
   testWidgets('test connection saves first and shows what it found', (

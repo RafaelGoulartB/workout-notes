@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/ai_chat_message.dart';
@@ -35,6 +36,8 @@ void main() {
     _Script? script,
     AiProposalService? proposals,
     String? utilityModel,
+    http.Client? client,
+    AiApiStyle apiStyle = AiApiStyle.chatCompletions,
   }) async {
     await installTestDb();
     SharedPreferences.setMockInitialValues({
@@ -47,6 +50,7 @@ void main() {
           'availableModels': ['m'],
           'selectedModel': 'm',
           'utilityModel': ?utilityModel,
+          'apiStyle': apiStyle.storageKey,
           'createdAt': '2026-01-01T00:00:00.000',
         },
       ]),
@@ -55,7 +59,7 @@ void main() {
     });
     FlutterSecureStorage.setMockInitialValues({'ai_token:p1': 'secret'});
     provider = _Provider(script ?? (_) => _Reply.text('ok'));
-    final service = AiService(client: provider, delay: (_) async {});
+    final service = AiService(client: client ?? provider, delay: (_) async {});
     settings = AiSettingsNotifier(
       prefs: await SharedPreferences.getInstance(),
       service: service,
@@ -123,6 +127,91 @@ void main() {
     );
     expect(payload['tools'], isNotEmpty);
     expect(payload, isNot(contains('tool_choice')));
+  });
+
+  test('Anthropic: thinking blocks go back inside the turn and are dropped '
+      'after it', () async {
+    final bodies = <Map<String, dynamic>>[];
+    String sse(List<Map<String, dynamic>> events) =>
+        [for (final event in events) 'data: ${jsonEncode(event)}\n\n'].join();
+    final client = MockClient.streaming((request, bodyStream) async {
+      final body =
+          jsonDecode(await bodyStream.bytesToString()) as Map<String, dynamic>;
+      bodies.add(body);
+      final round = bodies.length;
+      return http.StreamedResponse(
+        Stream.value(
+          utf8.encode(
+            sse([
+              {
+                'type': 'content_block_start',
+                'index': 0,
+                'content_block': {
+                  'type': 'thinking',
+                  'thinking': '',
+                  'signature': 'sig$round',
+                },
+              },
+              if (round == 1)
+                {
+                  'type': 'content_block_start',
+                  'index': 1,
+                  'content_block': {
+                    'type': 'tool_use',
+                    'id': 'toolu_1',
+                    'name': 'get_sleep',
+                    'input': {'days': 7},
+                  },
+                }
+              else
+                {
+                  'type': 'content_block_start',
+                  'index': 1,
+                  'content_block': {'type': 'text', 'text': 'Dormiu bem.'},
+                },
+              {
+                'type': 'message_delta',
+                'delta': {'stop_reason': round == 1 ? 'tool_use' : 'end_turn'},
+                'usage': {'output_tokens': 5},
+              },
+              {'type': 'message_stop'},
+            ]),
+          ),
+        ),
+        200,
+      );
+    });
+    await setUpChat(client: client, apiStyle: AiApiStyle.anthropicMessages);
+
+    await chat.send('Como dormi?');
+    await idle();
+    await chat.send('E ontem?');
+    await idle();
+
+    expect(bodies, hasLength(3));
+    final second = (bodies[1]['messages'] as List).cast<Map>();
+    expect((second[1]['content'] as List).first, {
+      'type': 'thinking',
+      'thinking': '',
+      'signature': 'sig1',
+    });
+    // The next turn replays the history without the old thinking.
+    final third = (bodies[2]['messages'] as List).cast<Map>();
+    final thinking = [
+      for (final message in third)
+        for (final block in message['content'] as List)
+          if ((block as Map)['type'] == 'thinking') block,
+    ];
+    expect(thinking, isEmpty);
+    expect(third.map((m) => m['role']), [
+      'user',
+      'assistant',
+      'user',
+      'assistant',
+      'user',
+    ]);
+    final messages = await stored(chat.state.activeThreadId!);
+    expect(messages.last.content, 'Dormiu bem.');
   });
 
   test('runs tools in parallel, then answers with the results', () async {

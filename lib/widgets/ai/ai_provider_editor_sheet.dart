@@ -20,9 +20,9 @@ Future<void> aiAutoFetchModels(AiSettingsNotifier notifier, String id) async {
   }
 }
 
-/// Add / edit a provider: name, base URL, token, model (typed or picked from
-/// the fetched list), utility model, API style, reasoning effort and a
-/// connection test. "Test connection" and "Fetch models" save first, so they
+/// Add / edit a provider: name, type (OpenAI-compatible or Anthropic), base
+/// URL, token, model (typed or picked from the fetched list), utility model,
+/// API style, reasoning effort and a connection test. "Test connection" and "Fetch models" save first, so they
 /// always run against exactly what is on screen.
 class AiProviderEditorSheet extends StatefulWidget {
   final AiSettingsNotifier notifier;
@@ -39,12 +39,18 @@ class AiProviderEditorSheet extends StatefulWidget {
 }
 
 class _AiProviderEditorSheetState extends State<AiProviderEditorSheet> {
+  static const _openAiBaseUrl = 'https://api.openai.com/v1';
+  static const _anthropicBaseUrl = 'https://api.anthropic.com/v1';
+
   late final TextEditingController _name;
   late final TextEditingController _baseUrl;
   late final TextEditingController _token;
   late final TextEditingController _model;
   late final TextEditingController _utility;
   late AiApiStyle _style;
+
+  /// OpenAI-compatible style to restore when switching back from Anthropic.
+  late AiApiStyle _openAiStyle;
   late Map<String, AiReasoningEffort> _efforts;
 
   /// The provider once it exists in the settings (an edit, or after the first
@@ -66,13 +72,14 @@ class _AiProviderEditorSheetState extends State<AiProviderEditorSheet> {
     final p = widget.existing;
     _saved = p;
     _name = TextEditingController(text: p?.name ?? '');
-    _baseUrl = TextEditingController(
-      text: p?.baseUrl ?? 'https://api.openai.com/v1',
-    );
+    _baseUrl = TextEditingController(text: p?.baseUrl ?? _openAiBaseUrl);
     _token = TextEditingController();
     _model = TextEditingController(text: p?.selectedModel ?? '');
     _utility = TextEditingController(text: p?.utilityModel ?? '');
     _style = p?.apiStyle ?? AiApiStyle.chatCompletions;
+    _openAiStyle = _style.isOpenAiCompatible
+        ? _style
+        : AiApiStyle.chatCompletions;
     _efforts = {...?p?.reasoningEffortByModel};
     _check = p?.lastCheck;
     _model.addListener(_onModelChanged);
@@ -94,6 +101,25 @@ class _AiProviderEditorSheetState extends State<AiProviderEditorSheet> {
   }
 
   bool get _busy => _saving || _fetching || _testing;
+
+  bool get _anthropic => _style == AiApiStyle.anthropicMessages;
+
+  void _setAnthropic(bool anthropic) {
+    if (anthropic == _anthropic) return;
+    final url = _baseUrl.text.trim();
+    setState(() {
+      if (anthropic) {
+        _openAiStyle = _style;
+        _style = AiApiStyle.anthropicMessages;
+      } else {
+        _style = _openAiStyle;
+      }
+      // A default (or empty) address follows the type; a typed one stays.
+      if (url.isEmpty || url == _openAiBaseUrl || url == _anthropicBaseUrl) {
+        _baseUrl.text = anthropic ? _anthropicBaseUrl : _openAiBaseUrl;
+      }
+    });
+  }
 
   AiReasoningEffort get _effort =>
       _efforts[_model.text.trim()] ?? AiReasoningEffort.automatic;
@@ -292,6 +318,33 @@ class _AiProviderEditorSheetState extends State<AiProviderEditorSheet> {
               errorText: _nameError,
             ),
           ),
+          const SizedBox(height: 16),
+          Text(l10n.aiSettingsProviderKind, style: theme.textTheme.labelLarge),
+          const SizedBox(height: 8),
+          SegmentedButton<bool>(
+            showSelectedIcon: false,
+            segments: [
+              ButtonSegment(
+                value: false,
+                label: Text(l10n.aiSettingsProviderKindOpenAi),
+              ),
+              ButtonSegment(
+                value: true,
+                label: Text(l10n.aiSettingsProviderKindAnthropic),
+              ),
+            ],
+            selected: {_anthropic},
+            onSelectionChanged: (value) => _setAnthropic(value.first),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _anthropic
+                ? l10n.aiSettingsProviderKindAnthropicHelp
+                : l10n.aiSettingsProviderKindOpenAiHelp,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          ),
           const SizedBox(height: 12),
           TextField(
             controller: _baseUrl,
@@ -299,7 +352,9 @@ class _AiProviderEditorSheetState extends State<AiProviderEditorSheet> {
             autocorrect: false,
             decoration: InputDecoration(
               labelText: l10n.aiSettingsBaseUrl,
-              hintText: l10n.aiSettingsBaseUrlHint,
+              hintText: _anthropic
+                  ? l10n.aiSettingsBaseUrlHintAnthropic
+                  : l10n.aiSettingsBaseUrlHint,
               errorText: _urlError,
             ),
           ),
@@ -333,7 +388,9 @@ class _AiProviderEditorSheetState extends State<AiProviderEditorSheet> {
             enableSuggestions: false,
             decoration: InputDecoration(
               labelText: l10n.aiSettingsModelId,
-              hintText: l10n.aiSettingsModelIdHint,
+              hintText: _anthropic
+                  ? l10n.aiSettingsModelIdHintAnthropic
+                  : l10n.aiSettingsModelIdHint,
               helperText: l10n.aiSettingsModelIdHelp,
               helperMaxLines: 2,
               suffixIcon: hasModels
@@ -378,38 +435,43 @@ class _AiProviderEditorSheetState extends State<AiProviderEditorSheet> {
             enableSuggestions: false,
             decoration: InputDecoration(
               labelText: l10n.aiSettingsUtilityModel,
-              hintText: l10n.aiSettingsModelIdHint,
+              hintText: _anthropic
+                  ? l10n.aiSettingsModelIdHintAnthropic
+                  : l10n.aiSettingsModelIdHint,
               helperText: l10n.aiSettingsUtilityModelHelp,
               helperMaxLines: 3,
             ),
           ),
-          const SizedBox(height: 18),
-          Text(l10n.aiSettingsApiStyle, style: theme.textTheme.labelLarge),
-          const SizedBox(height: 8),
-          SegmentedButton<AiApiStyle>(
-            showSelectedIcon: false,
-            segments: [
-              ButtonSegment(
-                value: AiApiStyle.chatCompletions,
-                label: Text(l10n.aiSettingsApiStyleChat),
-              ),
-              ButtonSegment(
-                value: AiApiStyle.responses,
-                label: Text(l10n.aiSettingsApiStyleResponses),
-              ),
-            ],
-            selected: {_style},
-            onSelectionChanged: (value) => setState(() => _style = value.first),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _style == AiApiStyle.chatCompletions
-                ? l10n.aiSettingsApiStyleChatHelp
-                : l10n.aiSettingsApiStyleResponsesHelp,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colors.onSurfaceVariant,
+          if (!_anthropic) ...[
+            const SizedBox(height: 18),
+            Text(l10n.aiSettingsApiStyle, style: theme.textTheme.labelLarge),
+            const SizedBox(height: 8),
+            SegmentedButton<AiApiStyle>(
+              showSelectedIcon: false,
+              segments: [
+                ButtonSegment(
+                  value: AiApiStyle.chatCompletions,
+                  label: Text(l10n.aiSettingsApiStyleChat),
+                ),
+                ButtonSegment(
+                  value: AiApiStyle.responses,
+                  label: Text(l10n.aiSettingsApiStyleResponses),
+                ),
+              ],
+              selected: {_style},
+              onSelectionChanged: (value) =>
+                  setState(() => _style = value.first),
             ),
-          ),
+            const SizedBox(height: 6),
+            Text(
+              _style == AiApiStyle.chatCompletions
+                  ? l10n.aiSettingsApiStyleChatHelp
+                  : l10n.aiSettingsApiStyleResponsesHelp,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+          ],
           if (model.isNotEmpty) ...[
             const SizedBox(height: 18),
             Text(

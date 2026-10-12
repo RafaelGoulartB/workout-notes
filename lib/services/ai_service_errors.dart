@@ -79,14 +79,24 @@ extension AiServiceErrors on AiService {
 
   Future<void> _waitBeforeRetry(int retryIndex) => _delay(_backoff(retryIndex));
 
-  Map<String, String> _headers({required String token, bool stream = false}) =>
-      {
-        // Local providers (e.g. Ollama) have no token; sending an empty
-        // Bearer header can make some servers reject the request.
-        if (token.isNotEmpty) 'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-        'Accept': stream ? 'text/event-stream' : 'application/json',
-      };
+  Map<String, String> _headers({
+    required String token,
+    bool stream = false,
+    AiApiStyle apiStyle = AiApiStyle.chatCompletions,
+    List<String> betas = const [],
+  }) => {
+    if (apiStyle == AiApiStyle.anthropicMessages) ...{
+      if (token.isNotEmpty) 'x-api-key': token,
+      'anthropic-version': _anthropicVersion,
+      if (betas.isNotEmpty) 'anthropic-beta': betas.join(','),
+    } else
+    // Local providers (e.g. Ollama) have no token; sending an empty
+    // Bearer header can make some servers reject the request.
+    if (token.isNotEmpty)
+      'Authorization': 'Bearer $token',
+    'Content-Type': 'application/json',
+    'Accept': stream ? 'text/event-stream' : 'application/json',
+  };
 
   String? _extractText(dynamic content) {
     if (content == null) return null;

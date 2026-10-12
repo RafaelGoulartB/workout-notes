@@ -22,7 +22,8 @@ class _History {
   });
 }
 
-/// Builds OpenAI-compatible transcripts.
+/// Builds OpenAI-compatible transcripts ([AiService] translates them for the
+/// other protocols).
 ///
 /// Layout, from most to least stable — each block only changes when
 /// something it contains changes, so a provider's prefix cache covers almost
@@ -48,7 +49,7 @@ extension AiChatWire on AiChatService {
     required List<String> imageDataUrls,
     List<Map<String, dynamic>> extra = const [],
   }) {
-    final responses = setup.provider.apiStyle == AiApiStyle.responses;
+    final apiStyle = setup.provider.apiStyle;
     final system = StringBuffer(setup.systemPrompt);
     if (memoryBlock.isNotEmpty) {
       system.write('\n\n<memory>\n$memoryBlock\n</memory>');
@@ -73,7 +74,7 @@ extension AiChatWire on AiChatService {
     final historyWire = <Map<String, dynamic>>[];
     for (final m in history.messages) {
       historyWire.addAll(
-        _wireMessage(m, stub: stubbing, currentTurn: false, responses: false),
+        _wireMessage(m, stub: stubbing, currentTurn: false, apiStyle: apiStyle),
       );
       if (stubbing && m.id == history.toolsThroughMessageId) stubbing = false;
     }
@@ -102,7 +103,7 @@ extension AiChatWire on AiChatService {
     final turnWire = <Map<String, dynamic>>[];
     for (final m in turnMessages) {
       turnWire.addAll(
-        _wireMessage(m, stub: false, currentTurn: true, responses: responses),
+        _wireMessage(m, stub: false, currentTurn: true, apiStyle: apiStyle),
       );
     }
     out.addAll(_repairToolPairs(turnWire));
@@ -126,7 +127,7 @@ extension AiChatWire on AiChatService {
     AiChatMessage m, {
     required bool stub,
     required bool currentTurn,
-    required bool responses,
+    required AiApiStyle apiStyle,
   }) {
     switch (m.role) {
       case AiMessageRole.system:
@@ -159,8 +160,16 @@ extension AiChatWire on AiChatService {
         }
         if (currentTurn) {
           for (final extra in m.providerExtras.entries) {
-            // Responses reasoning items only make sense to that API.
-            if (extra.key == 'responses_reasoning' && !responses) continue;
+            // Responses reasoning items and Claude content blocks only make
+            // sense to the API that produced them.
+            if (extra.key == 'responses_reasoning' &&
+                apiStyle != AiApiStyle.responses) {
+              continue;
+            }
+            if (extra.key == kAnthropicContentExtra &&
+                apiStyle != AiApiStyle.anthropicMessages) {
+              continue;
+            }
             if (extra.key == kAiCutOffExtra) continue; // app flag, not wire
             entry[extra.key] = extra.value;
           }

@@ -531,7 +531,12 @@ extension AiChatTurn on AiChatService {
       var chars = 0;
       for (final m in turn) {
         chars += jsonEncode(
-          _wireMessage(m, stub: stub, currentTurn: false, responses: false),
+          _wireMessage(
+            m,
+            stub: stub,
+            currentTurn: false,
+            apiStyle: AiApiStyle.chatCompletions,
+          ),
         ).length;
       }
       return _estimateChars(chars);

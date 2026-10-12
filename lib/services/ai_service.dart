@@ -11,6 +11,7 @@ import 'package:workout_notes/utils/ai_endpoint_policy.dart';
 import 'package:workout_notes/utils/text_sanitizer.dart';
 
 part 'ai_model_compatibility.dart';
+part 'ai_service_anthropic.dart';
 part 'ai_service_errors.dart';
 part 'ai_service_payloads.dart';
 part 'ai_service_responses.dart';
@@ -23,9 +24,17 @@ enum AiApiStyle {
 
   /// OpenAI `/responses`. Keeps reasoning between tool calls (encrypted
   /// reasoning items are sent back), which Chat Completions discards.
-  responses;
+  responses,
+
+  /// Anthropic's native Messages API (`/messages`, `x-api-key`). Prompt
+  /// caching, adaptive thinking and effort; thinking blocks are sent back
+  /// within the turn that produced them.
+  anthropicMessages;
 
   String get storageKey => name;
+
+  /// Protocols that talk to an OpenAI-compatible server.
+  bool get isOpenAiCompatible => this != anthropicMessages;
 
   static AiApiStyle fromStorageKey(String? value) => values.firstWhere(
     (style) => style.name == value,
@@ -138,7 +147,9 @@ class AiProbeResult {
   });
 }
 
-/// OpenAI-compatible HTTP client. Safe to share.
+/// HTTP client for OpenAI-compatible providers and Anthropic's Messages API.
+/// Safe to share. Callers always speak the Chat Completions message shape;
+/// other protocols are translated here ([AiApiStyle]).
 ///
 /// - Requests can be streamed (SSE) with an *idle* timeout instead of a total
 ///   one, and aborted for real through `abortTrigger`.
@@ -279,13 +290,22 @@ class AiService {
   Future<List<String>> listModels({
     required String baseUrl,
     required String token,
+    AiApiStyle apiStyle = AiApiStyle.chatCompletions,
   }) async {
     requireAllowedEndpoint(baseUrl);
-    final uri = Uri.parse('$baseUrl/models');
+    // Anthropic pages the list (20 by default).
+    final uri = Uri.parse(
+      apiStyle == AiApiStyle.anthropicMessages
+          ? '$baseUrl/models?limit=1000'
+          : '$baseUrl/models',
+    );
     final http.Response res;
     try {
       res = await _client
-          .get(uri, headers: _headers(token: token))
+          .get(
+            uri,
+            headers: _headers(token: token, apiStyle: apiStyle),
+          )
           .timeout(const Duration(seconds: 30));
     } on TimeoutException {
       throw AiServiceException(
@@ -351,15 +371,29 @@ class AiService {
     requireAllowedEndpoint(baseUrl);
     final compatibility = _compatibilityFor(baseUrl, model);
     final responses = apiStyle == AiApiStyle.responses;
-    final uri = Uri.parse(
-      responses ? '$baseUrl/responses' : '$baseUrl/chat/completions',
-    );
+    final anthropic = apiStyle == AiApiStyle.anthropicMessages;
+    final uri = Uri.parse(switch (apiStyle) {
+      AiApiStyle.chatCompletions => '$baseUrl/chat/completions',
+      AiApiStyle.responses => '$baseUrl/responses',
+      AiApiStyle.anthropicMessages => '$baseUrl/messages',
+    });
     var attempts = 0;
     var transientRetries = 0;
     while (true) {
       attempts++;
       final streaming = stream && !compatibility.streamUnsupported;
-      final payload = responses
+      final payload = anthropic
+          ? _anthropicPayload(
+              model: model,
+              messages: messages,
+              tools: tools,
+              toolChoice: toolChoice,
+              reasoningEffort: reasoningEffort,
+              compatibility: compatibility,
+              stream: streaming,
+              maxOutputTokens: maxOutputTokens,
+            )
+          : responses
           ? _responsesPayload(
               model: model,
               messages: messages,
@@ -394,7 +428,14 @@ class AiService {
       );
       final request =
           http.AbortableRequest('POST', uri, abortTrigger: abort.future)
-            ..headers.addAll(_headers(token: token, stream: streaming))
+            ..headers.addAll(
+              _headers(
+                token: token,
+                stream: streaming,
+                apiStyle: apiStyle,
+                betas: _anthropicBetas(payload),
+              ),
+            )
             ..body = jsonEncode(payload);
 
       http.StreamedResponse res;
@@ -470,16 +511,36 @@ class AiService {
 
       try {
         if (streaming) {
-          return responses
-              ? await _readResponsesStream(res, abort, onDelta, uri)
-              : await _readChatStream(res, abort, onDelta, uri);
+          return switch (apiStyle) {
+            AiApiStyle.chatCompletions => await _readChatStream(
+              res,
+              abort,
+              onDelta,
+              uri,
+            ),
+            AiApiStyle.responses => await _readResponsesStream(
+              res,
+              abort,
+              onDelta,
+              uri,
+            ),
+            AiApiStyle.anthropicMessages => await _readAnthropicStream(
+              res,
+              onDelta,
+              uri,
+            ),
+          };
         }
         final body = await _readBody(
           res,
           maxBytes: maxResponseBodyBytes,
           failWhenOver: true,
         ).timeout(timeout);
-        return responses ? _parseResponses(body) : _parseChat(body);
+        return switch (apiStyle) {
+          AiApiStyle.chatCompletions => _parseChat(body),
+          AiApiStyle.responses => _parseResponses(body),
+          AiApiStyle.anthropicMessages => _parseAnthropic(body),
+        };
       } on http.RequestAbortedException {
         throw _cancelled(uri);
       } on http.ClientException catch (error) {
@@ -512,11 +573,13 @@ class AiService {
     required String token,
     required String model,
     required List<Map<String, dynamic>> messages,
+    AiApiStyle apiStyle = AiApiStyle.chatCompletions,
   }) => sendMultimodalChat(
     baseUrl: baseUrl,
     token: token,
     model: model,
     messages: messages,
+    apiStyle: apiStyle,
   );
 
   /// Multimodal chat preserving tool calling. Maps a provider rejection of
@@ -544,7 +607,9 @@ class AiService {
         tools: tools,
         toolChoice: toolChoice,
         reasoningEffort: reasoningEffort,
-        apiStyle: usesResponsesApiForVision(baseUrl: baseUrl, model: model)
+        apiStyle:
+            apiStyle.isOpenAiCompatible &&
+                usesResponsesApiForVision(baseUrl: baseUrl, model: model)
             ? AiApiStyle.responses
             : apiStyle,
         stream: stream,
@@ -591,7 +656,8 @@ class AiService {
         model: model,
         apiStyle: apiStyle,
         stream: true,
-        maxOutputTokens: 512,
+        // Claude's thinking counts toward max_tokens.
+        maxOutputTokens: apiStyle == AiApiStyle.anthropicMessages ? 4096 : 512,
         messages: const [
           {
             'role': 'system',

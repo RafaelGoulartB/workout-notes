@@ -148,14 +148,17 @@ extension AiServiceResponses on AiService {
   }
 }
 
-/// Finish reasons (Chat Completions) and statuses (Responses) of an answer
-/// that did not end on its own: output limit, content filter, incomplete.
+/// Finish reasons (Chat Completions), statuses (Responses) and stop reasons
+/// (Anthropic) of an answer that did not end on its own: output limit,
+/// content filter or refusal, incomplete.
 bool _isCutOffReason(String? reason) => const {
   'length',
   'content_filter',
   'max_tokens',
   'max_output_tokens',
   'incomplete',
+  'refusal',
+  'model_context_window_exceeded',
 }.contains(reason);
 
 /// Every assistant-message field besides the standard ones, kept opaque.

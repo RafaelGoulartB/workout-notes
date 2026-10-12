@@ -43,6 +43,9 @@ extension AiServiceCompatibility on AiService {
       return compatibility.record(label);
     }
 
+    final anthropic = _anthropicAdjustment(error, sentPayload, compatibility);
+    if (anthropic != null) return compatibility.record(anthropic);
+
     final mentionsReasoningEffort =
         error.contains('reasoning_effort') ||
         (error.contains('reasoning') && error.contains('effort'));
@@ -152,6 +155,47 @@ extension AiServiceCompatibility on AiService {
   }
 }
 
+/// Anthropic Messages settings a model or endpoint refused. Returns the
+/// adjustment label after applying it, or null.
+String? _anthropicAdjustment(
+  String error,
+  Map<String, dynamic> payload,
+  _ModelCompatibility compatibility,
+) {
+  final thinking = payload['thinking'];
+  if (thinking is Map &&
+      thinking.containsKey('block_binding') &&
+      !compatibility.omitBlockBinding &&
+      (error.contains('block_binding') || error.contains('anthropic-beta'))) {
+    compatibility.omitBlockBinding = true;
+    return 'thinking block binding omitted';
+  }
+  if (payload.containsKey('output_config') &&
+      !compatibility.omitReasoningEffort &&
+      (error.contains('effort') || error.contains('output_config'))) {
+    compatibility.omitReasoningEffort = true;
+    return 'effort omitted';
+  }
+  // A thinking-block signature error is about the transcript, not the model.
+  if (thinking != null &&
+      !compatibility.omitThinking &&
+      _mentions(error, 'thinking') &&
+      !error.contains('signature')) {
+    compatibility.omitThinking = true;
+    return 'thinking omitted';
+  }
+  final cap = RegExp(r'max_tokens:\s*(\d+)\s*>\s*(\d+)').firstMatch(error);
+  final limit = cap == null ? null : int.tryParse(cap.group(2)!);
+  if (payload.containsKey('max_tokens') &&
+      limit != null &&
+      limit > 0 &&
+      limit != compatibility.maxTokensCap) {
+    compatibility.maxTokensCap = limit;
+    return 'max_tokens=$limit';
+  }
+  return null;
+}
+
 /// [parameter] as a whole word (`stream` does not match `upstream` or
 /// `stream_options`).
 bool _mentions(String error, String parameter) => RegExp(
@@ -181,6 +225,9 @@ class _ModelCompatibility {
   bool omitCacheControl = false;
   bool omitMaxTokens = false;
   bool omitReasoningInclude = false;
+  bool omitThinking = false;
+  bool omitBlockBinding = false;
+  int? maxTokensCap;
   final Set<String> adjustments = {};
 
   _ModelCompatibility();
@@ -196,7 +243,10 @@ class _ModelCompatibility {
       ..omitCacheKey = json['omitCacheKey'] == true
       ..omitCacheControl = json['omitCacheControl'] == true
       ..omitMaxTokens = json['omitMaxTokens'] == true
-      ..omitReasoningInclude = json['omitReasoningInclude'] == true;
+      ..omitReasoningInclude = json['omitReasoningInclude'] == true
+      ..omitThinking = json['omitThinking'] == true
+      ..omitBlockBinding = json['omitBlockBinding'] == true
+      ..maxTokensCap = (json['maxTokensCap'] as num?)?.toInt();
     final adjustments = json['adjustments'];
     if (adjustments is List) {
       c.adjustments.addAll(adjustments.whereType<String>());
@@ -215,6 +265,9 @@ class _ModelCompatibility {
     'omitCacheControl': omitCacheControl,
     'omitMaxTokens': omitMaxTokens,
     'omitReasoningInclude': omitReasoningInclude,
+    'omitThinking': omitThinking,
+    'omitBlockBinding': omitBlockBinding,
+    if (maxTokensCap != null) 'maxTokensCap': maxTokensCap,
     'adjustments': adjustments.toList(),
   };
 
