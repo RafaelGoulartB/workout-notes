@@ -310,7 +310,8 @@ class SleepMonitorRepository extends BaseRepository {
     return imported!;
   }
 
-  /// Repairs only incomplete v1-v5 results that still have capture data.
+  /// Repairs only incomplete results of an older engine that still have
+  /// capture data.
   /// Database metadata wins over the archive, including later alarm dismissal.
   Future<SleepMonitorSession?> reprocessDiagnostic(
     Map<String, dynamic> archive,
@@ -326,13 +327,7 @@ class SleepMonitorRepository extends BaseRepository {
           SleepMonitorSession.completed,
           SleepMonitorSession.interrupted,
         }.contains(current.status) ||
-        !{
-          'sleep-wake-bedside-v1',
-          'sleep-wake-bedside-v2',
-          'sleep-wake-bedside-v3',
-          'sleep-wake-bedside-v4',
-          'sleep-wake-bedside-v5',
-        }.contains(current.stageAlgorithmVersion) ||
+        !SleepWakeEngine.isOlderVersion(current.stageAlgorithmVersion) ||
         DateTime.tryParse(raw['started_at']?.toString() ?? '') !=
             current.startedAt ||
         DateTime.tryParse(raw['ended_at']?.toString() ?? '') !=

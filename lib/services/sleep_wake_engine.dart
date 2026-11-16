@@ -7,8 +7,10 @@ import 'package:workout_notes/services/sleep_wake_model.dart';
 
 /// Audio-only sleep/wake estimate for a phone on a bedside table.
 ///
-/// Each window becomes evidence ([SleepAudioEvidenceExtractor]) for a hidden
-/// Markov model ([SleepWakeModel]). [SleepWakeCursor] runs the causal forward
+/// Each window becomes evidence of a person moving next to the phone
+/// ([SleepAudioEvidenceExtractor]: sound that raises every frequency band at
+/// once, unlike birds, traffic or rain) for a hidden Markov model
+/// ([SleepWakeModel]). [SleepWakeCursor] runs the causal forward
 /// filter and drives the live UI. A completed session is replayed through the
 /// same cursor and then smoothed with the backward pass, so each window is
 /// judged with the whole night as context: a sleep onset lands where the
@@ -19,19 +21,13 @@ import 'package:workout_notes/services/sleep_wake_model.dart';
 /// signals; the model assumes it lasts a few minutes after the last sound of
 /// a person. Probabilities are model probabilities, not calibrated ones.
 class SleepWakeEngine {
-  static const algorithmVersion = 'sleep-wake-bedside-v6';
+  static const algorithmVersion = 'sleep-wake-bedside-v7';
   static const source = 'bedside_heuristic';
   static const featureVersions = {
     'audio-features-v3',
     'audio-features-v4',
     'audio-features-v5',
   };
-
-  /// What the native recorder shipped with this build produces.
-  static const currentFeatureVersion = 'audio-features-v5';
-
-  /// Feature versions whose breathing envelope is band-limited.
-  static const bandLimitedBreathingVersions = {'audio-features-v5'};
   static const alignmentToleranceMilliseconds = 1000;
 
   /// Live labels fall back to unknown after this long without evidence.
@@ -44,33 +40,27 @@ class SleepWakeEngine {
     'minimum_valid_fraction': SleepAudioEvidenceExtractor.minimumValidFraction,
     'maximum_zero_sample_fraction':
         SleepAudioEvidenceExtractor.maximumZeroSampleFraction,
-    'minimum_regularity': SleepAudioEvidenceExtractor.minimumRegularity,
-    'minimum_rate_hz': SleepAudioEvidenceExtractor.minimumRateHz,
-    'maximum_rate_hz': SleepAudioEvidenceExtractor.maximumRateHz,
-    'loud_activity_noise_db': SleepAudioEvidenceExtractor.loudActivityNoiseDb,
+    'floor_windows': SleepAudioEvidenceExtractor.floorWindows,
+    'minimum_floor_windows': SleepAudioEvidenceExtractor.minimumFloorWindows,
+    'floor_percentile': SleepAudioEvidenceExtractor.floorPercentile,
+    'recent_floor_windows': SleepAudioEvidenceExtractor.recentFloorWindows,
+    'minimum_scored_bands': SleepAudioEvidenceExtractor.minimumScoredBands,
+    'faint_score_db': SleepAudioEvidenceExtractor.faintScoreDb,
+    'movement_score_db': SleepAudioEvidenceExtractor.movementScoreDb,
+    'strong_movement_score_db':
+        SleepAudioEvidenceExtractor.strongMovementScoreDb,
+    'minimum_burst_seconds': SleepAudioEvidenceExtractor.minimumBurstSeconds,
+    'rumble_high_share': SleepAudioEvidenceExtractor.rumbleHighShare,
     'stationary_active_fraction':
         SleepAudioEvidenceExtractor.stationaryActiveFraction,
     'minimum_variable_level_stddev_db':
         SleepAudioEvidenceExtractor.minimumVariableLevelStddevDb,
+    'minimum_regularity': SleepAudioEvidenceExtractor.minimumRegularity,
+    'minimum_rate_hz': SleepAudioEvidenceExtractor.minimumRateHz,
+    'maximum_rate_hz': SleepAudioEvidenceExtractor.maximumRateHz,
+    'maximum_flatness': SleepAudioEvidenceExtractor.maximumFlatness,
+    'snoring_noise_db': SleepAudioEvidenceExtractor.snoringNoiseDb,
     'snoring_low_share': SleepAudioEvidenceExtractor.snoringLowShare,
-    'environmental_low_band_fraction':
-        SleepAudioEvidenceExtractor.environmentalLowBandFraction,
-    'environmental_high_band_fraction':
-        SleepAudioEvidenceExtractor.environmentalHighBandFraction,
-    'maximum_environmental_prominence_db':
-        SleepAudioEvidenceExtractor.maximumEnvironmentalProminenceDb,
-    'maximum_environmental_excess_ratio':
-        SleepAudioEvidenceExtractor.maximumEnvironmentalExcessRatio,
-    'maximum_environmental_noise_db':
-        SleepAudioEvidenceExtractor.maximumEnvironmentalNoiseDb,
-    'minimum_foreground_excess_ratio':
-        SleepAudioEvidenceExtractor.minimumForegroundExcessRatio,
-    'environmental_high_excess_share':
-        SleepAudioEvidenceExtractor.environmentalHighExcessShare,
-    'environmental_rumble_excess_share':
-        SleepAudioEvidenceExtractor.environmentalRumbleExcessShare,
-    'floor_windows': SleepAudioEvidenceExtractor.floorWindows,
-    'floor_percentile': SleepAudioEvidenceExtractor.floorPercentile,
     'settling_quiet_to_sleep': 0.03,
     'wake_quiet_to_sleep': 0.10,
     'sleep_to_wake': 0.014,
@@ -80,6 +70,12 @@ class SleepWakeEngine {
   };
 
   const SleepWakeEngine();
+
+  /// A night staged by an earlier bedside engine.
+  static bool isOlderVersion(String? stageVersion) =>
+      stageVersion != null &&
+      stageVersion.startsWith('sleep-wake-bedside-') &&
+      stageVersion != algorithmVersion;
 
   static bool supports(SleepMonitorSession session) =>
       featureVersions.contains(session.algorithmVersion);
@@ -95,17 +91,13 @@ class SleepWakeEngine {
     if (end == null || !end.isAfter(session.startedAt) || segments.isEmpty) {
       return const SleepStageEngineResult(ran: false, blockers: ['no_data']);
     }
-    final cursor = SleepWakeCursor(
-      sessionId: session.id,
-      startsAwake: true,
-      featureVersion: session.algorithmVersion,
-    );
-    final decisions = <SleepWakeDecision>[];
     final ordered = [...segments]
       ..sort((a, b) {
         final time = a.startedAt.compareTo(b.startedAt);
         return time != 0 ? time : a.id.compareTo(b.id);
       });
+    final cursor = SleepWakeCursor(sessionId: session.id, startsAwake: true);
+    final decisions = <SleepWakeDecision>[];
     var position = session.startedAt;
 
     void gap(DateTime until) {
@@ -286,25 +278,18 @@ class SleepWakeDecision {
 /// and a counter. Previously emitted epochs are never rewritten.
 class SleepWakeCursor {
   final String sessionId;
-  final SleepAudioEvidenceExtractor _evidence;
+  final _evidence = SleepAudioEvidenceExtractor();
   DateTime? _expectedStart;
   List<double>? _probabilities;
   final List<double> _startProbabilities;
   int _secondsWithoutEvidence = 0;
 
   /// [startsAwake] is for a cursor that begins at the moment the user started
-  /// recording. [featureVersion] is the session's native feature version.
-  SleepWakeCursor({
-    required this.sessionId,
-    bool startsAwake = false,
-    String? featureVersion,
-  }) : _evidence = SleepAudioEvidenceExtractor(
-         bandLimitedBreathing: SleepWakeEngine.bandLimitedBreathingVersions
-             .contains(featureVersion),
-       ),
-       _startProbabilities = startsAwake
-           ? SleepWakeModel.startAwake
-           : SleepWakeModel.startUnknown;
+  /// recording.
+  SleepWakeCursor({required this.sessionId, bool startsAwake = false})
+    : _startProbabilities = startsAwake
+          ? SleepWakeModel.startAwake
+          : SleepWakeModel.startUnknown;
 
   /// Current probability that the person is asleep, null before any window.
   double? get sleepProbability => _probabilities == null
@@ -316,6 +301,7 @@ class SleepWakeCursor {
 
   /// Advances the model through time without capture and labels it unknown.
   SleepWakeDecision missing(DateTime start, int seconds) {
+    _evidence.interrupt();
     _step(null);
     _expectedStart = start.add(Duration(seconds: seconds));
     _secondsWithoutEvidence += seconds;
@@ -344,14 +330,11 @@ class SleepWakeCursor {
           _step(null);
         }
         _secondsWithoutEvidence += gapMs ~/ 1000;
+        _evidence.interrupt();
       }
     }
     _expectedStart = start.add(Duration(seconds: seconds));
-    final evidence = _evidence.evaluate(
-      segment,
-      sessionId: sessionId,
-      seconds: seconds,
-    );
+    final evidence = _evidence.evaluate(segment, sessionId: sessionId);
     _step(evidence.likelihoods);
     if (evidence.informative) {
       _secondsWithoutEvidence = 0;
@@ -373,6 +356,10 @@ class SleepWakeCursor {
         stage,
         sleep,
         evidence,
+        // A clipped window keeps only its share of the window's sound.
+        share: seconds < segment.durationSeconds
+            ? seconds / segment.durationSeconds
+            : 1,
       ),
       evidence.reason,
       evidence.validSignal,
@@ -393,8 +380,9 @@ class SleepWakeCursor {
     int seconds,
     SleepStageType stage,
     double sleepProbability,
-    SleepAudioEvidence? evidence,
-  ) {
+    SleepAudioEvidence? evidence, {
+    double share = 1,
+  }) {
     final known = stage != SleepStageType.unknown;
     return SleepStageEpoch(
       id: '$sessionId:${start.microsecondsSinceEpoch}',
@@ -410,8 +398,8 @@ class SleepWakeCursor {
       deepProbability: null,
       algorithmVersion: SleepWakeEngine.algorithmVersion,
       source: SleepWakeEngine.source,
-      movementSeconds: evidence?.movementSeconds ?? 0,
-      ambientSeconds: evidence?.ambientSeconds ?? 0,
+      movementSeconds: (evidence?.movementSeconds ?? 0) * share,
+      ambientSeconds: (evidence?.ambientSeconds ?? 0) * share,
       snoring: evidence?.snoring ?? false,
     );
   }

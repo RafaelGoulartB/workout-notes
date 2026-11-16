@@ -147,11 +147,7 @@ Map<String, dynamic> simulateSmartWake(
 }) {
   final deadline = session.alarmAt ?? session.endedAt!;
   final windowStart = deadline.subtract(Duration(minutes: windowMinutes));
-  final cursor = SleepWakeCursor(
-    sessionId: session.id,
-    startsAwake: true,
-    featureVersion: session.algorithmVersion,
-  );
+  final cursor = SleepWakeCursor(sessionId: session.id, startsAwake: true);
   final policy = SmartWakePolicy(sensitivity.threshold);
   final ordered = [...segments]
     ..sort((a, b) => a.startedAt.compareTo(b.startedAt));

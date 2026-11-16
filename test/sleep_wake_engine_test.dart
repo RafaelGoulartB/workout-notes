@@ -1,8 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/models/sleep_stage_epoch.dart';
 import 'package:workout_notes/models/sleep_stage_type.dart';
+import 'package:workout_notes/services/sleep_audio_evidence.dart';
 import 'package:workout_notes/services/sleep_stage_analysis_service.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
 import 'support/sleep_bedside_fixture.dart';
@@ -10,11 +13,30 @@ import 'support/sleep_bedside_fixture.dart';
 void main() {
   const engine = SleepWakeEngine();
 
+  /// Every band [db] above the quiet fixture level.
+  SleepMonitorSegment broadband(
+    int index, {
+    double db = 10,
+    double seconds = 3,
+    double noise = 12,
+  }) {
+    final gain = math.pow(10, db / 10);
+    return SleepMonitorSegment.fromMap({
+      ...bedsideSegment(index).toMap(),
+      'noise_score': noise,
+      'noise_active_seconds': seconds,
+      'audio_level_stddev_db': 6.0,
+      'spectral_band_energy_0': 10 * gain,
+      'spectral_band_energy_1': 20 * gain,
+      'spectral_band_energy_2': 5 * gain,
+      'spectral_band_energy_3': 1 * gain,
+      'spectral_band_energy_4': 1 * gain,
+    });
+  }
+
+  /// A turn in bed: a few seconds, every band 10 dB up.
   SleepMonitorSegment brief(int index, double seconds) =>
-      SleepMonitorSegment.fromMap({
-        ...bedsideSegment(index, activity: true).toMap(),
-        'noise_active_seconds': seconds,
-      });
+      broadband(index, seconds: seconds);
 
   SleepMonitorSegment steady(int index) => SleepMonitorSegment.fromMap({
     ...bedsideSegment(index, activity: true).toMap(),
@@ -68,7 +90,10 @@ void main() {
 
     test('a steady loud background carries no evidence', () {
       final result = runNight([for (var i = 0; i < 120; i++) steady(i)]);
-      expect(result.decisionReasons.values.toSet(), {'steady_background'});
+      expect(result.decisionReasons.values.toSet(), {
+        'calibrating',
+        'steady_background',
+      });
       // 60 minutes without evidence is longer than any bridge: unknown.
       expect(
         result.epochs.every((e) => e.stage == SleepStageType.unknown),
@@ -80,79 +105,294 @@ void main() {
       expect(live.last.epoch.stage, SleepStageType.unknown);
     });
 
-    test('narrowband ambient sound near the floor is not wake evidence', () {
-      // Compressor/HVAC rumble: >90% below 200 Hz, peaks ~20 dB over floor.
+    test('sound confined to a few bands is the room, not the person', () {
+      // Traffic or a compressor: almost everything below 200 Hz.
       SleepMonitorSegment rumble(int i) => SleepMonitorSegment.fromMap({
         ...bedsideSegment(i).toMap(),
         'noise_active_seconds': 16.0,
         'noise_score': 12.0,
         'audio_level_stddev_db': 6.0,
-        'audio_peak_dbfs': -62.0,
-        'audio_baseline_dbfs': -84.0,
-        'spectral_band_energy_0': 97.0,
-        'spectral_band_energy_1': 2.0,
-        'spectral_band_energy_2': 0.5,
-        'spectral_band_energy_3': 0.3,
-        'spectral_band_energy_4': 0.2,
+        'spectral_band_energy_0': 1000.0,
+        'spectral_band_energy_1': 40.0,
+      });
+      // Dawn birdsong: only above 1.5 kHz.
+      SleepMonitorSegment birds(int i) => SleepMonitorSegment.fromMap({
+        ...bedsideSegment(i).toMap(),
+        'noise_active_seconds': 14.0,
+        'noise_score': 13.0,
+        'audio_level_stddev_db': 6.0,
+        'spectral_band_energy_3': 60.0,
+        'spectral_band_energy_4': 300.0,
+      });
+      // A dove or a distant voice: only the middle.
+      SleepMonitorSegment cooing(int i) => SleepMonitorSegment.fromMap({
+        ...bedsideSegment(i).toMap(),
+        'noise_active_seconds': 8.0,
+        'noise_score': 10.0,
+        'audio_level_stddev_db': 5.0,
+        'spectral_band_energy_1': 400.0,
+        'spectral_band_energy_2': 100.0,
+      });
+      for (final ambient in [rumble, birds, cooing]) {
+        final cursor = SleepWakeCursor(sessionId: 'bedside', startsAwake: true);
+        for (var i = 0; i < 60; i++) {
+          cursor.add(bedsideSegment(i));
+        }
+        // Two hours of it, like a whole morning.
+        for (var i = 60; i < 300; i++) {
+          final decision = cursor.add(ambient(i));
+          expect(decision.reason, 'environmental_sound');
+          expect(decision.epoch.stage, SleepStageType.sleeping);
+          expect(decision.epoch.movementSeconds, 0);
+          expect(decision.epoch.ambientSeconds, greaterThan(0));
+        }
+        // A person moving is still heard on top of it.
+        final stages = [
+          for (var i = 300; i < 304; i++)
+            cursor.add(bedsideSegment(i, activity: true)),
+        ];
+        // Masked bands may hide part of it, never all of it.
+        expect(stages.first.reason, anyOf('movement', 'strong_movement'));
+        expect(stages.first.epoch.movementSeconds, 10);
+        expect(stages.last.epoch.stage, SleepStageType.awake);
+      }
+    });
+
+    test('a loud vehicle that leaks into every band is rumble', () {
+      // 40 dB below 200 Hz, falling to 9 dB at 1.5-4 kHz: every band is up,
+      // but practically none of the added energy is above 1.5 kHz.
+      SleepMonitorSegment truck(int i) => SleepMonitorSegment.fromMap({
+        ...bedsideSegment(i).toMap(),
+        'noise_active_seconds': 18.0,
+        'noise_score': 30.0,
+        'audio_level_stddev_db': 11.0,
+        'spectral_band_energy_0': 100000.0,
+        'spectral_band_energy_1': 6000.0,
+        'spectral_band_energy_2': 150.0,
+        'spectral_band_energy_3': 8.0,
+        'spectral_band_energy_4': 3.0,
       });
       final cursor = SleepWakeCursor(sessionId: 'bedside', startsAwake: true);
       for (var i = 0; i < 60; i++) {
         cursor.add(bedsideSegment(i));
       }
-      for (var i = 60; i < 90; i++) {
-        final decision = cursor.add(rumble(i));
-        expect(decision.reason, 'environmental_sound');
+      for (var i = 60; i < 66; i++) {
+        final decision = cursor.add(truck(i));
+        expect(decision.reason, 'low_rumble');
         expect(decision.epoch.stage, SleepStageType.sleeping);
         expect(decision.epoch.movementSeconds, 0);
       }
-      // The same activity from a loud broadband source still wakes.
-      SleepMonitorSegment movement(int i) => SleepMonitorSegment.fromMap({
-        ...rumble(i).toMap(),
-        'noise_score': 20.0,
-        'audio_peak_dbfs': -20.0,
-        'spectral_band_energy_0': 30.0,
-        'spectral_band_energy_2': 40.0,
-      });
-      final stages = [
-        for (var i = 90; i < 95; i++) cursor.add(movement(i)).epoch.stage,
-      ];
-      expect(stages.first, SleepStageType.sleeping);
-      expect(stages.last, SleepStageType.awake);
     });
 
-    test('soft high-frequency sound relative to the room floor is ambient', () {
-      // Dawn birdsong: a few seconds per window, excess energy only above
-      // 1.5 kHz and well under 10x the room's own quiet spectrum. No peak or
-      // baseline fields, so only the floor-relative rule can recognise it.
-      SleepMonitorSegment birds(int i) => SleepMonitorSegment.fromMap({
-        ...bedsideSegment(i).toMap(),
-        'noise_active_seconds': 6.0,
-        'noise_score': 9.0,
-        'audio_level_stddev_db': 6.0,
-        'spectral_band_energy_3': 20.0,
-        'spectral_band_energy_4': 60.0,
-      });
-      // A person next to the phone: loud and below 1.5 kHz.
-      SleepMonitorSegment person(int i) => SleepMonitorSegment.fromMap({
-        ...bedsideSegment(i).toMap(),
-        'noise_active_seconds': 6.0,
-        'noise_score': 22.0,
-        'audio_level_stddev_db': 9.0,
-        'spectral_band_energy_0': 900.0,
-        'spectral_band_energy_1': 600.0,
-      });
+    test('a broadband rise without bursts is not a movement', () {
+      // Rain: every band 12 dB up, nothing standing out of its own level.
+      SleepMonitorSegment rain(int i) =>
+          broadband(i, db: 12, seconds: 0.25, noise: 3);
       final cursor = SleepWakeCursor(sessionId: 'bedside', startsAwake: true);
       for (var i = 0; i < 60; i++) {
         cursor.add(bedsideSegment(i));
       }
-      for (var i = 60; i < 100; i++) {
-        final decision = cursor.add(birds(i));
-        expect(decision.reason, 'environmental_sound');
+      final reasons = <String>[];
+      for (var i = 60; i < 180; i++) {
+        final decision = cursor.add(rain(i));
+        reasons.add(decision.reason);
         expect(decision.epoch.stage, SleepStageType.sleeping);
       }
-      final decision = cursor.add(person(100));
-      expect(decision.reason, 'audio_activity');
-      expect(decision.epoch.movementSeconds, 6);
+      expect(reasons.first, 'sustained_sound');
+      // Five minutes without a pause and the rain is the room's new floor.
+      expect(
+        reasons[SleepAudioEvidenceExtractor.recentFloorWindows],
+        'quiet_audio',
+      );
+      expect(reasons.last, 'quiet_audio');
+      // A movement is then judged against the rain, not the old silence.
+      expect(cursor.add(broadband(180, db: 12 + 10)).reason, 'movement');
+      expect(
+        cursor.add(broadband(181, db: 12 + 3)).reason,
+        'environmental_sound',
+      );
+    });
+
+    test('a room sound with bursts in it is not hours awake', () {
+      // Two hours of rain and wind in the middle of the night: every band
+      // 12-18 dB up, changing from window to window, with gusts that stand
+      // out of the level. Only its first minutes can pass for a person.
+      final random = math.Random(7);
+      SleepMonitorSegment storm(int i) => broadband(
+        i,
+        db: 15 + (random.nextDouble() - 0.5) * 6,
+        seconds: 1.5 + random.nextDouble() * 4.5,
+        noise: 8,
+      );
+      final segments = [
+        for (var i = 0; i < 960; i++)
+          i >= 300 && i < 540 ? storm(i) : bedsideSegment(i),
+      ];
+      for (final smooth in [true, false]) {
+        final epochs = runNight(segments, smooth: smooth).epochs;
+        final awake = epochs.skip(300).where((e) => !e.isSleep).length;
+        expect(awake, lessThanOrEqualTo(16), reason: 'smooth $smooth');
+        expect(epochs.skip(330).take(210).every((e) => e.isSleep), true);
+      }
+    });
+
+    test('a sound that never pauses becomes the room', () {
+      // A podcast next to the phone for the first 40 minutes at a constant
+      // level. Nobody can tell from it when the listener fell asleep, so it
+      // must not read as 40 minutes awake; a movement on top of it still
+      // counts.
+      final segments = [
+        for (var i = 0; i < 80; i++) sustainedBedsideActivity(i),
+        for (var i = 80; i < 600; i++) bedsideSegment(i),
+      ];
+      final result = runNight(segments);
+      expect(result.epochs.first.stage, SleepStageType.awake);
+      expect(
+        result.decisionReasons[result.epochs[40].id],
+        'environmental_sound',
+      );
+      expect(firstSleep(result.epochs), lessThan(40));
+      final cursor = SleepWakeCursor(sessionId: 'bedside', startsAwake: true);
+      for (var i = 0; i < 40; i++) {
+        cursor.add(sustainedBedsideActivity(i));
+      }
+      final podcast = sustainedBedsideActivity(40).toMap();
+      final onTop = SleepMonitorSegment.fromMap({
+        ...podcast,
+        for (var band = 0; band < 5; band++)
+          'spectral_band_energy_$band':
+              (podcast['spectral_band_energy_$band'] as num) * 20,
+      });
+      expect(cursor.add(onTop).reason, 'movement');
+    });
+
+    test('a person whose sound comes and goes stays awake', () {
+      // Twenty minutes awake in the middle of the night, the way recorded
+      // wake looks: levels all over the place and silent windows in between.
+      // The five-minute floor must not turn that into the room.
+      final random = math.Random(11);
+      final segments = [
+        for (var i = 0; i < 600; i++)
+          i >= 300 && i < 340 && random.nextDouble() < 0.7
+              ? broadband(
+                  i,
+                  db: 14 + random.nextDouble() * 18,
+                  seconds: 4 + random.nextDouble() * 10,
+                  noise: 20,
+                )
+              : bedsideSegment(i),
+      ];
+      for (final smooth in [true, false]) {
+        final wake = runNight(
+          segments,
+          smooth: smooth,
+        ).epochs.sublist(302, 340);
+        expect(
+          wake.where((e) => e.stage == SleepStageType.awake).length,
+          greaterThan(wake.length * 0.9),
+          reason: 'smooth $smooth',
+        );
+      }
+    });
+
+    test('talk at an even level is awake until it becomes the room', () {
+      // The price of the five-minute floor: the first minutes are a person,
+      // what never drops after that is not.
+      final segments = [
+        for (var i = 0; i < 600; i++)
+          i >= 300 && i < 340
+              ? broadband(i, db: 20, seconds: 15, noise: 20)
+              : bedsideSegment(i),
+      ];
+      final result = runNight(segments);
+      expect(
+        result.epochs
+            .sublist(300, 300 + SleepAudioEvidenceExtractor.recentFloorWindows)
+            .every((e) => e.stage == SleepStageType.awake),
+        true,
+      );
+      expect(
+        result.decisionReasons[result.epochs[320].id],
+        'environmental_sound',
+      );
+      expect(result.epochs[339].isSleep, true);
+    });
+
+    test('a window is judged over its own duration', () {
+      // The session ends 3 s into the last window: its energy still belongs
+      // to 30 s, not to the 3 s that get a label.
+      final result = engine.run(
+        session: SleepMonitorSession.fromMap({
+          ...bedsideSession(minutes: 30).toMap(),
+          'ended_at': bedsideStart
+              .add(const Duration(minutes: 29, seconds: 33))
+              .toIso8601String(),
+        }),
+        segments: [for (var i = 0; i < 60; i++) bedsideSegment(i)],
+      );
+      expect(result.epochs.last.durationSeconds, 3);
+      expect(result.decisionReasons[result.epochs.last.id], 'quiet_audio');
+      // The 3 s keep a tenth of the window's sound, not all of it.
+      final cursor = SleepWakeCursor(sessionId: 'bedside');
+      for (var i = 0; i < 10; i++) {
+        cursor.add(bedsideSegment(i));
+      }
+      final clipped = cursor.add(
+        bedsideSegment(10, activity: true),
+        durationSeconds: 3,
+      );
+      expect(clipped.reason, 'strong_movement');
+      expect(clipped.epoch.movementSeconds, closeTo(1, 1e-9));
+    });
+
+    test('only earlier bedside engines count as older', () {
+      expect(SleepWakeEngine.isOlderVersion('sleep-wake-bedside-v6'), true);
+      expect(SleepWakeEngine.isOlderVersion('sleep-wake-bedside-v1'), true);
+      expect(
+        SleepWakeEngine.isOlderVersion(SleepWakeEngine.algorithmVersion),
+        false,
+      );
+      expect(SleepWakeEngine.isOlderVersion(null), false);
+      expect(SleepWakeEngine.isOlderVersion('legacy_unavailable'), false);
+    });
+
+    test('bands without any signal are left out of the score', () {
+      SleepMonitorSegment window(
+        int i, {
+        required int deadBands,
+        double gain = 1,
+      }) => SleepMonitorSegment.fromMap({
+        ...bedsideSegment(i).toMap(),
+        'noise_active_seconds': gain > 1 ? 5.0 : 0.0,
+        'noise_score': gain > 1 ? 15.0 : 1.0,
+        'audio_level_stddev_db': 6.0,
+        for (var band = 0; band < 5; band++)
+          'spectral_band_energy_$band': band >= 5 - deadBands
+              ? 0.0
+              : [10.0, 20.0, 5.0, 1.0, 1.0][band] * gain,
+      });
+      // One silent band: the other four still tell a movement from quiet.
+      final one = SleepWakeCursor(sessionId: 'bedside');
+      for (var i = 0; i < 20; i++) {
+        expect(
+          one.add(window(i, deadBands: 1)).reason,
+          anyOf('calibrating', 'quiet_audio'),
+        );
+      }
+      expect(
+        one.add(window(20, deadBands: 1, gain: 100)).reason,
+        'strong_movement',
+      );
+      // Two: too little left to say anything, and never "still".
+      final two = SleepWakeCursor(sessionId: 'bedside');
+      for (var i = 0; i < 20; i++) {
+        two.add(window(i, deadBands: 2));
+      }
+      for (final gain in [1.0, 100.0]) {
+        final decision = two.add(window(20, deadBands: 2, gain: gain));
+        expect(decision.reason, 'silent_bands');
+        expect(decision.likelihoods, isNull);
+      }
     });
 
     test('snoring is sleep evidence, not wake', () {
@@ -180,24 +420,84 @@ void main() {
       )!;
       expect(summary.snoreMinutes, 60);
       expect(summary.restlessSleepMinutes, 0);
+      SleepWakeCursor quietCursor() {
+        final cursor = SleepWakeCursor(sessionId: 'bedside');
+        for (var i = 0; i < 10; i++) {
+          cursor.add(bedsideSegment(i));
+        }
+        return cursor;
+      }
+
+      // One periodic window can be chance; snoring goes on.
+      final once = quietCursor();
+      expect(once.add(snore(10)).reason, 'environmental_sound');
+      expect(once.add(snore(11)).reason, 'snoring');
+      expect(once.add(bedsideSegment(12)).reason, 'quiet_audio');
+      expect(once.add(snore(13)).reason, 'environmental_sound');
+      // A periodic sound faster than breathing is something else.
+      final fast = quietCursor();
+      for (var i = 10; i < 13; i++) {
+        expect(
+          fast
+              .add(
+                SleepMonitorSegment.fromMap({
+                  ...snore(i).toMap(),
+                  'breathing_rate_hz': 0.6,
+                }),
+              )
+              .reason,
+          'environmental_sound',
+        );
+      }
+      // Not loud, or not mostly below 600 Hz: not snoring.
+      for (final change in <Map<String, Object?>>[
+        {'noise_score': 9.0},
+        {'spectral_band_energy_3': 300.0, 'spectral_band_energy_4': 300.0},
+      ]) {
+        final other = quietCursor();
+        for (var i = 10; i < 13; i++) {
+          expect(
+            other
+                .add(
+                  SleepMonitorSegment.fromMap({...snore(i).toMap(), ...change}),
+                )
+                .reason,
+            isNot('snoring'),
+          );
+        }
+      }
+      // A capture failure or a gap ends the run.
+      final broken = quietCursor();
+      broken.add(snore(10));
+      broken.add(bedsideSegment(11, invalid: true));
+      expect(broken.add(snore(12)).reason, 'environmental_sound');
+      expect(broken.add(snore(30)).reason, 'environmental_sound');
+      expect(broken.add(snore(31)).reason, 'snoring');
+      // Loud snoring next to the phone reaches every band: one periodic
+      // window is still a movement, a run of them is snoring.
+      SleepMonitorSegment loudSnore(int i) =>
+          bedsideSegment(i, periodic: true, activity: true);
+      final loud = quietCursor();
+      expect(loud.add(loudSnore(10)).reason, 'strong_movement');
+      final second = loud.add(loudSnore(11));
+      expect(second.reason, 'snoring');
+      expect(second.epoch.movementSeconds, 0);
     });
 
-    test('band-limited breathing is trusted despite microphone hiss', () {
-      // Periodic breathing in a window whose total energy is mostly hiss.
-      final hissy = SleepMonitorSegment.fromMap({
-        ...bedsideSegment(0, periodic: true).toMap(),
-        'spectral_band_energy_4': 60.0,
-      });
-      final v4 = SleepWakeCursor(
-        sessionId: 'bedside',
-        featureVersion: 'audio-features-v4',
-      );
-      final v5 = SleepWakeCursor(
-        sessionId: 'bedside',
-        featureVersion: 'audio-features-v5',
-      );
-      expect(v4.add(hissy).reason, 'quiet_audio');
-      expect(v5.add(hissy).reason, 'periodic_breathing');
+    test('quiet wake is never less likely to move than sleep', () {
+      // Otherwise every silent window would count against sleep and a long
+      // quiet night would read as lying awake.
+      const quiet = SleepAudioEvidenceExtractor.quietWakeScore;
+      const sleep = SleepAudioEvidenceExtractor.sleepScore;
+      const active = SleepAudioEvidenceExtractor.activeWakeScore;
+      expect(quiet[0], lessThanOrEqualTo(sleep[0]));
+      for (var bin = 2; bin < 4; bin++) {
+        expect(quiet[bin], greaterThanOrEqualTo(sleep[bin]));
+        expect(active[bin], greaterThan(quiet[bin]));
+      }
+      for (final group in [quiet, sleep, active]) {
+        expect(group.fold<double>(0, (a, b) => a + b), closeTo(1, 1e-9));
+      }
     });
 
     test(
@@ -243,9 +543,10 @@ void main() {
     test(
       'offline onset lands after the last activity, before live confirms',
       () {
+        // Awake and moving on and off for the first ten minutes.
         final segments = [
           for (var i = 0; i < 120; i++)
-            i < 20 ? sustainedBedsideActivity(i) : bedsideSegment(i),
+            bedsideSegment(i, activity: i < 20 && i.isEven),
         ];
         final smoothed = firstSleep(runNight(segments).epochs);
         final causal = firstSleep(runNight(segments, smooth: false).epochs);
@@ -271,11 +572,13 @@ void main() {
     );
 
     test('falling back asleep is faster than the first sleep onset', () {
+      // Moving on and off for five minutes, at bedtime and again later.
       final segments = [
-        for (var i = 0; i < 10; i++) sustainedBedsideActivity(i),
-        for (var i = 10; i < 200; i++) bedsideSegment(i),
-        for (var i = 200; i < 210; i++) sustainedBedsideActivity(i),
-        for (var i = 210; i < 400; i++) bedsideSegment(i),
+        for (var i = 0; i < 400; i++)
+          bedsideSegment(
+            i,
+            activity: (i < 10 || (i >= 200 && i < 210)) && i.isEven,
+          ),
       ];
       final epochs = runNight(segments).epochs;
       final firstOnset = firstSleep(epochs) - 10;
@@ -288,7 +591,13 @@ void main() {
     test('isolated noise during sleep is movement, not an awakening', () {
       final result = runNight([
         for (var i = 0; i < 960; i++)
-          bedsideSegment(i, periodic: i % 3 == 0, activity: i % 10 == 9),
+          // The first movement comes well after falling asleep; earlier it
+          // would be part of settling down.
+          bedsideSegment(
+            i,
+            periodic: i % 3 == 0,
+            activity: i > 60 && i % 10 == 9,
+          ),
       ]);
       final onset = firstSleep(result.epochs);
       expect(onset, greaterThan(0));
@@ -309,7 +618,7 @@ void main() {
     test('repeated movement inside sleep is restless sleep', () {
       final result = runNight([
         for (var i = 0; i < 480; i++)
-          i >= 200 && i < 260 && i.isEven ? brief(i, 3) : bedsideSegment(i),
+          i >= 200 && i < 260 && i % 4 == 0 ? brief(i, 3) : bedsideSegment(i),
       ]);
       final summary = const SleepStageAnalysisService().summarize(
         sessionStart: bedsideStart,
@@ -317,7 +626,7 @@ void main() {
         epochs: result.epochs,
       )!;
       expect(result.epochs.skip(200).take(60).every((e) => e.isSleep), true);
-      expect(summary.restlessSleepMinutes, inInclusiveRange(30, 40));
+      expect(summary.restlessSleepMinutes, inInclusiveRange(20, 30));
     });
   });
 
@@ -485,7 +794,13 @@ void main() {
       );
       expect(result.validEpochs, segments.length);
       expect(result.coverage, greaterThan(0.95));
-      expect(result.epochs.any((e) => e.isSleep), true);
+      // The only long wake on record: a noisy first hour and a bit.
+      final onset = firstSleep(result.epochs);
+      expect(onset, inInclusiveRange(130, 160));
+      expect(
+        result.epochs.take(onset).every((e) => e.stage == SleepStageType.awake),
+        true,
+      );
       // Zero-crossings must not change labels when all other aggregates agree.
       final withoutZeros = engine.run(
         session: bedsideSession(minutes: 425),
@@ -568,18 +883,84 @@ void main() {
         dawn.where((e) => e.isSleep).length,
         greaterThan(dawn.length * 0.9),
       );
-      // Loud low-frequency activity (local 04:59-05:17, 06:28-06:33) wakes.
+      // Loud activity around the fan being switched off (local 05:00-05:07)
+      // and again at 06:31-06:38 wakes.
       expect(
-        span(135, 150).every((e) => e.stage == SleepStageType.awake),
+        span(131, 136).every((e) => e.stage == SleepStageType.awake),
         true,
       );
       expect(
-        span(222, 226).every((e) => e.stage == SleepStageType.awake),
+        span(222, 227).every((e) => e.stage == SleepStageType.awake),
         true,
       );
-      expect(summary.awakeMinutes, inInclusiveRange(30, 90));
+      expect(summary.awakeMinutes, inInclusiveRange(20, 60));
       expect(summary.awakeningCount, greaterThanOrEqualTo(2));
       expect(summary.restlessSleepMinutes, lessThan(summary.sleepingMinutes));
+    });
+
+    test('morning night: birds and traffic for hours are not time awake', () {
+      // 02:39-09:00 local, audio-features-v5. Quiet until 03:54,
+      // then a dawn chorus, then traffic and birds until the alarm. The v6
+      // engine counted that sound as the person's and reported 3 h 18 min of
+      // sleep. The phone was picked up at 07:51.
+      final segments = quantizedBedsideSegments(
+        fileName: 'sleep_morning_bedside.json',
+      );
+      final start = bedsideStart.add(const Duration(milliseconds: 288));
+      final session = SleepMonitorSession.fromMap({
+        ...bedsideSession().toMap(),
+        'started_at': start.toIso8601String(),
+        'ended_at': start
+            .add(const Duration(seconds: 22840, milliseconds: 861))
+            .toIso8601String(),
+        'algorithm_version': 'audio-features-v5',
+        'time_in_bed_minutes': 381,
+        'end_reason': 'alarm',
+      });
+      final result = engine.run(session: session, segments: segments);
+      final summary = const SleepStageAnalysisService().summarize(
+        sessionStart: session.startedAt,
+        sessionEnd: session.endedAt!,
+        epochs: result.epochs,
+      )!;
+      List<SleepStageEpoch> span(int from, int to) =>
+          result.epochs.sublist(from * 2, to * 2);
+      int count(List<SleepStageEpoch> epochs, String reason) =>
+          epochs.where((e) => result.decisionReasons[e.id] == reason).length;
+
+      expect(result.epochs.first.stage, SleepStageType.awake);
+      expect(summary.unknownMinutes, 0);
+      expect(summary.sleepLatencyMinutes, inInclusiveRange(5, 20));
+      expect(summary.sleepingMinutes, inInclusiveRange(350, 372));
+      expect(summary.awakeMinutes, inInclusiveRange(9, 30));
+      // 03:54-07:49: nearly four hours of birds and traffic. Nothing says
+      // the night had no short awakening in there, only that it was not
+      // hours of them.
+      final morning = span(75, 310);
+      expect(
+        morning.where((e) => e.isSleep).length,
+        greaterThan(morning.length * 0.95),
+      );
+      var longestAwake = 0;
+      var run = 0;
+      for (final epoch in morning) {
+        run = epoch.isSleep ? 0 : run + 1;
+        longestAwake = math.max(longestAwake, run);
+      }
+      expect(longestAwake, lessThanOrEqualTo(10));
+      expect(
+        count(morning, 'environmental_sound'),
+        greaterThan(morning.length * 0.6),
+      );
+      // The trucks loud enough to leak into every band are still the street.
+      expect(count(morning, 'low_rumble'), greaterThanOrEqualTo(1));
+      // Picking the phone up is a real awakening.
+      final handling = span(312, 315);
+      expect(handling.every((e) => e.stage == SleepStageType.awake), true);
+      expect(count(handling, 'strong_movement'), greaterThanOrEqualTo(2));
+      expect(summary.awakeningCount, inInclusiveRange(1, 3));
+      expect(summary.restlessSleepMinutes, lessThan(30));
+      expect(summary.finalWakeAt, isNull);
     });
   });
 
