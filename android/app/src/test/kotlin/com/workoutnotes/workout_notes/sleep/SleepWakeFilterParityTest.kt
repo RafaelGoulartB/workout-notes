@@ -24,14 +24,17 @@ class SleepWakeFilterParityTest {
         val runs = golden.getJSONArray("runs")
         for (r in 0 until runs.length()) {
             val run = runs.getJSONObject(r)
-            val label = "${run.getString("fixture")} ${run.getString("feature_version")}"
-            val segments = segments(run.getString("fixture"), sessionId, start)
+            val label = run.getString("fixture")
+            // Recorded nights live in their own file; the synthetic run carries its table.
+            val table = run.optJSONObject("table")
+                ?: JSONObject(File(fixtures, run.getString("fixture")).readText())
+            val segments = segments(table, sessionId, start)
             val expectedP = run.getJSONArray("p")
             val expectedReason = run.getJSONArray("reason")
             val expectedValid = run.getJSONArray("valid")
             assertEquals(label, expectedP.length(), segments.size)
 
-            val filter = SleepWakeFilter(sessionId, featureVersion = run.getString("feature_version"))
+            val filter = SleepWakeFilter(sessionId)
             val decisions = segments.map { filter.add(it) }
             decisions.forEachIndexed { i, decision ->
                 assertEquals("$label reason $i", expectedReason.getString(i), decision.reason)
@@ -72,8 +75,7 @@ class SleepWakeFilterParityTest {
     }
 
     /** Same maps the Dart loader and the native recorder produce. */
-    private fun segments(name: String, sessionId: String, start: Long): List<Map<String, Any?>> {
-        val fixture = JSONObject(File(fixtures, name).readText())
+    private fun segments(fixture: JSONObject, sessionId: String, start: Long): List<Map<String, Any?>> {
         val columns = fixture.getJSONArray("columns")
         val rows = fixture.getJSONArray("rows")
         return (0 until rows.length()).map { index ->

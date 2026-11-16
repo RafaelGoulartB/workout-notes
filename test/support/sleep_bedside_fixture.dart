@@ -8,14 +8,18 @@ final bedsideStart = DateTime.utc(2026, 9, 1, 22);
 
 List<SleepMonitorSegment> quantizedBedsideSegments({
   String fileName = 'sleep_quantized_bedside.json',
-}) {
-  final fixture =
-      jsonDecode(File('test/fixtures/$fileName').readAsStringSync())
-          as Map<String, dynamic>;
-  final columns = (fixture['columns'] as List).cast<String>();
+}) => bedsideSegmentsFromTable(
+  jsonDecode(File('test/fixtures/$fileName').readAsStringSync())
+      as Map<String, dynamic>,
+);
+
+/// Segments of a `{columns, rows}` table whose first column is the offset in
+/// seconds from [bedsideStart] (the format of the recorded fixtures).
+List<SleepMonitorSegment> bedsideSegmentsFromTable(Map<String, dynamic> table) {
+  final columns = (table['columns'] as List).cast<String>();
   return [
     for (final (index, row)
-        in (fixture['rows'] as List).cast<List<Object?>>().indexed)
+        in (table['rows'] as List).cast<List<Object?>>().indexed)
       SleepMonitorSegment.fromMap({
         for (var i = 1; i < columns.length; i++) columns[i]: row[i],
         'id': 'recorded-$index',
@@ -27,6 +31,8 @@ List<SleepMonitorSegment> quantizedBedsideSegments({
   ];
 }
 
+/// A loud sound next to the phone for the whole window, at a constant level:
+/// a person or a device, the aggregates cannot tell which.
 SleepMonitorSegment sustainedBedsideActivity(int index) =>
     SleepMonitorSegment.fromMap({
       ...bedsideSegment(index, activity: true).toMap(),
@@ -57,6 +63,8 @@ SleepMonitorSession bedsideSession({
   createdAt: bedsideStart,
 );
 
+/// A quiet window; with [activity], a loud sound of a person next to the
+/// phone: every band 30 dB above the quiet level for ten seconds.
 SleepMonitorSegment bedsideSegment(
   int index, {
   bool periodic = false,
@@ -79,11 +87,11 @@ SleepMonitorSegment bedsideSegment(
       : 'quiet',
   validFraction: invalid ? 0 : 1,
   noiseBurstCount: 0,
-  spectralBandEnergy0: 10,
-  spectralBandEnergy1: 20,
-  spectralBandEnergy2: 5,
-  spectralBandEnergy3: activity ? 40 : 1,
-  spectralBandEnergy4: 1,
+  spectralBandEnergy0: activity ? 10000 : 10,
+  spectralBandEnergy1: activity ? 20000 : 20,
+  spectralBandEnergy2: activity ? 5000 : 5,
+  spectralBandEnergy3: activity ? 1000 : 1,
+  spectralBandEnergy4: activity ? 1000 : 1,
   spectralFlatness: periodic ? 0.3 : 0.8,
   breathingRegularity: periodic ? 0.7 : 0,
   breathingRateHz: periodic ? 0.25 : 0,

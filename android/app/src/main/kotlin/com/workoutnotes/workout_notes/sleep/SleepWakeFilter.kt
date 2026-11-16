@@ -2,9 +2,11 @@ package com.workoutnotes.workout_notes.sleep
 
 import java.time.Instant
 import kotlin.math.floor
+import kotlin.math.ln
 import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.roundToInt
-import kotlin.math.sqrt
 
 /**
  * Native copy of the Dart bedside sleep/wake model
@@ -16,16 +18,14 @@ import kotlin.math.sqrt
  * engine, which smooths the whole night. Every constant and every arithmetic
  * step mirrors the Dart code in the same order: `test/fixtures/
  * sleep_wake_parity.json` holds the Dart probabilities of the real fixture
- * nights and `SleepWakeFilterParityTest` checks this class against them.
+ * nights and of a synthetic night that reaches every rule, and
+ * `SleepWakeFilterParityTest` checks this class against them.
  */
 class SleepWakeFilter(
     private val sessionId: String,
     startsAwake: Boolean = true,
-    featureVersion: String? = CURRENT_FEATURE_VERSION,
 ) {
     companion object {
-        const val CURRENT_FEATURE_VERSION = "audio-features-v5"
-        private val BAND_LIMITED_BREATHING_VERSIONS = setOf("audio-features-v5")
         private const val ALIGNMENT_TOLERANCE_MILLIS = 1_000L
     }
 
@@ -38,9 +38,7 @@ class SleepWakeFilter(
         val ambientSeconds: Double,
     )
 
-    private val evidence = SleepAudioEvidenceExtractor(
-        bandLimitedBreathing = featureVersion in BAND_LIMITED_BREATHING_VERSIONS,
-    )
+    private val evidence = SleepAudioEvidenceExtractor()
     private val startProbabilities =
         if (startsAwake) SleepWakeModel.START_AWAKE else SleepWakeModel.START_UNKNOWN
     private var probabilities: DoubleArray? = null
@@ -61,6 +59,7 @@ class SleepWakeFilter(
                 // Windows that never arrived: let the model drift through them.
                 val steps = (gapMillis / 30_000.0).roundToInt().coerceIn(1, 480)
                 repeat(steps) { step(null) }
+                evidence.interrupt()
             }
         }
         expectedStartMillis = startMillis + seconds * 1_000L
@@ -141,46 +140,174 @@ internal class SleepAudioEvidence(
     val ambientSeconds: Double = 0.0,
 )
 
-/** Mirror of `SleepAudioEvidenceExtractor` in Dart. */
-internal class SleepAudioEvidenceExtractor(private val bandLimitedBreathing: Boolean) {
+/**
+ * Mirror of `SleepAudioEvidenceExtractor` in Dart: a person next to the phone
+ * raises every frequency band at once, the room (birds, traffic, rain) only
+ * some. Each band is compared in dB with its own recent quiet level and the
+ * window is scored by its second-smallest band excess.
+ */
+internal class SleepAudioEvidenceExtractor {
     companion object {
         private const val MINIMUM_VALID_FRACTION = 0.8
         private const val MAXIMUM_ZERO_SAMPLE_FRACTION = 0.98
-        private val ACTIVITY_BIN_EDGES = doubleArrayOf(1.0, 3.0, 10.0, 20.0)
-        private val ACTIVE_WAKE_ACTIVITY = doubleArrayOf(0.20, 0.12, 0.25, 0.20, 0.23)
-        private val QUIET_WAKE_ACTIVITY = doubleArrayOf(0.785, 0.105, 0.08, 0.02, 0.01)
-        private val SLEEP_ACTIVITY = doubleArrayOf(0.80, 0.10, 0.07, 0.02, 0.01)
-        private val PERIODIC_BREATHING = doubleArrayOf(0.06, 0.12, 0.15)
-        private const val PERIODIC_BASELINE = 0.12
-        private val SNORING_LIKELIHOOD = doubleArrayOf(0.002, 0.002, 0.05)
-        private const val MINIMUM_REGULARITY = 0.45
-        private const val MINIMUM_RATE_HZ = 0.15
-        private const val MAXIMUM_RATE_HZ = 0.65
-        private const val MAXIMUM_FLATNESS = 0.65
-        private const val LOUD_ACTIVITY_NOISE_DB = 10.0
+        private val SCORE_BIN_EDGES = doubleArrayOf(4.0, 8.0, 14.0)
+        private val ACTIVE_WAKE_SCORE = doubleArrayOf(0.42, 0.10, 0.15, 0.33)
+        private val QUIET_WAKE_SCORE = doubleArrayOf(0.84, 0.10, 0.045, 0.015)
+        private val SLEEP_SCORE = doubleArrayOf(0.86, 0.10, 0.03, 0.01)
+        private val SNORING_LIKELIHOOD = doubleArrayOf(0.02, 0.04, 0.10)
+        private const val FLOOR_WINDOWS = 40
+        private const val MINIMUM_FLOOR_WINDOWS = 3
+        private const val FLOOR_PERCENTILE = 0.2
+        private const val RECENT_FLOOR_WINDOWS = 10
+        private const val MINIMUM_BAND_ENERGY = 1e-18
+        private const val MINIMUM_SCORED_BANDS = 4
+        private const val MINIMUM_BURST_SECONDS = 1.0
+        private const val RUMBLE_HIGH_SHARE = 0.02
         private const val STATIONARY_ACTIVE_FRACTION = 0.8
         private const val MINIMUM_VARIABLE_LEVEL_STDDEV_DB = 3.0
+        private const val MINIMUM_REGULARITY = 0.45
+        private const val MINIMUM_RATE_HZ = 0.15
+        private const val MAXIMUM_RATE_HZ = 0.5
+        private const val MAXIMUM_FLATNESS = 0.65
+        private const val SNORING_NOISE_DB = 10.0
         private const val SNORING_LOW_SHARE = 0.6
-        private const val ENVIRONMENTAL_LOW_BAND_FRACTION = 0.9
-        private const val ENVIRONMENTAL_HIGH_BAND_FRACTION = 0.7
-        private const val MAXIMUM_ENVIRONMENTAL_PROMINENCE_DB = 30.0
-        private const val MAXIMUM_ENVIRONMENTAL_EXCESS_RATIO = 10.0
-        private const val MAXIMUM_ENVIRONMENTAL_NOISE_DB = 15.0
-        private const val MINIMUM_FOREGROUND_EXCESS_RATIO = 0.5
-        private const val ENVIRONMENTAL_HIGH_EXCESS_SHARE = 0.8
-        private const val ENVIRONMENTAL_RUMBLE_EXCESS_SHARE = 0.9
-        private const val FLOOR_WINDOWS = 40
-        private const val MINIMUM_FLOOR_WINDOWS = 10
-        private const val FLOOR_PERCENTILE = 0.2
 
         private val INVALID = SleepAudioEvidence("invalid_capture", false, null)
     }
 
-    private class Excess(val bands: DoubleArray, val total: Double, val ratio: Double)
+    /** Recent band levels in dB, oldest first. */
+    private val levels = ArrayDeque<DoubleArray>()
+    private var previousSnoreLike = false
 
-    private val floorHistory = ArrayDeque<DoubleArray>()
+    /** Windows are missing before the next one: a snoring run does not continue. */
+    fun interrupt() {
+        previousSnoreLike = false
+    }
 
     fun evaluate(segment: Map<String, Any?>, sessionId: String, seconds: Int): SleepAudioEvidence {
+        val level = bandLevels(segment, sessionId, seconds)
+        if (level == null) {
+            previousSnoreLike = false
+            return INVALID
+        }
+        val floor = floor()
+        levels.addLast(level)
+        if (levels.size > FLOOR_WINDOWS) levels.removeFirst()
+        val snoreLikeBefore = previousSnoreLike
+        previousSnoreLike = false
+
+        val activity = number(segment, "noise_active_seconds")
+        if (activity == null || !activity.isFinite() || activity < 0.0) {
+            return SleepAudioEvidence("no_activity_measure", true, null)
+        }
+        val active = activity.coerceIn(0.0, seconds.toDouble())
+        if (floor == null) return SleepAudioEvidence("calibrating", true, null)
+        val levelStddev = number(segment, "audio_level_stddev_db")
+        if (active / seconds >= STATIONARY_ACTIVE_FRACTION &&
+            (levelStddev == null ||
+                !levelStddev.isFinite() ||
+                levelStddev < MINIMUM_VARIABLE_LEVEL_STDDEV_DB)
+        ) {
+            return SleepAudioEvidence("steady_background", true, null)
+        }
+
+        val silent = decibels(0.0)
+        // A band whose floor is digitally silent has no level to rise from.
+        val excess = (0 until 5)
+            .filter { floor[it] > silent }
+            .map { level[it] - floor[it] }
+            .sorted()
+        if (excess.size < MINIMUM_SCORED_BANDS) {
+            return SleepAudioEvidence("silent_bands", true, null)
+        }
+        val burst = active >= MINIMUM_BURST_SECONDS
+        // Judged before the score: loud snoring next to the phone reaches every band.
+        val snoreLike = burst &&
+            number(segment, "noise_score")!! >= SNORING_NOISE_DB &&
+            periodic(segment) &&
+            lowShare(level) >= SNORING_LOW_SHARE
+        previousSnoreLike = snoreLike
+        if (snoreLike && snoreLikeBefore) {
+            return SleepAudioEvidence("snoring", true, SNORING_LIKELIHOOD)
+        }
+        val bin = bin(excess[1])
+        if (bin < 2) {
+            return SleepAudioEvidence(
+                if (bin == 1) "faint_sound" else if (burst) "environmental_sound" else "quiet_audio",
+                true,
+                groups(bin),
+                ambientSeconds = if (burst) active else 0.0,
+            )
+        }
+        // Every band rose, but not the way a person next to the phone does it.
+        if (!burst) return SleepAudioEvidence("sustained_sound", true, groups(1))
+        if (addedHighShare(level, floor) < RUMBLE_HIGH_SHARE) {
+            return SleepAudioEvidence("low_rumble", true, groups(1), ambientSeconds = active)
+        }
+        return SleepAudioEvidence(
+            if (bin == 2) "movement" else "strong_movement",
+            true,
+            groups(bin),
+            movementSeconds = active,
+        )
+    }
+
+    private fun decibels(energy: Double): Double =
+        10 * ln(max(energy, MINIMUM_BAND_ENERGY)) / ln(10.0)
+
+    private fun bin(score: Double): Int {
+        for (i in SCORE_BIN_EDGES.indices) {
+            if (score < SCORE_BIN_EDGES[i]) return i
+        }
+        return SCORE_BIN_EDGES.size
+    }
+
+    private fun groups(bin: Int) = doubleArrayOf(
+        ACTIVE_WAKE_SCORE[bin],
+        QUIET_WAKE_SCORE[bin],
+        SLEEP_SCORE[bin],
+    )
+
+    private fun periodic(segment: Map<String, Any?>): Boolean {
+        val regularity = number(segment, "breathing_regularity")
+        val rate = number(segment, "breathing_rate_hz")
+        val flatness = number(segment, "spectral_flatness")
+        return regularity != null &&
+            regularity.isFinite() &&
+            regularity >= MINIMUM_REGULARITY &&
+            regularity <= 1.0 &&
+            rate != null &&
+            rate.isFinite() &&
+            rate >= MINIMUM_RATE_HZ &&
+            rate <= MAXIMUM_RATE_HZ &&
+            flatness != null &&
+            flatness.isFinite() &&
+            flatness >= 0.0 &&
+            flatness < MAXIMUM_FLATNESS
+    }
+
+    /** Share of the energy above the room floor that lies above 1.5 kHz. */
+    private fun addedHighShare(level: DoubleArray, floor: DoubleArray): Double {
+        var high = 0.0
+        var all = 0.0
+        for (band in 0 until 5) {
+            val added = max(0.0, 10.0.pow(level[band] / 10) - 10.0.pow(floor[band] / 10))
+            all += added
+            if (band >= 3) high += added
+        }
+        return if (all > 0) high / all else 1.0
+    }
+
+    /** Share of the window's energy below 600 Hz. */
+    private fun lowShare(level: DoubleArray): Double {
+        val energy = DoubleArray(5) { 10.0.pow(level[it] / 10) }
+        var total = 0.0
+        for (v in energy) total += v
+        return if (total > 0) (energy[0] + energy[1]) / total else 0.0
+    }
+
+    /** Band levels in dB of a usable window, null for a capture failure. */
+    private fun bandLevels(segment: Map<String, Any?>, sessionId: String, seconds: Int): DoubleArray? {
         val noise = number(segment, "noise_score")
         val bands = Array(5) { number(segment, "spectral_band_energy_$it") }
         val zeros = number(segment, "digital_silence_fraction")
@@ -201,151 +328,35 @@ internal class SleepAudioEvidenceExtractor(private val bandLimitedBreathing: Boo
             noise.isFinite() &&
             noise >= 0.0 &&
             bands.all { it != null && it.isFinite() && it >= 0.0 }
-        if (!valid) return INVALID
+        if (!valid) return null
         val energy = DoubleArray(5) { bands[it]!! / seconds }
         var total = 0.0
         for (v in energy) total += v
-        if (!total.isFinite() || total <= 0.0) return INVALID
+        if (!total.isFinite() || total <= 0.0) return null
+        return DoubleArray(5) { decibels(energy[it]) }
+    }
 
-        val excess = excessOverFloor(energy)
-        remember(energy)
-
-        val activity = number(segment, "noise_active_seconds")
-        if (activity == null || !activity.isFinite() || activity < 0.0) {
-            return SleepAudioEvidence("no_activity_measure", true, null)
-        }
-        val active = activity.coerceIn(0.0, seconds.toDouble())
-        val per30 = active * 30 / seconds
-        val bin = bin(per30)
-        val high = (energy[3] + energy[4]) / total
-        val regularity = number(segment, "breathing_regularity")
-        val rate = number(segment, "breathing_rate_hz")
-        val flatness = number(segment, "spectral_flatness")
-        val periodic = regularity != null &&
-            regularity.isFinite() &&
-            regularity >= MINIMUM_REGULARITY &&
-            regularity <= 1.0 &&
-            rate != null &&
-            rate.isFinite() &&
-            rate >= MINIMUM_RATE_HZ &&
-            rate <= MAXIMUM_RATE_HZ &&
-            flatness != null &&
-            flatness.isFinite() &&
-            flatness >= 0.0 &&
-            flatness < MAXIMUM_FLATNESS
-
-        if (bin == 0) {
-            val quiet = groups(0)
-            if (periodic && (bandLimitedBreathing || high < 0.4)) {
-                return SleepAudioEvidence(
-                    "periodic_breathing",
-                    true,
-                    DoubleArray(3) { quiet[it] * PERIODIC_BREATHING[it] / PERIODIC_BASELINE },
-                )
+    /**
+     * The room's quiet level per band, from the windows before this one: a low
+     * percentile of the last 20 minutes, or the lowest level of the last five
+     * when that is higher (a room sound that has just started).
+     */
+    private fun floor(): DoubleArray? {
+        val count = levels.size
+        if (count < MINIMUM_FLOOR_WINDOWS) return null
+        val index = floor(count * FLOOR_PERCENTILE).toInt()
+        return DoubleArray(5) { band ->
+            val percentile = levels.map { it[band] }.sorted()[index]
+            if (count < RECENT_FLOOR_WINDOWS) {
+                percentile
+            } else {
+                var lowest = Double.POSITIVE_INFINITY
+                for (i in count - RECENT_FLOOR_WINDOWS until count) {
+                    lowest = min(lowest, levels[i][band])
+                }
+                max(percentile, lowest)
             }
-            return SleepAudioEvidence("quiet_audio", true, quiet)
         }
-
-        if (isEnvironmental(segment, noise, energy, total, excess)) {
-            return SleepAudioEvidence(
-                "environmental_sound",
-                true,
-                groups(0).map { sqrt(it) }.toDoubleArray(),
-                ambientSeconds = active,
-            )
-        }
-        val levelStddev = number(segment, "audio_level_stddev_db")
-        if (active / seconds >= STATIONARY_ACTIVE_FRACTION &&
-            (levelStddev == null ||
-                !levelStddev.isFinite() ||
-                levelStddev < MINIMUM_VARIABLE_LEVEL_STDDEV_DB)
-        ) {
-            return SleepAudioEvidence("steady_background", true, null)
-        }
-        val lowShare = if (excess != null && excess.total > 0) {
-            (excess.bands[0] + excess.bands[1]) / excess.total
-        } else {
-            (energy[0] + energy[1]) / total
-        }
-        if (periodic && noise >= LOUD_ACTIVITY_NOISE_DB && lowShare >= SNORING_LOW_SHARE) {
-            return SleepAudioEvidence("snoring", true, SNORING_LIKELIHOOD)
-        }
-        val likelihoods = groups(bin)
-        if (noise >= LOUD_ACTIVITY_NOISE_DB) {
-            return SleepAudioEvidence(
-                "audio_activity",
-                true,
-                likelihoods,
-                movementSeconds = active,
-            )
-        }
-        return SleepAudioEvidence(
-            "soft_audio_activity",
-            true,
-            likelihoods.map { sqrt(it) }.toDoubleArray(),
-            movementSeconds = active,
-        )
-    }
-
-    private fun bin(activeSecondsPer30: Double): Int {
-        for (i in ACTIVITY_BIN_EDGES.indices) {
-            if (activeSecondsPer30 < ACTIVITY_BIN_EDGES[i]) return i
-        }
-        return ACTIVITY_BIN_EDGES.size
-    }
-
-    private fun groups(bin: Int) = doubleArrayOf(
-        ACTIVE_WAKE_ACTIVITY[bin],
-        QUIET_WAKE_ACTIVITY[bin],
-        SLEEP_ACTIVITY[bin],
-    )
-
-    private fun isEnvironmental(
-        segment: Map<String, Any?>,
-        noise: Double,
-        energy: DoubleArray,
-        total: Double,
-        excess: Excess?,
-    ): Boolean {
-        val peak = number(segment, "audio_peak_dbfs")
-        val floor = number(segment, "audio_baseline_dbfs")
-        if (peak != null &&
-            floor != null &&
-            peak.isFinite() &&
-            floor.isFinite() &&
-            peak - floor < MAXIMUM_ENVIRONMENTAL_PROMINENCE_DB &&
-            (energy[0] / total >= ENVIRONMENTAL_LOW_BAND_FRACTION ||
-                (energy[3] + energy[4]) / total >= ENVIRONMENTAL_HIGH_BAND_FRACTION)
-        ) {
-            return true
-        }
-        if (excess == null || noise >= MAXIMUM_ENVIRONMENTAL_NOISE_DB) return false
-        if (excess.ratio < MINIMUM_FOREGROUND_EXCESS_RATIO) return true
-        if (excess.ratio >= MAXIMUM_ENVIRONMENTAL_EXCESS_RATIO) return false
-        return (excess.bands[3] + excess.bands[4]) / excess.total >=
-            ENVIRONMENTAL_HIGH_EXCESS_SHARE ||
-            excess.bands[0] / excess.total >= ENVIRONMENTAL_RUMBLE_EXCESS_SHARE
-    }
-
-    private fun excessOverFloor(energy: DoubleArray): Excess? {
-        if (floorHistory.size < MINIMUM_FLOOR_WINDOWS) return null
-        val floor = DoubleArray(5)
-        for (band in 0 until 5) {
-            val values = floorHistory.map { it[band] }.sorted()
-            floor[band] = values[floor(values.size * FLOOR_PERCENTILE).toInt()]
-        }
-        var floorTotal = 0.0
-        for (v in floor) floorTotal += v
-        if (floorTotal <= 0.0) return null
-        val bands = DoubleArray(5) { max(0.0, energy[it] - floor[it]) }
-        var total = 0.0
-        for (v in bands) total += v
-        return Excess(bands, total, total / floorTotal)
-    }
-
-    private fun remember(energy: DoubleArray) {
-        floorHistory.addLast(energy)
-        if (floorHistory.size > FLOOR_WINDOWS) floorHistory.removeFirst()
     }
 
     private fun number(segment: Map<String, Any?>, key: String): Double? =
