@@ -345,6 +345,17 @@ void main() {
       expect(clipped.epoch.movementSeconds, closeTo(1, 1e-9));
     });
 
+    test('only earlier bedside engines count as older', () {
+      expect(SleepWakeEngine.isOlderVersion('sleep-wake-bedside-v6'), true);
+      expect(SleepWakeEngine.isOlderVersion('sleep-wake-bedside-v1'), true);
+      expect(
+        SleepWakeEngine.isOlderVersion(SleepWakeEngine.algorithmVersion),
+        false,
+      );
+      expect(SleepWakeEngine.isOlderVersion(null), false);
+      expect(SleepWakeEngine.isOlderVersion('legacy_unavailable'), false);
+    });
+
     test('bands without any signal are left out of the score', () {
       SleepMonitorSegment window(
         int i, {

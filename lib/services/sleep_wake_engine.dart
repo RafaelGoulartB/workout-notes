@@ -71,6 +71,12 @@ class SleepWakeEngine {
 
   const SleepWakeEngine();
 
+  /// A night staged by an earlier bedside engine.
+  static bool isOlderVersion(String? stageVersion) =>
+      stageVersion != null &&
+      stageVersion.startsWith('sleep-wake-bedside-') &&
+      stageVersion != algorithmVersion;
+
   static bool supports(SleepMonitorSession session) =>
       featureVersions.contains(session.algorithmVersion);
 

@@ -476,13 +476,7 @@ class SleepMonitorService extends ChangeNotifier {
             : const <SleepMonitorSession>[];
         for (final session in candidates) {
           if (_state.isActive) break;
-          if (!{
-            'sleep-wake-bedside-v1',
-            'sleep-wake-bedside-v2',
-            'sleep-wake-bedside-v3',
-            'sleep-wake-bedside-v4',
-            'sleep-wake-bedside-v5',
-          }.contains(session.stageAlgorithmVersion)) {
+          if (!SleepWakeEngine.isOlderVersion(session.stageAlgorithmVersion)) {
             continue;
           }
           try {
