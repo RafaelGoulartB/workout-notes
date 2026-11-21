@@ -87,10 +87,10 @@ kotlin {
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation("androidx.activity:activity:1.10.1")
-    implementation("androidx.camera:camera-camera2:1.6.1")
-    implementation("androidx.camera:camera-core:1.6.1")
-    implementation("androidx.camera:camera-lifecycle:1.6.1")
-    implementation("androidx.camera:camera-view:1.6.1")
+    implementation("androidx.camera:camera-camera2:1.7.0")
+    implementation("androidx.camera:camera-core:1.7.0")
+    implementation("androidx.camera:camera-lifecycle:1.7.0")
+    implementation("androidx.camera:camera-view:1.7.0")
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
     testImplementation("junit:junit:4.13.2")
     // Real org.json for unit tests — the android.jar stub throws "Stub!",
