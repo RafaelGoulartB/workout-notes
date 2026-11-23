@@ -77,7 +77,7 @@ void main() {
         ],
       });
       expect(imported.estimatedSleepMinutes, greaterThan(45));
-      expect(imported.stageAlgorithmVersion, 'sleep-wake-bedside-v6');
+      expect(imported.stageAlgorithmVersion, 'sleep-wake-bedside-v8');
       expect(imported.finalWakeAt, isNull);
       expect(imported.deepSleepMinutes, isNull);
       expect(imported.sleepEntryId, isNotNull);
@@ -141,7 +141,7 @@ void main() {
       );
       final result = await repository.reprocessDiagnostic(archive);
       expect(result!.estimatedSleepMinutes, greaterThan(0));
-      expect(result.stageAlgorithmVersion, 'sleep-wake-bedside-v6');
+      expect(result.stageAlgorithmVersion, 'sleep-wake-bedside-v8');
       expect(result.alarmDismissedAt, dismissedAt);
       expect(await repository.reprocessDiagnostic(archive), isNull);
       expect(await database.query('sleep_entries'), hasLength(1));
@@ -208,7 +208,7 @@ void main() {
         ).map((s) => s.toMap()).toList(),
       };
       final repaired = await repository.reprocessDiagnostic(archive);
-      expect(repaired!.stageAlgorithmVersion, 'sleep-wake-bedside-v6');
+      expect(repaired!.stageAlgorithmVersion, 'sleep-wake-bedside-v8');
       expect(repaired.estimatedSleepMinutes, isNotNull);
       expect(repaired.unknownMinutes, lessThan(369 * 0.2));
       expect(await repository.getUnestimatedSessions(), isEmpty);

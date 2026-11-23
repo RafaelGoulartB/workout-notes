@@ -16,6 +16,13 @@ class AudioSignalProcessor(
     private val sessionId: String,
     private val onSegment: (Map<String, Any?>) -> Unit,
     private val onError: (Throwable) -> Unit,
+    /**
+     * When true (monitor UI visible and polling the live waveform), read
+     * 250 ms chunks; when false (backgrounded overnight), read 1 s chunks to
+     * cut JNI crossings and processing loop wakeups while producing identical
+     * 125 ms block features.
+     */
+    private val lowLatency: () -> Boolean = { false },
 ) {
     companion object {
         const val SAMPLE_RATE = 16_000
@@ -97,7 +104,10 @@ class AudioSignalProcessor(
                     AudioFormat.ENCODING_PCM_16BIT,
                 )
                 if (minimumBuffer <= 0) continue
-                val bufferSize = max(minimumBuffer, sampleRate / 2)
+                // Hold 2 seconds of 16-bit mono PCM (64 KB at 16 kHz) so 1 s
+                // background reads retain 1 s of overrun headroom during
+                // segment flushes or GC pauses.
+                val bufferSize = max(minimumBuffer, sampleRate * 4)
                 candidate = AudioRecord(
                     source,
                     sampleRate,
@@ -140,11 +150,14 @@ class AudioSignalProcessor(
 
     private fun captureLoop(record: AudioRecord, bufferLength: Int) {
         val buffer = ShortArray(max(bufferLength, 256))
+        val fastChunk = max(256, min(buffer.size, activeSampleRate / 4))
+        val idleChunk = max(256, min(buffer.size, activeSampleRate))
         var consecutiveReadErrors = 0
         var lastSuccessfulReadAt = SystemClock.elapsedRealtime()
         try {
             while (running) {
-                val read = record.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
+                val readSize = if (lowLatency()) fastChunk else idleChunk
+                val read = record.read(buffer, 0, readSize, AudioRecord.READ_BLOCKING)
                 if (read == 0) {
                     if (SystemClock.elapsedRealtime() - lastSuccessfulReadAt >= NO_DATA_TIMEOUT_MILLIS) {
                         throw IllegalStateException("audio_record_no_data")

@@ -30,18 +30,24 @@ class SmartWakePolicy {
 
   /// Feeds one window ending at [now]; returns the trigger when the alarm
   /// should ring now, otherwise null.
+  ///
+  /// Only [informative] windows (those with real acoustic or device evidence,
+  /// not calibrating/steady-background/silent-band drift) arm the alarm, and
+  /// early triggers require [evidenceFresh] so stale probabilities cannot ring.
   String? onWindow({
     required double sleepProbability,
     required bool validSignal,
+    required bool informative,
+    required bool evidenceFresh,
     required int seconds,
     required DateTime now,
     required DateTime windowStart,
     required DateTime deadline,
   }) {
-    if (validSignal && sleepProbability >= armingProbability) {
+    if (validSignal && informative && sleepProbability >= armingProbability) {
       _confidentSleepSeconds += seconds < 0 ? 0 : seconds;
     }
-    if (!isArmed || !validSignal) return null;
+    if (!isArmed || !validSignal || !informative || !evidenceFresh) return null;
     if (now.isBefore(windowStart) || !now.isBefore(deadline)) return null;
     if (sleepProbability >= threshold) return null;
     return sleepProbability < awakeProbability ? triggerAwake : triggerStirring;

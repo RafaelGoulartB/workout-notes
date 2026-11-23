@@ -154,7 +154,7 @@ class SleepMonitorRepository extends BaseRepository {
     final recovered = SleepMonitorSession.fromNative(rawSession, rawSegments);
     final bedside = SleepWakeEngine.supports(recovered);
     final sessionEnd = recovered.endedAt ?? recovered.startedAt;
-    // Only bedside feature nights (audio-features-v3/v4/v5) are staged; older
+    // Only bedside feature nights (audio-features-v3/v4/v5/v6) are staged; older
     // recordings keep the legacy status and no inference.
     SleepStageSummary? stageSummary;
     if (bedside && rawSegments.any((segment) => segment.hasSpectralFeatures)) {
@@ -310,7 +310,8 @@ class SleepMonitorRepository extends BaseRepository {
     return imported!;
   }
 
-  /// Repairs only incomplete v1-v5 results that still have capture data.
+  /// Repairs only incomplete results of an older engine that still have
+  /// capture data.
   /// Database metadata wins over the archive, including later alarm dismissal.
   Future<SleepMonitorSession?> reprocessDiagnostic(
     Map<String, dynamic> archive,
@@ -326,13 +327,7 @@ class SleepMonitorRepository extends BaseRepository {
           SleepMonitorSession.completed,
           SleepMonitorSession.interrupted,
         }.contains(current.status) ||
-        !{
-          'sleep-wake-bedside-v1',
-          'sleep-wake-bedside-v2',
-          'sleep-wake-bedside-v3',
-          'sleep-wake-bedside-v4',
-          'sleep-wake-bedside-v5',
-        }.contains(current.stageAlgorithmVersion) ||
+        !SleepWakeEngine.isOlderVersion(current.stageAlgorithmVersion) ||
         DateTime.tryParse(raw['started_at']?.toString() ?? '') !=
             current.startedAt ||
         DateTime.tryParse(raw['ended_at']?.toString() ?? '') !=

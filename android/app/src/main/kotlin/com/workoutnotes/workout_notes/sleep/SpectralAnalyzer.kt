@@ -16,6 +16,11 @@ import kotlin.math.sin
 class SpectralAnalyzer(
     private val sampleRate: Int = 16_000,
     /**
+     * Called once per non-silent FFT frame with a reused 5-element array of
+     * linear band powers for that frame (never retain the array reference).
+     */
+    private val onBands: ((frameBandPowers: DoubleArray) -> Unit)? = null,
+    /**
      * Called once per hop (every ~125 ms) with the power in the breath band
      * ([BREATH_BAND_LOW_HZ], [BREATH_BAND_HIGH_HZ]). All-zero frames skip the
      * FFT but still report 0.0 so a consumer's timeline stays continuous.
@@ -49,6 +54,7 @@ class SpectralAnalyzer(
     private val re = DoubleArray(FFT_SIZE)
     private val im = DoubleArray(FFT_SIZE)
     private val bandSum = DoubleArray(BANDS.size)
+    private val frameBandPower = DoubleArray(BANDS.size)
     private var flatnessLogSum = 0.0
     private var powerSum = 0.0
     private var centroidSum = 0.0
@@ -88,6 +94,7 @@ class SpectralAnalyzer(
                 frameCount++
                 processedFrames++
                 onFrame?.invoke(framePower)
+                onBands?.invoke(frameBandPower)
             } else {
                 onFrame?.invoke(0.0)
             }
@@ -127,6 +134,7 @@ class SpectralAnalyzer(
 
     private fun accumulate() {
         framePower = 0.0
+        frameBandPower.fill(0.0)
         for (k in 1 until FFT_SIZE / 2) {
             val power = (re[k] * re[k] + im[k] * im[k]) / (FFT_SIZE.toDouble() * FFT_SIZE)
             val freq = k * sampleRate.toDouble() / FFT_SIZE
@@ -135,6 +143,7 @@ class SpectralAnalyzer(
             for (band in BANDS.indices) {
                 if (freq >= BANDS[band].first && freq < BANDS[band].second) {
                     bandSum[band] += power
+                    frameBandPower[band] += power
                 }
             }
             // The floor must stay far below real bin power. Quiet 16-bit capture

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
 import 'package:workout_notes/services/smart_wake_policy.dart';
 import 'support/sleep_bedside_fixture.dart';
@@ -17,10 +18,10 @@ import 'support/sleep_bedside_fixture.dart';
 void main() {
   const goldenPath = 'test/fixtures/sleep_wake_parity.json';
   const runs = [
-    ('sleep_quantized_bedside.json', 'audio-features-v3'),
-    ('sleep_ambiguous_bedside.json', 'audio-features-v3'),
-    ('sleep_dawn_bedside.json', 'audio-features-v4'),
-    ('sleep_dawn_bedside.json', 'audio-features-v5'),
+    'sleep_quantized_bedside.json',
+    'sleep_ambiguous_bedside.json',
+    'sleep_dawn_bedside.json',
+    'sleep_morning_bedside.json',
   ];
 
   Map<String, Object?> compute() => {
@@ -30,7 +31,15 @@ void main() {
         'Kotlin copy must reproduce them.',
     'session_id': 'bedside',
     'start': bedsideStart.toIso8601String(),
-    'runs': [for (final (file, version) in runs) _run(file, version)],
+    'runs': [
+      for (final file in runs)
+        _run(file, quantizedBedsideSegments(fileName: file)),
+      // The recorded nights never reach every branch of the evidence rules.
+      {
+        ..._run('synthetic', bedsideSegmentsFromTable(_syntheticNight())),
+        'table': _syntheticNight(),
+      },
+    ],
   };
 
   test('Dart sleep/wake filter matches the parity golden', () {
@@ -46,9 +55,27 @@ void main() {
     for (var r = 0; r < currentRuns.length; r++) {
       final expected = goldenRuns[r] as Map<String, dynamic>;
       final actual = currentRuns[r] as Map<String, Object?>;
-      final label = '${actual['fixture']} ${actual['feature_version']}';
+      final label = '${actual['fixture']}';
       expect(expected['reason'], actual['reason'], reason: label);
       expect(expected['valid'], actual['valid'], reason: label);
+      expect(expected['informative'], actual['informative'], reason: label);
+      expect(expected['fresh'], actual['fresh'], reason: label);
+      final moveExpected = expected['movement'] as List;
+      final moveActual = actual['movement']! as List<double>;
+      final ambExpected = expected['ambient'] as List;
+      final ambActual = actual['ambient']! as List<double>;
+      for (var i = 0; i < moveActual.length; i++) {
+        expect(
+          (moveExpected[i] as num).toDouble(),
+          closeTo(moveActual[i], 1e-9),
+          reason: '$label movement $i',
+        );
+        expect(
+          (ambExpected[i] as num).toDouble(),
+          closeTo(ambActual[i], 1e-9),
+          reason: '$label ambient $i',
+        );
+      }
       final p = expected['p'] as List;
       final q = actual['p']! as List<double>;
       expect(p.length, q.length, reason: label);
@@ -67,6 +94,37 @@ void main() {
     }
   });
 
+  test('the golden reaches every evidence rule', () {
+    final reasons = {
+      for (final run in compute()['runs']! as List)
+        ...(run as Map)['reason'] as List<String>,
+    };
+    // The synthetic night alone covers them, so Kotlin is held to each.
+    final last = (compute()['runs']! as List).last as Map;
+    final synthetic = {...last['reason'] as List<String>};
+    expect(synthetic, reasons);
+    expect(
+      reasons,
+      containsAll([
+        'invalid_capture',
+        'no_activity_measure',
+        'calibrating',
+        'silent_bands',
+        'steady_background',
+        'quiet_audio',
+        'environmental_sound',
+        'faint_sound',
+        'sustained_sound',
+        'low_rumble',
+        'snoring',
+        'movement',
+        'strong_movement',
+        'device_interaction',
+        'phone_pickup',
+      ]),
+    );
+  });
+
   test('the smart alarm never rings before sleep or after the deadline', () {
     final policy = SmartWakePolicy(0.5);
     final deadline = bedsideStart.add(const Duration(hours: 1));
@@ -74,6 +132,8 @@ void main() {
     String? feed(int i, double p) => policy.onWindow(
       sleepProbability: p,
       validSignal: true,
+      informative: true,
+      evidenceFresh: true,
       seconds: 30,
       now: bedsideStart.add(Duration(seconds: 30 * (i + 1))),
       windowStart: windowStart,
@@ -98,21 +158,303 @@ void main() {
   });
 }
 
-Map<String, Object?> _run(String file, String version) {
-  final segments = quantizedBedsideSegments(fileName: file);
-  final cursor = SleepWakeCursor(
-    sessionId: 'bedside',
-    startsAwake: true,
-    featureVersion: version,
+/// Quiet windows with one of everything the evidence rules distinguish: a
+/// capture failure, missing measures, steady and sustained sound, rumble,
+/// snoring, band-limited sound, movements, a gap and an odd duration.
+Map<String, dynamic> _syntheticNight() {
+  const columns = [
+    'offset_seconds',
+    'duration_seconds',
+    'classification',
+    'valid_fraction',
+    'noise_score',
+    'noise_active_seconds',
+    'audio_calibrated',
+    'digital_silence_fraction',
+    'audio_level_stddev_db',
+    'spectral_band_energy_0',
+    'spectral_band_energy_1',
+    'spectral_band_energy_2',
+    'spectral_band_energy_3',
+    'spectral_band_energy_4',
+    'spectral_flatness',
+    'breathing_regularity',
+    'breathing_rate_hz',
+    'broadband_active_seconds',
+    'broadband_strong_seconds',
+    'broadband_peak_db',
+    'broadband_tail_seconds',
+    'device_active_seconds',
+    'screen_on_seconds',
+    'phone_pickup_count',
+  ];
+  const quiet = [10.0, 20.0, 5.0, 1.0, 1.0];
+  final rows = <List<Object?>>[];
+  var offset = 0;
+  void add({
+    List<double> gain = const [1, 1, 1, 1, 1],
+    double noise = 1,
+    double? active = 0,
+    double? stddev = 2,
+    bool invalid = false,
+    double zeros = 0.1,
+    bool periodic = false,
+    double rate = 0.25,
+    int seconds = 30,
+    int gapBefore = 0,
+    double valid = 1,
+    bool? calibrated = true,
+    double? bbActive,
+    double? bbStrong,
+    double? bbPeak,
+    double? bbTail,
+    double? deviceActive,
+    double? screenOn,
+    int? pickups,
+  }) {
+    offset += gapBefore;
+    rows.add([
+      offset,
+      seconds,
+      invalid ? 'invalid' : (noise >= 10 ? 'noise' : 'quiet'),
+      invalid ? 0.0 : valid,
+      noise,
+      active,
+      calibrated,
+      zeros,
+      stddev,
+      for (var band = 0; band < 5; band++) quiet[band] * gain[band],
+      0.3,
+      periodic ? 0.7 : 0.0,
+      periodic ? rate : 0.0,
+      bbActive,
+      bbStrong,
+      bbPeak,
+      bbTail,
+      deviceActive,
+      screenOn,
+      pickups,
+    ]);
+    offset += seconds;
+  }
+
+  const all10 = [10.0, 10.0, 10.0, 10.0, 10.0];
+  const all1000 = [1000.0, 1000.0, 1000.0, 1000.0, 1000.0];
+  const snore = [40.0, 15.0, 1.0, 1.0, 1.0];
+  // Two bands start digitally silent: they have no level to rise from.
+  const deaf = [1.0, 1.0, 1.0, 0.0, 0.0];
+  for (var i = 0; i < 4; i++) {
+    add(gain: deaf);
+  }
+  add();
+  add(gain: all10, noise: 12, active: 3, stddev: 6);
+  for (var i = 0; i < 24; i++) {
+    add();
+  }
+  add(gain: all10, noise: 12, active: 3, stddev: 6); // movement
+  add(gain: all1000, noise: 30, active: 10, stddev: 9); // strong movement
+  add();
+  add(invalid: true);
+  add(zeros: 0.99);
+  add(active: null);
+  add(gain: all1000, noise: 30, active: 30, stddev: 0.2); // steady
+  add(gain: all1000, noise: 30, active: 30, stddev: null);
+  add(gain: all10, noise: 3, active: 0.25); // sustained, no burst
+  add(
+    gain: const [10000, 300, 30, 8, 3],
+    noise: 30,
+    active: 18,
+    stddev: 11,
+  ); // rumble
+  for (var i = 0; i < 3; i++) {
+    add(gain: snore, noise: 18, active: 9, stddev: 8, periodic: true);
+  }
+  add(gain: snore, noise: 18, active: 9, stddev: 8, periodic: true, rate: 0.6);
+  add(gain: const [1, 1, 1, 60, 300], noise: 13, active: 14, stddev: 6);
+  add(gain: const [1, 3, 3, 4, 4], noise: 6, active: 2, stddev: 4); // faint
+  add(seconds: 31);
+  add(gain: const [0, 1, 1, 1, 1]);
+  add(gapBefore: 300);
+  // Gaps that are not whole windows, the longest window and one too long.
+  add(gapBefore: 14);
+  add(gapBefore: 45);
+  add(gapBefore: 1);
+  add(seconds: 60);
+  add(seconds: 61);
+  add(valid: 0.75);
+  add(valid: 0.8);
+  add(calibrated: null);
+  add(calibrated: false);
+  add(gain: all1000, noise: 30, active: 30, stddev: 3); // not steady at 3 dB
+  // Snoring ends at a window that is not loud enough, and at a gap.
+  add(gain: snore, noise: 18, active: 9, stddev: 8, periodic: true);
+  add(gain: snore, noise: 9.9, active: 9, stddev: 8, periodic: true);
+  add(gain: snore, noise: 12, active: 9, stddev: 8, periodic: true);
+  add(gain: snore, noise: 12, active: 9, stddev: 8, periodic: true);
+  add(
+    gain: snore,
+    noise: 12,
+    active: 9,
+    stddev: 8,
+    periodic: true,
+    gapBefore: 90,
   );
+  // Loud snoring reaches every band: a movement in its first window, snoring
+  // from the second.
+  add();
+  add(gain: all1000, noise: 30, active: 12, stddev: 9, periodic: true);
+  add(gain: all1000, noise: 30, active: 12, stddev: 9, periodic: true);
+  // What ends a snoring run: a capture failure, a window without an activity
+  // measure, a window without a burst.
+  add();
+  add(gain: snore, noise: 18, active: 9, stddev: 8, periodic: true);
+  add(invalid: true);
+  add(gain: snore, noise: 18, active: 9, stddev: 8, periodic: true);
+  add();
+  add(gain: snore, noise: 18, active: 9, stddev: 8, periodic: true);
+  add(gain: snore, noise: 18, active: null, stddev: 8, periodic: true);
+  add(gain: snore, noise: 18, active: 9, stddev: 8, periodic: true);
+  add();
+  add(gain: snore, noise: 18, active: 0.5, stddev: 8, periodic: true);
+  add(gain: snore, noise: 18, active: 9, stddev: 8, periodic: true);
+  // One silent band leaves four to score.
+  for (var i = 0; i < 10; i++) {
+    add(gain: const [1, 1, 1, 1, 0]);
+  }
+  add(gain: const [10, 10, 10, 10, 0], noise: 12, active: 3, stddev: 6);
+  for (var i = 0; i < 4; i++) {
+    add();
+  }
+  for (var i = 0; i < 12; i++) {
+    // A room sound that starts and stays: the floor follows it.
+    add(gain: all10, noise: 9, active: 2, stddev: 4);
+  }
+  for (var i = 0; i < 6; i++) {
+    add(
+      gain: i.isEven ? all1000 : const [1, 1, 1, 1, 1],
+      noise: i.isEven ? 30 : 1,
+      active: i.isEven ? 12 : 0,
+      stddev: i.isEven ? 9 : 2,
+    );
+  }
+  // v6 frame-level broadband bursts and bedside device signals.
+  add(bbActive: 0.0, bbStrong: 0.0, bbPeak: 2.0, active: 0.0); // quiet v6
+  add(
+    bbActive: 0.0,
+    bbStrong: 0.0,
+    bbPeak: 3.0,
+    active: 12.0,
+    stddev: 6.0,
+  ); // env v6
+  add(
+    bbActive: 0.5,
+    bbStrong: 0.0,
+    bbPeak: 9.0,
+    active: 0.5,
+    stddev: 4.0,
+  ); // faint v6
+  // Fan-masked brief turn: active=0, stddev=1.3 must still score movement.
+  add(bbActive: 1.5, bbStrong: 0.0, bbPeak: 11.0, active: 0.0, stddev: 1.3);
+  // Step onset (AC switching on at window tail): sustained_sound.
+  add(
+    bbActive: 8.0,
+    bbStrong: 0.0,
+    bbPeak: 12.0,
+    bbTail: 8.0,
+    active: 4.0,
+    stddev: 5.5,
+  );
+  // Strong movement via bbStrong, via bbActive >= 4, and via bbPeak >= 14 && bbActive >= 2.
+  add(bbActive: 2.5, bbStrong: 1.5, bbPeak: 18.0, active: 4.0, stddev: 8.0);
+  add(
+    gain: all10,
+    bbActive: 4.5,
+    bbStrong: 0.0,
+    bbPeak: 11.0,
+    active: 5.0,
+    stddev: 6.0,
+  );
+  add(bbActive: 2.2, bbStrong: 0.0, bbPeak: 15.0, active: 2.0, stddev: 5.0);
+  // v6 snoring branch (two consecutive periodic windows).
+  add(
+    gain: snore,
+    noise: 18,
+    active: 9,
+    stddev: 8,
+    periodic: true,
+    bbActive: 2.0,
+    bbPeak: 12.0,
+  );
+  add(
+    gain: snore,
+    noise: 18,
+    active: 9,
+    stddev: 8,
+    periodic: true,
+    bbActive: 2.0,
+    bbPeak: 12.0,
+  );
+  // v6 steady_background and negative broadband value (falls back to legacy).
+  add(bbActive: 28.0, bbStrong: 0.0, bbPeak: 10.0, active: 0.0, stddev: 1.0);
+  add(bbActive: -1.0, active: 0.0, stddev: 2.0);
+  // 5-min room-adapted v6 broadband (podcast/storm after floor catches up).
+  for (var i = 0; i < 12; i++) {
+    add(
+      gain: all10,
+      bbActive: 12.0,
+      bbStrong: 4.0,
+      bbPeak: 16.0,
+      active: 10.0,
+      stddev: 6.0,
+    );
+  }
+  // Recurring short (2 s) broadband room sound (clock/drip): adapts after 5 min.
+  for (var i = 0; i < 12; i++) {
+    add(
+      gain: const [1.2, 1.2, 1.2, 1.2, 1.2],
+      bbActive: 2.0,
+      bbStrong: 0.0,
+      bbPeak: 10.0,
+      active: 2.0,
+      stddev: 5.0,
+    );
+  }
+  // Lockscreen notification alone is ignored; pickup split across windows wakes
+  // once (never twice); device interaction clears pickup carry-over and wakes
+  // even on invalid mic capture.
+  add(screenOn: 8.0, deviceActive: 0.0, pickups: 0);
+  add(screenOn: 0.0, deviceActive: 0.0, pickups: 1);
+  add(screenOn: 5.0, deviceActive: 0.0, pickups: 0);
+  add(screenOn: 5.0, deviceActive: 0.0, pickups: 0);
+  add(screenOn: 15.0, deviceActive: 15.0, pickups: 1, invalid: true);
+  add(screenOn: 5.0, deviceActive: 0.0, pickups: 0);
+  // 92 motionless unlocked windows: first 90 are device_interaction, 91st falls
+  // through; a gap resets the counter so the next unlocked window fires again.
+  for (var i = 0; i < 92; i++) {
+    add(screenOn: 30.0, deviceActive: 30.0, pickups: 0);
+  }
+  add(screenOn: 30.0, deviceActive: 30.0, pickups: 0, gapBefore: 90);
+  return {'columns': columns, 'rows': rows};
+}
+
+Map<String, Object?> _run(String file, List<SleepMonitorSegment> segments) {
+  final cursor = SleepWakeCursor(sessionId: 'bedside', startsAwake: true);
   final p = <double>[];
   final reasons = <String>[];
   final valid = <bool>[];
+  final informative = <bool>[];
+  final fresh = <bool>[];
+  final movement = <double>[];
+  final ambient = <double>[];
   for (final segment in segments) {
     final decision = cursor.add(segment);
     p.add(cursor.sleepProbability!);
     reasons.add(decision.reason);
     valid.add(decision.validSignal);
+    informative.add(decision.informative);
+    fresh.add(decision.evidenceFresh);
+    movement.add(decision.epoch.movementSeconds);
+    ambient.add(decision.epoch.ambientSeconds);
   }
   final ends = [
     for (final s in segments)
@@ -129,6 +471,8 @@ Map<String, Object?> _run(String file, String version) {
         final result = policy.onWindow(
           sleepProbability: p[i],
           validSignal: valid[i],
+          informative: informative[i],
+          evidenceFresh: fresh[i],
           seconds: segments[i].durationSeconds,
           now: ends[i],
           windowStart: deadline.subtract(const Duration(minutes: 30)),
@@ -150,10 +494,13 @@ Map<String, Object?> _run(String file, String version) {
   }
   return {
     'fixture': file,
-    'feature_version': version,
     'p': p,
     'reason': reasons,
     'valid': valid,
+    'informative': informative,
+    'fresh': fresh,
+    'movement': movement,
+    'ambient': ambient,
     'smart': smart,
   };
 }

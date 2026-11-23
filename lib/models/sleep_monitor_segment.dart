@@ -30,6 +30,16 @@ class SleepMonitorSegment {
   final double? breathingRegularity;
   final double? breathingRateHz;
 
+  // v6: per-frame (125 ms) simultaneous broadband burst aggregates and
+  // event-driven bedside device interaction signals. Null on older recordings.
+  final double? broadbandActiveSeconds;
+  final double? broadbandStrongSeconds;
+  final double? broadbandPeakDb;
+  final double? broadbandTailSeconds;
+  final double? deviceActiveSeconds;
+  final double? screenOnSeconds;
+  final int? phonePickupCount;
+
   // v28 actigraphy aggregates. Null when no accelerometer was available.
   final double? motionActiveSeconds;
   final double? motionMeanDeviationG;
@@ -62,6 +72,13 @@ class SleepMonitorSegment {
     this.spectralCentroidHz,
     this.breathingRegularity,
     this.breathingRateHz,
+    this.broadbandActiveSeconds,
+    this.broadbandStrongSeconds,
+    this.broadbandPeakDb,
+    this.broadbandTailSeconds,
+    this.deviceActiveSeconds,
+    this.screenOnSeconds,
+    this.phonePickupCount,
     this.motionActiveSeconds,
     this.motionMeanDeviationG,
     this.motionMaxDeviationG,
@@ -109,6 +126,17 @@ class SleepMonitorSegment {
     if (breathingRegularity != null)
       'breathing_regularity': breathingRegularity,
     if (breathingRateHz != null) 'breathing_rate_hz': breathingRateHz,
+    if (broadbandActiveSeconds != null)
+      'broadband_active_seconds': broadbandActiveSeconds,
+    if (broadbandStrongSeconds != null)
+      'broadband_strong_seconds': broadbandStrongSeconds,
+    if (broadbandPeakDb != null) 'broadband_peak_db': broadbandPeakDb,
+    if (broadbandTailSeconds != null)
+      'broadband_tail_seconds': broadbandTailSeconds,
+    if (deviceActiveSeconds != null)
+      'device_active_seconds': deviceActiveSeconds,
+    if (screenOnSeconds != null) 'screen_on_seconds': screenOnSeconds,
+    if (phonePickupCount != null) 'phone_pickup_count': phonePickupCount,
     if (motionActiveSeconds != null)
       'motion_active_seconds': motionActiveSeconds,
     if (motionMeanDeviationG != null)
@@ -146,6 +174,15 @@ class SleepMonitorSegment {
       spectralCentroidHz: (map['spectral_centroid_hz'] as num?)?.toDouble(),
       breathingRegularity: (map['breathing_regularity'] as num?)?.toDouble(),
       breathingRateHz: (map['breathing_rate_hz'] as num?)?.toDouble(),
+      broadbandActiveSeconds: (map['broadband_active_seconds'] as num?)
+          ?.toDouble(),
+      broadbandStrongSeconds: (map['broadband_strong_seconds'] as num?)
+          ?.toDouble(),
+      broadbandPeakDb: (map['broadband_peak_db'] as num?)?.toDouble(),
+      broadbandTailSeconds: (map['broadband_tail_seconds'] as num?)?.toDouble(),
+      deviceActiveSeconds: (map['device_active_seconds'] as num?)?.toDouble(),
+      screenOnSeconds: (map['screen_on_seconds'] as num?)?.toDouble(),
+      phonePickupCount: (map['phone_pickup_count'] as num?)?.toInt(),
       motionActiveSeconds: (map['motion_active_seconds'] as num?)?.toDouble(),
       motionMeanDeviationG: (map['motion_mean_deviation_g'] as num?)
           ?.toDouble(),

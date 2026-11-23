@@ -29,6 +29,10 @@ class SmartWakePolicy(private val threshold: Double) {
     /**
      * Feeds one window ending at [nowMillis] and returns the trigger reason
      * when the alarm should ring now, or null.
+     *
+     * Only informative windows (real acoustic or device evidence, never
+     * calibrating/steady-background/silent-band drift) arm the alarm, and
+     * early triggers require fresh evidence.
      */
     fun onWindow(
         decision: SleepWakeFilter.Decision,
@@ -37,10 +41,17 @@ class SmartWakePolicy(private val threshold: Double) {
         windowStartMillis: Long,
         deadlineMillis: Long,
     ): String? {
-        if (decision.validSignal && decision.sleepProbability >= ARMING_PROBABILITY) {
+        if (decision.validSignal &&
+            decision.informative &&
+            decision.sleepProbability >= ARMING_PROBABILITY
+        ) {
             confidentSleepSeconds += seconds.coerceAtLeast(0)
         }
-        if (!isArmed || !decision.validSignal) return null
+        if (!isArmed ||
+            !decision.validSignal ||
+            !decision.informative ||
+            !decision.evidenceFresh
+        ) return null
         if (nowMillis < windowStartMillis || nowMillis >= deadlineMillis) return null
         if (decision.sleepProbability >= threshold) return null
         return if (decision.sleepProbability < AWAKE_PROBABILITY) {

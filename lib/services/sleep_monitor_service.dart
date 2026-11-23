@@ -39,6 +39,8 @@ class SleepMonitorService extends ChangeNotifier {
   SleepWakeDecision? _liveDecision;
   SleepWakeDecision? get liveDecision => _liveDecision;
   String? _restoredLiveSession;
+  bool _restoringLiveState = false;
+  bool _disposed = false;
   // Alarm nights whose result already opened in this process; the native
   // state reports the dismissal until the next night starts.
   final Set<String> _shownAlarmResults = {};
@@ -99,6 +101,10 @@ class SleepMonitorService extends ChangeNotifier {
   Future<void> resync() async {
     if (!_isAndroid) return;
     await initialize();
+    // Background monitoring skips periodic EventChannel pushes overnight;
+    // clear the memoized session id so getState() replays any unseen segments
+    // from the spool into the live cursor.
+    _restoredLiveSession = null;
     await refresh();
     await recoverPendingSessions();
   }
@@ -170,8 +176,8 @@ class SleepMonitorService extends ChangeNotifier {
       final result = await methods.invokeMapMethod<String, dynamic>('getState');
       if (result != null) {
         _state = SleepMonitorState.fromMap(result);
-        await _restoreLiveState();
-        _updateLiveState(_state.latestSegment);
+        final restored = await _restoreLiveState();
+        _updateLiveState(_state.latestSegment, allowRestore: !restored);
         notifyListeners();
       }
     } on MissingPluginException {
@@ -476,13 +482,7 @@ class SleepMonitorService extends ChangeNotifier {
             : const <SleepMonitorSession>[];
         for (final session in candidates) {
           if (_state.isActive) break;
-          if (!{
-            'sleep-wake-bedside-v1',
-            'sleep-wake-bedside-v2',
-            'sleep-wake-bedside-v3',
-            'sleep-wake-bedside-v4',
-            'sleep-wake-bedside-v5',
-          }.contains(session.stageAlgorithmVersion)) {
+          if (!SleepWakeEngine.isOlderVersion(session.stageAlgorithmVersion)) {
             continue;
           }
           try {
@@ -554,7 +554,10 @@ class SleepMonitorService extends ChangeNotifier {
     }
   }
 
-  void _updateLiveState(SleepMonitorSegment? segment) {
+  void _updateLiveState(
+    SleepMonitorSegment? segment, {
+    bool allowRestore = true,
+  }) {
     if (!_state.isActive ||
         segment == null ||
         segment.sessionId != _state.sessionId ||
@@ -570,8 +573,6 @@ class SleepMonitorService extends ChangeNotifier {
       // awake; a cursor joining mid-night must not invent that evidence.
       _liveCursor = SleepWakeCursor(
         sessionId: segment.sessionId,
-        // Live sessions are recorded by the native side shipped with this app.
-        featureVersion: SleepWakeEngine.currentFeatureVersion,
         startsAwake:
             started != null &&
             segment.startedAt.difference(started).inSeconds.abs() <= 1,
@@ -582,26 +583,43 @@ class SleepMonitorService extends ChangeNotifier {
         !segment.startedAt.isAfter(_lastLiveSegment!)) {
       return;
     }
+    final jumped =
+        allowRestore &&
+        ((_lastLiveSegment != null &&
+                segment.startedAt.difference(_lastLiveSegment!).inSeconds >
+                    45) ||
+            (_lastLiveSegment == null &&
+                _state.startedAt != null &&
+                segment.startedAt.difference(_state.startedAt!).inSeconds >
+                    45));
     _liveDecision = _liveCursor!.add(segment);
     _lastLiveSegment = segment.startedAt;
+    if (jumped) {
+      // Background overnight recording skips periodic EventChannel pushes;
+      // replay unseen spooled segments so the live cursor recovers its floor.
+      unawaited(_restoreLiveState(force: true));
+    }
   }
 
-  Future<void> _restoreLiveState() async {
+  Future<bool> _restoreLiveState({bool force = false}) async {
     final id = _state.sessionId;
     if (!_isAndroid ||
         !_state.isActive ||
         id == null ||
-        _restoredLiveSession == id) {
-      return;
+        _restoringLiveState ||
+        (!force && _restoredLiveSession == id)) {
+      return false;
     }
+    _restoringLiveState = true;
     _restoredLiveSession = id;
     try {
-      // Once on opening the session; no polling, background isolate or raw audio.
+      // Once on opening the session (or after a background jump); no polling,
+      // background isolate or raw audio.
       final spool = await methods.invokeMapMethod<String, dynamic>(
         'readSession',
         id,
       );
-      if (_state.sessionId != id || !_state.isActive) return;
+      if (_disposed || _state.sessionId != id || !_state.isActive) return true;
       final segments =
           (spool?['segments'] as List? ?? const [])
               .whereType<Map>()
@@ -614,10 +632,21 @@ class SleepMonitorService extends ChangeNotifier {
       _liveCursor = null;
       _lastLiveSegment = null;
       for (final segment in segments) {
-        _updateLiveState(segment);
+        _updateLiveState(segment, allowRestore: false);
       }
+      final latest = _state.latestSegment;
+      if (latest != null && latest.sessionId == id) {
+        _updateLiveState(latest, allowRestore: false);
+      }
+      if (!_disposed && (segments.isNotEmpty || latest != null)) {
+        notifyListeners();
+      }
+      return true;
     } catch (_) {
       _restoredLiveSession = null;
+      return false;
+    } finally {
+      _restoringLiveState = false;
     }
   }
 
@@ -630,6 +659,7 @@ class SleepMonitorService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _eventSubscription?.cancel();
     super.dispose();
   }

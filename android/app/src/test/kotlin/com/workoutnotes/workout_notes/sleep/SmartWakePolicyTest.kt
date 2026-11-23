@@ -10,11 +10,20 @@ class SmartWakePolicyTest {
     private val deadline = 3_600_000L
     private val windowStart = deadline - 30 * 60_000L
 
-    private fun decision(p: Double, valid: Boolean = true) =
-        SleepWakeFilter.Decision("quiet_audio", valid, p, 0.0, 0.0)
+    private fun decision(
+        p: Double,
+        valid: Boolean = true,
+        informative: Boolean = valid,
+        fresh: Boolean = valid,
+    ) = SleepWakeFilter.Decision("quiet_audio", valid, p, 0.0, 0.0, informative, fresh)
 
-    private fun SmartWakePolicy.feed(window: Int, p: Double, valid: Boolean = true) =
-        onWindow(decision(p, valid), 30, (window + 1) * 30_000L, windowStart, deadline)
+    private fun SmartWakePolicy.feed(
+        window: Int,
+        p: Double,
+        valid: Boolean = true,
+        informative: Boolean = valid,
+        fresh: Boolean = valid,
+    ) = onWindow(decision(p, valid, informative, fresh), 30, (window + 1) * 30_000L, windowStart, deadline)
 
     @Test
     fun `does not ring before the night has seen sleep`() {
@@ -42,5 +51,27 @@ class SmartWakePolicyTest {
         for (window in 0 until 20) policy.feed(window, 0.95)
         assertNull(policy.feed(119, 0.1))
         assertNull(policy.feed(200, 0.1))
+    }
+
+    @Test
+    fun `never arms on non-informative drift or fires on stale evidence`() {
+        val policy = SmartWakePolicy(0.5)
+        // Hours of steady_background / silent_bands drift must not arm the alarm.
+        for (window in 0 until 60) {
+            assertNull(policy.feed(window, 0.95, valid = true, informative = false, fresh = false))
+        }
+        assertFalse(policy.isArmed)
+        // Arm properly with 10 min of informative sleep.
+        for (window in 60 until 80) {
+            assertNull(policy.feed(window, 0.95, valid = true, informative = true, fresh = true))
+        }
+        assertTrue(policy.isArmed)
+        // Stale or non-informative evidence inside the window must not trigger early.
+        assertNull(policy.feed(90, 0.2, valid = true, informative = false, fresh = false))
+        assertNull(policy.feed(90, 0.2, valid = true, informative = false, fresh = true))
+        assertEquals(
+            SmartWakePolicy.TRIGGER_AWAKE,
+            policy.feed(91, 0.2, valid = true, informative = true, fresh = true),
+        )
     }
 }
