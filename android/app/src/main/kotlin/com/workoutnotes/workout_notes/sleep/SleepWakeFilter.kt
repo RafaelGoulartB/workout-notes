@@ -27,6 +27,7 @@ class SleepWakeFilter(
 ) {
     companion object {
         private const val ALIGNMENT_TOLERANCE_MILLIS = 1_000L
+        private const val LIVE_EVIDENCE_HOLD_SECONDS = 2 * 60
     }
 
     data class Decision(
@@ -36,6 +37,10 @@ class SleepWakeFilter(
         val sleepProbability: Double,
         val movementSeconds: Double,
         val ambientSeconds: Double,
+        /** True when this window carried real acoustic or device evidence. */
+        val informative: Boolean,
+        /** True when valid and within [LIVE_EVIDENCE_HOLD_SECONDS] of evidence. */
+        val evidenceFresh: Boolean,
     )
 
     private val evidence = SleepAudioEvidenceExtractor()
@@ -43,6 +48,7 @@ class SleepWakeFilter(
         if (startsAwake) SleepWakeModel.START_AWAKE else SleepWakeModel.START_UNKNOWN
     private var probabilities: DoubleArray? = null
     private var expectedStartMillis: Long? = null
+    private var secondsWithoutEvidence = 0
 
     /** Current probability of being asleep; null before the first window. */
     val sleepProbability: Double?
@@ -59,18 +65,28 @@ class SleepWakeFilter(
                 // Windows that never arrived: let the model drift through them.
                 val steps = (gapMillis / 30_000.0).roundToInt().coerceIn(1, 480)
                 repeat(steps) { step(null) }
+                secondsWithoutEvidence += (gapMillis / 1_000L).toInt()
                 evidence.interrupt()
             }
         }
         expectedStartMillis = startMillis + seconds * 1_000L
         val result = evidence.evaluate(segment, sessionId, seconds)
         step(result.likelihoods)
+        val informative = result.likelihoods != null
+        if (informative) {
+            secondsWithoutEvidence = 0
+        } else {
+            secondsWithoutEvidence += seconds
+        }
+        val evidenceFresh = result.validSignal && secondsWithoutEvidence <= LIVE_EVIDENCE_HOLD_SECONDS
         return Decision(
             reason = result.reason,
             validSignal = result.validSignal,
             sleepProbability = SleepWakeModel.sleepProbability(probabilities!!),
             movementSeconds = result.movementSeconds,
             ambientSeconds = result.ambientSeconds,
+            informative = informative,
+            evidenceFresh = evidenceFresh,
         )
     }
 
@@ -141,10 +157,10 @@ internal class SleepAudioEvidence(
 )
 
 /**
- * Mirror of `SleepAudioEvidenceExtractor` in Dart: a person next to the phone
- * raises every frequency band at once, the room (birds, traffic, rain) only
- * some. Each band is compared in dB with its own recent quiet level and the
- * window is scored by its second-smallest band excess.
+ * Mirror of `SleepAudioEvidenceExtractor` in Dart (`sleep-wake-bedside-v8`):
+ * combines zero-polling bedside device interaction (`audio-features-v6`),
+ * per-frame simultaneous broadband bursts (`audio-features-v6`), and 30-second
+ * broadband spectral excess with scale-invariant dB rumble filtering (`v3`–`v5`).
  */
 internal class SleepAudioEvidenceExtractor {
     companion object {
@@ -154,7 +170,19 @@ internal class SleepAudioEvidenceExtractor {
         private val ACTIVE_WAKE_SCORE = doubleArrayOf(0.42, 0.10, 0.15, 0.33)
         private val QUIET_WAKE_SCORE = doubleArrayOf(0.84, 0.10, 0.045, 0.015)
         private val SLEEP_SCORE = doubleArrayOf(0.86, 0.10, 0.03, 0.01)
+        private val DEVICE_INTERACTION_LIKELIHOOD = doubleArrayOf(0.45, 0.02, 0.005)
         private val SNORING_LIKELIHOOD = doubleArrayOf(0.02, 0.04, 0.10)
+        private const val MINIMUM_DEVICE_ACTIVE_SECONDS = 5.0
+        private const val MINIMUM_PICKUP_SCREEN_SECONDS = 1.0
+        private const val MOTIONLESS_UNLOCKED_SECONDS = 25.0
+        private const val MAXIMUM_MOTIONLESS_UNLOCKED_WINDOWS = 90
+        private const val FAINT_BROADBAND_BURST_SECONDS = 0.375
+        private const val MINIMUM_BROADBAND_BURST_SECONDS = 1.0
+        private const val STRONG_BROADBAND_BURST_SECONDS = 4.0
+        private const val STEP_ONSET_TAIL_SECONDS = 5.0
+        private const val STEP_ONSET_MAX_PRIOR_SECONDS = 0.5
+        private const val ROOM_ADAPTED_PERSISTENCE_WINDOWS = 8
+        private const val ROOM_ADAPTED_FLOOR_EXCESS_DB = 4.0
         private const val FLOOR_WINDOWS = 40
         private const val MINIMUM_FLOOR_WINDOWS = 3
         private const val FLOOR_PERCENTILE = 0.2
@@ -162,7 +190,8 @@ internal class SleepAudioEvidenceExtractor {
         private const val MINIMUM_BAND_ENERGY = 1e-18
         private const val MINIMUM_SCORED_BANDS = 4
         private const val MINIMUM_BURST_SECONDS = 1.0
-        private const val RUMBLE_HIGH_SHARE = 0.02
+        private const val RUMBLE_TILT_DB = 15.0
+        private const val RUMBLE_HIGH_SHARE = 0.03
         private const val STATIONARY_ACTIVE_FRACTION = 0.8
         private const val MINIMUM_VARIABLE_LEVEL_STDDEV_DB = 3.0
         private const val MINIMUM_REGULARITY = 0.45
@@ -177,50 +206,199 @@ internal class SleepAudioEvidenceExtractor {
 
     /** Recent band levels in dB, oldest first. */
     private val levels = ArrayDeque<DoubleArray>()
+    /** Whether each of the last [RECENT_FLOOR_WINDOWS] windows had v6 broadband activity. */
+    private val recentBroadbandActive = ArrayDeque<Boolean>()
     private var previousSnoreLike = false
+    private var motionlessUnlockedWindows = 0
+    private var previousHadPickup = false
+    private var previousHadScreenOn = false
 
-    /** Windows are missing before the next one: a snoring run does not continue. */
+    /** Windows are missing before the next one: runs do not continue across gaps. */
     fun interrupt() {
         previousSnoreLike = false
+        motionlessUnlockedWindows = 0
+        previousHadPickup = false
+        previousHadScreenOn = false
+        recentBroadbandActive.clear()
     }
 
     fun evaluate(segment: Map<String, Any?>, sessionId: String, seconds: Int): SleepAudioEvidence {
-        val level = bandLevels(segment, sessionId, seconds)
-        if (level == null) {
+        if (segment["session_id"]?.toString() != sessionId || seconds <= 0 || seconds > 60) {
             previousSnoreLike = false
+            motionlessUnlockedWindows = 0
+            previousHadPickup = false
+            previousHadScreenOn = false
+            recentBroadbandActive.clear()
             return INVALID
         }
-        val floor = floor()
-        levels.addLast(level)
-        if (levels.size > FLOOR_WINDOWS) levels.removeFirst()
+
+        val level = bandLevels(segment, sessionId, seconds)
+        val priorFloorCount = levels.size
+        val floor = if (level == null) null else floor()
+        if (level != null) {
+            levels.addLast(level)
+            if (levels.size > FLOOR_WINDOWS) levels.removeFirst()
+        }
         val snoreLikeBefore = previousSnoreLike
         previousSnoreLike = false
 
-        val activity = number(segment, "noise_active_seconds")
-        if (activity == null || !activity.isFinite() || activity < 0.0) {
+        val rawActivity = number(segment, "noise_active_seconds")
+        val activeOrZero = if (rawActivity != null && rawActivity.isFinite() && rawActivity >= 0.0) {
+            rawActivity.coerceIn(0.0, seconds.toDouble())
+        } else {
+            0.0
+        }
+
+        val deviceActive = clampPositive(number(segment, "device_active_seconds"), seconds)
+        val screenOn = clampPositive(number(segment, "screen_on_seconds"), seconds)
+        val pickups = ((segment["phone_pickup_count"] as? Number)?.toInt() ?: 0).coerceIn(0, 1000)
+        val hadPickup = pickups >= 1
+        val hadScreenOn = screenOn >= MINIMUM_PICKUP_SCREEN_SECONDS
+        val prevPickup = previousHadPickup
+        val prevScreenOn = previousHadScreenOn
+        previousHadPickup = hadPickup
+        previousHadScreenOn = hadScreenOn
+
+        if (deviceActive >= MOTIONLESS_UNLOCKED_SECONDS && pickups == 0) {
+            motionlessUnlockedWindows++
+        } else {
+            motionlessUnlockedWindows = 0
+        }
+        if (deviceActive >= MINIMUM_DEVICE_ACTIVE_SECONDS &&
+            motionlessUnlockedWindows <= MAXIMUM_MOTIONLESS_UNLOCKED_WINDOWS
+        ) {
+            previousHadPickup = false
+            previousHadScreenOn = false
+            recentBroadbandActive.clear()
+            return SleepAudioEvidence(
+                "device_interaction",
+                true,
+                DEVICE_INTERACTION_LIKELIHOOD,
+                movementSeconds = max(activeOrZero, deviceActive),
+            )
+        }
+        if ((hadPickup && (hadScreenOn || prevScreenOn)) ||
+            (prevPickup && hadScreenOn)
+        ) {
+            // Clear carry-over once credited so one pickup cannot trigger two windows.
+            previousHadPickup = false
+            previousHadScreenOn = false
+            recentBroadbandActive.clear()
+            return SleepAudioEvidence(
+                "phone_pickup",
+                true,
+                groups(3),
+                movementSeconds = max(activeOrZero, if (hadScreenOn) screenOn else 1.0)
+                    .coerceIn(1.0, seconds.toDouble()),
+            )
+        }
+
+        if (level == null) return INVALID
+        if (rawActivity == null || !rawActivity.isFinite() || rawActivity < 0.0) {
             return SleepAudioEvidence("no_activity_measure", true, null)
         }
-        val active = activity.coerceIn(0.0, seconds.toDouble())
-        if (floor == null) return SleepAudioEvidence("calibrating", true, null)
+        val active = activeOrZero
         val levelStddev = number(segment, "audio_level_stddev_db")
-        if (active / seconds >= STATIONARY_ACTIVE_FRACTION &&
-            (levelStddev == null ||
-                !levelStddev.isFinite() ||
-                levelStddev < MINIMUM_VARIABLE_LEVEL_STDDEV_DB)
+        val steadyLevel = levelStddev == null ||
+            !levelStddev.isFinite() ||
+            levelStddev < MINIMUM_VARIABLE_LEVEL_STDDEV_DB
+
+        val bbActiveRaw = number(segment, "broadband_active_seconds")
+        val hasFrameBroadband = bbActiveRaw != null && bbActiveRaw.isFinite() && bbActiveRaw >= 0.0
+        val bbActive = if (hasFrameBroadband) bbActiveRaw.coerceIn(0.0, seconds.toDouble()) else 0.0
+
+        if (!hasFrameBroadband && floor == null) {
+            return SleepAudioEvidence("calibrating", true, null)
+        }
+        if ((active / seconds >= STATIONARY_ACTIVE_FRACTION ||
+                (hasFrameBroadband && bbActive / seconds >= STATIONARY_ACTIVE_FRACTION)) &&
+            steadyLevel
         ) {
+            if (hasFrameBroadband) recordRecentBroadbandActive(false)
             return SleepAudioEvidence("steady_background", true, null)
         }
 
+        val burst = active >= MINIMUM_BURST_SECONDS
+
+        if (hasFrameBroadband) {
+            val isBroadbandActive = bbActive >= MINIMUM_BROADBAND_BURST_SECONDS
+            val snoreLike = burst &&
+                number(segment, "noise_score")!! >= SNORING_NOISE_DB &&
+                periodic(segment) &&
+                lowShare(level) >= SNORING_LOW_SHARE
+            previousSnoreLike = snoreLike
+            if (snoreLike && snoreLikeBefore) {
+                recordRecentBroadbandActive(false)
+                return SleepAudioEvidence("snoring", true, SNORING_LIKELIHOOD)
+            }
+            val recentActiveCount = recentBroadbandActive.count { it }
+            recordRecentBroadbandActive(isBroadbandActive)
+            val bbStrong = clampPositive(number(segment, "broadband_strong_seconds"), seconds)
+            val bbTail = clampPositive(number(segment, "broadband_tail_seconds"), seconds)
+            val bbPeakRaw = number(segment, "broadband_peak_db")
+            val bbPeak = if (bbPeakRaw != null && bbPeakRaw.isFinite()) bbPeakRaw else 0.0
+            if (isBroadbandActive) {
+                if (bbTail >= STEP_ONSET_TAIL_SECONDS &&
+                    bbActive - bbTail < STEP_ONSET_MAX_PRIOR_SECONDS
+                ) {
+                    return SleepAudioEvidence("sustained_sound", true, groups(1))
+                }
+                // After a full 5-minute floor (10 windows), persistent
+                // broadband activity in >= 8 of the last 10 windows whose
+                // 30-second spectrum stays within 4 dB of the room floor has
+                // become the room (podcast, gusty storm, ticking/dripping).
+                if (floor != null &&
+                    priorFloorCount >= RECENT_FLOOR_WINDOWS &&
+                    recentActiveCount >= ROOM_ADAPTED_PERSISTENCE_WINDOWS
+                ) {
+                    val silent = decibels(0.0)
+                    val excess30s = (0 until 5)
+                        .filter { floor[it] > silent }
+                        .map { level[it] - floor[it] }
+                        .sorted()
+                    if (excess30s.size >= MINIMUM_SCORED_BANDS &&
+                        excess30s[1] < ROOM_ADAPTED_FLOOR_EXCESS_DB
+                    ) {
+                        return SleepAudioEvidence(
+                            "environmental_sound",
+                            true,
+                            groups(0),
+                            ambientSeconds = if (burst) active else 0.0,
+                        )
+                    }
+                }
+                val strong = bbStrong >= MINIMUM_BROADBAND_BURST_SECONDS ||
+                    bbActive >= STRONG_BROADBAND_BURST_SECONDS ||
+                    (bbPeak >= SCORE_BIN_EDGES[2] && bbActive >= 2.0)
+                val bin = if (strong) 3 else 2
+                return SleepAudioEvidence(
+                    if (bin == 2) "movement" else "strong_movement",
+                    true,
+                    groups(bin),
+                    movementSeconds = bbActive,
+                )
+            }
+            if (bbActive >= FAINT_BROADBAND_BURST_SECONDS) {
+                return SleepAudioEvidence("faint_sound", true, groups(1))
+            }
+            return SleepAudioEvidence(
+                if (burst) "environmental_sound" else "quiet_audio",
+                true,
+                groups(0),
+                ambientSeconds = if (burst) active else 0.0,
+            )
+        }
+
+        val nonNullFloor = floor!!
         val silent = decibels(0.0)
         // A band whose floor is digitally silent has no level to rise from.
-        val excess = (0 until 5)
-            .filter { floor[it] > silent }
-            .map { level[it] - floor[it] }
-            .sorted()
+        val rawExcess = Array<Double?>(5) { band ->
+            if (nonNullFloor[band] > silent) level[band] - nonNullFloor[band] else null
+        }
+        val excess = rawExcess.filterNotNull().sorted()
         if (excess.size < MINIMUM_SCORED_BANDS) {
             return SleepAudioEvidence("silent_bands", true, null)
         }
-        val burst = active >= MINIMUM_BURST_SECONDS
         // Judged before the score: loud snoring next to the phone reaches every band.
         val snoreLike = burst &&
             number(segment, "noise_score")!! >= SNORING_NOISE_DB &&
@@ -236,12 +414,12 @@ internal class SleepAudioEvidenceExtractor {
                 if (bin == 1) "faint_sound" else if (burst) "environmental_sound" else "quiet_audio",
                 true,
                 groups(bin),
-                ambientSeconds = if (burst) active else 0.0,
+                ambientSeconds = if (bin == 0 && burst) active else 0.0,
             )
         }
         // Every band rose, but not the way a person next to the phone does it.
         if (!burst) return SleepAudioEvidence("sustained_sound", true, groups(1))
-        if (addedHighShare(level, floor) < RUMBLE_HIGH_SHARE) {
+        if (isLowRumble(level, nonNullFloor, rawExcess)) {
             return SleepAudioEvidence("low_rumble", true, groups(1), ambientSeconds = active)
         }
         return SleepAudioEvidence(
@@ -251,6 +429,13 @@ internal class SleepAudioEvidenceExtractor {
             movementSeconds = active,
         )
     }
+
+    private fun clampPositive(value: Double?, maxSeconds: Int): Double =
+        if (value != null && value.isFinite() && value > 0.0) {
+            value.coerceIn(0.0, maxSeconds.toDouble())
+        } else {
+            0.0
+        }
 
     private fun decibels(energy: Double): Double =
         10 * ln(max(energy, MINIMUM_BAND_ENERGY)) / ln(10.0)
@@ -284,6 +469,29 @@ internal class SleepAudioEvidenceExtractor {
             flatness.isFinite() &&
             flatness >= 0.0 &&
             flatness < MAXIMUM_FLATNESS
+    }
+
+    /**
+     * True when band 0 (<200 Hz) rose at least [RUMBLE_TILT_DB] more than
+     * either high band AND less than [RUMBLE_HIGH_SHARE] of the added energy
+     * lies above 1.5 kHz.
+     */
+    private fun isLowRumble(
+        level: DoubleArray,
+        floor: DoubleArray,
+        rawExcess: Array<Double?>,
+    ): Boolean {
+        val low = rawExcess[0] ?: return false
+        val b3 = rawExcess[3]
+        val b4 = rawExcess[4]
+        val high = when {
+            b3 != null && b4 != null -> max(b3, b4)
+            b3 != null -> b3
+            b4 != null -> b4
+            else -> return false
+        }
+        if (low - high < RUMBLE_TILT_DB) return false
+        return addedHighShare(level, floor) < RUMBLE_HIGH_SHARE
     }
 
     /** Share of the energy above the room floor that lies above 1.5 kHz. */
@@ -356,6 +564,13 @@ internal class SleepAudioEvidenceExtractor {
                 }
                 max(percentile, lowest)
             }
+        }
+    }
+
+    private fun recordRecentBroadbandActive(active: Boolean) {
+        recentBroadbandActive.addLast(active)
+        if (recentBroadbandActive.size > RECENT_FLOOR_WINDOWS) {
+            recentBroadbandActive.removeFirst()
         }
     }
 

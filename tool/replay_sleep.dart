@@ -161,6 +161,8 @@ Map<String, dynamic> simulateSmartWake(
     trigger = policy.onWindow(
       sleepProbability: cursor.sleepProbability!,
       validSignal: decision.validSignal,
+      informative: decision.informative,
+      evidenceFresh: decision.evidenceFresh,
       seconds: segment.durationSeconds,
       now: end,
       windowStart: windowStart,

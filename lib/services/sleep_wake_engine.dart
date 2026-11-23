@@ -21,12 +21,13 @@ import 'package:workout_notes/services/sleep_wake_model.dart';
 /// signals; the model assumes it lasts a few minutes after the last sound of
 /// a person. Probabilities are model probabilities, not calibrated ones.
 class SleepWakeEngine {
-  static const algorithmVersion = 'sleep-wake-bedside-v7';
+  static const algorithmVersion = 'sleep-wake-bedside-v8';
   static const source = 'bedside_heuristic';
   static const featureVersions = {
     'audio-features-v3',
     'audio-features-v4',
     'audio-features-v5',
+    'audio-features-v6',
   };
   static const alignmentToleranceMilliseconds = 1000;
 
@@ -50,6 +51,28 @@ class SleepWakeEngine {
     'strong_movement_score_db':
         SleepAudioEvidenceExtractor.strongMovementScoreDb,
     'minimum_burst_seconds': SleepAudioEvidenceExtractor.minimumBurstSeconds,
+    'faint_broadband_burst_seconds':
+        SleepAudioEvidenceExtractor.faintBroadbandBurstSeconds,
+    'minimum_broadband_burst_seconds':
+        SleepAudioEvidenceExtractor.minimumBroadbandBurstSeconds,
+    'strong_broadband_burst_seconds':
+        SleepAudioEvidenceExtractor.strongBroadbandBurstSeconds,
+    'step_onset_tail_seconds': SleepAudioEvidenceExtractor.stepOnsetTailSeconds,
+    'step_onset_max_prior_seconds':
+        SleepAudioEvidenceExtractor.stepOnsetMaxPriorSeconds,
+    'room_adapted_persistence_windows':
+        SleepAudioEvidenceExtractor.roomAdaptedPersistenceWindows,
+    'room_adapted_floor_excess_db':
+        SleepAudioEvidenceExtractor.roomAdaptedFloorExcessDb,
+    'minimum_device_active_seconds':
+        SleepAudioEvidenceExtractor.minimumDeviceActiveSeconds,
+    'minimum_pickup_screen_seconds':
+        SleepAudioEvidenceExtractor.minimumPickupScreenSeconds,
+    'motionless_unlocked_seconds':
+        SleepAudioEvidenceExtractor.motionlessUnlockedSeconds,
+    'maximum_motionless_unlocked_windows':
+        SleepAudioEvidenceExtractor.maximumMotionlessUnlockedWindows,
+    'rumble_tilt_db': SleepAudioEvidenceExtractor.rumbleTiltDb,
     'rumble_high_share': SleepAudioEvidenceExtractor.rumbleHighShare,
     'stationary_active_fraction':
         SleepAudioEvidenceExtractor.stationaryActiveFraction,
@@ -258,16 +281,23 @@ class SleepWakeDecision {
   final String reason;
   final bool validSignal;
 
+  /// True when the causal filter still holds recent evidence (within
+  /// [SleepWakeEngine.liveEvidenceHoldSeconds]) and this window was valid.
+  final bool evidenceFresh;
+
   /// Emission-group likelihoods of the window, null without evidence.
   final List<double>? likelihoods;
 
   /// Filtered state probabilities after this window.
   final List<double> probabilities;
 
+  bool get informative => likelihoods != null;
+
   const SleepWakeDecision(
     this.epoch,
     this.reason,
     this.validSignal, {
+    this.evidenceFresh = false,
     this.likelihoods,
     this.probabilities = const [],
   });
@@ -342,9 +372,10 @@ class SleepWakeCursor {
       _secondsWithoutEvidence += seconds;
     }
     final sleep = SleepWakeModel.sleepProbability(_probabilities!);
-    final stage =
-        !evidence.validSignal ||
-            _secondsWithoutEvidence > SleepWakeEngine.liveEvidenceHoldSeconds
+    final evidenceFresh =
+        evidence.validSignal &&
+        _secondsWithoutEvidence <= SleepWakeEngine.liveEvidenceHoldSeconds;
+    final stage = !evidenceFresh
         ? SleepStageType.unknown
         : sleep >= 0.5
         ? SleepStageType.sleeping
@@ -363,6 +394,7 @@ class SleepWakeCursor {
       ),
       evidence.reason,
       evidence.validSignal,
+      evidenceFresh: evidenceFresh,
       likelihoods: evidence.likelihoods,
       probabilities: _probabilities!,
     );

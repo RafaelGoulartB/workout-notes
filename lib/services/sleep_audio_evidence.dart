@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 
-/// What one ~30-second audio aggregate says about the person in bed.
+/// What one ~30-second audio/device aggregate says about the person in bed.
 ///
 /// [likelihoods] holds the probability of the window under the three emission
 /// groups of [SleepWakeModel] (active wake, quiet wake, sleep). It is null
@@ -14,8 +14,8 @@ class SleepAudioEvidence {
   final bool validSignal;
   final List<double>? likelihoods;
 
-  /// Seconds of sound attributed to the person (movement, voice). Ambient
-  /// sound and snoring are excluded.
+  /// Seconds of sound or phone use attributed to the person (movement, voice,
+  /// active device use). Ambient sound and snoring are excluded.
   final double movementSeconds;
 
   /// Seconds of sound attributed to the room (birds, traffic, HVAC).
@@ -34,43 +34,42 @@ class SleepAudioEvidence {
   bool get informative => likelihoods != null;
 }
 
-/// Turns native aggregates into [SleepAudioEvidence].
+/// Turns native bedside aggregates into [SleepAudioEvidence].
 ///
-/// The question it answers is "did a person next to the phone make a sound
-/// in this window?", and the answer rests on one physical difference. A body
-/// moving in bed, bedding, a voice or a hand on the phone is close to the
-/// microphone and raises **every** frequency band at once. Sound from
-/// outside the room is coloured by its source and by the walls: birds and
-/// insects only reach the bands above 1.5 kHz, traffic and thunder mostly the
-/// one below 200 Hz, a dove or a distant voice the middle.
-///
-/// So each band is compared, in dB, with this room's own recent quiet level
-/// ([_floor]) and the window is scored by its **second-smallest** band
-/// excess: at least four of the five bands must have risen by that much. One
-/// band may stay masked by the ambient sound of the moment.
+/// Two complementary sources answer "is the person awake/moving next to the
+/// phone?":
+/// 1. **Bedside device interaction (`audio-features-v6`):** event-driven screen
+///    unlock duration (`device_active_seconds`) and hardware significant-motion
+///    triggers paired with a screen wake (`phone_pickup_count` +
+///    `screen_on_seconds`). A lockscreen notification alone is ignored (and a
+///    12 s grace filters notification wakes without a real unlock from a locked
+///    keyguard), Android dreams / screen savers stop device interaction, and an
+///    unlocked screen sitting motionless for more than 45 minutes (autoplay /
+///    stay-awake while charging) stops overriding audio.
+/// 2. **Broadband acoustic evidence (`v3`–`v6`):** a body moving in bed,
+///    bedding, a voice or a hand on the phone raises **every** frequency band
+///    at once, while birds (>1.5 kHz), traffic (<200 Hz) or a dove (mid-band)
+///    only raise some.
+///    - On `audio-features-v6`, `broadband_active_seconds` is measured natively
+///      on every 125 ms FFT frame against a rolling 5-minute per-band floor, so
+///      brief 1–2 s movements are not diluted by 30-second averaging and a bird
+///      chirp at t=4 s never overlaps a truck at t=22 s.
+///    - On `audio-features-v3`–`v5`, each band's 30-second level is compared in
+///      dB with its recent quiet floor ([_floor]) and scored by its
+///      second-smallest band excess, with a scale-invariant dB tilt filter
+///      ([rumbleTiltDb]) for passing trucks/thunder.
 ///
 /// What this cannot do, by construction:
-/// - A sound whose 30-second level stays within a few dB for five minutes
-///   becomes the room, whoever makes it: a video, a conversation at an even
-///   level, a crying baby next to the phone. At the very start of a night,
-///   with no quiet to compare with, that takes a minute and a half. Someone
-///   watching a video reads as still, exactly like someone who fell asleep
-///   to a podcast; only what stands out of it counts. A person whose sound
-///   comes and goes (every real wake recorded so far) is not affected.
-/// - Bursty sound that stays in a few bands counts as a still person
-///   (`environmental_sound`), not as missing evidence. That is what lets a
-///   morning of birds and traffic be sleep, and it rests on a movement still
-///   standing out of that sound, which holds while the room is not much
-///   louder than a movement.
-/// - Broadband, bursty, strongly varying room sound (a storm with gusts)
-///   looks like a person.
-/// - Low-pitched sound at a breathing rate for a minute or more reads as
-///   snoring, whoever makes it (a snoring bed partner, heavy breathing while
-///   awake), and a movement inside a snoring run is labelled snoring too.
-///   Snoring that stops every other window is still scored as movement. No
-///   recorded night has snoring.
-/// - The dB thresholds are relative to the microphone's own noise floor and
-///   were set on one phone in one bedroom.
+/// - Quiet wakefulness with the screen off still looks like sleep; the HMM's
+///   transition priors assume sleep a few minutes after the last movement.
+/// - A sound with an even level for five minutes while the screen is off
+///   (radio, TV across the room, steady talk) becomes the room.
+/// - A gusty storm with >8 dB broadband gusts can still look like a person.
+/// - Low-pitched periodic sound at a breathing rate for a minute or more reads
+///   as snoring whoever makes it (a bed partner), and no recorded night has
+///   snoring yet.
+/// - The dB thresholds were validated on recorded bedside nights from one
+///   phone/bedroom plus synthetic audio fixtures.
 class SleepAudioEvidenceExtractor {
   static const minimumValidFraction = 0.8;
   static const maximumZeroSampleFraction = 0.98;
@@ -96,8 +95,41 @@ class SleepAudioEvidenceExtractor {
   static const quietWakeScore = [0.84, 0.10, 0.045, 0.015];
   static const sleepScore = [0.86, 0.10, 0.03, 0.01];
 
+  /// Active use of the unlocked phone: strong evidence of wakefulness even in
+  /// silence or steady video audio.
+  static const deviceInteractionLikelihood = [0.45, 0.02, 0.005];
+
   /// Loud, periodic, low-frequency sound: people snore asleep.
   static const snoringLikelihood = [0.02, 0.04, 0.10];
+
+  /// Device interaction thresholds (`audio-features-v6`).
+  static const minimumDeviceActiveSeconds = 5.0;
+  static const minimumPickupScreenSeconds = 1.0;
+  static const motionlessUnlockedSeconds = 25.0;
+
+  /// After 45 minutes (90 windows) of an unlocked screen with zero motion
+  /// triggers, stop overriding audio so stay-awake / autoplay never ruins an
+  /// entire night while still covering long bedtime reading or scrolling.
+  static const maximumMotionlessUnlockedWindows = 90;
+
+  /// Per-frame broadband burst thresholds (`audio-features-v6`).
+  static const faintBroadbandBurstSeconds = 0.375;
+  static const minimumBroadbandBurstSeconds = 1.0;
+  static const strongBroadbandBurstSeconds = 4.0;
+
+  /// An unbroken broadband rise still active at the end of a window for at
+  /// least [stepOnsetTailSeconds] with < [stepOnsetMaxPriorSeconds] earlier
+  /// in the window is a step onset (AC/fan switching on), not a person burst.
+  static const stepOnsetTailSeconds = 5.0;
+  static const stepOnsetMaxPriorSeconds = 0.5;
+
+  /// Persistent v6 broadband activity (present in at least
+  /// [roomAdaptedPersistenceWindows] of the last [recentFloorWindows] windows
+  /// once the 5-minute floor is full) whose 30-second spectrum stays within
+  /// [roomAdaptedFloorExcessDb] of the floor has become the room (bedtime
+  /// podcast, TV, gusty storm, dripping/ticking).
+  static const roomAdaptedPersistenceWindows = 8;
+  static const roomAdaptedFloorExcessDb = 4.0;
 
   /// The floor of a band is the 20th percentile of the last 20 minutes: a
   /// person's sounds are intermittent at that scale and never reach it.
@@ -118,18 +150,19 @@ class SleepAudioEvidenceExtractor {
   static const minimumScoredBands = 4;
 
   /// A movement is a burst: at least this much of the window stood 10 dB
-  /// above the native 5-minute level baseline. A broadband rise without any
-  /// burst is a sound that has been going on for minutes (rain, a fan).
+  /// above the native 5-minute level baseline (legacy `v3`–`v5` path).
   static const minimumBurstSeconds = 1.0;
 
-  /// Less than this share of the energy added over the floor lies above
-  /// 1.5 kHz: a vehicle, thunder or a door slammed somewhere else, whose
-  /// rumble is loud enough to leak into every band. A person next to the
-  /// phone always adds more (measured on added energy, not on the dB excess,
-  /// so it still holds while birdsong masks the high bands).
-  static const rumbleHighShare = 0.02;
+  /// Low-frequency rumble (passing truck, thunder, distant door slam) requires
+  /// both a steep sub-200 Hz dB rise over >1.5 kHz ([rumbleTiltDb], keeping
+  /// uniform movements over a fan floor from being rejected) and a tiny share
+  /// of added linear energy above 1.5 kHz ([rumbleHighShare], keeping close
+  /// movements while birds mask the high-band floor from being rejected).
+  static const rumbleTiltDb = 15.0;
+  static const rumbleHighShare = 0.03;
 
-  /// A constant loud source (fan, AC) before the native baseline absorbs it.
+  /// A constant loud source (fan, AC, steady rain) before the baseline absorbs
+  /// it.
   static const stationaryActiveFraction = 0.8;
   static const minimumVariableLevelStddevDb = 3.0;
 
@@ -146,7 +179,14 @@ class SleepAudioEvidenceExtractor {
 
   /// Recent band levels in dB, oldest first.
   final List<List<double>> _levels = [];
+
+  /// Whether each of the last [recentFloorWindows] windows had v6 broadband
+  /// activity.
+  final List<bool> _recentBroadbandActive = [];
   bool _previousSnoreLike = false;
+  int _motionlessUnlockedWindows = 0;
+  bool _previousHadPickup = false;
+  bool _previousHadScreenOn = false;
 
   static const invalid = SleepAudioEvidence(
     reason: 'invalid_capture',
@@ -154,9 +194,14 @@ class SleepAudioEvidenceExtractor {
     likelihoods: null,
   );
 
-  /// Windows are missing before the next one: a run of snoring does not
-  /// continue across them.
-  void interrupt() => _previousSnoreLike = false;
+  /// Windows are missing before the next one: runs do not continue across gaps.
+  void interrupt() {
+    _previousSnoreLike = false;
+    _motionlessUnlockedWindows = 0;
+    _previousHadPickup = false;
+    _previousHadScreenOn = false;
+    _recentBroadbandActive.clear();
+  }
 
   /// [segment] is judged over its own duration, whatever part of it the
   /// caller labels.
@@ -165,38 +210,112 @@ class SleepAudioEvidenceExtractor {
     required String sessionId,
   }) {
     final seconds = segment.durationSeconds;
-    final level = _bandLevels(segment, sessionId: sessionId);
-    if (level == null) {
+    if (segment.sessionId != sessionId || seconds <= 0 || seconds > 60) {
       _previousSnoreLike = false;
+      _motionlessUnlockedWindows = 0;
+      _previousHadPickup = false;
+      _previousHadScreenOn = false;
+      _recentBroadbandActive.clear();
       return invalid;
     }
-    final floor = _floor();
-    _levels.add(level);
-    if (_levels.length > floorWindows) _levels.removeAt(0);
+
+    final level = _bandLevels(segment, sessionId: sessionId);
+    final priorFloorCount = _levels.length;
+    final floor = level == null ? null : _floor();
+    if (level != null) {
+      _levels.add(level);
+      if (_levels.length > floorWindows) _levels.removeAt(0);
+    }
     final snoreLikeBefore = _previousSnoreLike;
     _previousSnoreLike = false;
 
-    final activity = segment.noiseActiveSeconds;
-    if (activity == null || !activity.isFinite || activity < 0) {
+    final rawActivity = segment.noiseActiveSeconds;
+    final activeOrZero =
+        rawActivity != null && rawActivity.isFinite && rawActivity >= 0
+        ? rawActivity.clamp(0, seconds).toDouble()
+        : 0.0;
+
+    // Bedside device signals (audio-features-v6): evaluated even when another
+    // app temporarily silences the mic or while the acoustic floor calibrates.
+    final deviceActive = _clampPositive(segment.deviceActiveSeconds, seconds);
+    final screenOn = _clampPositive(segment.screenOnSeconds, seconds);
+    final pickups = (segment.phonePickupCount ?? 0).clamp(0, 1000);
+    final hadPickup = pickups >= 1;
+    final hadScreenOn = screenOn >= minimumPickupScreenSeconds;
+    final prevPickup = _previousHadPickup;
+    final prevScreenOn = _previousHadScreenOn;
+    _previousHadPickup = hadPickup;
+    _previousHadScreenOn = hadScreenOn;
+
+    if (deviceActive >= motionlessUnlockedSeconds && pickups == 0) {
+      _motionlessUnlockedWindows++;
+    } else {
+      _motionlessUnlockedWindows = 0;
+    }
+    if (deviceActive >= minimumDeviceActiveSeconds &&
+        _motionlessUnlockedWindows <= maximumMotionlessUnlockedWindows) {
+      // Clear pickup carry-over once active use is credited so a pickup during
+      // an unlocked window cannot fire phone_pickup on the next window.
+      _previousHadPickup = false;
+      _previousHadScreenOn = false;
+      _recentBroadbandActive.clear();
+      return SleepAudioEvidence(
+        reason: 'device_interaction',
+        validSignal: true,
+        likelihoods: deviceInteractionLikelihood,
+        movementSeconds: math.max(activeOrZero, deviceActive),
+      );
+    }
+    if ((hadPickup && (hadScreenOn || prevScreenOn)) ||
+        (prevPickup && hadScreenOn)) {
+      // Clear carry-over once credited so one pickup cannot trigger two windows.
+      _previousHadPickup = false;
+      _previousHadScreenOn = false;
+      _recentBroadbandActive.clear();
+      return SleepAudioEvidence(
+        reason: 'phone_pickup',
+        validSignal: true,
+        likelihoods: _groups(3),
+        movementSeconds: math
+            .max(activeOrZero, hadScreenOn ? screenOn : 1.0)
+            .clamp(1.0, seconds.toDouble()),
+      );
+    }
+
+    if (level == null) return invalid;
+    if (rawActivity == null || !rawActivity.isFinite || rawActivity < 0) {
       return const SleepAudioEvidence(
         reason: 'no_activity_measure',
         validSignal: true,
         likelihoods: null,
       );
     }
-    final active = activity.clamp(0, seconds).toDouble();
-    if (floor == null) {
+    final active = activeOrZero;
+    final levelStddev = segment.audioLevelStddevDb;
+    final steadyLevel =
+        levelStddev == null ||
+        !levelStddev.isFinite ||
+        levelStddev < minimumVariableLevelStddevDb;
+
+    final bbActiveRaw = segment.broadbandActiveSeconds;
+    final hasFrameBroadband =
+        bbActiveRaw != null && bbActiveRaw.isFinite && bbActiveRaw >= 0;
+    final bbActive = hasFrameBroadband
+        ? bbActiveRaw.clamp(0, seconds).toDouble()
+        : 0.0;
+
+    if (!hasFrameBroadband && floor == null) {
       return const SleepAudioEvidence(
         reason: 'calibrating',
         validSignal: true,
         likelihoods: null,
       );
     }
-    final levelStddev = segment.audioLevelStddevDb;
-    if (active / seconds >= stationaryActiveFraction &&
-        (levelStddev == null ||
-            !levelStddev.isFinite ||
-            levelStddev < minimumVariableLevelStddevDb)) {
+    if ((active / seconds >= stationaryActiveFraction ||
+            (hasFrameBroadband &&
+                bbActive / seconds >= stationaryActiveFraction)) &&
+        steadyLevel) {
+      if (hasFrameBroadband) _recordRecentBroadbandActive(false);
       return const SleepAudioEvidence(
         reason: 'steady_background',
         validSignal: true,
@@ -204,11 +323,101 @@ class SleepAudioEvidenceExtractor {
       );
     }
 
+    final burst = active >= minimumBurstSeconds;
+
+    if (hasFrameBroadband) {
+      final isBroadbandActive = bbActive >= minimumBroadbandBurstSeconds;
+      final snoreLike =
+          burst &&
+          segment.noiseScore! >= snoringNoiseDb &&
+          _periodic(segment) &&
+          _lowShare(level) >= snoringLowShare;
+      _previousSnoreLike = snoreLike;
+      if (snoreLike && snoreLikeBefore) {
+        _recordRecentBroadbandActive(false);
+        return const SleepAudioEvidence(
+          reason: 'snoring',
+          validSignal: true,
+          likelihoods: snoringLikelihood,
+          snoring: true,
+        );
+      }
+      final recentActiveCount = _recentBroadbandActive.where((v) => v).length;
+      _recordRecentBroadbandActive(isBroadbandActive);
+      final bbStrong = _clampPositive(segment.broadbandStrongSeconds, seconds);
+      final bbTail = _clampPositive(segment.broadbandTailSeconds, seconds);
+      final bbPeak =
+          segment.broadbandPeakDb != null && segment.broadbandPeakDb!.isFinite
+          ? segment.broadbandPeakDb!
+          : 0.0;
+      if (isBroadbandActive) {
+        // An unbroken rise still running at window end (AC/fan switching on
+        // mid-window) is treated as neutral sustained sound rather than a
+        // sudden movement burst.
+        if (bbTail >= stepOnsetTailSeconds &&
+            bbActive - bbTail < stepOnsetMaxPriorSeconds) {
+          return SleepAudioEvidence(
+            reason: 'sustained_sound',
+            validSignal: true,
+            likelihoods: _groups(1),
+          );
+        }
+        // After a full 5-minute floor (10 windows), persistent broadband
+        // activity in >= 8 of the last 10 windows whose 30-second spectrum
+        // stays within 4 dB of the room floor has become the room (podcast,
+        // TV, gusty storm, recurring clicks/dripping).
+        if (floor != null &&
+            priorFloorCount >= recentFloorWindows &&
+            recentActiveCount >= roomAdaptedPersistenceWindows) {
+          final silent = _decibels(0);
+          final excess30s = [
+            for (var band = 0; band < 5; band++)
+              if (floor[band] > silent) level[band] - floor[band],
+          ]..sort();
+          if (excess30s.length >= minimumScoredBands &&
+              excess30s[1] < roomAdaptedFloorExcessDb) {
+            return SleepAudioEvidence(
+              reason: 'environmental_sound',
+              validSignal: true,
+              likelihoods: _groups(0),
+              ambientSeconds: burst ? active : 0,
+            );
+          }
+        }
+        final strong =
+            bbStrong >= minimumBroadbandBurstSeconds ||
+            bbActive >= strongBroadbandBurstSeconds ||
+            (bbPeak >= strongMovementScoreDb && bbActive >= 2.0);
+        final bin = strong ? 3 : 2;
+        return SleepAudioEvidence(
+          reason: bin == 2 ? 'movement' : 'strong_movement',
+          validSignal: true,
+          likelihoods: _groups(bin),
+          movementSeconds: bbActive,
+        );
+      }
+      if (bbActive >= faintBroadbandBurstSeconds) {
+        return SleepAudioEvidence(
+          reason: 'faint_sound',
+          validSignal: true,
+          likelihoods: _groups(1),
+        );
+      }
+      return SleepAudioEvidence(
+        reason: burst ? 'environmental_sound' : 'quiet_audio',
+        validSignal: true,
+        likelihoods: _groups(0),
+        ambientSeconds: burst ? active : 0,
+      );
+    }
+
+    // Legacy 30-second spectral path (audio-features-v3/v4/v5).
     final silent = _decibels(0);
-    final excess = [
+    final rawExcess = <double?>[
       for (var band = 0; band < 5; band++)
-        if (floor[band] > silent) level[band] - floor[band],
-    ]..sort();
+        floor![band] > silent ? level[band] - floor[band] : null,
+    ];
+    final excess = [for (final value in rawExcess) ?value]..sort();
     if (excess.length < minimumScoredBands) {
       return const SleepAudioEvidence(
         reason: 'silent_bands',
@@ -216,7 +425,6 @@ class SleepAudioEvidenceExtractor {
         likelihoods: null,
       );
     }
-    final burst = active >= minimumBurstSeconds;
     final snoreLike =
         burst &&
         segment.noiseScore! >= snoringNoiseDb &&
@@ -241,7 +449,7 @@ class SleepAudioEvidenceExtractor {
             : 'quiet_audio',
         validSignal: true,
         likelihoods: _groups(bin),
-        ambientSeconds: burst ? active : 0,
+        ambientSeconds: bin == 0 && burst ? active : 0,
       );
     }
     // Every band rose, but not the way a person next to the phone does it.
@@ -253,7 +461,7 @@ class SleepAudioEvidenceExtractor {
         likelihoods: _groups(1),
       );
     }
-    if (_addedHighShare(level, floor) < rumbleHighShare) {
+    if (_isLowRumble(level, floor!, rawExcess)) {
       return SleepAudioEvidence(
         reason: 'low_rumble',
         validSignal: true,
@@ -268,6 +476,11 @@ class SleepAudioEvidenceExtractor {
       movementSeconds: active,
     );
   }
+
+  static double _clampPositive(double? value, int maxSeconds) =>
+      value != null && value.isFinite && value > 0
+      ? value.clamp(0, maxSeconds).toDouble()
+      : 0.0;
 
   static double _decibels(double energy) =>
       10 * math.log(math.max(energy, minimumBandEnergy)) / math.ln10;
@@ -301,6 +514,29 @@ class SleepAudioEvidenceExtractor {
         flatness.isFinite &&
         flatness >= 0 &&
         flatness < maximumFlatness;
+  }
+
+  /// True when band 0 (<200 Hz) rose at least [rumbleTiltDb] more than either
+  /// band above 1.5 kHz AND less than [rumbleHighShare] of the added energy
+  /// lies above 1.5 kHz. Requiring both keeps uniform movements on a fan floor
+  /// and close-range movements during loud birdsong from being misclassified.
+  static bool _isLowRumble(
+    List<double> level,
+    List<double> floor,
+    List<double?> rawExcess,
+  ) {
+    final low = rawExcess[0];
+    if (low == null) return false;
+    final b3 = rawExcess[3];
+    final b4 = rawExcess[4];
+    final double? high;
+    if (b3 != null && b4 != null) {
+      high = math.max(b3, b4);
+    } else {
+      high = b3 ?? b4;
+    }
+    if (high == null || low - high < rumbleTiltDb) return false;
+    return _addedHighShare(level, floor) < rumbleHighShare;
   }
 
   /// Share of the energy above the room floor that lies above 1.5 kHz.
@@ -384,5 +620,12 @@ class SleepAudioEvidenceExtractor {
               : recent.map((window) => window[band]).reduce(math.min),
         ),
     ];
+  }
+
+  void _recordRecentBroadbandActive(bool active) {
+    _recentBroadbandActive.add(active);
+    if (_recentBroadbandActive.length > recentFloorWindows) {
+      _recentBroadbandActive.removeAt(0);
+    }
   }
 }

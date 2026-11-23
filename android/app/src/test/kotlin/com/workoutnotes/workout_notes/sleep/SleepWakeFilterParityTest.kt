@@ -32,6 +32,10 @@ class SleepWakeFilterParityTest {
             val expectedP = run.getJSONArray("p")
             val expectedReason = run.getJSONArray("reason")
             val expectedValid = run.getJSONArray("valid")
+            val expectedInformative = run.getJSONArray("informative")
+            val expectedFresh = run.getJSONArray("fresh")
+            val expectedMovement = run.getJSONArray("movement")
+            val expectedAmbient = run.getJSONArray("ambient")
             assertEquals(label, expectedP.length(), segments.size)
 
             val filter = SleepWakeFilter(sessionId)
@@ -39,6 +43,10 @@ class SleepWakeFilterParityTest {
             decisions.forEachIndexed { i, decision ->
                 assertEquals("$label reason $i", expectedReason.getString(i), decision.reason)
                 assertEquals("$label valid $i", expectedValid.getBoolean(i), decision.validSignal)
+                assertEquals("$label informative $i", expectedInformative.getBoolean(i), decision.informative)
+                assertEquals("$label fresh $i", expectedFresh.getBoolean(i), decision.evidenceFresh)
+                assertEquals("$label movement $i", expectedMovement.getDouble(i), decision.movementSeconds, 1e-9)
+                assertEquals("$label ambient $i", expectedAmbient.getDouble(i), decision.ambientSeconds, 1e-9)
                 assertEquals(
                     "$label p $i",
                     expectedP.getDouble(i),

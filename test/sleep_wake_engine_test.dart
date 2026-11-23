@@ -8,6 +8,7 @@ import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/services/sleep_audio_evidence.dart';
 import 'package:workout_notes/services/sleep_stage_analysis_service.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
+import 'package:workout_notes/services/smart_wake_policy.dart';
 import 'support/sleep_bedside_fixture.dart';
 
 void main() {
@@ -964,11 +965,283 @@ void main() {
     });
   });
 
-  test('v3 feature fields survive spool roundtrip', () {
-    final original = bedsideSegment(1, periodic: true);
+  test('v3 and v6 feature fields survive spool roundtrip', () {
+    final original = SleepMonitorSegment.fromMap({
+      ...bedsideSegment(1, periodic: true).toMap(),
+      'broadband_active_seconds': 2.5,
+      'broadband_strong_seconds': 1.25,
+      'broadband_peak_db': 16.4,
+      'broadband_tail_seconds': 0.5,
+      'device_active_seconds': 18.0,
+      'screen_on_seconds': 20.0,
+      'phone_pickup_count': 2,
+    });
     expect(
       SleepMonitorSegment.fromMap(original.toMap()).toMap(),
       original.toMap(),
     );
+  });
+
+  group('v8 improvements', () {
+    test('low_rumble is scale-invariant under a low-frequency fan floor', () {
+      // A fan makes band 0 1000x louder in linear energy than bands 3-4.
+      SleepMonitorSegment fanRoom(
+        int i, {
+        double gain = 1,
+        double active = 0,
+      }) => SleepMonitorSegment.fromMap({
+        ...bedsideSegment(i).toMap(),
+        'noise_active_seconds': active,
+        'noise_score': active > 0 ? 15.0 : 1.0,
+        'audio_level_stddev_db': active > 0 ? 7.0 : 1.5,
+        'spectral_band_energy_0': 10000.0 * gain,
+        'spectral_band_energy_1': 500.0 * gain,
+        'spectral_band_energy_2': 50.0 * gain,
+        'spectral_band_energy_3': 5.0 * gain,
+        'spectral_band_energy_4': 5.0 * gain,
+      });
+      final cursor = SleepWakeCursor(sessionId: 'bedside', startsAwake: true);
+      for (var i = 0; i < 15; i++) {
+        cursor.add(fanRoom(i));
+      }
+      // Uniform +20 dB broadband movement across all 5 bands must NOT be
+      // discarded as low_rumble even though floor high share is < 0.1%.
+      final move = cursor.add(fanRoom(15, gain: 100, active: 5));
+      expect(move.reason, 'strong_movement');
+      expect(move.epoch.movementSeconds, 5);
+    });
+
+    test('faint_sound does not inflate ambientSeconds', () {
+      final cursor = SleepWakeCursor(sessionId: 'bedside', startsAwake: true);
+      for (var i = 0; i < 10; i++) {
+        cursor.add(bedsideSegment(i));
+      }
+      final faint = cursor.add(broadband(10, db: 6, seconds: 4, noise: 8));
+      expect(faint.reason, 'faint_sound');
+      expect(faint.epoch.ambientSeconds, 0);
+      expect(faint.epoch.movementSeconds, 0);
+    });
+
+    test(
+      'audio-features-v6 detects fan-masked brief turns, guards AC step onset and adapts to steady podcasts',
+      () {
+        SleepMonitorSegment v6(
+          int i, {
+          double bbActive = 0,
+          double bbStrong = 0,
+          double bbPeak = 2,
+          double bbTail = 0,
+          double active = 0,
+          double stddev = 1.3,
+          double gainDb = 0,
+        }) {
+          final gain = math.pow(10, gainDb / 10);
+          return SleepMonitorSegment.fromMap({
+            ...bedsideSegment(i).toMap(),
+            'noise_active_seconds': active,
+            'audio_level_stddev_db': stddev,
+            'spectral_band_energy_0': 10.0 * gain,
+            'spectral_band_energy_1': 20.0 * gain,
+            'spectral_band_energy_2': 5.0 * gain,
+            'spectral_band_energy_3': 1.0 * gain,
+            'spectral_band_energy_4': 1.0 * gain,
+            'broadband_active_seconds': bbActive,
+            'broadband_strong_seconds': bbStrong,
+            'broadband_peak_db': bbPeak,
+            'broadband_tail_seconds': bbTail,
+          });
+        }
+
+        final cursor = SleepWakeCursor(sessionId: 'bedside', startsAwake: true);
+        for (var i = 0; i < 40; i++) {
+          cursor.add(v6(i));
+        }
+        // Non-simultaneous birds + truck in the same 30 s window: bbActive = 0.
+        final ambient = cursor.add(v6(40, bbActive: 0, active: 15, stddev: 7));
+        expect(ambient.reason, 'environmental_sound');
+        expect(ambient.epoch.ambientSeconds, 15);
+        expect(ambient.epoch.movementSeconds, 0);
+
+        // Realistic fan-masked 1.5 s turn: active = 0 and low full-band stddev
+        // (1.3 dB) must STILL score movement, not sustained_sound.
+        final briefTurn = cursor.add(
+          v6(41, bbActive: 1.5, bbPeak: 11, active: 0, stddev: 1.3),
+        );
+        expect(briefTurn.reason, 'movement');
+        expect(briefTurn.epoch.movementSeconds, 1.5);
+
+        // AC switching on at window tail (unbroken 10 s run to end) is neutral.
+        final acOnset = cursor.add(
+          v6(42, bbActive: 10, bbTail: 10, bbPeak: 12, active: 5, stddev: 5.8),
+        );
+        expect(acOnset.reason, 'sustained_sound');
+
+        // Smooth broadband rain/fan (stddev < 3) is steady_background.
+        final steadyRain = cursor.add(
+          v6(43, bbActive: 28, bbPeak: 10, active: 0, stddev: 1.2),
+        );
+        expect(steadyRain.reason, 'steady_background');
+        expect(steadyRain.informative, false);
+
+        // Even-level podcast/storm OR recurring 2 s room clicks/dripping
+        // running for >5 min adapt into the room once the 5-minute floor fills.
+        for (final bbSeconds in [2.0, 15.0]) {
+          final recurring = [
+            for (var i = 0; i < 40; i++) v6(i),
+            for (var i = 40; i < 120; i++)
+              v6(
+                i,
+                bbActive: bbSeconds,
+                bbStrong: bbSeconds > 4 ? 5 : 0,
+                bbPeak: 14,
+                active: bbSeconds,
+                stddev: 6,
+                gainDb: 12 + (i.isEven ? 1.5 : 0.0),
+              ),
+          ];
+          final recResult = runNight(recurring);
+          expect(
+            recResult.decisionReasons[recResult.epochs[65].id],
+            'environmental_sound',
+            reason: 'bbSeconds=$bbSeconds',
+          );
+          expect(
+            recResult.epochs[80].isSleep,
+            true,
+            reason: 'bbSeconds=$bbSeconds',
+          );
+        }
+
+        // During the first 4 minutes of bedtime (<10 windows), persistent
+        // broadband speech/movement is NOT suppressed by the 5-min guard.
+        final earlyWake = [
+          for (var i = 0; i < 8; i++)
+            v6(i, bbActive: 8, bbPeak: 12, active: 8, stddev: 6, gainDb: 10),
+        ];
+        final earlyResult = runNight(earlyWake);
+        expect(
+          earlyResult.decisionReasons[earlyResult.epochs[5].id],
+          'strong_movement',
+        );
+      },
+    );
+
+    test(
+      'bedside device interaction catches silent phone use, split pickups, and caps stale unlocked screens',
+      () {
+        SleepMonitorSegment withDevice(
+          int i, {
+          double deviceActive = 0,
+          double screenOn = 0,
+          int pickups = 0,
+          bool silentMic = false,
+        }) => SleepMonitorSegment.fromMap({
+          ...bedsideSegment(i).toMap(),
+          if (silentMic) 'digital_silence_fraction': 1.0,
+          'device_active_seconds': deviceActive,
+          'screen_on_seconds': screenOn,
+          'phone_pickup_count': pickups,
+        });
+
+        // 1. Lockscreen notification alone while asleep does not wake.
+        final segments = [
+          for (var i = 0; i < 60; i++) withDevice(i),
+          for (var i = 60; i < 62; i++) withDevice(i, screenOn: 8),
+          withDevice(62),
+          // 2. Motion at end of window 63 + screen wake at start of window 64.
+          withDevice(63, pickups: 1),
+          withDevice(64, screenOn: 6),
+          // A subsequent lockscreen wake does not re-credit the same pickup.
+          withDevice(65, screenOn: 6),
+          // 3. Silent unlocked scrolling (even if mic is silenced by another app)
+          // wakes immediately.
+          for (var i = 66; i < 76; i++)
+            withDevice(i, deviceActive: 20, screenOn: 20, silentMic: i == 69),
+          for (var i = 76; i < 160; i++) withDevice(i),
+        ];
+        final result = runNight(segments);
+        expect(result.decisionReasons[result.epochs[61].id], 'quiet_audio');
+        expect(result.epochs[61].isSleep, true);
+        expect(result.decisionReasons[result.epochs[64].id], 'phone_pickup');
+        expect(result.decisionReasons[result.epochs[65].id], 'quiet_audio');
+        expect(
+          result.decisionReasons[result.epochs[69].id],
+          'device_interaction',
+        );
+        expect(
+          result.epochs
+              .sublist(66, 76)
+              .every((e) => e.stage == SleepStageType.awake),
+          true,
+        );
+
+        // 4. Phone left unlocked & motionless all night ("stay awake while
+        // charging") stops overriding audio after 45 minutes (90 windows).
+        final stayAwake = [
+          for (var i = 0; i < 240; i++)
+            withDevice(i, deviceActive: 30, screenOn: 30, pickups: 0),
+        ];
+        final stayResult = runNight(stayAwake);
+        expect(
+          stayResult.decisionReasons[stayResult.epochs[89].id],
+          'device_interaction',
+        );
+        expect(
+          stayResult.decisionReasons[stayResult.epochs[90].id],
+          'quiet_audio',
+        );
+        expect(stayResult.epochs.last.isSleep, true);
+      },
+    );
+
+    test('process-recovered session recomputes stale checkpoint aggregates', () {
+      final segments = [
+        for (var i = 0; i < 19; i++) bedsideSegment(i, activity: i == 15),
+      ];
+      // Simulate OS kill 9 segments after a segment-10 session.json checkpoint.
+      final recovered = SleepMonitorSession.fromNative({
+        'id': 'bedside',
+        'status': SleepMonitorSession.running,
+        'started_at': bedsideStart.toIso8601String(),
+        'ended_at': null,
+        'utc_offset_start_minutes': 0,
+        'sensor_mode': 'audio_bedside',
+        'algorithm_version': 'audio-features-v6',
+        'time_in_bed_minutes': 5,
+        'quiet_minutes': 5,
+        'noisy_minutes': 0,
+        'noise_event_count': 0,
+        'signal_quality_score': 0.5,
+        'created_at': bedsideStart.toIso8601String(),
+      }, segments);
+      expect(recovered.status, SleepMonitorSession.interrupted);
+      expect(recovered.timeInBedMinutes, 10);
+      expect(recovered.quietMinutes, 9);
+      expect(recovered.noisyMinutes, 1);
+      expect(recovered.noiseEventCount, 1);
+      expect(recovered.signalQualityScore, closeTo(1.0, 1e-9));
+    });
+
+    test('smart alarm never arms on steady_background drift', () {
+      final cursor = SleepWakeCursor(sessionId: 'bedside', startsAwake: true);
+      final policy = SmartWakePolicy(0.5);
+      final deadline = bedsideStart.add(const Duration(hours: 3));
+      final windowStart = deadline.subtract(const Duration(minutes: 30));
+      for (var i = 0; i < 300; i++) {
+        final d = cursor.add(steady(i));
+        final trigger = policy.onWindow(
+          sleepProbability: cursor.sleepProbability!,
+          validSignal: d.validSignal,
+          informative: d.informative,
+          evidenceFresh: d.evidenceFresh,
+          seconds: 30,
+          now: bedsideStart.add(Duration(seconds: 30 * (i + 1))),
+          windowStart: windowStart,
+          deadline: deadline,
+        );
+        expect(trigger, isNull);
+      }
+      expect(policy.isArmed, false);
+    });
   });
 }

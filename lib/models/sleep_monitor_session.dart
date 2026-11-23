@@ -403,13 +403,12 @@ class SleepMonitorSession {
     normalized['monitor_mode'] ??= normalized['alarm_at'] == null
         ? SleepMonitoringMode.monitoringOnly.wireValue
         : SleepMonitoringMode.alarmWithoutMission.wireValue;
-    normalized['time_in_bed_minutes'] ??=
-        ((DateTime.parse(
-                  normalized['ended_at'] as String,
-                ).difference(start).inSeconds) /
-                60)
-            .round();
-    normalized['quiet_minutes'] ??=
+    final resolvedEndText = normalized['ended_at'] as String?;
+    final computedTimeInBed = resolvedEndText == null
+        ? 0
+        : ((DateTime.parse(resolvedEndText).difference(start).inSeconds) / 60)
+              .round();
+    final computedQuiet =
         (segments
                     .where((segment) => segment.isQuiet)
                     .fold<int>(
@@ -418,7 +417,7 @@ class SleepMonitorSession {
                     ) /
                 60)
             .round();
-    normalized['noisy_minutes'] ??=
+    final computedNoisy =
         (segments
                     .where((segment) => segment.isNoise)
                     .fold<int>(
@@ -427,14 +426,30 @@ class SleepMonitorSession {
                     ) /
                 60)
             .round();
-    normalized['noise_event_count'] ??= _eventCount(segments);
-    normalized['signal_quality_score'] ??= segments.isEmpty
+    final computedNoiseEvents = _eventCount(segments);
+    final computedSignalQuality = segments.isEmpty
         ? 0.0
         : segments.fold<double>(
                 0,
                 (sum, segment) => sum + segment.validFraction,
               ) /
               segments.length;
+    if (isUnfinished && segments.isNotEmpty) {
+      // A process-recovered spool may carry a periodic session.json checkpoint
+      // older than the latest appended segment; always derive the recovery
+      // totals from the full segment list so time-in-bed never lags behind.
+      normalized['time_in_bed_minutes'] = computedTimeInBed;
+      normalized['quiet_minutes'] = computedQuiet;
+      normalized['noisy_minutes'] = computedNoisy;
+      normalized['noise_event_count'] = computedNoiseEvents;
+      normalized['signal_quality_score'] = computedSignalQuality;
+    } else {
+      normalized['time_in_bed_minutes'] ??= computedTimeInBed;
+      normalized['quiet_minutes'] ??= computedQuiet;
+      normalized['noisy_minutes'] ??= computedNoisy;
+      normalized['noise_event_count'] ??= computedNoiseEvents;
+      normalized['signal_quality_score'] ??= computedSignalQuality;
+    }
     return SleepMonitorSession.fromMap(normalized);
   }
 

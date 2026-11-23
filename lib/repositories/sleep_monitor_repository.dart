@@ -154,7 +154,7 @@ class SleepMonitorRepository extends BaseRepository {
     final recovered = SleepMonitorSession.fromNative(rawSession, rawSegments);
     final bedside = SleepWakeEngine.supports(recovered);
     final sessionEnd = recovered.endedAt ?? recovered.startedAt;
-    // Only bedside feature nights (audio-features-v3/v4/v5) are staged; older
+    // Only bedside feature nights (audio-features-v3/v4/v5/v6) are staged; older
     // recordings keep the legacy status and no inference.
     SleepStageSummary? stageSummary;
     if (bedside && rawSegments.any((segment) => segment.hasSpectralFeatures)) {

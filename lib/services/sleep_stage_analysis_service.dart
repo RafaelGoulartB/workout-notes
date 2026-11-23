@@ -19,7 +19,7 @@ class SleepStageAnalysisService {
   /// person moving (not ambient sound, not snoring).
   static const restlessNeighbourhoodSeconds = 5 * 60;
   static const restlessMovementWindows = 5;
-  static const movementSeconds = 2.0;
+  static const movementSeconds = 1.0;
 
   const SleepStageAnalysisService();
 

@@ -58,6 +58,24 @@ void main() {
       final label = '${actual['fixture']}';
       expect(expected['reason'], actual['reason'], reason: label);
       expect(expected['valid'], actual['valid'], reason: label);
+      expect(expected['informative'], actual['informative'], reason: label);
+      expect(expected['fresh'], actual['fresh'], reason: label);
+      final moveExpected = expected['movement'] as List;
+      final moveActual = actual['movement']! as List<double>;
+      final ambExpected = expected['ambient'] as List;
+      final ambActual = actual['ambient']! as List<double>;
+      for (var i = 0; i < moveActual.length; i++) {
+        expect(
+          (moveExpected[i] as num).toDouble(),
+          closeTo(moveActual[i], 1e-9),
+          reason: '$label movement $i',
+        );
+        expect(
+          (ambExpected[i] as num).toDouble(),
+          closeTo(ambActual[i], 1e-9),
+          reason: '$label ambient $i',
+        );
+      }
       final p = expected['p'] as List;
       final q = actual['p']! as List<double>;
       expect(p.length, q.length, reason: label);
@@ -101,6 +119,8 @@ void main() {
         'snoring',
         'movement',
         'strong_movement',
+        'device_interaction',
+        'phone_pickup',
       ]),
     );
   });
@@ -112,6 +132,8 @@ void main() {
     String? feed(int i, double p) => policy.onWindow(
       sleepProbability: p,
       validSignal: true,
+      informative: true,
+      evidenceFresh: true,
       seconds: 30,
       now: bedsideStart.add(Duration(seconds: 30 * (i + 1))),
       windowStart: windowStart,
@@ -158,6 +180,13 @@ Map<String, dynamic> _syntheticNight() {
     'spectral_flatness',
     'breathing_regularity',
     'breathing_rate_hz',
+    'broadband_active_seconds',
+    'broadband_strong_seconds',
+    'broadband_peak_db',
+    'broadband_tail_seconds',
+    'device_active_seconds',
+    'screen_on_seconds',
+    'phone_pickup_count',
   ];
   const quiet = [10.0, 20.0, 5.0, 1.0, 1.0];
   final rows = <List<Object?>>[];
@@ -175,6 +204,13 @@ Map<String, dynamic> _syntheticNight() {
     int gapBefore = 0,
     double valid = 1,
     bool? calibrated = true,
+    double? bbActive,
+    double? bbStrong,
+    double? bbPeak,
+    double? bbTail,
+    double? deviceActive,
+    double? screenOn,
+    int? pickups,
   }) {
     offset += gapBefore;
     rows.add([
@@ -191,6 +227,13 @@ Map<String, dynamic> _syntheticNight() {
       0.3,
       periodic ? 0.7 : 0.0,
       periodic ? rate : 0.0,
+      bbActive,
+      bbStrong,
+      bbPeak,
+      bbTail,
+      deviceActive,
+      screenOn,
+      pickups,
     ]);
     offset += seconds;
   }
@@ -294,6 +337,103 @@ Map<String, dynamic> _syntheticNight() {
       stddev: i.isEven ? 9 : 2,
     );
   }
+  // v6 frame-level broadband bursts and bedside device signals.
+  add(bbActive: 0.0, bbStrong: 0.0, bbPeak: 2.0, active: 0.0); // quiet v6
+  add(
+    bbActive: 0.0,
+    bbStrong: 0.0,
+    bbPeak: 3.0,
+    active: 12.0,
+    stddev: 6.0,
+  ); // env v6
+  add(
+    bbActive: 0.5,
+    bbStrong: 0.0,
+    bbPeak: 9.0,
+    active: 0.5,
+    stddev: 4.0,
+  ); // faint v6
+  // Fan-masked brief turn: active=0, stddev=1.3 must still score movement.
+  add(bbActive: 1.5, bbStrong: 0.0, bbPeak: 11.0, active: 0.0, stddev: 1.3);
+  // Step onset (AC switching on at window tail): sustained_sound.
+  add(
+    bbActive: 8.0,
+    bbStrong: 0.0,
+    bbPeak: 12.0,
+    bbTail: 8.0,
+    active: 4.0,
+    stddev: 5.5,
+  );
+  // Strong movement via bbStrong, via bbActive >= 4, and via bbPeak >= 14 && bbActive >= 2.
+  add(bbActive: 2.5, bbStrong: 1.5, bbPeak: 18.0, active: 4.0, stddev: 8.0);
+  add(
+    gain: all10,
+    bbActive: 4.5,
+    bbStrong: 0.0,
+    bbPeak: 11.0,
+    active: 5.0,
+    stddev: 6.0,
+  );
+  add(bbActive: 2.2, bbStrong: 0.0, bbPeak: 15.0, active: 2.0, stddev: 5.0);
+  // v6 snoring branch (two consecutive periodic windows).
+  add(
+    gain: snore,
+    noise: 18,
+    active: 9,
+    stddev: 8,
+    periodic: true,
+    bbActive: 2.0,
+    bbPeak: 12.0,
+  );
+  add(
+    gain: snore,
+    noise: 18,
+    active: 9,
+    stddev: 8,
+    periodic: true,
+    bbActive: 2.0,
+    bbPeak: 12.0,
+  );
+  // v6 steady_background and negative broadband value (falls back to legacy).
+  add(bbActive: 28.0, bbStrong: 0.0, bbPeak: 10.0, active: 0.0, stddev: 1.0);
+  add(bbActive: -1.0, active: 0.0, stddev: 2.0);
+  // 5-min room-adapted v6 broadband (podcast/storm after floor catches up).
+  for (var i = 0; i < 12; i++) {
+    add(
+      gain: all10,
+      bbActive: 12.0,
+      bbStrong: 4.0,
+      bbPeak: 16.0,
+      active: 10.0,
+      stddev: 6.0,
+    );
+  }
+  // Recurring short (2 s) broadband room sound (clock/drip): adapts after 5 min.
+  for (var i = 0; i < 12; i++) {
+    add(
+      gain: const [1.2, 1.2, 1.2, 1.2, 1.2],
+      bbActive: 2.0,
+      bbStrong: 0.0,
+      bbPeak: 10.0,
+      active: 2.0,
+      stddev: 5.0,
+    );
+  }
+  // Lockscreen notification alone is ignored; pickup split across windows wakes
+  // once (never twice); device interaction clears pickup carry-over and wakes
+  // even on invalid mic capture.
+  add(screenOn: 8.0, deviceActive: 0.0, pickups: 0);
+  add(screenOn: 0.0, deviceActive: 0.0, pickups: 1);
+  add(screenOn: 5.0, deviceActive: 0.0, pickups: 0);
+  add(screenOn: 5.0, deviceActive: 0.0, pickups: 0);
+  add(screenOn: 15.0, deviceActive: 15.0, pickups: 1, invalid: true);
+  add(screenOn: 5.0, deviceActive: 0.0, pickups: 0);
+  // 92 motionless unlocked windows: first 90 are device_interaction, 91st falls
+  // through; a gap resets the counter so the next unlocked window fires again.
+  for (var i = 0; i < 92; i++) {
+    add(screenOn: 30.0, deviceActive: 30.0, pickups: 0);
+  }
+  add(screenOn: 30.0, deviceActive: 30.0, pickups: 0, gapBefore: 90);
   return {'columns': columns, 'rows': rows};
 }
 
@@ -302,11 +442,19 @@ Map<String, Object?> _run(String file, List<SleepMonitorSegment> segments) {
   final p = <double>[];
   final reasons = <String>[];
   final valid = <bool>[];
+  final informative = <bool>[];
+  final fresh = <bool>[];
+  final movement = <double>[];
+  final ambient = <double>[];
   for (final segment in segments) {
     final decision = cursor.add(segment);
     p.add(cursor.sleepProbability!);
     reasons.add(decision.reason);
     valid.add(decision.validSignal);
+    informative.add(decision.informative);
+    fresh.add(decision.evidenceFresh);
+    movement.add(decision.epoch.movementSeconds);
+    ambient.add(decision.epoch.ambientSeconds);
   }
   final ends = [
     for (final s in segments)
@@ -323,6 +471,8 @@ Map<String, Object?> _run(String file, List<SleepMonitorSegment> segments) {
         final result = policy.onWindow(
           sleepProbability: p[i],
           validSignal: valid[i],
+          informative: informative[i],
+          evidenceFresh: fresh[i],
           seconds: segments[i].durationSeconds,
           now: ends[i],
           windowStart: deadline.subtract(const Duration(minutes: 30)),
@@ -347,6 +497,10 @@ Map<String, Object?> _run(String file, List<SleepMonitorSegment> segments) {
     'p': p,
     'reason': reasons,
     'valid': valid,
+    'informative': informative,
+    'fresh': fresh,
+    'movement': movement,
+    'ambient': ambient,
     'smart': smart,
   };
 }
