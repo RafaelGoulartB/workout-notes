@@ -22,9 +22,41 @@ import kotlin.math.roundToInt
 class SleepMonitoringService : Service() {
     companion object {
         private const val MAX_SESSION_MILLIS = 16L * 60L * 60L * 1_000L
-        private var activeInstance: SleepMonitoringService? = null
+        private const val SESSION_FLUSH_INTERVAL_SEGMENTS = 10
+        private const val LIVE_WAVEFORM_HOLD_MILLIS = 3_000L
+        @Volatile private var activeInstance: SleepMonitoringService? = null
         @Volatile private var lastState: Map<String, Any?>? = null
         @Volatile var eventSink: ((Map<String, Any?>) -> Unit)? = null
+        @Volatile var uiVisible: Boolean = false
+            private set
+        private var visibleOwner: Any? = null
+        @Volatile private var lastLiveLevelRequestedElapsed: Long = 0L
+
+        /**
+         * Tracks whether [MainActivity] is started/visible. Keyed by owner so
+         * an older Activity's teardown never clears a newer Activity's state.
+         */
+        @Synchronized
+        fun setUiVisible(owner: Any, visible: Boolean) {
+            if (visible) {
+                visibleOwner = owner
+                uiVisible = true
+                if (eventSink != null) {
+                    activeInstance?.publish()
+                }
+            } else if (visibleOwner === owner) {
+                visibleOwner = null
+                uiVisible = false
+            }
+        }
+
+        /** Clears [eventSink] only when it still matches the caller's sink. */
+        @Synchronized
+        fun clearEventSink(sink: ((Map<String, Any?>) -> Unit)?) {
+            if (sink != null && eventSink === sink) {
+                eventSink = null
+            }
+        }
 
         fun startResponse(
             context: android.content.Context,
@@ -116,7 +148,8 @@ class SleepMonitoringService : Service() {
 
         fun publishAlarmRinging(context: android.content.Context) {
             val snapshot = SleepAlarmScheduler.read(context)
-            val updated = (lastState ?: currentState(context)) + mapOf(
+            val base = activeInstance?.stateMap() ?: lastState ?: currentState(context)
+            val updated = base + mapOf(
                 "alarm_ringing" to true,
                 "alarm_snoozing" to false,
                 "alarm_state" to SleepAlarmScheduler.STATE_RINGING,
@@ -146,7 +179,8 @@ class SleepMonitoringService : Service() {
             if (snapshot.state != SleepAlarmScheduler.STATE_SCHEDULED ||
                 snapshot.snoozeCount <= 0
             ) return
-            val updated = (lastState ?: currentState(context)) + mapOf(
+            val base = activeInstance?.stateMap() ?: lastState ?: currentState(context)
+            val updated = base + mapOf(
                 "alarm_ringing" to false,
                 "alarm_snoozing" to true,
                 "alarm_state" to snapshot.state,
@@ -197,7 +231,10 @@ class SleepMonitoringService : Service() {
         }
 
         /** Live microphone level while recording; a UI signal, never spooled. */
-        fun liveLevel(): Map<String, Any?>? = activeInstance?.processor?.liveLevel()
+        fun liveLevel(): Map<String, Any?>? {
+            lastLiveLevelRequestedElapsed = SystemClock.elapsedRealtime()
+            return activeInstance?.processor?.liveLevel()
+        }
 
         fun currentState(context: android.content.Context): Map<String, Any?> {
             val service = activeInstance
@@ -259,6 +296,7 @@ class SleepMonitoringService : Service() {
     // capture thread.
     private val sessionLock = Any()
     private var processor: AudioSignalProcessor? = null
+    private var deviceTracker: SleepDeviceActivityTracker? = null
     private var sessionStartedAtMillis = 0L
     private var sessionStartedElapsedMillis = 0L
     private var wakeLock: PowerManager.WakeLock? = null
@@ -351,7 +389,7 @@ class SleepMonitoringService : Service() {
             "utc_offset_start_minutes" to offset,
             "utc_offset_end_minutes" to null,
             "sensor_mode" to "audio_bedside",
-            "algorithm_version" to "audio-features-v5",
+            "algorithm_version" to "audio-features-v6",
             "battery_start" to batterySnapshot(),
             "time_in_bed_minutes" to null,
             "quiet_minutes" to null,
@@ -381,10 +419,16 @@ class SleepMonitoringService : Service() {
 
         try {
             acquireWakeLock()
+            deviceTracker = SleepDeviceActivityTracker(this, mainHandler).also { it.start() }
             processor = AudioSignalProcessor(
                 sessionId,
                 onSegment = ::onSegment,
                 onError = { finish("audio_error", "failed") },
+                lowLatency = {
+                    uiVisible &&
+                        SystemClock.elapsedRealtime() - lastLiveLevelRequestedElapsed <
+                        LIVE_WAVEFORM_HOLD_MILLIS
+                },
             )
             processor?.start()
             synchronized(sessionLock) {
@@ -401,7 +445,8 @@ class SleepMonitoringService : Service() {
     private fun onSegment(rawSegment: Map<String, Any?>) {
         val current = session ?: return
         if (finished) return
-        val segment = evaluateWake(rawSegment)
+        val deviceActivity = deviceTracker?.snapshot() ?: emptyMap()
+        val segment = evaluateWake(rawSegment + deviceActivity)
         val startedMillis = Instant.parse(current["started_at"].toString()).toEpochMilli()
         if (!finishing) {
             if (!hasMicrophonePermission()) {
@@ -432,9 +477,16 @@ class SleepMonitoringService : Service() {
             current["time_in_bed_minutes"] =
                 ((sessionNowMillis() - startedMillis) / 60_000.0).roundToInt()
             spool.appendSegment(segment)
-            spool.updateSession(current)
+            // Segments are durably appended every 30 s; flush session.json on
+            // periodic checkpoints (and on lifecycle/alarm updates) to cut
+            // atomic temp-file flash churn by ~90% overnight.
+            if (segmentCount % SESSION_FLUSH_INTERVAL_SEGMENTS == 0) {
+                spool.updateSession(current)
+            }
         }
-        publish()
+        // Skip Binder permission checks, map allocation and Dart isolate wakes
+        // every 30 s while the app is paused/screen-off overnight.
+        if (uiVisible && eventSink != null) publish()
     }
 
     /**
@@ -546,6 +598,8 @@ class SleepMonitoringService : Service() {
 
     private fun releaseResources() {
         processor = null
+        deviceTracker?.stop()
+        deviceTracker = null
         wakeLock?.let { lock ->
             if (lock.isHeld) lock.release()
         }

@@ -64,6 +64,11 @@ class MainActivity : FlutterActivity() {
         ).setMethodCallHandler(MedicationReminderBridge(applicationContext))
     }
 
+    override fun onStart() {
+        super.onStart()
+        sleepMonitorBridge?.setUiVisible(true)
+    }
+
     override fun onResume() {
         super.onResume()
         sleepMonitorBridge?.attachActivity(this)
@@ -76,6 +81,16 @@ class MainActivity : FlutterActivity() {
         runTrackingBridge?.detachActivity()
         barcodeScannerBridge?.detachActivity()
         super.onPause()
+    }
+
+    override fun onStop() {
+        sleepMonitorBridge?.setUiVisible(false)
+        super.onStop()
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        sleepMonitorBridge?.dispose()
+        super.cleanUpFlutterEngine(flutterEngine)
     }
 
     override fun onRequestPermissionsResult(

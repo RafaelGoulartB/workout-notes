@@ -30,6 +30,7 @@ class SleepMonitorBridge(private val context: Context) :
     }
 
     private var activity: Activity? = null
+    private var installedSink: ((Map<String, Any?>) -> Unit)? = null
     private val pendingPermission = AtomicReference<MethodChannel.Result?>(null)
     private val pendingScan = AtomicReference<MethodChannel.Result?>(null)
     private val spool by lazy { SleepSessionSpool(context.applicationContext) }
@@ -49,8 +50,24 @@ class SleepMonitorBridge(private val context: Context) :
         }
     }
 
-    fun attachActivity(value: Activity) { activity = value }
-    fun detachActivity() { activity = null }
+    fun setUiVisible(visible: Boolean) {
+        SleepMonitoringService.setUiVisible(this, visible)
+    }
+
+    fun attachActivity(value: Activity) {
+        activity = value
+    }
+
+    fun detachActivity() {
+        activity = null
+    }
+
+    fun dispose() {
+        activity = null
+        SleepMonitoringService.setUiVisible(this, false)
+        SleepMonitoringService.clearEventSink(installedSink)
+        installedSink = null
+    }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
@@ -422,13 +439,16 @@ class SleepMonitorBridge(private val context: Context) :
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
         val mainHandler = Handler(Looper.getMainLooper())
-        SleepMonitoringService.eventSink = { event ->
+        val sink: (Map<String, Any?>) -> Unit = { event ->
             mainHandler.post { events?.success(event) }
         }
+        installedSink = sink
+        SleepMonitoringService.eventSink = sink
         events?.success(SleepMonitoringService.currentState(context))
     }
 
     override fun onCancel(arguments: Any?) {
-        SleepMonitoringService.eventSink = null
+        SleepMonitoringService.clearEventSink(installedSink)
+        installedSink = null
     }
 }
